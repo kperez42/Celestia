@@ -2,7 +2,7 @@
 //  MatchesView.swift
 //  Celestia
 //
-//  View showing actual matches and received interests
+//  Enhanced matches view with test dummies
 //
 
 import SwiftUI
@@ -16,10 +16,14 @@ struct MatchesView: View {
     @State private var matchedUsers: [String: User] = [:]
     @State private var selectedTab = 0
     
+    // For testing
+    @State private var useTestData = true // Set to false when using real data
+    @State private var testMatches: [(Match, User)] = []
+    
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Custom tab picker
+                // Custom tab picker with gradient
                 Picker("", selection: $selectedTab) {
                     Text("Matches").tag(0)
                     Text("Interests").tag(1)
@@ -36,12 +40,46 @@ struct MatchesView: View {
             .navigationTitle("Matches")
             .navigationBarTitleDisplayMode(.inline)
             .task {
-                await loadData()
+                if useTestData {
+                    loadTestData()
+                } else {
+                    await loadData()
+                }
             }
         }
     }
     
     private var matchesTab: some View {
+        Group {
+            if useTestData {
+                testMatchesView
+            } else {
+                realMatchesView
+            }
+        }
+    }
+    
+    private var testMatchesView: some View {
+        Group {
+            if testMatches.isEmpty {
+                emptyMatchesView
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 15) {
+                        ForEach(testMatches, id: \.0.id) { match, user in
+                            NavigationLink(destination: ChatView(match: match, otherUser: user)) {
+                                MatchCardView(match: match, user: user)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                    }
+                    .padding()
+                }
+            }
+        }
+    }
+    
+    private var realMatchesView: some View {
         Group {
             if matchService.isLoading && matchService.matches.isEmpty {
                 ProgressView()
@@ -117,6 +155,69 @@ struct MatchesView: View {
     private func getOtherUserId(match: Match) -> String? {
         guard let currentUserId = authService.currentUser?.id else { return nil }
         return match.user1Id == currentUserId ? match.user2Id : match.user1Id
+    }
+    
+    // MARK: - Test Data
+    private func loadTestData() {
+        let testUsers = [
+            User(
+                id: "test1",
+                email: "sofia@test.com",
+                fullName: "Sofia Martinez",
+                age: 24,
+                gender: "Female",
+                lookingFor: "Male",
+                bio: "Adventure seeker 🌍",
+                location: "Barcelona",
+                country: "Spain",
+                languages: ["Spanish", "English"],
+                interests: ["Travel", "Cooking"],
+                profileImageURL: "",
+                isVerified: true
+            ),
+            User(
+                id: "test2",
+                email: "yuki@test.com",
+                fullName: "Yuki Tanaka",
+                age: 26,
+                gender: "Female",
+                lookingFor: "Everyone",
+                bio: "Anime lover 🎌 | Digital artist",
+                location: "Tokyo",
+                country: "Japan",
+                languages: ["Japanese", "English"],
+                interests: ["Art", "Anime"],
+                profileImageURL: "",
+                isVerified: true
+            ),
+            User(
+                id: "test3",
+                email: "emma@test.com",
+                fullName: "Emma Dubois",
+                age: 25,
+                gender: "Female",
+                lookingFor: "Male",
+                bio: "Fashion designer ✨",
+                location: "Paris",
+                country: "France",
+                languages: ["French", "English"],
+                interests: ["Fashion", "Art"],
+                profileImageURL: "",
+                isVerified: false
+            )
+        ]
+        
+        testMatches = testUsers.enumerated().map { index, user in
+            let match = Match(
+                id: "match\(index + 1)",
+                user1Id: "currentUser",
+                user2Id: user.id ?? "",
+                timestamp: Date().addingTimeInterval(-Double(index) * 86400), // Days ago
+                lastMessageTimestamp: index == 0 ? Date().addingTimeInterval(-3600) : nil, // 1 hour ago for first match
+                lastMessage: index == 0 ? "Hey! How are you?" : nil
+            )
+            return (match, user)
+        }
     }
 }
 

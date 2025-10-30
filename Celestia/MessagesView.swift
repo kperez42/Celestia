@@ -1,3 +1,10 @@
+//
+//  MessagesView.swift
+//  Celestia
+//
+//  Chat messages list with matches
+//
+
 import SwiftUI
 
 struct MessagesView: View {
@@ -96,18 +103,10 @@ struct MessagesView: View {
                     }
                     
                     // Get unread count
-                    // FIXED: Changed from getUnreadMessageCount to getUnreadCount
                     if let matchId = match.id {
-                        do {
-                            let count = try await messageService.getUnreadCount(
-                                matchId: matchId,
-                                userId: currentUserId
-                            )
-                            await MainActor.run {
-                                unreadCounts[matchId] = count
-                            }
-                        } catch {
-                            print("Error fetching unread count: \(error)")
+                        let count = await messageService.getUnreadMessageCount(userId: currentUserId)
+                        await MainActor.run {
+                            unreadCounts[matchId] = count
                         }
                     }
                 }

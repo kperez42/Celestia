@@ -58,8 +58,8 @@ struct ProfileView: View {
                                             )
                                             .frame(width: 120, height: 120)
                                             .overlay {
-                                                Text(user.fullName.prefix(1).uppercased())
-                                                    .font(.system(size: 50, weight: .bold))
+                                                Image(systemName: "person.fill")
+                                                    .font(.system(size: 50))
                                                     .foregroundColor(.white)
                                             }
                                             .overlay {
@@ -186,7 +186,7 @@ struct ProfileView: View {
                             .padding(.horizontal)
                         }
                         
-                        // Languages section
+                        // Languages
                         if !user.languages.isEmpty {
                             VStack(alignment: .leading, spacing: 12) {
                                 Label("Languages", systemImage: "globe")
@@ -199,15 +199,27 @@ struct ProfileView: View {
                                         )
                                     )
                                 
-                                FlowLayout2(spacing: 8) {
+                                FlowLayout(spacing: 8) {
                                     ForEach(user.languages, id: \.self) { language in
                                         Text(language)
-                                            .font(.subheadline)
+                                            .font(.caption)
                                             .padding(.horizontal, 12)
                                             .padding(.vertical, 6)
-                                            .background(Color.purple.opacity(0.1))
-                                            .foregroundColor(.purple)
-                                            .cornerRadius(20)
+                                            .background(
+                                                LinearGradient(
+                                                    colors: [Color.purple.opacity(0.1), Color.blue.opacity(0.1)],
+                                                    startPoint: .leading,
+                                                    endPoint: .trailing
+                                                )
+                                            )
+                                            .foregroundStyle(
+                                                LinearGradient(
+                                                    colors: [Color.purple, Color.blue],
+                                                    startPoint: .leading,
+                                                    endPoint: .trailing
+                                                )
+                                            )
+                                            .cornerRadius(15)
                                     }
                                 }
                             }
@@ -219,7 +231,7 @@ struct ProfileView: View {
                             .padding(.horizontal)
                         }
                         
-                        // Interests section
+                        // Interests
                         if !user.interests.isEmpty {
                             VStack(alignment: .leading, spacing: 12) {
                                 Label("Interests", systemImage: "star.fill")
@@ -232,15 +244,27 @@ struct ProfileView: View {
                                         )
                                     )
                                 
-                                FlowLayout2(spacing: 8) {
+                                FlowLayout(spacing: 8) {
                                     ForEach(user.interests, id: \.self) { interest in
                                         Text(interest)
-                                            .font(.subheadline)
+                                            .font(.caption)
                                             .padding(.horizontal, 12)
                                             .padding(.vertical, 6)
-                                            .background(Color.blue.opacity(0.1))
-                                            .foregroundColor(.blue)
-                                            .cornerRadius(20)
+                                            .background(
+                                                LinearGradient(
+                                                    colors: [Color.purple.opacity(0.1), Color.blue.opacity(0.1)],
+                                                    startPoint: .leading,
+                                                    endPoint: .trailing
+                                                )
+                                            )
+                                            .foregroundStyle(
+                                                LinearGradient(
+                                                    colors: [Color.purple, Color.blue],
+                                                    startPoint: .leading,
+                                                    endPoint: .trailing
+                                                )
+                                            )
+                                            .cornerRadius(15)
                                     }
                                 }
                             }
@@ -252,45 +276,35 @@ struct ProfileView: View {
                             .padding(.horizontal)
                         }
                         
-                        // Preferences section
-                        VStack(alignment: .leading, spacing: 12) {
-                            Label("Discovery Preferences", systemImage: "slider.horizontal.3")
-                                .font(.headline)
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [Color.purple, Color.blue],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                            
-                            VStack(spacing: 12) {
-                                PreferenceRow(icon: "heart.fill", title: "Looking for", value: user.lookingFor)
-                                Divider()
-                                PreferenceRow(icon: "person.2.fill", title: "Age range", value: "\(user.ageRangeMin)-\(user.ageRangeMax)")
-                                Divider()
-                                PreferenceRow(icon: "location.fill", title: "Max distance", value: "\(user.maxDistance) km")
+                        // Preferences Card
+                        VStack(spacing: 15) {
+                            HStack {
+                                Label("Preferences", systemImage: "slider.horizontal.3")
+                                    .font(.headline)
+                                Spacer()
                             }
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [Color.purple, Color.blue],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            
+                            PreferenceRow(icon: "heart.fill", title: "Looking for", value: user.lookingFor)
+                            PreferenceRow(icon: "calendar", title: "Age Range", value: "\(user.ageRangeMin)-\(user.ageRangeMax)")
+                            PreferenceRow(icon: "location.circle", title: "Max Distance", value: "\(user.maxDistance) km")
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
                         .padding()
                         .background(Color.white)
                         .cornerRadius(15)
                         .shadow(color: .black.opacity(0.05), radius: 5)
                         .padding(.horizontal)
                         
-                        // Profile Stats
-                        HStack(spacing: 20) {
-                            StatBox(title: "Likes", value: "\(user.likesReceived)", icon: "heart.fill", color: .pink)
-                            StatBox(title: "Matches", value: "\(user.matchCount)", icon: "heart.circle.fill", color: .purple)
-                            StatBox(title: "Views", value: "\(user.profileViews)", icon: "eye.fill", color: .blue)
-                        }
-                        .padding(.horizontal)
-                        
-                        // Premium upgrade (if not premium)
+                        // Premium upgrade
                         if !user.isPremium {
                             Button {
-                                // TODO: Premium upgrade flow
+                                // TODO: Show premium upgrade
                             } label: {
                                 HStack(spacing: 15) {
                                     Image(systemName: "star.fill")
@@ -347,109 +361,18 @@ struct ProfileView: View {
                         .padding(.bottom, 30)
                     }
                     .padding(.top)
-                } else {
-                    // FIXED: Added loading/error state when user is nil
-                    VStack(spacing: 20) {
-                        if authService.isLoading {
-                            ProgressView()
-                                .scaleEffect(1.5)
-                            
-                            Text("Loading profile...")
-                                .font(.subheadline)
-                                .foregroundColor(.gray)
-                                .padding(.top, 10)
-                        } else {
-                            Image(systemName: "person.crop.circle.badge.exclamationmark")
-                                .font(.system(size: 60))
-                                .foregroundColor(.gray)
-                            
-                            Text("Unable to load profile")
-                                .font(.headline)
-                            
-                            Text("Please try signing out and back in")
-                                .font(.subheadline)
-                                .foregroundColor(.gray)
-                                .multilineTextAlignment(.center)
-                            
-                            Button {
-                                Task {
-                                    await authService.fetchUser()
-                                }
-                            } label: {
-                                Text("Retry")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 30)
-                                    .padding(.vertical, 12)
-                                    .background(
-                                        LinearGradient(
-                                            colors: [Color.purple, Color.blue],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                    )
-                                    .cornerRadius(10)
-                            }
-                            .padding(.top, 10)
-                            
-                            Button {
-                                authService.signOut()
-                            } label: {
-                                Text("Sign Out")
-                                    .font(.subheadline)
-                                    .foregroundColor(.red)
-                            }
-                            .padding(.top, 5)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(.top, 100)
                 }
             }
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showingEditProfile) {
-                EditProfileView()
+                ProfileEditView()
             }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
             }
-            .task {
-                // Attempt to load user if not already loaded
-                if authService.currentUser == nil && !authService.isLoading {
-                    await authService.fetchUser()
-                }
-            }
         }
-    }
-}
-
-struct StatBox: View {
-    let title: String
-    let value: String
-    let icon: String
-    let color: Color
-    
-    var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundColor(color)
-            
-            Text(value)
-                .font(.title3)
-                .fontWeight(.bold)
-            
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.gray)
-        }
-        .frame(maxWidth: .infinity)
-        .padding()
-        .background(Color.white)
-        .cornerRadius(15)
-        .shadow(color: .black.opacity(0.05), radius: 5)
     }
 }
 
@@ -509,60 +432,6 @@ struct SettingsButton: View {
             .background(Color.white)
             .cornerRadius(12)
             .shadow(color: .black.opacity(0.05), radius: 3)
-        }
-    }
-}
-
-// Simple FlowLayout for tags
-struct FlowLayout2: Layout {
-    var spacing: CGFloat = 8
-    
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let result = FlowResult(
-            in: proposal.replacingUnspecifiedDimensions().width,
-            subviews: subviews,
-            spacing: spacing
-        )
-        return result.size
-    }
-    
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let result = FlowResult(
-            in: bounds.width,
-            subviews: subviews,
-            spacing: spacing
-        )
-        for (index, subview) in subviews.enumerated() {
-            subview.place(at: CGPoint(x: bounds.minX + result.frames[index].minX,
-                                     y: bounds.minY + result.frames[index].minY),
-                         proposal: .unspecified)
-        }
-    }
-    
-    struct FlowResult {
-        var frames: [CGRect] = []
-        var size: CGSize = .zero
-        
-        init(in maxWidth: CGFloat, subviews: Subviews, spacing: CGFloat) {
-            var currentX: CGFloat = 0
-            var currentY: CGFloat = 0
-            var lineHeight: CGFloat = 0
-            
-            for subview in subviews {
-                let size = subview.sizeThatFits(.unspecified)
-                
-                if currentX + size.width > maxWidth && currentX > 0 {
-                    currentX = 0
-                    currentY += lineHeight + spacing
-                    lineHeight = 0
-                }
-                
-                frames.append(CGRect(x: currentX, y: currentY, width: size.width, height: size.height))
-                lineHeight = max(lineHeight, size.height)
-                currentX += size.width + spacing
-            }
-            
-            self.size = CGSize(width: maxWidth, height: currentY + lineHeight)
         }
     }
 }

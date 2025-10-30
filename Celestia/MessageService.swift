@@ -209,6 +209,20 @@ class MessageService: ObservableObject {
         return snapshot.documents.count
     }
     
+    /// Get total unread message count for a user across all matches
+    func getUnreadMessageCount(userId: String) async -> Int {
+        do {
+            let snapshot = try await db.collection("messages")
+                .whereField("receiverId", isEqualTo: userId)
+                .whereField("isRead", isEqualTo: false)
+                .getDocuments()
+            return snapshot.documents.count
+        } catch {
+            print("Error getting unread count: \(error)")
+            return 0
+        }
+    }
+    
     /// Delete all messages in a match
     func deleteAllMessages(matchId: String) async throws {
         let snapshot = try await db.collection("messages")

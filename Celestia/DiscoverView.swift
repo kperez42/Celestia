@@ -2,21 +2,30 @@
 //  DiscoverView.swift
 //  Celestia
 //
-//  Browse and discover other users with swipe cards
+//  Enhanced discovery view with swipe cards and test dummies
 //
 
 import SwiftUI
 
 struct DiscoverView: View {
     @EnvironmentObject var authService: AuthService
-    @StateObject private var viewModel = DiscoverViewModel()
     @StateObject private var userService = UserService.shared
     @StateObject private var interestService = InterestService.shared
     
     @State private var showingFilters = false
-    @State private var showingSendInterest = false
+    @State private var showingUserDetail = false
     @State private var selectedUser: User?
-    @State private var showSuccessMessage = false
+    @State private var showingSendInterest = false
+    @State private var showingMatchAlert = false
+    @State private var showingInterestSent = false
+    
+    // For testing - remove these when connecting to real Firebase
+    @State private var testUsers: [User] = []
+    @State private var useTestData = true // Set to false when using real data
+    
+    var displayUsers: [User] {
+        useTestData ? testUsers : userService.users
+    }
     
     var body: some View {
         NavigationStack {
@@ -30,33 +39,27 @@ struct DiscoverView: View {
                 .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    if userService.isLoading && userService.users.isEmpty {
-                        ProgressView()
-                            .scaleEffect(1.5)
-                            .padding()
-                    } else if userService.users.isEmpty {
+                    if displayUsers.isEmpty {
                         emptyStateView
                     } else {
                         // Card stack
                         ZStack {
-                            ForEach(Array(userService.users.prefix(3).enumerated()), id: \.element.id) { index, user in
-                                UserCardSwipeView(user: user, index: index) { action in
-                                    handleSwipeAction(user: user, action: action)
-                                }
-                                .zIndex(Double(userService.users.count - index))
+                            ForEach(Array(displayUsers.prefix(3).enumerated()), id: \.element.id) { index, user in
+                                UserCardSwipeView(user: user)
+                                    .offset(y: CGFloat(index * 8))
+                                    .scaleEffect(1.0 - CGFloat(index) * 0.05)
+                                    .zIndex(Double(displayUsers.count - index))
+                                    .opacity(index == 0 ? 1 : 0.8)
                             }
                         }
+                        .padding(.horizontal, 20)
                         .padding(.vertical, 20)
                         
                         // Action buttons
-                        HStack(spacing: 30) {
+                        HStack(spacing: 25) {
                             // Pass button
                             Button {
-                                if let firstUser = userService.users.first {
-                                    withAnimation(.spring()) {
-                                        userService.users.removeFirst()
-                                    }
-                                }
+                                handleSwipeAction(user: displayUsers.first!, action: .pass)
                             } label: {
                                 Image(systemName: "xmark")
                                     .font(.title2)
@@ -70,7 +73,7 @@ struct DiscoverView: View {
                             
                             // Send interest with message
                             Button {
-                                if let firstUser = userService.users.first {
+                                if let firstUser = displayUsers.first {
                                     selectedUser = firstUser
                                     showingSendInterest = true
                                 }
@@ -93,7 +96,7 @@ struct DiscoverView: View {
                             
                             // Like button
                             Button {
-                                if let firstUser = userService.users.first {
+                                if let firstUser = displayUsers.first {
                                     handleSwipeAction(user: firstUser, action: .like)
                                 }
                             } label: {
@@ -112,8 +115,14 @@ struct DiscoverView: View {
                                     .shadow(color: .purple.opacity(0.4), radius: 10)
                             }
                         }
-                        .padding(.bottom, 30)
+                        .padding(.bottom, 40)
                     }
+                }
+                
+                // Success banner
+                if showingInterestSent {
+                    successBanner
+                        .transition(.move(edge: .top).combined(with: .opacity))
                 }
             }
             .navigationTitle("Discover")
@@ -138,33 +147,25 @@ struct DiscoverView: View {
                 FilterView()
             }
             .sheet(item: $selectedUser) { user in
-                SendInterestView(user: user, showSuccess: $showSuccessMessage)
-            }
-            .overlay(alignment: .top) {
-                if showSuccessMessage {
-                    successBanner
-                        .transition(.move(edge: .top).combined(with: .opacity))
+                if showingSendInterest {
+                    SendInterestView(user: user, showSuccess: $showingInterestSent)
+                } else {
+                    UserDetailView(user: user)
                 }
             }
-            .task {
-                guard let currentUser = authService.currentUser else { return }
-                do {
-                    try await userService.fetchUsers(
-                        excludingUserId: currentUser.id ?? "",
-                        lookingFor: currentUser.lookingFor == "Everyone" ? nil : currentUser.lookingFor,
-                        ageRange: currentUser.ageRangeMin...currentUser.ageRangeMax
-                    )
-                } catch {
-                    print("Error loading users: \(error)")
+            .alert("It's a Match! 🎉", isPresented: $showingMatchAlert) {
+                Button("Send Message") {
+                    // Navigate to messages
                 }
+                Button("Keep Browsing", role: .cancel) { }
+            } message: {
+                Text("You both liked each other!")
             }
-            .onChange(of: showSuccessMessage) { newValue in
-                if newValue {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                        withAnimation {
-                            showSuccessMessage = false
-                        }
-                    }
+            .onAppear {
+                if useTestData {
+                    loadTestUsers()
+                } else {
+                    loadRealUsers()
                 }
             }
         }
@@ -182,13 +183,14 @@ struct DiscoverView: View {
                     )
                 )
             
-            Text("No users found")
+            Text("No more profiles")
                 .font(.title2)
                 .fontWeight(.semibold)
             
-            Text("Try adjusting your filters")
+            Text("Try adjusting your filters to see more people")
                 .font(.subheadline)
                 .foregroundColor(.gray)
+                .multilineTextAlignment(.center)
             
             Button {
                 showingFilters = true
@@ -210,6 +212,7 @@ struct DiscoverView: View {
             .padding(.top, 10)
         }
         .padding()
+        .padding(.top, 50)
     }
     
     private var successBanner: some View {
@@ -224,128 +227,286 @@ struct DiscoverView: View {
                     )
                 )
             
-            Text("Interest sent! 💫")
-                .font(.headline)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Interest Sent!")
+                    .font(.headline)
+                Text("We'll let you know if they're interested")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+            
+            Spacer()
         }
         .padding()
         .background(Color.white)
         .cornerRadius(15)
         .shadow(color: .black.opacity(0.1), radius: 10)
-        .padding(.top, 10)
+        .padding()
+        .frame(maxWidth: .infinity)
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                withAnimation {
+                    showingInterestSent = false
+                }
+            }
+        }
     }
     
     private func handleSwipeAction(user: User, action: SwipeAction) {
-        guard let currentUserId = authService.currentUser?.id else { return }
-        guard let userId = user.id else { return }
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            if useTestData {
+                testUsers.removeFirst()
+            } else {
+                userService.users.removeFirst()
+            }
+        }
         
-        switch action {
-        case .like:
+        if action == .like {
+            // Send interest
+            guard let currentUserId = authService.currentUser?.id,
+                  let targetUserId = user.id else { return }
+            
             Task {
                 do {
                     try await interestService.sendInterest(
                         fromUserId: currentUserId,
-                        toUserId: userId
+                        toUserId: targetUserId
                     )
                     
-                    await MainActor.run {
-                        withAnimation(.spring()) {
-                            if let index = userService.users.firstIndex(where: { $0.id == user.id }) {
-                                userService.users.remove(at: index)
-                            }
+                    // Check if it's a match
+                    if let match = try? await interestService.checkForMutualMatch(
+                        userId1: currentUserId,
+                        userId2: targetUserId
+                    ), match {
+                        await MainActor.run {
+                            showingMatchAlert = true
+                        }
+                    } else {
+                        await MainActor.run {
+                            showingInterestSent = true
                         }
                     }
                 } catch {
                     print("Error sending interest: \(error)")
                 }
             }
-        case .pass:
-            withAnimation(.spring()) {
-                if let index = userService.users.firstIndex(where: { $0.id == user.id }) {
-                    userService.users.remove(at: index)
-                }
+        }
+    }
+    
+    private func loadRealUsers() {
+        guard let currentUserId = authService.currentUser?.id else { return }
+        
+        Task {
+            do {
+                // Create proper age range from optional values
+                let minAge = authService.currentUser?.ageRangeMin ?? 18
+                let maxAge = authService.currentUser?.ageRangeMax ?? 99
+                let ageRange = minAge...maxAge
+                
+                try await userService.fetchUsers(
+                    excludingUserId: currentUserId,
+                    lookingFor: authService.currentUser?.lookingFor,
+                    ageRange: ageRange
+                )
+            } catch {
+                print("Error loading users: \(error)")
             }
         }
+    }
+    
+    // MARK: - Test Data
+    private func loadTestUsers() {
+        testUsers = [
+            User(
+                id: "test1",
+                email: "sofia@test.com",
+                fullName: "Sofia Martinez",
+                age: 24,
+                gender: "Female",
+                lookingFor: "Male",
+                bio: "Adventure seeker 🌍 | Love trying new cuisines | Fluent in Spanish & English | Looking for someone to explore the world with!",
+                location: "Barcelona",
+                country: "Spain",
+                languages: ["Spanish", "English", "Catalan"],
+                interests: ["Travel", "Cooking", "Yoga", "Photography"],
+                profileImageURL: "",
+                isVerified: true
+            ),
+            User(
+                id: "test2",
+                email: "liam@test.com",
+                fullName: "Liam O'Connor",
+                age: 27,
+                gender: "Male",
+                lookingFor: "Female",
+                bio: "Software engineer by day, guitarist by night 🎸 | Coffee enthusiast ☕️ | Love hiking and indie music",
+                location: "Dublin",
+                country: "Ireland",
+                languages: ["English", "Irish"],
+                interests: ["Music", "Hiking", "Technology", "Coffee"],
+                profileImageURL: "",
+                isVerified: false
+            ),
+            User(
+                id: "test3",
+                email: "yuki@test.com",
+                fullName: "Yuki Tanaka",
+                age: 26,
+                gender: "Female",
+                lookingFor: "Everyone",
+                bio: "Anime lover 🎌 | Digital artist | Foodie who loves ramen & sushi 🍜 | Let's explore Tokyo together!",
+                location: "Tokyo",
+                country: "Japan",
+                languages: ["Japanese", "English"],
+                interests: ["Art", "Anime", "Food", "Design"],
+                profileImageURL: "",
+                isVerified: true
+            ),
+            User(
+                id: "test4",
+                email: "marcus@test.com",
+                fullName: "Marcus Johnson",
+                age: 29,
+                gender: "Male",
+                lookingFor: "Female",
+                bio: "Personal trainer 💪 | Marathon runner | Plant-based lifestyle 🌱 | Looking for someone who shares my passion for fitness",
+                location: "Los Angeles",
+                country: "USA",
+                languages: ["English"],
+                interests: ["Fitness", "Running", "Nutrition", "Cooking"],
+                profileImageURL: "",
+                isVerified: true
+            ),
+            User(
+                id: "test5",
+                email: "emma@test.com",
+                fullName: "Emma Dubois",
+                age: 25,
+                gender: "Female",
+                lookingFor: "Male",
+                bio: "Fashion designer ✨ | Wine enthusiast 🍷 | Love art galleries and weekend getaways | Seeking someone cultured and fun",
+                location: "Paris",
+                country: "France",
+                languages: ["French", "English", "Italian"],
+                interests: ["Fashion", "Art", "Wine", "Travel"],
+                profileImageURL: "",
+                isVerified: false
+            )
+        ]
     }
 }
 
 // MARK: - User Card Swipe View
 struct UserCardSwipeView: View {
     let user: User
-    let index: Int
-    let onSwipe: (SwipeAction) -> Void
-    
-    @State private var offset = CGSize.zero
+    @State private var offset: CGSize = .zero
     @State private var rotation: Double = 0
     
     var body: some View {
-        NavigationLink(destination: UserDetailView(user: user)) {
-            ZStack(alignment: .topLeading) {
-                // Card background
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.white)
-                    .shadow(color: .black.opacity(0.15), radius: 10)
-                
-                VStack(spacing: 0) {
-                    // Profile image
-                    ZStack(alignment: .topTrailing) {
-                        if let imageURL = URL(string: user.profileImageURL), !user.profileImageURL.isEmpty {
-                            AsyncImage(url: imageURL) { image in
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                            } placeholder: {
-                                Rectangle()
-                                    .fill(Color.gray.opacity(0.3))
-                            }
-                        } else {
+        ZStack(alignment: .bottom) {
+            // Card content
+            VStack(spacing: 0) {
+                // Image
+                ZStack(alignment: .topTrailing) {
+                    if !user.profileImageURL.isEmpty, let imageURL = URL(string: user.profileImageURL) {
+                        AsyncImage(url: imageURL) { image in
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        } placeholder: {
                             Rectangle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [Color.purple.opacity(0.6), Color.blue.opacity(0.6)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
+                                .fill(Color.gray.opacity(0.3))
+                        }
+                        .frame(height: 450)
+                        .clipped()
+                    } else {
+                        Rectangle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.purple.opacity(0.6), Color.blue.opacity(0.6)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
                                 )
-                                .overlay {
-                                    Image(systemName: "person.fill")
-                                        .font(.system(size: 80))
-                                        .foregroundColor(.white.opacity(0.7))
-                                }
+                            )
+                            .overlay {
+                                Image(systemName: "person.fill")
+                                    .font(.system(size: 80))
+                                    .foregroundColor(.white.opacity(0.7))
+                            }
+                            .frame(height: 450)
+                    }
+                    
+                    // Verified badge
+                    if user.isVerified {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.title2)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [Color.purple, Color.blue],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .padding(12)
+                    }
+                }
+                
+                // Info section
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 8) {
+                                Text(user.fullName)
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                
+                                Text("\(user.age)")
+                                    .font(.title3)
+                                    .foregroundColor(.gray)
+                            }
+                            
+                            HStack(spacing: 4) {
+                                Image(systemName: "mappin.circle.fill")
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [Color.purple, Color.blue],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                Text("\(user.location), \(user.country)")
+                                    .foregroundColor(.gray)
+                            }
+                            .font(.subheadline)
                         }
                         
-                        // Verified badge
-                        if user.isVerified {
-                            Image(systemName: "checkmark.seal.fill")
-                                .font(.title2)
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [Color.purple, Color.blue],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                                .padding(12)
-                        }
+                        Spacer()
                     }
-                    .frame(height: 450)
-                    .clipped()
                     
-                    // User info
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack(alignment: .top) {
-                            VStack(alignment: .leading, spacing: 5) {
-                                HStack(spacing: 8) {
-                                    Text(user.fullName)
-                                        .font(.title2)
-                                        .fontWeight(.bold)
-                                    
-                                    Text("\(user.age)")
-                                        .font(.title3)
-                                        .foregroundColor(.gray)
-                                }
-                                
-                                HStack(spacing: 4) {
-                                    Image(systemName: "mappin.circle.fill")
+                    // Bio
+                    if !user.bio.isEmpty {
+                        Text(user.bio)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .lineLimit(3)
+                    }
+                    
+                    // Tags
+                    if !user.interests.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(user.interests.prefix(3), id: \.self) { interest in
+                                    Text(interest)
+                                        .font(.caption)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(
+                                            LinearGradient(
+                                                colors: [Color.purple.opacity(0.1), Color.blue.opacity(0.1)],
+                                                startPoint: .leading,
+                                                endPoint: .trailing
+                                            )
+                                        )
                                         .foregroundStyle(
                                             LinearGradient(
                                                 colors: [Color.purple, Color.blue],
@@ -353,124 +514,40 @@ struct UserCardSwipeView: View {
                                                 endPoint: .trailing
                                             )
                                         )
-                                    Text("\(user.location), \(user.country)")
-                                        .foregroundColor(.gray)
-                                }
-                                .font(.subheadline)
-                            }
-                            
-                            Spacer()
-                        }
-                        
-                        if !user.bio.isEmpty {
-                            Text(user.bio)
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                                .lineLimit(2)
-                        }
-                        
-                        // Tags
-                        if !user.interests.isEmpty {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 8) {
-                                    ForEach(user.interests.prefix(3), id: \.self) { interest in
-                                        Text(interest)
-                                            .font(.caption)
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 6)
-                                            .background(
-                                                LinearGradient(
-                                                    colors: [Color.purple.opacity(0.1), Color.blue.opacity(0.1)],
-                                                    startPoint: .leading,
-                                                    endPoint: .trailing
-                                                )
-                                            )
-                                            .foregroundStyle(
-                                                LinearGradient(
-                                                    colors: [Color.purple, Color.blue],
-                                                    startPoint: .leading,
-                                                    endPoint: .trailing
-                                                )
-                                            )
-                                            .cornerRadius(15)
-                                    }
+                                        .cornerRadius(15)
                                 }
                             }
                         }
                     }
-                    .padding(20)
                 }
-                
-                // Swipe indicators
-                if offset.width > 50 {
-                    Text("LIKE")
-                        .font(.title)
-                        .fontWeight(.bold)
-                        .foregroundColor(.green)
-                        .padding()
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(.green, lineWidth: 3)
-                        }
-                        .rotationEffect(.degrees(-20))
-                        .padding(30)
-                } else if offset.width < -50 {
-                    Text("PASS")
-                        .font(.title)
-                        .fontWeight(.bold)
-                        .foregroundColor(.red)
-                        .padding()
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(.red, lineWidth: 3)
-                        }
-                        .rotationEffect(.degrees(20))
-                        .padding(30)
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                }
+                .padding(20)
+                .background(Color.white)
             }
+            .background(Color.white)
             .cornerRadius(20)
-            .offset(x: offset.width, y: offset.height * 0.4)
-            .rotationEffect(.degrees(rotation))
-            .scaleEffect(index == 0 ? 1.0 : 0.95 - Double(index) * 0.05)
-            .opacity(index == 0 ? 1.0 : 0.7)
-            .gesture(
-                index == 0 ?
-                DragGesture()
-                    .onChanged { gesture in
-                        offset = gesture.translation
-                        rotation = Double(gesture.translation.width / 20)
-                    }
-                    .onEnded { gesture in
-                        if abs(gesture.translation.width) > 100 {
-                            let direction: SwipeAction = gesture.translation.width > 0 ? .like : .pass
-                            withAnimation(.spring()) {
-                                offset = CGSize(width: gesture.translation.width > 0 ? 500 : -500, height: 0)
-                            }
-                            
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                onSwipe(direction)
-                                offset = .zero
-                                rotation = 0
-                            }
-                        } else {
-                            withAnimation(.spring()) {
-                                offset = .zero
-                                rotation = 0
-                            }
-                        }
-                    }
-                : nil
-            )
+            .shadow(color: .black.opacity(0.1), radius: 10)
         }
-        .buttonStyle(PlainButtonStyle())
-        .frame(height: 600)
-        .padding(.horizontal)
+        .offset(offset)
+        .rotationEffect(.degrees(rotation))
+        .gesture(
+            DragGesture()
+                .onChanged { gesture in
+                    offset = gesture.translation
+                    rotation = Double(gesture.translation.width / 20)
+                }
+                .onEnded { _ in
+                    withAnimation(.spring()) {
+                        offset = .zero
+                        rotation = 0
+                    }
+                }
+        )
     }
 }
 
 enum SwipeAction {
-    case like, pass
+    case like
+    case pass
 }
 
 #Preview {
