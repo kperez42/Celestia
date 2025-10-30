@@ -1,0 +1,287 @@
+//
+//  AuthService.swift
+//  Celestia
+//
+//  Created by Kevin Perez on 10/29/25.
+//
+
+import Foundation
+import Firebase
+import FirebaseAuth
+import FirebaseFirestore
+
+class AuthService: ObservableObject {
+    @Published var userSession: FirebaseAuth.User?
+    @Published var currentUser: User?
+    @Published var isLoading = false
+    @Published var errorMessage: String?
+    
+    static let shared = AuthService()
+    
+    private init() {
+        self.userSession = Auth.auth().currentUser
+        print("🔵 AuthService initialized")
+        print("🔵 Current user session: \(Auth.auth().currentUser?.uid ?? "none")")
+        Task {
+            await fetchUser()
+        }
+    }
+    
+    @MainActor
+    func signIn(withEmail email: String, password: String) async throws {
+        isLoading = true
+        errorMessage = nil
+        
+        print("🔵 Attempting sign in with email: \(email)")
+        
+        do {
+            let result = try await Auth.auth().signIn(withEmail: email, password: password)
+            self.userSession = result.user
+            print("✅ Sign in successful: \(result.user.uid)")
+            
+            await fetchUser()
+            
+            if currentUser != nil {
+                print("✅ User data fetched successfully")
+            } else {
+                print("⚠️ User session exists but no user data in Firestore")
+            }
+            
+            isLoading = false
+        } catch let error as NSError {
+            isLoading = false
+            
+            print("❌ Sign in error:")
+            print("  - Domain: \(error.domain)")
+            print("  - Code: \(error.code)")
+            print("  - Description: \(error.localizedDescription)")
+            
+            // User-friendly error messages
+            if error.domain == "FIRAuthErrorDomain" {
+                switch error.code {
+                case 17008: // Invalid email
+                    errorMessage = "Please enter a valid email address."
+                case 17009: // Wrong password
+                    errorMessage = "Incorrect password. Please try again."
+                case 17011: // User not found
+                    errorMessage = "No account found with this email."
+                case 17010: // User disabled
+                    errorMessage = "This account has been disabled."
+                default:
+                    errorMessage = "Login failed: \(error.localizedDescription)"
+                }
+            } else {
+                errorMessage = error.localizedDescription
+            }
+            
+            throw error
+        }
+    }
+    
+    @MainActor
+    func createUser(withEmail email: String, password: String, fullName: String, age: Int, gender: String, lookingFor: String, location: String, country: String) async throws {
+        isLoading = true
+        errorMessage = nil
+        
+        print("🔵 Creating user with email: \(email)")
+        
+        do {
+            // Step 1: Create Firebase Auth user
+            let result = try await Auth.auth().createUser(withEmail: email, password: password)
+            self.userSession = result.user
+            print("✅ Firebase Auth user created: \(result.user.uid)")
+            
+            // Step 2: Create User object with all required fields
+            let user = User(
+                id: result.user.uid,
+                email: email,
+                fullName: fullName,
+                age: age,
+                gender: gender,
+                lookingFor: lookingFor,
+                bio: "",
+                location: location,
+                country: country,
+                languages: [],
+                interests: [],
+                photos: [],
+                profileImageURL: "",
+                timestamp: Date(),
+                isPremium: false,
+                lastActive: Date(),
+                ageRangeMin: 18,
+                ageRangeMax: 99,
+                maxDistance: 100
+            )
+            
+            print("🔵 Attempting to save user to Firestore...")
+            
+            // Step 3: Save to Firestore
+            let encodedUser = try Firestore.Encoder().encode(user)
+            try await Firestore.firestore().collection("users").document(user.id!).setData(encodedUser)
+            
+            print("✅ User saved to Firestore successfully")
+            
+            // Step 4: Fetch user data
+            await fetchUser()
+            isLoading = false
+            
+            print("✅ Account creation completed")
+        } catch let error as NSError {
+            isLoading = false
+            
+            // Detailed error logging
+            print("❌ Error creating user:")
+            print("  - Domain: \(error.domain)")
+            print("  - Code: \(error.code)")
+            print("  - Description: \(error.localizedDescription)")
+            print("  - User Info: \(error.userInfo)")
+            
+            // User-friendly error messages
+            if error.domain == "FIRAuthErrorDomain" {
+                switch error.code {
+                case 17007: // Email already in use
+                    errorMessage = "This email is already registered. Please sign in instead."
+                case 17008: // Invalid email
+                    errorMessage = "Please enter a valid email address."
+                case 17026: // Weak password
+                    errorMessage = "Password should be at least 6 characters."
+                default:
+                    errorMessage = "Authentication error: \(error.localizedDescription)"
+                }
+            } else if error.domain == "FIRFirestoreErrorDomain" {
+                errorMessage = "Error saving user data. Please check your internet connection."
+            } else {
+                errorMessage = error.localizedDescription
+            }
+            
+            throw error
+        }
+    }
+    
+    @MainActor
+    func signOut() {
+        do {
+            try Auth.auth().signOut()
+            self.userSession = nil
+            self.currentUser = nil
+            print("✅ User signed out")
+        } catch {
+            print("❌ Error signing out: \(error.localizedDescription)")
+        }
+    }
+    
+    @MainActor
+    func fetchUser() async {
+        guard let uid = Auth.auth().currentUser?.uid else { 
+            print("⚠️ No current user to fetch")
+            return 
+        }
+        
+        print("🔵 Fetching user data for: \(uid)")
+        
+        do {
+            let snapshot = try await Firestore.firestore().collection("users").document(uid).getDocument()
+            
+            if snapshot.exists {
+                // FIXED: Try both decoding methods
+                if let data = snapshot.data() {
+                    print("📄 Raw Firestore data keys: \(data.keys.joined(separator: ", "))")
+                    
+                    // Try using the dictionary initializer first (more forgiving)
+                    self.currentUser = User(dictionary: data)
+                    
+                    if let user = currentUser {
+                        print("✅ User data fetched successfully")
+                        print("  - Name: \(user.fullName)")
+                        print("  - Email: \(user.email)")
+                        print("  - Location: \(user.location)")
+                    }
+                } else {
+                    print("⚠️ Document exists but has no data")
+                    // Create a minimal user document
+                    await createMissingUserDocument(uid: uid)
+                }
+            } else {
+                print("⚠️ User document does not exist in Firestore for uid: \(uid)")
+                // Create the missing user document
+                await createMissingUserDocument(uid: uid)
+            }
+        } catch {
+            print("❌ Error fetching user: \(error.localizedDescription)")
+            print("Full error: \(error)")
+        }
+    }
+    
+    @MainActor
+    private func createMissingUserDocument(uid: String) async {
+        print("🔧 Creating missing user document for uid: \(uid)")
+        
+        guard let firebaseUser = Auth.auth().currentUser else {
+            print("❌ Cannot create document - no Firebase auth user")
+            return
+        }
+        
+        // Create a minimal user document with defaults
+        let user = User(
+            id: uid,
+            email: firebaseUser.email ?? "unknown@email.com",
+            fullName: firebaseUser.displayName ?? "User",
+            age: 18,
+            gender: "Other",
+            lookingFor: "Everyone",
+            bio: "",
+            location: "Unknown",
+            country: "Unknown",
+            languages: [],
+            interests: [],
+            photos: [],
+            profileImageURL: "",
+            timestamp: Date(),
+            isPremium: false,
+            lastActive: Date(),
+            ageRangeMin: 18,
+            ageRangeMax: 99,
+            maxDistance: 100
+        )
+        
+        do {
+            let encodedUser = try Firestore.Encoder().encode(user)
+            try await Firestore.firestore().collection("users").document(uid).setData(encodedUser)
+            print("✅ Missing user document created successfully")
+            
+            // Now fetch it
+            await fetchUser()
+        } catch {
+            print("❌ Error creating missing user document: \(error)")
+        }
+    }
+    
+    @MainActor
+    func updateUser(_ user: User) async throws {
+        guard let uid = user.id else { return }
+        let encodedUser = try Firestore.Encoder().encode(user)
+        try await Firestore.firestore().collection("users").document(uid).setData(encodedUser, merge: true)
+        self.currentUser = user
+        print("✅ User updated successfully")
+    }
+    
+    @MainActor
+    func deleteAccount() async throws {
+        guard let user = Auth.auth().currentUser else { return }
+        guard let uid = user.uid as String? else { return }
+        
+        print("🔵 Deleting account: \(uid)")
+        
+        // Delete user data from Firestore
+        try await Firestore.firestore().collection("users").document(uid).delete()
+        
+        // Delete auth account
+        try await user.delete()
+        
+        self.userSession = nil
+        self.currentUser = nil
+        
+        print("✅ Account deleted successfully")
+    }
+}

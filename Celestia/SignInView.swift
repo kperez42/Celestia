@@ -1,0 +1,154 @@
+//
+//  SignInView.swift
+//  Celestia
+//
+//  Sign in screen
+//
+
+import SwiftUI
+
+struct SignInView: View {
+    @StateObject private var authViewModel = AuthViewModel()
+    @Environment(\.dismiss) var dismiss
+    
+    @State private var email = ""
+    @State private var password = ""
+    @State private var showPassword = false
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                Color(.systemGroupedBackground)
+                    .ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(spacing: 25) {
+                        // Header
+                        VStack(spacing: 10) {
+                            Image(systemName: "star.circle.fill")
+                                .font(.system(size: 60))
+                                .foregroundColor(.purple)
+                            
+                            Text("Welcome Back")
+                                .font(.title.bold())
+                            
+                            Text("Sign in to continue")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.top, 30)
+                        
+                        // Form
+                        VStack(spacing: 20) {
+                            // Email
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Email")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                
+                                TextField("Enter your email", text: $email)
+                                    .textInputAutocapitalization(.never)
+                                    .keyboardType(.emailAddress)
+                                    .padding()
+                                    .background(Color(.systemBackground))
+                                    .cornerRadius(10)
+                            }
+                            
+                            // Password
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Password")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                
+                                HStack {
+                                    if showPassword {
+                                        TextField("Enter your password", text: $password)
+                                    } else {
+                                        SecureField("Enter your password", text: $password)
+                                    }
+                                    
+                                    Button {
+                                        showPassword.toggle()
+                                    } label: {
+                                        Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                                .padding()
+                                .background(Color(.systemBackground))
+                                .cornerRadius(10)
+                            }
+                            
+                            // Error message
+                            if !authViewModel.errorMessage.isEmpty {
+                                Text(authViewModel.errorMessage)
+                                    .font(.caption)
+                                    .foregroundColor(.red)
+                                    .padding(.horizontal)
+                            }
+                            
+                            // Sign In Button
+                            Button {
+                                authViewModel.signIn(email: email, password: password)
+                            } label: {
+                                if authViewModel.isLoading {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        .frame(maxWidth: .infinity)
+                                        .padding()
+                                } else {
+                                    Text("Sign In")
+                                        .font(.headline)
+                                        .foregroundColor(.white)
+                                        .frame(maxWidth: .infinity)
+                                        .padding()
+                                }
+                            }
+                            .background(
+                                LinearGradient(
+                                    colors: [Color.purple, Color.blue],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(15)
+                            .disabled(email.isEmpty || password.isEmpty || authViewModel.isLoading)
+                            
+                            // Forgot Password
+                            Button {
+                                // TODO: Implement forgot password
+                            } label: {
+                                Text("Forgot Password?")
+                                    .font(.subheadline)
+                                    .foregroundColor(.purple)
+                            }
+                        }
+                        .padding(.horizontal, 30)
+                        
+                        Spacer()
+                    }
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .foregroundColor(.primary)
+                    }
+                }
+            }
+        }
+        .onChange(of: authViewModel.isAuthenticated) { isAuth in
+            if isAuth {
+                dismiss()
+            }
+        }
+    }
+}
+
+#Preview {
+    SignInView()
+}
