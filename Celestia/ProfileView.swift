@@ -11,6 +11,7 @@ struct ProfileView: View {
     @EnvironmentObject var authService: AuthService
     @State private var showingEditProfile = false
     @State private var showingSettings = false
+    @State private var showingPremiumUpgrade = false
     @State private var selectedPhoto = 0
     
     var body: some View {
@@ -70,6 +71,9 @@ struct ProfileView: View {
             }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
+            }
+            .fullScreenCover(isPresented: $showingPremiumUpgrade) {
+                PremiumUpgradeView()
             }
         }
     }
@@ -503,7 +507,7 @@ struct ProfileView: View {
     
     private var premiumCard: some View {
         Button {
-            // TODO: Show premium upgrade
+            showingPremiumUpgrade = true
         } label: {
             HStack(spacing: 16) {
                 ZStack {
