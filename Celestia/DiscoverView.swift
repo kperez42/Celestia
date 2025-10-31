@@ -109,7 +109,7 @@ struct DiscoverView: View {
                             }
                             .buttonStyle(ScaleButtonStyle())
                         }
-                        .padding(.bottom, 40)
+                        .padding(.bottom, 100)
                     }
                 }
                 
@@ -399,7 +399,6 @@ struct UserCardSwipeView: View {
     @State private var offset: CGSize = .zero
     @State private var rotation: Double = 0
     @State private var isDragging = false
-    
     private let swipeThreshold: CGFloat = 100
     
     var body: some View {
