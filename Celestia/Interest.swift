@@ -2,7 +2,7 @@
 //  Interest.swift
 //  Celestia
 //
-//  Created by Kevin Perez on 10/29/25.
+//  Model for tracking user interests/likes
 //
 
 import Foundation
@@ -12,21 +12,23 @@ struct Interest: Identifiable, Codable {
     @DocumentID var id: String?
     var fromUserId: String
     var toUserId: String
+    var message: String?
     var timestamp: Date
     var isAccepted: Bool?
-    var message: String? // Optional initial message
     
-    init(id: String? = nil,
-         fromUserId: String,
-         toUserId: String,
-         timestamp: Date = Date(),
-         isAccepted: Bool? = nil,
-         message: String? = nil) {
+    init(
+        id: String? = nil,
+        fromUserId: String,
+        toUserId: String,
+        message: String? = nil,
+        timestamp: Date = Date(),
+        isAccepted: Bool? = nil
+    ) {
         self.id = id
         self.fromUserId = fromUserId
         self.toUserId = toUserId
+        self.message = message
         self.timestamp = timestamp
         self.isAccepted = isAccepted
-        self.message = message
     }
 }
