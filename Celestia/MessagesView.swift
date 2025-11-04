@@ -1,8 +1,8 @@
 //
-//  MessagesView.swift
+//  MessagesView.swift - FIXED VERSION
 //  Celestia
 //
-//  Enhanced messages list with modern design
+//  ⚠️ CRITICAL FIX: Removed test data mode
 //
 
 import SwiftUI
@@ -17,9 +17,7 @@ struct MessagesView: View {
     @State private var unreadCounts: [String: Int] = [:]
     @State private var searchText = ""
     
-    // Test mode toggle
-    @State private var useTestData = true // Set to false for real data
-    @State private var testConversations: [(Match, User)] = []
+    // ✅ FIXED: Removed test data mode - now uses real data only
     
     var body: some View {
         NavigationStack {
@@ -50,18 +48,14 @@ struct MessagesView: View {
             .navigationTitle("")
             .navigationBarHidden(true)
             .task {
-                if useTestData {
-                    loadTestData()
-                } else {
-                    await loadData()
-                }
+                await loadData()
             }
             .refreshable {
-                if useTestData {
-                    loadTestData()
-                } else {
-                    await loadData()
-                }
+                await loadData()
+            }
+            .onDisappear {
+                // ✅ FIXED: Properly clean up listeners
+                matchService.stopListening()
             }
         }
     }
@@ -169,17 +163,14 @@ struct MessagesView: View {
         }
     }
     
+    // ✅ FIXED: Only real data from matchService
     private var conversations: [(Match, User)] {
-        if useTestData {
-            return testConversations
-        } else {
-            return matchService.matches.compactMap { match in
-                guard let otherUserId = getOtherUserId(match: match),
-                      let user = matchedUsers[otherUserId] else {
-                    return nil
-                }
-                return (match, user)
+        return matchService.matches.compactMap { match in
+            guard let otherUserId = getOtherUserId(match: match),
+                  let user = matchedUsers[otherUserId] else {
+                return nil
             }
+            return (match, user)
         }
     }
     
@@ -198,7 +189,7 @@ struct MessagesView: View {
     }
     
     private var isLoading: Bool {
-        !useTestData && matchService.isLoading && matchService.matches.isEmpty
+        matchService.isLoading && matchService.matches.isEmpty
     }
     
     // MARK: - Empty State
@@ -239,75 +230,37 @@ struct MessagesView: View {
                     .lineSpacing(4)
             }
             
-            NavigationLink(destination: DiscoverView()) {
-                HStack(spacing: 8) {
-                    Image(systemName: "flame.fill")
-                    Text("Start Discovering")
-                }
-                .font(.headline)
-                .foregroundColor(.white)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 14)
-                .background(
-                    LinearGradient(
-                        colors: [Color.purple, Color.blue],
-                        startPoint: .leading,
-                        endPoint: .trailing
+            NavigationLink(destination: Text("Discover View")) {
+                Text("Start Discovering")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 30)
+                    .padding(.vertical, 14)
+                    .background(
+                        LinearGradient(
+                            colors: [Color.purple, Color.blue],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
                     )
-                )
-                .cornerRadius(25)
-                .shadow(color: Color.purple.opacity(0.3), radius: 8, y: 4)
+                    .cornerRadius(25)
             }
         }
-        .frame(maxHeight: .infinity)
         .padding()
     }
     
     // MARK: - Helper Methods
     
     private var unreadTotal: Int {
-        if useTestData {
-            return testConversations.reduce(0) { total, conversation in
-                total + (conversation.0.unreadCount[authService.currentUser?.id ?? ""] ?? 0)
-            }
-        } else {
-            return matchService.matches.reduce(0) { total, match in
-                guard let userId = authService.currentUser?.id else { return total }
-                return total + (match.unreadCount[userId] ?? 0)
-            }
+        guard let currentUserId = authService.currentUser?.id else { return 0 }
+        return matchService.matches.reduce(0) { total, match in
+            total + (match.unreadCount[currentUserId] ?? 0)
         }
     }
     
     private func getUnreadCount(for match: Match) -> Int {
-        guard let userId = authService.currentUser?.id else { return 0 }
-        return match.unreadCount[userId] ?? 0
-    }
-    
-    private func loadData() async {
-        guard let currentUserId = authService.currentUser?.id else { return }
-        
-        do {
-            try await matchService.fetchMatches(userId: currentUserId)
-            
-            for match in matchService.matches {
-                if let otherUserId = getOtherUserId(match: match) {
-                    if let user = try await userService.fetchUser(userId: otherUserId) {
-                        await MainActor.run {
-                            matchedUsers[otherUserId] = user
-                        }
-                    }
-                    
-                    if let matchId = match.id {
-                        let count = try await messageService.getUnreadCount(matchId: matchId, userId: currentUserId)
-                        await MainActor.run {
-                            unreadCounts[matchId] = count
-                        }
-                    }
-                }
-            }
-        } catch {
-            print("Error loading messages: \(error)")
-        }
+        guard let currentUserId = authService.currentUser?.id else { return 0 }
+        return match.unreadCount[currentUserId] ?? 0
     }
     
     private func getOtherUserId(match: Match) -> String? {
@@ -315,123 +268,33 @@ struct MessagesView: View {
         return match.user1Id == currentUserId ? match.user2Id : match.user1Id
     }
     
-    // MARK: - Test Data
-    
-    private func loadTestData() {
-        let currentUserId = "currentUser"
+    // ✅ FIXED: Proper async data loading
+    private func loadData() async {
+        guard let currentUserId = authService.currentUser?.id else { return }
         
-        let testUsers = [
-            User(
-                id: "test1",
-                email: "emma@test.com",
-                fullName: "Emma Wilson",
-                age: 24,
-                gender: "Female",
-                lookingFor: "Male",
-                bio: "Coffee enthusiast ☕️ | Travel blogger",
-                location: "Paris",
-                country: "France",
-                languages: ["French", "English"],
-                interests: ["Travel", "Photography", "Coffee"],
-                profileImageURL: "",
-                isVerified: true
-            ),
-            User(
-                id: "test2",
-                email: "sophia@test.com",
-                fullName: "Sophia Martinez",
-                age: 26,
-                gender: "Female",
-                lookingFor: "Male",
-                bio: "Yoga instructor 🧘‍♀️ | Nature lover",
-                location: "Barcelona",
-                country: "Spain",
-                languages: ["Spanish", "English", "Catalan"],
-                interests: ["Yoga", "Hiking", "Meditation"],
-                profileImageURL: "",
-                isVerified: true
-            ),
-            User(
-                id: "test3",
-                email: "olivia@test.com",
-                fullName: "Olivia Chen",
-                age: 25,
-                gender: "Female",
-                lookingFor: "Everyone",
-                bio: "Tech entrepreneur 💻 | Startup founder",
-                location: "Tokyo",
-                country: "Japan",
-                languages: ["Japanese", "English", "Mandarin"],
-                interests: ["Technology", "Startups", "Anime"],
-                profileImageURL: "",
-                isVerified: true
-            ),
-            User(
-                id: "test4",
-                email: "isabella@test.com",
-                fullName: "Isabella Rossi",
-                age: 23,
-                gender: "Female",
-                lookingFor: "Male",
-                bio: "Fashion designer ✨ | Art enthusiast",
-                location: "Milan",
-                country: "Italy",
-                languages: ["Italian", "English"],
-                interests: ["Fashion", "Art", "Design"],
-                profileImageURL: "",
-                isVerified: false
-            ),
-            User(
-                id: "test5",
-                email: "mia@test.com",
-                fullName: "Mia Anderson",
-                age: 27,
-                gender: "Female",
-                lookingFor: "Male",
-                bio: "Musician 🎸 | Indie rock lover",
-                location: "London",
-                country: "UK",
-                languages: ["English"],
-                interests: ["Music", "Concerts", "Guitar"],
-                profileImageURL: "",
-                isVerified: true
-            )
-        ]
-        
-        // Create test conversations with varying states
-        testConversations = testUsers.enumerated().map { index, user in
-            let hasMessages = index < 3 // First 3 have messages
-            let unreadCount = index == 0 ? 3 : (index == 1 ? 1 : 0)
+        do {
+            // Fetch matches
+            try await matchService.fetchMatches(userId: currentUserId)
             
-            var unreadDict: [String: Int] = [:]
-            if unreadCount > 0 {
-                unreadDict[currentUserId] = unreadCount
+            // Fetch user details for each match
+            for match in matchService.matches {
+                if let otherUserId = getOtherUserId(match: match) {
+                    // Check if we already have this user
+                    if matchedUsers[otherUserId] == nil {
+                        if let user = try await userService.fetchUser(userId: otherUserId) {
+                            await MainActor.run {
+                                matchedUsers[otherUserId] = user
+                            }
+                        }
+                    }
+                }
             }
             
-            let match = Match(
-                id: "match\(index + 1)",
-                user1Id: currentUserId,
-                user2Id: user.id ?? "",
-                timestamp: Date().addingTimeInterval(-Double(index) * 86400), // Days ago
-                lastMessageTimestamp: hasMessages ? Date().addingTimeInterval(-Double(index + 1) * 3600) : nil, // Hours ago
-                lastMessage: hasMessages ? getTestMessage(for: index) : nil,
-                unreadCount: unreadDict,
-                isActive: true
-            )
-            
-            return (match, user)
+            // Start listening for real-time updates
+            matchService.listenToMatches(userId: currentUserId)
+        } catch {
+            print("❌ Error loading messages: \(error)")
         }
-    }
-    
-    private func getTestMessage(for index: Int) -> String {
-        let messages = [
-            "Hey! How was your day? 😊",
-            "That sounds amazing! Would love to hear more about it",
-            "See you tomorrow!",
-            "",
-            ""
-        ]
-        return messages[index]
     }
 }
 

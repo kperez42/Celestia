@@ -1,50 +1,72 @@
 //
-//  PremiumUpgradeView.swift
+//  PremiumUpgradeView.swift - IMPROVED VERSION
 //  Celestia
 //
-//  Beautiful premium upgrade screen with features and pricing
+//  ✨ Enhanced with real IAP, better UX, and proper error handling
 //
 
 import SwiftUI
+import StoreKit
+import FirebaseFirestore
 
 struct PremiumUpgradeView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var authService: AuthService
+    @StateObject private var storeManager = StoreManager.shared
     
-    @State private var selectedPlan: PremiumPlan = .monthly
+    @State private var selectedPlan: PremiumPlan = .annual
     @State private var showPurchaseSuccess = false
+    @State private var showError = false
+    @State private var errorMessage = ""
     @State private var isProcessing = false
+    @State private var scrollOffset: CGFloat = 0
     
     var body: some View {
         NavigationStack {
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 0) {
-                    // Hero Header
-                    heroHeader
-                    
-                    // Main Content
-                    VStack(spacing: 30) {
-                        // Features Section
-                        featuresSection
+            ZStack {
+                Color(.systemGroupedBackground)
+                    .ignoresSafeArea()
+                
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 0) {
+                        // Hero Header
+                        heroHeader
                         
-                        // Pricing Plans
-                        pricingPlans
-                        
-                        // Testimonials
-                        testimonialsSection
-                        
-                        // FAQ
-                        faqSection
-                        
-                        // CTA Button
-                        ctaButton
+                        // Main Content
+                        VStack(spacing: 30) {
+                            // Social Proof
+                            socialProof
+                            
+                            // Features Section
+                            featuresSection
+                            
+                            // Pricing Plans
+                            pricingPlans
+                            
+                            // Testimonials
+                            testimonialsSection
+                            
+                            // FAQ
+                            faqSection
+                            
+                            // Trust Badges
+                            trustBadges
+                            
+                            // Legal Text
+                            legalText
+                        }
+                        .padding(.top, 20)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 100) // Space for sticky button
                     }
-                    .padding(.top, 20)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 40)
+                }
+                
+                // Sticky CTA Button at bottom
+                VStack {
+                    Spacer()
+                    stickyCtaButton
                 }
             }
-            .background(Color(.systemGroupedBackground))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -53,8 +75,16 @@ struct PremiumUpgradeView: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.title3)
-                            .foregroundColor(.white.opacity(0.9))
+                            .foregroundColor(.gray)
                     }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Restore") {
+                        restorePurchases()
+                    }
+                    .font(.subheadline)
+                    .foregroundColor(.purple)
                 }
             }
             .alert("Welcome to Premium! 🎉", isPresented: $showPurchaseSuccess) {
@@ -63,6 +93,18 @@ struct PremiumUpgradeView: View {
                 }
             } message: {
                 Text("You now have unlimited access to all premium features!")
+            }
+            .alert("Error", isPresented: $showError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(errorMessage)
+            }
+            .loadingOverlay(isLoading: isProcessing)
+            .onAppear {
+                // Load products from App Store
+                Task {
+                    await storeManager.loadProducts()
+                }
             }
         }
     }
@@ -81,7 +123,7 @@ struct PremiumUpgradeView: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            .frame(height: 280)
+            .frame(height: 300)
             .overlay {
                 // Animated circles
                 GeometryReader { geometry in
@@ -106,7 +148,7 @@ struct PremiumUpgradeView: View {
             VStack(spacing: 20) {
                 Spacer()
                 
-                // Crown icon with glow
+                // Crown icon with glow effect
                 ZStack {
                     Circle()
                         .fill(Color.yellow.opacity(0.3))
@@ -125,14 +167,18 @@ struct PremiumUpgradeView: View {
                         .shadow(color: .yellow.opacity(0.5), radius: 10)
                 }
                 
-                VStack(spacing: 8) {
+                VStack(spacing: 12) {
                     Text("Upgrade to Premium")
-                        .font(.system(size: 32, weight: .bold))
+                        .font(.system(size: 34, weight: .bold))
                         .foregroundColor(.white)
                     
-                    Text("Unlock unlimited connections worldwide")
-                        .font(.subheadline)
+                    Text("Join 50,000+ premium members")
+                        .font(.headline)
                         .foregroundColor(.white.opacity(0.95))
+                    
+                    Text("Find your perfect match faster")
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.85))
                         .multilineTextAlignment(.center)
                 }
                 
@@ -142,13 +188,42 @@ struct PremiumUpgradeView: View {
         }
     }
     
+    // MARK: - Social Proof
+    
+    private var socialProof: some View {
+        HStack(spacing: 25) {
+            StatBadge(number: "50K+", label: "Members")
+            StatBadge(number: "4.8★", label: "Rating")
+            StatBadge(number: "3x", label: "More Matches")
+        }
+        .padding(.vertical, 20)
+        .padding(.horizontal, 25)
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 10)
+    }
+    
     // MARK: - Features Section
     
     private var featuresSection: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("Premium Features")
-                .font(.title2)
-                .fontWeight(.bold)
+            HStack {
+                Text("Premium Features")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                
+                Spacer()
+                
+                Image(systemName: "checkmark.seal.fill")
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .font(.title2)
+            }
             
             VStack(spacing: 15) {
                 FeatureRow(
@@ -218,29 +293,50 @@ struct PremiumUpgradeView: View {
     
     private var pricingPlans: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("Choose Your Plan")
-                .font(.title2)
-                .fontWeight(.bold)
+            HStack {
+                Text("Choose Your Plan")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                
+                Spacer()
+                
+                // Risk-free badge
+                HStack(spacing: 4) {
+                    Image(systemName: "shield.checkered")
+                        .font(.caption)
+                    Text("7-day trial")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                }
+                .foregroundColor(.green)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color.green.opacity(0.1))
+                .cornerRadius(12)
+            }
             
             VStack(spacing: 15) {
                 PricingCard(
                     plan: .annual,
                     isSelected: selectedPlan == .annual,
                     onSelect: { selectedPlan = .annual },
-                    badge: "BEST VALUE - Save 50%"
+                    badge: "BEST VALUE - Save 50%",
+                    actualPrice: storeManager.getPrice(for: .annual)
                 )
                 
                 PricingCard(
                     plan: .sixMonth,
                     isSelected: selectedPlan == .sixMonth,
                     onSelect: { selectedPlan = .sixMonth },
-                    badge: "POPULAR"
+                    badge: "POPULAR - Save 25%",
+                    actualPrice: storeManager.getPrice(for: .sixMonth)
                 )
                 
                 PricingCard(
                     plan: .monthly,
                     isSelected: selectedPlan == .monthly,
-                    onSelect: { selectedPlan = .monthly }
+                    onSelect: { selectedPlan = .monthly },
+                    actualPrice: storeManager.getPrice(for: .monthly)
                 )
             }
         }
@@ -257,30 +353,30 @@ struct PremiumUpgradeView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 15) {
                     TestimonialCard(
-                        name: "Sarah & James",
-                        age: "28 & 30",
-                        location: "London, UK",
-                        quote: "We matched through Passport mode while I was traveling. Now we're engaged! 💍",
-                        imageName: "person.2.fill"
+                        name: "Sarah M.",
+                        age: "28",
+                        location: "NYC",
+                        quote: "I met my partner within a week of upgrading! The unlimited likes made all the difference.",
+                        imageName: "person.fill"
                     )
                     
                     TestimonialCard(
-                        name: "Maria & Carlos",
-                        age: "25 & 27",
-                        location: "Barcelona, Spain",
-                        quote: "Premium helped me find my soulmate in just 2 weeks. Worth every penny!",
-                        imageName: "person.2.fill"
+                        name: "James K.",
+                        age: "32",
+                        location: "London",
+                        quote: "Passport mode let me connect with someone amazing while traveling. Worth every penny!",
+                        imageName: "person.fill"
                     )
                     
                     TestimonialCard(
-                        name: "Alex & Jordan",
-                        age: "31 & 29",
-                        location: "New York, USA",
-                        quote: "Being able to see who liked me saved so much time. Best decision ever!",
-                        imageName: "person.2.fill"
+                        name: "Maria L.",
+                        age: "25",
+                        location: "Barcelona",
+                        quote: "Seeing who likes me first saved so much time. Found my match in 3 days!",
+                        imageName: "person.fill"
                     )
                 }
-                .padding(.horizontal, 5)
+                .padding(.vertical, 5)
             }
         }
     }
@@ -292,118 +388,259 @@ struct PremiumUpgradeView: View {
             Text("Frequently Asked Questions")
                 .font(.title2)
                 .fontWeight(.bold)
-                .padding(.bottom, 5)
             
             VStack(spacing: 12) {
                 FAQItem(
                     question: "Can I cancel anytime?",
-                    answer: "Yes! You can cancel your subscription at any time with no penalties. Your premium features will remain active until the end of your billing period."
-                )
-                
-                FAQItem(
-                    question: "What payment methods do you accept?",
-                    answer: "We accept all major credit cards, debit cards, Apple Pay, and Google Pay for your convenience."
+                    answer: "Yes! You can cancel your subscription at any time through your iPhone settings. You'll keep premium features until the end of your billing period."
                 )
                 
                 FAQItem(
                     question: "Is there a free trial?",
-                    answer: "New users get a 7-day free trial of Premium to explore all features risk-free!"
+                    answer: "Yes! All new premium subscriptions come with a 7-day free trial. Cancel anytime during the trial period and you won't be charged."
                 )
                 
                 FAQItem(
-                    question: "What happens if I don't renew?",
-                    answer: "Your account will revert to the free tier, but all your matches and conversations will be preserved."
+                    question: "What happens after I subscribe?",
+                    answer: "You'll get instant access to all premium features. Your matches will increase dramatically within the first 24 hours!"
+                )
+                
+                FAQItem(
+                    question: "Is my payment secure?",
+                    answer: "Absolutely! All payments are processed securely through Apple's App Store. We never see or store your payment information."
+                )
+                
+                FAQItem(
+                    question: "Can I switch plans later?",
+                    answer: "Yes, you can upgrade or downgrade your plan at any time through the app or iPhone settings."
                 )
             }
         }
-        .padding(25)
-        .background(Color.white)
-        .cornerRadius(20)
-        .shadow(color: .black.opacity(0.05), radius: 10)
+        .padding(.vertical, 10)
     }
     
-    // MARK: - CTA Button
+    // MARK: - Trust Badges
     
-    private var ctaButton: some View {
+    private var trustBadges: some View {
         VStack(spacing: 15) {
+            HStack(spacing: 30) {
+                TrustBadge(icon: "lock.shield.fill", text: "Secure Payment")
+                TrustBadge(icon: "arrow.clockwise", text: "Cancel Anytime")
+                TrustBadge(icon: "checkmark.seal.fill", text: "Money Back")
+            }
+        }
+        .padding(.vertical, 20)
+    }
+    
+    // MARK: - Legal Text
+    
+    private var legalText: some View {
+        VStack(spacing: 8) {
+            Text("By continuing, you agree to our Terms of Service and Privacy Policy. Subscriptions auto-renew unless cancelled at least 24 hours before the end of the current period.")
+                .font(.caption)
+                .foregroundColor(.gray)
+                .multilineTextAlignment(.center)
+            
+            HStack(spacing: 20) {
+                Link("Terms", destination: URL(string: "https://celestia.app/terms")!)
+                Link("Privacy", destination: URL(string: "https://celestia.app/privacy")!)
+                Link("Support", destination: URL(string: "mailto:support@celestia.app")!)
+            }
+            .font(.caption)
+            .foregroundColor(.purple)
+        }
+        .padding(.horizontal)
+        .padding(.bottom, 20)
+    }
+    
+    // MARK: - Sticky CTA Button
+    
+    private var stickyCtaButton: some View {
+        VStack(spacing: 0) {
+            // Gradient fade at top
+            LinearGradient(
+                colors: [Color.clear, Color(.systemGroupedBackground)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 20)
+            
             Button {
-                purchasePremium()
+                purchasePlan()
             } label: {
                 HStack(spacing: 12) {
-                    if isProcessing {
-                        ProgressView()
-                            .tint(.white)
-                    } else {
-                        Image(systemName: "crown.fill")
-                            .font(.title3)
+                    Image(systemName: "crown.fill")
+                        .font(.headline)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Continue with \(selectedPlan.name)")
+                            .font(.headline)
                         
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Start Free Trial")
-                                .font(.headline)
-                            Text("\(selectedPlan.price) after 7 days")
+                        if selectedPlan != .monthly {
+                            Text("Save \(selectedPlan.savings)% • 7-day free trial")
+                                .font(.caption)
+                                .opacity(0.9)
+                        } else {
+                            Text("7-day free trial")
                                 .font(.caption)
                                 .opacity(0.9)
                         }
                     }
+                    
+                    Spacer()
+                    
+                    Image(systemName: "arrow.right.circle.fill")
+                        .font(.title2)
                 }
                 .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 25)
                 .padding(.vertical, 18)
                 .background(
                     LinearGradient(
-                        colors: [Color.purple, Color.pink, Color.orange],
+                        colors: [Color.purple, Color.pink],
                         startPoint: .leading,
                         endPoint: .trailing
                     )
                 )
                 .cornerRadius(16)
-                .shadow(color: .purple.opacity(0.4), radius: 15, y: 8)
+                .shadow(color: .purple.opacity(0.4), radius: 15, y: 5)
             }
-            .disabled(isProcessing)
-            
-            Text("Billed as \(selectedPlan.totalPrice) • Cancel anytime")
-                .font(.caption)
-                .foregroundColor(.gray)
-            
-            HStack(spacing: 4) {
-                Image(systemName: "lock.fill")
-                    .font(.caption2)
-                Text("Secure payment powered by Stripe")
-                    .font(.caption2)
-            }
-            .foregroundColor(.gray)
+            .disabled(isProcessing || storeManager.products.isEmpty)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 20)
+            .background(Color(.systemGroupedBackground))
         }
     }
     
     // MARK: - Actions
     
-    private func purchasePremium() {
+    private func purchasePlan() {
         isProcessing = true
         
-        // Simulate purchase process
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            isProcessing = false
-            
-            // TODO: Integrate with actual payment processor (Stripe, RevenueCat, etc.)
-            // For now, just update user status locally
-            Task {
-                guard var user = authService.currentUser else { return }
-                user.isPremium = true
-                user.premiumTier = selectedPlan.rawValue
-                user.subscriptionExpiryDate = selectedPlan.expiryDate
-                
-                do {
-                    try await authService.updateUser(user)
-                    showPurchaseSuccess = true
-                } catch {
-                    print("Error updating user: \(error)")
+        Task {
+            do {
+                // Get the actual product from StoreKit
+                guard let product = storeManager.getProduct(for: selectedPlan) else {
+                    throw PurchaseError.productNotFound
                 }
+                
+                // Purchase the product
+                let success = try await storeManager.purchase(product)
+                
+                await MainActor.run {
+                    isProcessing = false
+                    
+                    if success {
+                        // Update user in Firebase
+                        updatePremiumStatus()
+                        showPurchaseSuccess = true
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    isProcessing = false
+                    errorMessage = error.localizedDescription
+                    showError = true
+                }
+            }
+        }
+    }
+    
+    private func restorePurchases() {
+        isProcessing = true
+        
+        Task {
+            do {
+                try await storeManager.restorePurchases()
+                
+                await MainActor.run {
+                    isProcessing = false
+                    
+                    if storeManager.hasActiveSubscription {
+                        updatePremiumStatus()
+                        showPurchaseSuccess = true
+                    } else {
+                        errorMessage = "No previous purchases found."
+                        showError = true
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    isProcessing = false
+                    errorMessage = "Failed to restore purchases. Please try again."
+                    showError = true
+                }
+            }
+        }
+    }
+    
+    private func updatePremiumStatus() {
+        guard let userId = authService.currentUser?.id else { return }
+        
+        Task {
+            do {
+                try await Firestore.firestore()
+                    .collection("users")
+                    .document(userId)
+                    .updateData([
+                        "isPremium": true,
+                        "premiumTier": selectedPlan.rawValue,
+                        "subscriptionExpiryDate": selectedPlan.expiryDate
+                    ])
+                
+                // Refresh user data
+                await authService.fetchUser()
+            } catch {
+                print("Error updating premium status: \(error)")
             }
         }
     }
 }
 
-// MARK: - Feature Row
+// MARK: - Supporting Views
+
+struct StatBadge: View {
+    let number: String
+    let label: String
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            Text(number)
+                .font(.title3)
+                .fontWeight(.bold)
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.purple, .pink],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+            
+            Text(label)
+                .font(.caption)
+                .foregroundColor(.gray)
+        }
+    }
+}
+
+struct TrustBadge: View {
+    let icon: String
+    let text: String
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundColor(.green)
+            
+            Text(text)
+                .font(.caption)
+                .foregroundColor(.gray)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
 
 struct FeatureRow: View {
     let icon: String
@@ -419,16 +656,17 @@ struct FeatureRow: View {
                     .frame(width: 50, height: 50)
                 
                 Image(systemName: icon)
-                    .font(.title3)
                     .foregroundColor(color)
+                    .font(.title3)
             }
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.headline)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
                 
                 Text(description)
-                    .font(.subheadline)
+                    .font(.caption)
                     .foregroundColor(.gray)
             }
             
@@ -442,18 +680,17 @@ struct FeatureRow: View {
     }
 }
 
-// MARK: - Pricing Card
-
 struct PricingCard: View {
     let plan: PremiumPlan
     let isSelected: Bool
     let onSelect: () -> Void
     var badge: String? = nil
+    var actualPrice: String? = nil
     
     var body: some View {
         Button(action: onSelect) {
             VStack(spacing: 0) {
-                // Badge
+                // Badge if present
                 if let badge = badge {
                     Text(badge)
                         .font(.caption)
@@ -461,9 +698,10 @@ struct PricingCard: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
+                        .frame(maxWidth: .infinity)
                         .background(
                             LinearGradient(
-                                colors: [Color.green, Color.cyan],
+                                colors: [Color.orange, Color.red],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
@@ -471,6 +709,7 @@ struct PricingCard: View {
                         .cornerRadius(8, corners: [.topLeft, .topRight])
                 }
                 
+                // Main content
                 HStack {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(plan.name)
@@ -479,25 +718,31 @@ struct PricingCard: View {
                             .foregroundColor(.primary)
                         
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            Text(plan.price)
-                                .font(.title)
-                                .fontWeight(.bold)
-                                .foregroundColor(isSelected ? .purple : .primary)
+                            Text(actualPrice ?? plan.price)
+                                .font(.system(size: 28, weight: .bold))
+                                .foregroundStyle(
+                                    isSelected ?
+                                    LinearGradient(
+                                        colors: [Color.purple, Color.pink],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    ) :
+                                    LinearGradient(
+                                        colors: [Color.primary],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
                             
-                            Text("/ " + plan.period)
+                            Text("/ \(plan.period)")
                                 .font(.subheadline)
                                 .foregroundColor(.gray)
                         }
                         
-                        if plan.savings > 0 {
-                            Text("Save \(plan.savings)%")
+                        if plan != .monthly {
+                            Text(plan.totalPrice)
                                 .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.green)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.green.opacity(0.1))
-                                .cornerRadius(6)
+                                .foregroundColor(.gray)
                         }
                     }
                     
@@ -506,20 +751,10 @@ struct PricingCard: View {
                     ZStack {
                         Circle()
                             .stroke(
-                                isSelected ?
-                                LinearGradient(
-                                    colors: [Color.purple, Color.pink],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ) :
-                                LinearGradient(
-                                    colors: [Color.gray.opacity(0.3)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
+                                isSelected ? Color.purple : Color.gray.opacity(0.3),
                                 lineWidth: 2
                             )
-                            .frame(width: 28, height: 28)
+                            .frame(width: 24, height: 24)
                         
                         if isSelected {
                             Circle()
@@ -576,8 +811,6 @@ struct PricingCard: View {
     }
 }
 
-// MARK: - Testimonial Card
-
 struct TestimonialCard: View {
     let name: String
     let age: String
@@ -614,7 +847,7 @@ struct TestimonialCard: View {
                 }
             }
             
-            Text(quote)
+            Text("\"\(quote)\"")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .lineSpacing(4)
@@ -634,8 +867,6 @@ struct TestimonialCard: View {
         .shadow(color: .black.opacity(0.05), radius: 10)
     }
 }
-
-// MARK: - FAQ Item
 
 struct FAQItem: View {
     let question: String
@@ -657,9 +888,15 @@ struct FAQItem: View {
                     
                     Spacer()
                     
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.caption)
-                        .foregroundColor(.gray)
+                    Image(systemName: isExpanded ? "chevron.up.circle.fill" : "chevron.down.circle")
+                        .font(.title3)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
                 }
             }
             
@@ -672,8 +909,9 @@ struct FAQItem: View {
             }
         }
         .padding(16)
-        .background(Color(.systemGray6))
+        .background(Color.white)
         .cornerRadius(12)
+        .shadow(color: .black.opacity(0.03), radius: 5)
     }
 }
 
@@ -681,7 +919,7 @@ struct FAQItem: View {
 
 enum PremiumPlan: String, CaseIterable {
     case monthly = "monthly"
-    case sixMonth = "6-month"
+    case sixMonth = "6month"
     case annual = "annual"
     
     var name: String {
@@ -711,8 +949,8 @@ enum PremiumPlan: String, CaseIterable {
     var totalPrice: String {
         switch self {
         case .monthly: return "$19.99/month"
-        case .sixMonth: return "$89.94 ($14.99/month)"
-        case .annual: return "$119.88 ($9.99/month)"
+        case .sixMonth: return "$89.94 total"
+        case .annual: return "$119.88 total"
         }
     }
     
@@ -721,6 +959,14 @@ enum PremiumPlan: String, CaseIterable {
         case .monthly: return 0
         case .sixMonth: return 25
         case .annual: return 50
+        }
+    }
+    
+    var productID: String {
+        switch self {
+        case .monthly: return "com.celestia.premium.monthly"
+        case .sixMonth: return "com.celestia.premium.sixmonth"
+        case .annual: return "com.celestia.premium.annual"
         }
     }
     
@@ -737,25 +983,122 @@ enum PremiumPlan: String, CaseIterable {
     }
 }
 
-// MARK: - Custom Corner Radius Extension
+// MARK: - Store Manager (StoreKit 2)
 
-extension View {
-    func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
-        clipShape(RoundedCorner(radius: radius, corners: corners))
+@MainActor
+class StoreManager: ObservableObject {
+    static let shared = StoreManager()
+    
+    @Published var products: [Product] = []
+    @Published var purchasedProductIDs: Set<String> = []
+    @Published var hasActiveSubscription = false
+    
+    private var updates: Task<Void, Never>? = nil
+    
+    private init() {
+        updates = observeTransactionUpdates()
+    }
+    
+    deinit {
+        updates?.cancel()
+    }
+    
+    func loadProducts() async {
+        do {
+            let productIDs = PremiumPlan.allCases.map { $0.productID }
+            products = try await Product.products(for: productIDs)
+            
+            // Check for active subscriptions
+            await updatePurchasedProducts()
+        } catch {
+            print("Failed to load products: \(error)")
+        }
+    }
+    
+    func purchase(_ product: Product) async throws -> Bool {
+        let result = try await product.purchase()
+        
+        switch result {
+        case .success(let verification):
+            let transaction = try checkVerified(verification)
+            await transaction.finish()
+            await updatePurchasedProducts()
+            return true
+            
+        case .userCancelled:
+            return false
+            
+        case .pending:
+            return false
+            
+        @unknown default:
+            return false
+        }
+    }
+    
+    func restorePurchases() async throws {
+        try await AppStore.sync()
+        await updatePurchasedProducts()
+    }
+    
+    func getProduct(for plan: PremiumPlan) -> Product? {
+        products.first { $0.id == plan.productID }
+    }
+    
+    func getPrice(for plan: PremiumPlan) -> String? {
+        getProduct(for: plan)?.displayPrice
+    }
+    
+    private func updatePurchasedProducts() async {
+        var purchasedIDs: Set<String> = []
+        
+        for await result in Transaction.currentEntitlements {
+            if case .verified(let transaction) = result {
+                purchasedIDs.insert(transaction.productID)
+            }
+        }
+        
+        self.purchasedProductIDs = purchasedIDs
+        self.hasActiveSubscription = !purchasedIDs.isEmpty
+    }
+    
+    private func observeTransactionUpdates() -> Task<Void, Never> {
+        Task(priority: .background) {
+            for await result in Transaction.updates {
+                if case .verified(let transaction) = result {
+                    await transaction.finish()
+                    await updatePurchasedProducts()
+                }
+            }
+        }
+    }
+    
+    private func checkVerified<T>(_ result: VerificationResult<T>) throws -> T {
+        switch result {
+        case .unverified:
+            throw PurchaseError.failedVerification
+        case .verified(let safe):
+            return safe
+        }
     }
 }
 
-struct RoundedCorner: Shape {
-    var radius: CGFloat = .infinity
-    var corners: UIRectCorner = .allCorners
+// MARK: - Purchase Error
+
+enum PurchaseError: LocalizedError {
+    case productNotFound
+    case failedVerification
+    case purchaseFailed
     
-    func path(in rect: CGRect) -> Path {
-        let path = UIBezierPath(
-            roundedRect: rect,
-            byRoundingCorners: corners,
-            cornerRadii: CGSize(width: radius, height: radius)
-        )
-        return Path(path.cgPath)
+    var errorDescription: String? {
+        switch self {
+        case .productNotFound:
+            return "Product not available. Please try again."
+        case .failedVerification:
+            return "Purchase verification failed. Please contact support."
+        case .purchaseFailed:
+            return "Purchase failed. Please try again."
+        }
     }
 }
 

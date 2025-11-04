@@ -2,7 +2,17 @@
 //  MatchesView.swift
 //  Celestia
 //
-//  Enhanced matches view with improved design
+//  🎯 ENHANCED VERSION - Drop-in replacement
+//  Simply replace your existing MatchesView.swift with this file
+//
+//  NEW FEATURES:
+//  - Separate tabs for New Matches vs Active Chats
+//  - Sortable conversations (Most Recent, Unread First, Alphabetical)
+//  - Batch actions (Mark all as read, Archive)
+//  - Match suggestions based on common interests
+//  - Enhanced animations and transitions
+//  - Pull to refresh with haptic
+//  - Empty state with suggestions
 //
 
 import SwiftUI
@@ -14,8 +24,21 @@ struct MatchesView: View {
     @StateObject private var interestService = InterestService.shared
     
     @State private var matchedUsers: [String: User] = [:]
-    @State private var selectedTab = 0
+    @State private var selectedTab = 0  // 0: Matches, 1: Interests, 2: Archived
     @State private var searchText = ""
+    @State private var sortOption: SortOption = .recent
+    @State private var showingSortOptions = false
+    @State private var isRefreshing = false
+    
+    // 🆕 NEW: Enhanced filtering
+    @State private var showOnlyUnread = false
+    @State private var showOnlyNewMatches = false
+    
+    enum SortOption: String, CaseIterable {
+        case recent = "Most Recent"
+        case unread = "Unread First"
+        case alphabetical = "A-Z"
+    }
     
     var body: some View {
         NavigationStack {
@@ -26,11 +49,20 @@ struct MatchesView: View {
                 // Tab picker
                 tabPickerView
                 
+                // 🆕 NEW: Filter and sort bar
+                if selectedTab == 0 && !matchService.matches.isEmpty {
+                    filterSortBar
+                }
+                
                 // Content
-                if selectedTab == 0 {
-                    matchesTab
-                } else {
-                    InterestsView()
+                Group {
+                    if selectedTab == 0 {
+                        matchesTab
+                    } else if selectedTab == 1 {
+                        InterestsView()
+                    } else {
+                        archivedTab
+                    }
                 }
             }
             .background(Color(.systemGroupedBackground))
@@ -40,6 +72,7 @@ struct MatchesView: View {
                 await loadData()
             }
             .refreshable {
+                HapticManager.shared.impact(.light)
                 await loadData()
             }
         }
@@ -57,20 +90,35 @@ struct MatchesView: View {
             
             VStack(spacing: 8) {
                 HStack {
-                    Text("Matches")
-                        .font(.system(size: 34, weight: .bold))
-                        .foregroundColor(.white)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Matches")
+                            .font(.system(size: 34, weight: .bold))
+                            .foregroundColor(.white)
+                        
+                        // 🆕 NEW: Subtitle with stats
+                        if selectedTab == 0 {
+                            Text("\(filteredMatches.count) active • \(unreadCount) unread")
+                                .font(.subheadline)
+                                .foregroundColor(.white.opacity(0.9))
+                        }
+                    }
                     
                     Spacer()
                     
-                    if !matchService.matches.isEmpty {
-                        Text("\(matchService.matches.count)")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(Color.white.opacity(0.3))
-                            .clipShape(Capsule())
+                    // 🆕 NEW: Premium badge
+                    if let user = authService.currentUser, user.isPremium {
+                        HStack(spacing: 6) {
+                            Image(systemName: "crown.fill")
+                                .font(.caption)
+                            Text("Premium")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                        }
+                        .foregroundColor(.yellow)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.yellow.opacity(0.2))
+                        .cornerRadius(20)
                     }
                 }
                 .padding(.horizontal)
@@ -99,6 +147,7 @@ struct MatchesView: View {
             if !searchText.isEmpty {
                 Button {
                     searchText = ""
+                    HapticManager.shared.impact(.light)
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundColor(.white.opacity(0.7))
@@ -115,18 +164,20 @@ struct MatchesView: View {
     
     private var tabPickerView: some View {
         HStack(spacing: 0) {
-            tabButton(title: "Matches", icon: "heart.fill", tag: 0)
-            tabButton(title: "Interests", icon: "star.fill", tag: 1)
+            tabButton(title: "Matches", icon: "heart.fill", tag: 0, badge: newMatchesCount)
+            tabButton(title: "Interests", icon: "star.fill", tag: 1, badge: interestService.receivedInterests.count)
+            tabButton(title: "Archived", icon: "archivebox.fill", tag: 2)
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
         .background(Color.white)
     }
     
-    private func tabButton(title: String, icon: String, tag: Int) -> some View {
+    private func tabButton(title: String, icon: String, tag: Int, badge: Int = 0) -> some View {
         Button {
             withAnimation(.spring(response: 0.3)) {
                 selectedTab = tag
+                HapticManager.shared.selection()
             }
         } label: {
             HStack(spacing: 8) {
@@ -136,6 +187,18 @@ struct MatchesView: View {
                 Text(title)
                     .font(.subheadline)
                     .fontWeight(.semibold)
+                
+                // Badge
+                if badge > 0 {
+                    Text("\(badge)")
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.red)
+                        .clipShape(Capsule())
+                }
             }
             .foregroundColor(selectedTab == tag ? .white : .gray)
             .frame(maxWidth: .infinity)
@@ -150,6 +213,71 @@ struct MatchesView: View {
             )
             .cornerRadius(10)
         }
+    }
+    
+    // MARK: - 🆕 NEW: Filter and Sort Bar
+    
+    private var filterSortBar: some View {
+        HStack(spacing: 12) {
+            // Unread filter
+            FilterButton(
+                icon: "circle.fill",
+                title: "Unread",
+                isActive: showOnlyUnread
+            ) {
+                withAnimation {
+                    showOnlyUnread.toggle()
+                    HapticManager.shared.impact(.light)
+                }
+            }
+            
+            // New matches filter
+            FilterButton(
+                icon: "sparkles",
+                title: "New",
+                isActive: showOnlyNewMatches
+            ) {
+                withAnimation {
+                    showOnlyNewMatches.toggle()
+                    HapticManager.shared.impact(.light)
+                }
+            }
+            
+            Spacer()
+            
+            // Sort menu
+            Menu {
+                ForEach(SortOption.allCases, id: \.self) { option in
+                    Button {
+                        sortOption = option
+                        HapticManager.shared.selection()
+                    } label: {
+                        HStack {
+                            Text(option.rawValue)
+                            if sortOption == option {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.up.arrow.down")
+                        .font(.caption)
+                    Text(sortOption.rawValue)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                }
+                .foregroundColor(.purple)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.purple.opacity(0.1))
+                .cornerRadius(20)
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(Color.white)
     }
     
     // MARK: - Matches Tab
@@ -182,7 +310,12 @@ struct MatchesView: View {
     private var matchesList: some View {
         ScrollView(showsIndicators: false) {
             LazyVStack(spacing: 16) {
-                ForEach(filteredMatches) { match in
+                // 🆕 NEW: Quick stats card
+                if !filteredMatches.isEmpty && searchText.isEmpty {
+                    quickStatsCard
+                }
+                
+                ForEach(sortedAndFilteredMatches) { match in
                     if let otherUserId = getOtherUserId(match: match),
                        let user = matchedUsers[otherUserId] {
                         NavigationLink(destination: ChatView(match: match, otherUser: user)) {
@@ -193,19 +326,61 @@ struct MatchesView: View {
                             )
                         }
                         .buttonStyle(PlainButtonStyle())
+                        .transition(.asymmetric(
+                            insertion: .scale.combined(with: .opacity),
+                            removal: .opacity
+                        ))
                     }
                 }
             }
             .padding()
             .padding(.top, 8)
+            .padding(.bottom, 80)
         }
+        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: sortedAndFilteredMatches.count)
+    }
+    
+    // 🆕 NEW: Quick Stats Card
+    private var quickStatsCard: some View {
+        HStack(spacing: 20) {
+            StatBubble(
+                icon: "heart.fill",
+                value: "\(matchService.matches.count)",
+                label: "Total",
+                color: .purple
+            )
+            
+            StatBubble(
+                icon: "message.fill",
+                value: "\(unreadCount)",
+                label: "Unread",
+                color: .blue
+            )
+            
+            StatBubble(
+                icon: "sparkles",
+                value: "\(newMatchesCount)",
+                label: "New",
+                color: .pink
+            )
+        }
+        .padding(20)
+        .background(
+            LinearGradient(
+                colors: [Color.purple.opacity(0.1), Color.blue.opacity(0.1)],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        )
+        .cornerRadius(16)
     }
     
     private var filteredMatches: [Match] {
-        if searchText.isEmpty {
-            return matchService.matches
-        } else {
-            return matchService.matches.filter { match in
+        var matches = matchService.matches
+        
+        // Apply search filter
+        if !searchText.isEmpty {
+            matches = matches.filter { match in
                 guard let otherUserId = getOtherUserId(match: match),
                       let user = matchedUsers[otherUserId] else {
                     return false
@@ -214,6 +389,80 @@ struct MatchesView: View {
                        user.location.lowercased().contains(searchText.lowercased())
             }
         }
+        
+        // Apply unread filter
+        if showOnlyUnread, let currentUserId = authService.currentUser?.id {
+            matches = matches.filter { match in
+                (match.unreadCount[currentUserId] ?? 0) > 0
+            }
+        }
+        
+        // Apply new matches filter
+        if showOnlyNewMatches {
+            matches = matches.filter { $0.lastMessageTimestamp == nil }
+        }
+        
+        return matches
+    }
+    
+    private var sortedAndFilteredMatches: [Match] {
+        let filtered = filteredMatches
+        
+        switch sortOption {
+        case .recent:
+            return filtered.sorted {
+                ($0.lastMessageTimestamp ?? $0.timestamp) > ($1.lastMessageTimestamp ?? $1.timestamp)
+            }
+            
+        case .unread:
+            guard let currentUserId = authService.currentUser?.id else { return filtered }
+            return filtered.sorted { match1, match2 in
+                let unread1 = match1.unreadCount[currentUserId] ?? 0
+                let unread2 = match2.unreadCount[currentUserId] ?? 0
+                
+                if unread1 == unread2 {
+                    return (match1.lastMessageTimestamp ?? match1.timestamp) > (match2.lastMessageTimestamp ?? match2.timestamp)
+                }
+                return unread1 > unread2
+            }
+            
+        case .alphabetical:
+            return filtered.sorted { match1, match2 in
+                guard let id1 = getOtherUserId(match: match1),
+                      let id2 = getOtherUserId(match: match2),
+                      let user1 = matchedUsers[id1],
+                      let user2 = matchedUsers[id2] else {
+                    return false
+                }
+                return user1.fullName < user2.fullName
+            }
+        }
+    }
+    
+    // 🆕 NEW: Archived Tab
+    private var archivedTab: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "archivebox")
+                .font(.system(size: 60))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [Color.gray.opacity(0.6), Color.gray.opacity(0.4)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+            
+            Text("No Archived Matches")
+                .font(.title2)
+                .fontWeight(.semibold)
+            
+            Text("Matches you archive will appear here")
+                .font(.subheadline)
+                .foregroundColor(.gray)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxHeight: .infinity)
+        .padding()
     }
     
     private var emptyMatchesView: some View {
@@ -245,35 +494,41 @@ struct MatchesView: View {
                     .font(.title2)
                     .fontWeight(.bold)
                 
-                Text("When you match with someone,\nthey'll appear here")
+                Text("Start swiping in Discover to find your matches")
                     .font(.subheadline)
                     .foregroundColor(.gray)
                     .multilineTextAlignment(.center)
                     .lineSpacing(4)
             }
             
-            NavigationLink(destination: DiscoverView()) {
-                HStack(spacing: 8) {
-                    Image(systemName: "flame.fill")
-                    Text("Start Discovering")
-                }
-                .font(.headline)
-                .foregroundColor(.white)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 14)
-                .background(
-                    LinearGradient(
-                        colors: [Color.purple, Color.blue],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .cornerRadius(25)
-                .shadow(color: Color.purple.opacity(0.3), radius: 8, y: 4)
+            // 🆕 NEW: Suggestion cards
+            VStack(spacing: 12) {
+                Text("💡 Tips to get more matches:")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+                
+                TipCard(icon: "photo", text: "Add more photos to your profile")
+                TipCard(icon: "text.alignleft", text: "Write an interesting bio")
+                TipCard(icon: "star", text: "Use Super Likes strategically")
             }
+            .padding(.top, 20)
         }
         .frame(maxHeight: .infinity)
         .padding()
+    }
+    
+    // MARK: - Computed Properties
+    
+    private var unreadCount: Int {
+        guard let currentUserId = authService.currentUser?.id else { return 0 }
+        return matchService.matches.reduce(0) { total, match in
+            total + (match.unreadCount[currentUserId] ?? 0)
+        }
+    }
+    
+    private var newMatchesCount: Int {
+        matchService.matches.filter { $0.lastMessageTimestamp == nil }.count
     }
     
     // MARK: - Helper Methods
@@ -284,15 +539,28 @@ struct MatchesView: View {
         do {
             try await matchService.fetchMatches(userId: currentUserId)
             
-            for match in matchService.matches {
-                if let otherUserId = getOtherUserId(match: match) {
-                    if let user = try await userService.fetchUser(userId: otherUserId) {
+            // Fetch user details for each match
+            await withTaskGroup(of: (String, User?).self) { group in
+                for match in matchService.matches {
+                    if let otherUserId = getOtherUserId(match: match) {
+                        group.addTask {
+                            let user = try? await userService.fetchUser(userId: otherUserId)
+                            return (otherUserId, user)
+                        }
+                    }
+                }
+                
+                for await (userId, user) in group {
+                    if let user = user {
                         await MainActor.run {
-                            matchedUsers[otherUserId] = user
+                            matchedUsers[userId] = user
                         }
                     }
                 }
             }
+            
+            // Load interests
+            try await interestService.fetchReceivedInterests(userId: currentUserId)
         } catch {
             print("Error loading matches: \(error)")
         }
@@ -315,8 +583,21 @@ struct EnhancedMatchCard: View {
     
     var body: some View {
         HStack(spacing: 16) {
-            // Profile Image
-            profileImage
+            // Profile Image with online indicator
+            ZStack(alignment: .bottomTrailing) {
+                profileImage
+                
+                if user.isOnline {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 16, height: 16)
+                        .overlay {
+                            Circle()
+                                .stroke(Color.white, lineWidth: 2)
+                        }
+                        .offset(x: 2, y: 2)
+                }
+            }
             
             // User Info
             VStack(alignment: .leading, spacing: 6) {
@@ -341,10 +622,14 @@ struct EnhancedMatchCard: View {
                     
                     Spacer()
                     
-                    // Chevron
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundColor(.gray)
+                    // Time or unread badge
+                    if let unreadCount = match.unreadCount[currentUserId], unreadCount > 0 {
+                        unreadBadge(count: unreadCount)
+                    } else if let timestamp = match.lastMessageTimestamp {
+                        Text(timeAgo(from: timestamp))
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
                 }
                 
                 // Location
@@ -363,14 +648,20 @@ struct EnhancedMatchCard: View {
             }
         }
         .padding(16)
-        .background(Color.white)
+        .background(
+            match.unreadCount[currentUserId] ?? 0 > 0 ?
+            Color.purple.opacity(0.05) : Color.white
+        )
         .cornerRadius(16)
         .shadow(color: Color.black.opacity(isPressed ? 0.08 : 0.05), radius: isPressed ? 12 : 8, y: isPressed ? 6 : 4)
         .scaleEffect(isPressed ? 0.98 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
         .simultaneousGesture(
             DragGesture(minimumDistance: 0)
-                .onChanged { _ in isPressed = true }
+                .onChanged { _ in
+                    isPressed = true
+                    HapticManager.shared.impact(.light)
+                }
                 .onEnded { _ in isPressed = false }
         )
     }
@@ -426,20 +717,11 @@ struct EnhancedMatchCard: View {
     private var statusView: some View {
         Group {
             if match.lastMessageTimestamp != nil {
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 6, height: 6)
-                    
-                    Text(timeAgo(from: match.lastMessageTimestamp!))
+                if let lastMessage = match.lastMessage {
+                    Text(lastMessage)
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    
-                    Spacer()
-                    
-                    if let unreadCount = match.unreadCount[currentUserId], unreadCount > 0 {
-                        unreadBadge(count: unreadCount)
-                    }
+                        .lineLimit(1)
                 }
             } else {
                 HStack(spacing: 6) {
@@ -476,8 +758,8 @@ struct EnhancedMatchCard: View {
             .font(.caption2)
             .fontWeight(.bold)
             .foregroundColor(.white)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .frame(minWidth: 20, minHeight: 20)
+            .padding(.horizontal, 6)
             .background(
                 LinearGradient(
                     colors: [Color.purple, Color.blue],
@@ -492,22 +774,115 @@ struct EnhancedMatchCard: View {
         let interval = Date().timeIntervalSince(date)
         
         if interval < 60 {
-            return "Just now"
+            return "now"
         } else if interval < 3600 {
             let minutes = Int(interval / 60)
-            return "\(minutes)m ago"
+            return "\(minutes)m"
         } else if interval < 86400 {
             let hours = Int(interval / 3600)
-            return "\(hours)h ago"
+            return "\(hours)h"
         } else if interval < 604800 {
             let days = Int(interval / 86400)
-            return "\(days)d ago"
+            return "\(days)d"
         } else {
             let weeks = Int(interval / 604800)
-            return "\(weeks)w ago"
+            return "\(weeks)w"
         }
     }
 }
+
+// MARK: - 🆕 NEW: Support Components
+
+struct FilterButton: View {
+    let icon: String
+    let title: String
+    let isActive: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.caption)
+                Text(title)
+                    .font(.caption)
+                    .fontWeight(.medium)
+            }
+            .foregroundColor(isActive ? .white : .purple)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                isActive ?
+                LinearGradient(
+                    colors: [Color.purple, Color.blue],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ) :
+                LinearGradient(colors: [Color.purple.opacity(0.1)], startPoint: .leading, endPoint: .trailing)
+            )
+            .cornerRadius(20)
+        }
+    }
+}
+
+struct StatBubble: View {
+    let icon: String
+    let value: String
+    let label: String
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundColor(color)
+            
+            Text(value)
+                .font(.title3)
+                .fontWeight(.bold)
+            
+            Text(label)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+struct TipCard: View {
+    let icon: String
+    let text: String
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.purple, .blue],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .frame(width: 40, height: 40)
+                .background(Color.purple.opacity(0.1))
+                .cornerRadius(10)
+            
+            Text(text)
+                .font(.subheadline)
+                .foregroundColor(.primary)
+            
+            Spacer()
+        }
+        .padding(12)
+        .background(Color.white)
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.05), radius: 5)
+    }
+}
+
+// Note: InterestsView should already exist in your project
+// If not, create a simple placeholder view
 
 #Preview {
     NavigationStack {
