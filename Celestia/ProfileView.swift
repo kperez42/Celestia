@@ -2,78 +2,97 @@
 //  ProfileView.swift
 //  Celestia
 //
-//  Enhanced user profile with modern design
+//  ELITE PROFILE VIEW - Your Digital Identity
 //
 
 import SwiftUI
 
 struct ProfileView: View {
     @EnvironmentObject var authService: AuthService
+    @StateObject private var userService = UserService.shared
+    
     @State private var showingEditProfile = false
     @State private var showingSettings = false
     @State private var showingPremiumUpgrade = false
-    @State private var selectedPhoto = 0
     @State private var showingPhotoViewer = false
-    @State private var showingShareSheet = false
-    @State private var profileCompletionPercentage: Int = 0
+    @State private var selectedPhotoIndex = 0
     @State private var animateStats = false
+    @State private var profileCompletion = 0
     
     var body: some View {
         NavigationStack {
-            ScrollView(showsIndicators: false) {
+            ZStack {
+                Color(.systemGroupedBackground)
+                    .ignoresSafeArea()
+                
                 if let user = authService.currentUser {
-                    VStack(spacing: 0) {
-                        heroHeader(user: user)
-                        
-                        VStack(spacing: 20) {
-                            profileCompletionCard(user: user)
-                                .padding(.top, 20)
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 0) {
+                            // Hero header with profile photo
+                            heroSection(user: user)
                             
-                            quickStats(user: user)
-                            
-                            editProfileButton
-                            
-                            if user.isPremium {
-                                premiumBadgeCard(user: user)
+                            // Content sections
+                            VStack(spacing: 20) {
+                                // Profile completion
+                                if profileCompletion < 100 {
+                                    profileCompletionCard(user: user)
+                                        .padding(.top, 20)
+                                }
+                                
+                                // Stats row
+                                statsRow(user: user)
+                                
+                                // Edit profile button
+                                editButton
+                                
+                                // Premium badge or upgrade
+                                if user.isPremium {
+                                    premiumBadgeCard
+                                } else {
+                                    premiumUpgradeCard
+                                }
+                                
+                                // About section
+                                if !user.bio.isEmpty {
+                                    aboutSection(bio: user.bio)
+                                }
+                                
+                                // Details grid
+                                detailsCard(user: user)
+                                
+                                // Photo gallery
+                                if !user.photos.isEmpty {
+                                    photoGallerySection(photos: user.photos)
+                                }
+                                
+                                // Languages
+                                if !user.languages.isEmpty {
+                                    languagesCard(languages: user.languages)
+                                }
+                                
+                                // Interests
+                                if !user.interests.isEmpty {
+                                    interestsCard(interests: user.interests)
+                                }
+                                
+                                // Preferences
+                                preferencesCard(user: user)
+                                
+                                // Activity & Achievements
+                                achievementsCard(user: user)
+                                
+                                // Action buttons
+                                actionButtons
                             }
-                            
-                            if !user.bio.isEmpty {
-                                aboutSection(bio: user.bio)
-                            }
-                            
-                            detailsGrid(user: user)
-                            
-                            photoGallery(user: user)
-                            
-                            if !user.languages.isEmpty {
-                                languagesSection(languages: user.languages)
-                            }
-                            
-                            if !user.interests.isEmpty {
-                                interestsSection(interests: user.interests)
-                            }
-                            
-                            preferencesCard(user: user)
-                            
-                            achievementsSection(user: user)
-                            
-                            activitySection(user: user)
-                            
-                            if !user.isPremium {
-                                premiumCard
-                            }
-                            
-                            actionButtons
+                            .padding(.top, -40)
                         }
-                        .padding(.top, -30)
                     }
                 }
             }
-            .background(Color(.systemGroupedBackground))
             .navigationTitle("")
             .navigationBarHidden(true)
             .sheet(isPresented: $showingEditProfile) {
-                ProfileEditView()
+                EditProfileView()
             }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
@@ -83,75 +102,93 @@ struct ProfileView: View {
             }
             .fullScreenCover(isPresented: $showingPhotoViewer) {
                 if let user = authService.currentUser {
-                    PhotoViewerView(photos: user.photos.isEmpty ? [user.profileImageURL] : user.photos, selectedIndex: $selectedPhoto)
+                    PhotoViewerView(
+                        photos: user.photos.isEmpty ? [user.profileImageURL] : user.photos,
+                        selectedIndex: $selectedPhotoIndex
+                    )
                 }
             }
             .onAppear {
-                animateStats = true
+                withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
+                    animateStats = true
+                }
                 if let user = authService.currentUser {
-                    calculateProfileCompletion(user: user)
+                    profileCompletion = userService.profileCompletionPercentage(user)
                 }
             }
         }
     }
     
-    // MARK: - Hero Header
+    // MARK: - Hero Section
     
-    private func heroHeader(user: User) -> some View {
+    private func heroSection(user: User) -> some View {
         ZStack(alignment: .bottom) {
-            LinearGradient(
-                colors: [Color.purple.opacity(0.8), Color.blue.opacity(0.6)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .frame(height: 360)
-            .overlay {
-                Circle()
-                    .fill(Color.white.opacity(0.1))
-                    .frame(width: 200, height: 200)
-                    .offset(x: -100, y: -80)
+            // Gradient background with decorative elements
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        Color.purple.opacity(0.9),
+                        Color.pink.opacity(0.7),
+                        Color.blue.opacity(0.6)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
                 
-                Circle()
-                    .fill(Color.white.opacity(0.05))
-                    .frame(width: 150, height: 150)
-                    .offset(x: 120, y: -50)
-                
-                Circle()
-                    .fill(Color.yellow.opacity(0.1))
-                    .frame(width: 100, height: 100)
-                    .offset(x: 0, y: -120)
+                // Decorative circles
+                GeometryReader { geo in
+                    Circle()
+                        .fill(Color.white.opacity(0.1))
+                        .frame(width: 200, height: 200)
+                        .blur(radius: 40)
+                        .offset(x: -80, y: 50)
+                    
+                    Circle()
+                        .fill(Color.yellow.opacity(0.15))
+                        .frame(width: 120, height: 120)
+                        .blur(radius: 30)
+                        .offset(x: geo.size.width - 60, y: 100)
+                }
             }
+            .frame(height: 380)
             
+            // Profile content
             VStack(spacing: 16) {
                 Spacer()
                 
+                // Profile image with tap to expand
                 Button {
+                    selectedPhotoIndex = 0
                     showingPhotoViewer = true
+                    HapticManager.shared.impact(.medium)
                 } label: {
-                    profileImage(user: user)
+                    profileImageView(user: user)
                 }
                 
+                // Name and badges
                 VStack(spacing: 10) {
                     HStack(spacing: 8) {
                         Text(user.fullName)
-                            .font(.system(size: 28, weight: .bold))
+                            .font(.system(size: 32, weight: .bold))
                             .foregroundColor(.white)
                         
                         if user.isVerified {
                             Image(systemName: "checkmark.seal.fill")
                                 .font(.title3)
-                                .foregroundColor(.white)
+                                .foregroundColor(.blue)
+                                .shadow(color: .blue.opacity(0.5), radius: 5)
                         }
                         
                         if user.isPremium {
                             Image(systemName: "crown.fill")
-                                .font(.subheadline)
+                                .font(.title3)
                                 .foregroundColor(.yellow)
-                                .shadow(color: .yellow.opacity(0.5), radius: 4)
+                                .shadow(color: .yellow.opacity(0.7), radius: 8)
                         }
                     }
                     
-                    HStack(spacing: 12) {
+                    // Location and age
+                    HStack(spacing: 8) {
                         HStack(spacing: 4) {
                             Image(systemName: "mappin.circle.fill")
                                 .font(.caption)
@@ -159,27 +196,28 @@ struct ProfileView: View {
                                 .font(.subheadline)
                         }
                         
-                        if user.age >= 18 {
-                            Text("•")
-                            Text("\(user.age)")
-                                .font(.subheadline)
-                        }
+                        Text("•")
+                        
+                        Text("\(user.age) years old")
+                            .font(.subheadline)
                     }
-                    .foregroundColor(.white.opacity(0.9))
+                    .foregroundColor(.white.opacity(0.95))
                 }
-                .padding(.bottom, 30)
+                .padding(.bottom, 40)
             }
-            .frame(height: 360)
+            .frame(height: 380)
             
+            // Top bar buttons
             VStack {
                 HStack {
                     Button {
-                        showingShareSheet = true
+                        // Share profile
+                        HapticManager.shared.impact(.light)
                     } label: {
                         Image(systemName: "square.and.arrow.up")
                             .font(.title3)
                             .foregroundColor(.white)
-                            .padding(12)
+                            .frame(width: 44, height: 44)
                             .background(Color.white.opacity(0.2))
                             .clipShape(Circle())
                     }
@@ -188,25 +226,27 @@ struct ProfileView: View {
                     
                     Button {
                         showingSettings = true
+                        HapticManager.shared.impact(.light)
                     } label: {
                         Image(systemName: "gearshape.fill")
                             .font(.title3)
                             .foregroundColor(.white)
-                            .padding(12)
+                            .frame(width: 44, height: 44)
                             .background(Color.white.opacity(0.2))
                             .clipShape(Circle())
                     }
                 }
-                .padding()
+                .padding(20)
+                .padding(.top, 40)
                 Spacer()
             }
-            .frame(height: 360)
+            .frame(height: 380)
         }
     }
     
-    private func profileImage(user: User) -> some View {
+    private func profileImageView(user: User) -> some View {
         Group {
-            if !user.profileImageURL.isEmpty, let url = URL(string: user.profileImageURL) {
+            if let url = URL(string: user.profileImageURL), !user.profileImageURL.isEmpty {
                 AsyncImage(url: url) { phase in
                     switch phase {
                     case .success(let image):
@@ -214,729 +254,308 @@ struct ProfileView: View {
                             .resizable()
                             .scaledToFill()
                     default:
-                        placeholderProfileImage(initial: user.fullName.prefix(1))
+                        placeholderImage(initial: user.fullName.prefix(1))
                     }
                 }
             } else {
-                placeholderProfileImage(initial: user.fullName.prefix(1))
+                placeholderImage(initial: user.fullName.prefix(1))
             }
         }
-        .frame(width: 140, height: 140)
+        .frame(width: 160, height: 160)
         .clipShape(Circle())
-        .overlay {
+        .overlay(
             Circle()
-                .stroke(Color.white, lineWidth: 4)
-        }
-        .shadow(color: .black.opacity(0.3), radius: 15, y: 8)
-        .overlay(alignment: .bottomTrailing) {
-            if user.isOnline {
-                Circle()
-                    .fill(Color.green)
-                    .frame(width: 24, height: 24)
-                    .overlay {
-                        Circle()
-                            .stroke(Color.white, lineWidth: 3)
-                    }
-                    .offset(x: -8, y: -8)
-            }
-        }
-    }
-    
-    private func placeholderProfileImage(initial: String.SubSequence) -> some View {
-        ZStack {
-            Circle()
-                .fill(Color.white)
-            
-            Text(String(initial))
-                .font(.system(size: 56, weight: .bold))
-                .foregroundStyle(
+                .stroke(
                     LinearGradient(
-                        colors: [Color.purple, Color.blue],
+                        colors: [Color.white, Color.yellow.opacity(0.8)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
-                    )
+                    ),
+                    lineWidth: 4
                 )
+        )
+        .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
+        .overlay(alignment: .bottomTrailing) {
+            // Edit icon
+            ZStack {
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 44, height: 44)
+                
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 40, height: 40)
+                
+                Image(systemName: "camera.fill")
+                    .font(.callout)
+                    .foregroundColor(.white)
+            }
+            .offset(x: 4, y: 4)
         }
     }
     
-    // MARK: - Profile Completion
+    private func placeholderImage(initial: Substring) -> some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color.purple.opacity(0.8),
+                    Color.pink.opacity(0.7),
+                    Color.blue.opacity(0.6)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            
+            Text(initial)
+                .font(.system(size: 64, weight: .bold))
+                .foregroundColor(.white)
+        }
+    }
+    
+    // MARK: - Profile Completion Card
     
     private func profileCompletionCard(user: User) -> some View {
-        VStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Image(systemName: "chart.bar.fill")
-                    .foregroundColor(.purple)
-                
-                Text("Profile Strength")
-                    .font(.headline)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Profile Completion")
+                        .font(.headline)
+                    Text("Complete your profile to get more matches")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
                 
                 Spacer()
                 
-                Text("\(profileCompletionPercentage)%")
-                    .font(.headline)
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.purple, .blue],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-            }
-            
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.gray.opacity(0.2))
-                        .frame(height: 8)
+                ZStack {
+                    Circle()
+                        .stroke(Color.gray.opacity(0.2), lineWidth: 6)
                     
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(
+                    Circle()
+                        .trim(from: 0, to: CGFloat(profileCompletion) / 100)
+                        .stroke(
                             LinearGradient(
-                                colors: [.purple, .blue],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
+                                colors: [.purple, .pink],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            style: StrokeStyle(lineWidth: 6, lineCap: .round)
                         )
-                        .frame(width: geometry.size.width * CGFloat(profileCompletionPercentage) / 100, height: 8)
-                        .animation(.spring(response: 0.6, dampingFraction: 0.7), value: profileCompletionPercentage)
+                        .rotationEffect(.degrees(-90))
+                        .animation(.spring(response: 1.0, dampingFraction: 0.7), value: profileCompletion)
+                    
+                    Text("\(profileCompletion)%")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.purple)
                 }
+                .frame(width: 50, height: 50)
             }
-            .frame(height: 8)
             
-            if profileCompletionPercentage < 100 {
-                Text(getProfileTip(percentage: profileCompletionPercentage))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            // Missing items
+            if profileCompletion < 100 {
+                VStack(alignment: .leading, spacing: 8) {
+                    if user.bio.isEmpty {
+                        missingItem(icon: "text.alignleft", text: "Add a bio")
+                    }
+                    if user.photos.count < 3 {
+                        missingItem(icon: "photo.on.rectangle", text: "Add more photos")
+                    }
+                    if user.interests.count < 3 {
+                        missingItem(icon: "star", text: "Add interests")
+                    }
+                    if user.languages.isEmpty {
+                        missingItem(icon: "globe", text: "Add languages")
+                    }
+                }
             }
         }
         .padding(20)
         .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
-        .padding(.horizontal)
+        .cornerRadius(20)
+        .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
+        .padding(.horizontal, 20)
     }
     
-    private func calculateProfileCompletion(user: User) {
-        var completion = 0
-        let totalSteps = 8
-        
-        if !user.fullName.isEmpty { completion += 1 }
-        if !user.bio.isEmpty { completion += 1 }
-        if !user.profileImageURL.isEmpty { completion += 1 }
-        if user.interests.count >= 3 { completion += 1 }
-        if user.languages.count >= 1 { completion += 1 }
-        if user.photos.count >= 2 { completion += 1 }
-        if user.age >= 18 { completion += 1 }
-        if !user.location.isEmpty && !user.country.isEmpty { completion += 1 }
-        
-        profileCompletionPercentage = (completion * 100) / totalSteps
-    }
-    
-    private func getProfileTip(percentage: Int) -> String {
-        if percentage < 40 {
-            return "💡 Add a bio and interests to stand out!"
-        } else if percentage < 70 {
-            return "📸 Upload more photos to get 3x more matches!"
-        } else if percentage < 100 {
-            return "🎯 Almost there! Complete your profile for maximum visibility"
-        } else {
-            return "✨ Perfect! Your profile is complete"
+    private func missingItem(icon: String, text: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundColor(.purple)
+                .frame(width: 20)
+            
+            Text(text)
+                .font(.caption)
+                .foregroundColor(.secondary)
         }
     }
     
-    // MARK: - Quick Stats
+    // MARK: - Stats Row
     
-    private func quickStats(user: User) -> some View {
+    private func statsRow(user: User) -> some View {
         HStack(spacing: 0) {
-            statItem(title: "Matches", value: "\(user.matchCount)", icon: "heart.fill", color: .pink)
+            statCard(
+                icon: "heart.fill",
+                value: "\(user.matchCount)",
+                label: "Matches",
+                color: .pink
+            )
             
             Divider()
-                .frame(height: 50)
+                .frame(height: 40)
             
-            statItem(title: "Likes", value: "\(user.likesReceived)", icon: "star.fill", color: .yellow)
+            statCard(
+                icon: "eye.fill",
+                value: "\(user.profileViews)",
+                label: "Views",
+                color: .blue
+            )
             
             Divider()
-                .frame(height: 50)
+                .frame(height: 40)
             
-            statItem(title: "Views", value: "\(user.profileViews)", icon: "eye.fill", color: .blue)
+            statCard(
+                icon: "hand.thumbsup.fill",
+                value: "\(user.likesReceived)",
+                label: "Likes",
+                color: .purple
+            )
         }
-        .padding(.vertical, 24)
+        .padding(.vertical, 20)
         .background(Color.white)
         .cornerRadius(20)
-        .shadow(color: .black.opacity(0.08), radius: 12, y: 6)
-        .padding(.horizontal)
+        .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
+        .padding(.horizontal, 20)
+        .scaleEffect(animateStats ? 1 : 0.8)
+        .opacity(animateStats ? 1 : 0)
     }
     
-    private func statItem(title: String, value: String, icon: String, color: Color) -> some View {
+    private func statCard(icon: String, value: String, label: String, color: Color) -> some View {
         VStack(spacing: 10) {
-            ZStack {
-                Circle()
-                    .fill(color.opacity(0.15))
-                    .frame(width: 48, height: 48)
-                
-                Image(systemName: icon)
-                    .font(.title3)
-                    .foregroundColor(color)
-            }
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [color, color.opacity(0.7)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
             
             Text(value)
-                .font(.system(size: 24, weight: .bold))
+                .font(.title2)
+                .fontWeight(.bold)
                 .foregroundColor(.primary)
-                .opacity(animateStats ? 1 : 0)
-                .scaleEffect(animateStats ? 1 : 0.5)
-                .animation(.spring(response: 0.5, dampingFraction: 0.6).delay(0.1), value: animateStats)
             
-            Text(title)
+            Text(label)
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity)
     }
     
-    // MARK: - Premium Badge
+    // MARK: - Edit Button
     
-    private func premiumBadgeCard(user: User) -> some View {
-        HStack(spacing: 16) {
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [.yellow.opacity(0.3), .orange.opacity(0.3)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 56, height: 56)
-                
-                Image(systemName: "crown.fill")
-                    .font(.title2)
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.yellow, .orange],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            }
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Premium Member")
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                
-                if let expiryDate = user.subscriptionExpiryDate {
-                    Text("Active until \(expiryDate.formatted(date: .abbreviated, time: .omitted))")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                } else {
-                    Text("Unlimited access to all features")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-            
-            Spacer()
-            
-            Image(systemName: "checkmark.circle.fill")
-                .font(.title2)
-                .foregroundColor(.green)
-        }
-        .padding(20)
-        .background(
-            LinearGradient(
-                colors: [.yellow.opacity(0.1), .orange.opacity(0.1)],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-        )
-        .cornerRadius(16)
-        .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(
-                    LinearGradient(
-                        colors: [.yellow.opacity(0.4), .orange.opacity(0.4)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ),
-                    lineWidth: 1.5
-                )
-        }
-        .padding(.horizontal)
-    }
-    
-    // MARK: - Edit Profile Button
-    
-    private var editProfileButton: some View {
+    private var editButton: some View {
         Button {
             showingEditProfile = true
+            HapticManager.shared.impact(.medium)
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: "pencil.circle.fill")
                     .font(.title3)
-                
                 Text("Edit Profile")
-                    .font(.headline)
+                    .fontWeight(.semibold)
             }
             .foregroundColor(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
             .background(
                 LinearGradient(
-                    colors: [Color.purple, Color.blue],
+                    colors: [Color.purple, Color.pink],
                     startPoint: .leading,
                     endPoint: .trailing
                 )
             )
             .cornerRadius(16)
-            .shadow(color: .purple.opacity(0.3), radius: 8, y: 4)
+            .shadow(color: .purple.opacity(0.4), radius: 15, y: 8)
         }
-        .padding(.horizontal)
+        .padding(.horizontal, 20)
     }
     
-    // MARK: - About Section
+    // MARK: - Premium Badge Card
     
-    private func aboutSection(bio: String) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: "text.quote")
-                    .foregroundColor(.purple)
-                
-                Text("About Me")
-                    .font(.headline)
-                
-                Spacer()
-            }
-            
-            Text(bio)
-                .font(.body)
-                .foregroundColor(.secondary)
-                .lineSpacing(4)
-        }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 5)
-        .padding(.horizontal)
-    }
-    
-    // MARK: - Details Grid
-    
-    private func detailsGrid(user: User) -> some View {
-        VStack(spacing: 12) {
-            HStack {
-                Image(systemName: "info.circle")
-                    .foregroundColor(.purple)
-                
-                Text("Details")
-                    .font(.headline)
-                
-                Spacer()
-            }
-            
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                detailCard(icon: "person.fill", title: "Gender", value: user.gender, color: .purple)
-                detailCard(icon: "heart.circle.fill", title: "Looking For", value: user.lookingFor, color: .pink)
-                detailCard(icon: "calendar", title: "Age", value: "\(user.age)", color: .blue)
-                detailCard(icon: "globe", title: "Country", value: user.country, color: .green)
-            }
-        }
-        .padding(20)
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 5)
-        .padding(.horizontal)
-    }
-    
-    private func detailCard(icon: String, title: String, value: String, color: Color) -> some View {
-        VStack(spacing: 10) {
+    private var premiumBadgeCard: some View {
+        HStack(spacing: 16) {
             ZStack {
                 Circle()
-                    .fill(color.opacity(0.15))
-                    .frame(width: 44, height: 44)
+                    .fill(Color.yellow.opacity(0.2))
+                    .frame(width: 60, height: 60)
                 
-                Image(systemName: icon)
-                    .font(.title3)
-                    .foregroundColor(color)
+                Image(systemName: "crown.fill")
+                    .font(.title)
+                    .foregroundColor(.yellow)
             }
             
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.secondary)
-            
-            Text(value)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundColor(.primary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
-    }
-    
-    // MARK: - Photo Gallery
-    
-    private func photoGallery(user: User) -> some View {
-        let photos = user.photos.isEmpty ? [user.profileImageURL] : user.photos
-        
-        return VStack(spacing: 12) {
-            HStack {
-                Image(systemName: "photo.stack")
-                    .foregroundColor(.purple)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text("Premium Member")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.caption)
+                        .foregroundColor(.yellow)
+                }
                 
-                Text("Photos")
-                    .font(.headline)
-                
-                Spacer()
-                
-                Text("\(photos.count)")
-                    .font(.subheadline)
+                Text("Enjoying all premium features")
+                    .font(.caption)
                     .foregroundColor(.secondary)
             }
             
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(photos.indices, id: \.self) { index in
-                        Button {
-                            selectedPhoto = index
-                            showingPhotoViewer = true
-                        } label: {
-                            AsyncImage(url: URL(string: photos[index])) { phase in
-                                switch phase {
-                                case .success(let image):
-                                    image
-                                        .resizable()
-                                        .scaledToFill()
-                                case .failure(_):
-                                    placeholderPhoto
-                                default:
-                                    ProgressView()
-                                }
-                            }
-                            .frame(width: 120, height: 160)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                            }
-                        }
-                    }
-                }
-                .padding(.vertical, 4)
-            }
-        }
-        .padding(20)
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 5)
-        .padding(.horizontal)
-    }
-    
-    private var placeholderPhoto: some View {
-        ZStack {
-            Rectangle()
-                .fill(Color.gray.opacity(0.2))
-            
-            Image(systemName: "photo")
-                .font(.largeTitle)
-                .foregroundColor(.gray)
-        }
-    }
-    
-    // MARK: - Languages Section
-    
-    private func languagesSection(languages: [String]) -> some View {
-        VStack(spacing: 12) {
-            HStack {
-                Image(systemName: "globe")
-                    .foregroundColor(.purple)
-                
-                Text("Languages I Speak")
-                    .font(.headline)
-                
-                Spacer()
-            }
-            
-            FlowLayout3(spacing: 10) {
-                ForEach(languages, id: \.self) { language in
-                    HStack(spacing: 6) {
-                        Image(systemName: "bubble.left.fill")
-                            .font(.caption)
-                        Text(language)
-                            .font(.subheadline)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(
-                        LinearGradient(
-                            colors: [Color.purple.opacity(0.15), Color.blue.opacity(0.15)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .foregroundColor(.purple)
-                    .cornerRadius(20)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(20)
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 5)
-        .padding(.horizontal)
-    }
-    
-    // MARK: - Interests Section
-    
-    private func interestsSection(interests: [String]) -> some View {
-        VStack(spacing: 12) {
-            HStack {
-                Image(systemName: "star.fill")
-                    .foregroundColor(.purple)
-                
-                Text("My Interests")
-                    .font(.headline)
-                
-                Spacer()
-            }
-            
-            FlowLayout3(spacing: 10) {
-                ForEach(interests, id: \.self) { interest in
-                    HStack(spacing: 6) {
-                        Image(systemName: "heart.fill")
-                            .font(.caption)
-                        Text(interest)
-                            .font(.subheadline)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(
-                        LinearGradient(
-                            colors: [Color.pink.opacity(0.15), Color.orange.opacity(0.15)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .foregroundColor(.pink)
-                    .cornerRadius(20)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(20)
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 5)
-        .padding(.horizontal)
-    }
-    
-    // MARK: - Preferences Card
-    
-    private func preferencesCard(user: User) -> some View {
-        VStack(spacing: 16) {
-            HStack {
-                Image(systemName: "slider.horizontal.3")
-                    .foregroundColor(.purple)
-                
-                Text("My Preferences")
-                    .font(.headline)
-                
-                Spacer()
-            }
-            
-            VStack(spacing: 12) {
-                preferenceRow(icon: "calendar", title: "Age Range", value: "\(user.ageRangeMin) - \(user.ageRangeMax)")
-                preferenceRow(icon: "location.circle", title: "Max Distance", value: "\(user.maxDistance) km")
-                preferenceRow(icon: "eye", title: "Show in Search", value: user.showMeInSearch ? "Yes" : "No")
-            }
-        }
-        .padding(20)
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 5)
-        .padding(.horizontal)
-    }
-    
-    private func preferenceRow(icon: String, title: String, value: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.body)
-                .foregroundColor(.purple)
-                .frame(width: 28)
-            
-            Text(title)
-                .font(.subheadline)
-            
             Spacer()
-            
-            Text(value)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundColor(.gray)
-        }
-        .padding(14)
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
-    }
-    
-    // MARK: - Achievements
-    
-    private func achievementsSection(user: User) -> some View {
-        VStack(spacing: 16) {
-            HStack {
-                Image(systemName: "trophy.fill")
-                    .foregroundColor(.yellow)
-                
-                Text("Achievements")
-                    .font(.headline)
-                
-                Spacer()
-            }
-            
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                achievementBadge(
-                    icon: "flame.fill",
-                    title: "Active User",
-                    description: "7 day streak",
-                    isUnlocked: true,
-                    color: .orange
-                )
-                
-                achievementBadge(
-                    icon: "heart.fill",
-                    title: "First Match",
-                    description: "Got your first match",
-                    isUnlocked: user.matchCount > 0,
-                    color: .pink
-                )
-                
-                achievementBadge(
-                    icon: "star.fill",
-                    title: "Popular",
-                    description: "100+ profile views",
-                    isUnlocked: user.profileViews >= 100,
-                    color: .yellow
-                )
-                
-                achievementBadge(
-                    icon: "checkmark.seal.fill",
-                    title: "Complete Profile",
-                    description: "100% profile strength",
-                    isUnlocked: profileCompletionPercentage == 100,
-                    color: .blue
-                )
-            }
         }
         .padding(20)
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 5)
-        .padding(.horizontal)
+        .background(
+            LinearGradient(
+                colors: [Color.yellow.opacity(0.15), Color.orange.opacity(0.1)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .cornerRadius(20)
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(
+                    LinearGradient(
+                        colors: [Color.yellow.opacity(0.5), Color.orange.opacity(0.3)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 2
+                )
+        )
+        .padding(.horizontal, 20)
     }
     
-    private func achievementBadge(icon: String, title: String, description: String, isUnlocked: Bool, color: Color) -> some View {
-        VStack(spacing: 8) {
-            ZStack {
-                Circle()
-                    .fill(isUnlocked ? color.opacity(0.2) : Color.gray.opacity(0.1))
-                    .frame(width: 56, height: 56)
-                
-                Image(systemName: icon)
-                    .font(.title2)
-                    .foregroundColor(isUnlocked ? color : .gray)
-            }
-            
-            Text(title)
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundColor(isUnlocked ? .primary : .gray)
-            
-            Text(description)
-                .font(.caption2)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .padding(.vertical, 12)
-        .frame(maxWidth: .infinity)
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
-        .opacity(isUnlocked ? 1 : 0.5)
-    }
+    // MARK: - Premium Upgrade Card
     
-    // MARK: - Activity Section
-    
-    private func activitySection(user: User) -> some View {
-        VStack(spacing: 16) {
-            HStack {
-                Image(systemName: "chart.line.uptrend.xyaxis")
-                    .foregroundColor(.purple)
-                
-                Text("Recent Activity")
-                    .font(.headline)
-                
-                Spacer()
-            }
-            
-            VStack(spacing: 12) {
-                activityRow(icon: "clock.fill", title: "Last Active", value: user.lastActive.timeAgo(), color: .green)
-                activityRow(icon: "calendar", title: "Member Since", value: user.timestamp.formatted(date: .abbreviated, time: .omitted), color: .blue)
-                activityRow(icon: "heart.fill", title: "Likes Given", value: "\(user.likesGiven)", color: .pink)
-            }
-        }
-        .padding(20)
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 5)
-        .padding(.horizontal)
-    }
-    
-    private func activityRow(icon: String, title: String, value: String, color: Color) -> some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(color.opacity(0.15))
-                    .frame(width: 36, height: 36)
-                
-                Image(systemName: icon)
-                    .font(.caption)
-                    .foregroundColor(color)
-            }
-            
-            Text(title)
-                .font(.subheadline)
-            
-            Spacer()
-            
-            Text(value)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundColor(.secondary)
-        }
-        .padding(12)
-        .background(Color(.systemGray6))
-        .cornerRadius(10)
-    }
-    
-    // MARK: - Premium Card
-    
-    private var premiumCard: some View {
+    private var premiumUpgradeCard: some View {
         Button {
             showingPremiumUpgrade = true
+            HapticManager.shared.impact(.medium)
         } label: {
             HStack(spacing: 16) {
                 ZStack {
                     Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.yellow.opacity(0.3), Color.orange.opacity(0.3)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 64, height: 64)
+                        .fill(Color.yellow.opacity(0.2))
+                        .frame(width: 60, height: 60)
                     
                     Image(systemName: "crown.fill")
                         .font(.title)
@@ -950,7 +569,7 @@ struct ProfileView: View {
                 }
                 
                 VStack(alignment: .leading, spacing: 6) {
-                    HStack {
+                    HStack(spacing: 6) {
                         Text("Upgrade to Premium")
                             .font(.headline)
                             .foregroundColor(.primary)
@@ -960,61 +579,366 @@ struct ProfileView: View {
                             .foregroundColor(.yellow)
                     }
                     
-                    Text("Unlock unlimited features & boost visibility")
+                    Text("Unlock unlimited likes & see who likes you")
                         .font(.caption)
                         .foregroundColor(.secondary)
+                        .lineLimit(2)
                 }
                 
                 Spacer()
                 
                 Image(systemName: "arrow.right.circle.fill")
                     .font(.title2)
-                    .foregroundColor(.purple)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
             }
             .padding(20)
             .background(
                 LinearGradient(
-                    colors: [Color.yellow.opacity(0.1), Color.orange.opacity(0.1)],
-                    startPoint: .leading,
-                    endPoint: .trailing
+                    colors: [Color.yellow.opacity(0.1), Color.orange.opacity(0.08)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
                 )
             )
-            .cornerRadius(16)
-            .overlay {
-                RoundedRectangle(cornerRadius: 16)
+            .cornerRadius(20)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
                     .stroke(
                         LinearGradient(
-                            colors: [Color.yellow.opacity(0.5), Color.orange.opacity(0.5)],
-                            startPoint: .leading,
-                            endPoint: .trailing
+                            colors: [Color.yellow.opacity(0.3), Color.orange.opacity(0.2)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
                         ),
                         lineWidth: 2
                     )
-            }
-            .shadow(color: .yellow.opacity(0.2), radius: 10, y: 5)
+            )
+            .shadow(color: .yellow.opacity(0.15), radius: 15, y: 8)
         }
-        .padding(.horizontal)
+        .padding(.horizontal, 20)
+    }
+    
+    // MARK: - About Section
+    
+    private func aboutSection(bio: String) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "text.alignleft")
+                    .foregroundColor(.purple)
+                Text("About")
+                    .font(.headline)
+            }
+            
+            Text(bio)
+                .font(.body)
+                .foregroundColor(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(20)
+        .background(Color.white)
+        .cornerRadius(20)
+        .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
+        .padding(.horizontal, 20)
+    }
+    
+    // MARK: - Details Card
+    
+    private func detailsCard(user: User) -> some View {
+        VStack(spacing: 16) {
+            detailRow(icon: "person.fill", label: "Gender", value: user.gender)
+            Divider()
+            detailRow(icon: "heart.circle.fill", label: "Looking for", value: user.lookingFor)
+            Divider()
+            detailRow(icon: "calendar", label: "Member since", value: formatDate(user.timestamp))
+        }
+        .padding(20)
+        .background(Color.white)
+        .cornerRadius(20)
+        .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
+        .padding(.horizontal, 20)
+    }
+    
+    private func detailRow(icon: String, label: String, value: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .foregroundColor(.purple)
+                .frame(width: 24)
+            
+            Text(label)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            
+            Spacer()
+            
+            Text(value)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(.primary)
+        }
+    }
+    
+    // MARK: - Photo Gallery
+    
+    private func photoGallerySection(photos: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "photo.on.rectangle")
+                    .foregroundColor(.purple)
+                Text("Photo Gallery")
+                    .font(.headline)
+                
+                Spacer()
+                
+                Text("\(photos.count)")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Color.purple)
+                    .cornerRadius(12)
+            }
+            .padding(.horizontal, 20)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(photos.indices, id: \.self) { index in
+                        Button {
+                            selectedPhotoIndex = index
+                            showingPhotoViewer = true
+                            HapticManager.shared.impact(.light)
+                        } label: {
+                            AsyncImage(url: URL(string: photos[index])) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                default:
+                                    Color.gray.opacity(0.3)
+                                }
+                            }
+                            .frame(width: 140, height: 200)
+                            .cornerRadius(16)
+                            .clipped()
+                        }
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+        }
+    }
+    
+    // MARK: - Languages Card
+    
+    private func languagesCard(languages: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "globe")
+                    .foregroundColor(.purple)
+                Text("Languages")
+                    .font(.headline)
+            }
+            
+            FlowLayout3(spacing: 8) {
+                ForEach(languages, id: \.self) { language in
+                    Text(language)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.purple)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Color.purple.opacity(0.1))
+                        .cornerRadius(20)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(20)
+        .background(Color.white)
+        .cornerRadius(20)
+        .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
+        .padding(.horizontal, 20)
+    }
+    
+    // MARK: - Interests Card
+    
+    private func interestsCard(interests: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "star.fill")
+                    .foregroundColor(.purple)
+                Text("Interests")
+                    .font(.headline)
+            }
+            
+            FlowLayout3(spacing: 8) {
+                ForEach(interests, id: \.self) { interest in
+                    Text(interest)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.pink)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Color.pink.opacity(0.1))
+                        .cornerRadius(20)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(20)
+        .background(Color.white)
+        .cornerRadius(20)
+        .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
+        .padding(.horizontal, 20)
+    }
+    
+    // MARK: - Preferences Card
+    
+    private func preferencesCard(user: User) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "slider.horizontal.3")
+                    .foregroundColor(.purple)
+                Text("Discovery Preferences")
+                    .font(.headline)
+            }
+            
+            VStack(spacing: 12) {
+                HStack {
+                    Text("Age range")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(user.ageRangeMin) - \(user.ageRangeMax)")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                }
+                
+                Divider()
+                
+                HStack {
+                    Text("Max distance")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(user.maxDistance) km")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                }
+            }
+        }
+        .padding(20)
+        .background(Color.white)
+        .cornerRadius(20)
+        .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
+        .padding(.horizontal, 20)
+    }
+    
+    // MARK: - Achievements Card
+    
+    private func achievementsCard(user: User) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 8) {
+                Image(systemName: "trophy.fill")
+                    .foregroundColor(.purple)
+                Text("Achievements")
+                    .font(.headline)
+            }
+            
+            HStack(spacing: 12) {
+                achievementBadge(
+                    icon: "flame.fill",
+                    title: "Active",
+                    subtitle: "Daily user",
+                    color: .orange
+                )
+                
+                if user.matchCount >= 10 {
+                    achievementBadge(
+                        icon: "heart.fill",
+                        title: "Popular",
+                        subtitle: "\(user.matchCount) matches",
+                        color: .pink
+                    )
+                }
+                
+                if user.isVerified {
+                    achievementBadge(
+                        icon: "checkmark.seal.fill",
+                        title: "Verified",
+                        subtitle: "Trusted",
+                        color: .blue
+                    )
+                }
+            }
+        }
+        .padding(20)
+        .background(Color.white)
+        .cornerRadius(20)
+        .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
+        .padding(.horizontal, 20)
+    }
+    
+    private func achievementBadge(icon: String, title: String, subtitle: String, color: Color) -> some View {
+        VStack(spacing: 8) {
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.15))
+                    .frame(width: 60, height: 60)
+                
+                Image(systemName: icon)
+                    .font(.title2)
+                    .foregroundColor(color)
+            }
+            
+            Text(title)
+                .font(.caption)
+                .fontWeight(.semibold)
+            
+            Text(subtitle)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
     }
     
     // MARK: - Action Buttons
     
     private var actionButtons: some View {
         VStack(spacing: 12) {
-            actionButton(icon: "questionmark.circle.fill", title: "Help & Support", color: .blue) {
+            actionButton(
+                icon: "questionmark.circle.fill",
+                title: "Help & Support",
+                color: .blue
+            ) {
                 if let url = URL(string: "mailto:support@celestia.app") {
                     UIApplication.shared.open(url)
                 }
             }
             
-            actionButton(icon: "shield.checkered", title: "Privacy & Safety", color: .green) {
+            actionButton(
+                icon: "shield.checkered",
+                title: "Privacy & Safety",
+                color: .green
+            ) {
                 showingSettings = true
             }
             
-            actionButton(icon: "arrow.right.square.fill", title: "Sign Out", color: .red) {
+            actionButton(
+                icon: "arrow.right.square.fill",
+                title: "Sign Out",
+                color: .red
+            ) {
                 authService.signOut()
             }
         }
-        .padding(.horizontal)
+        .padding(.horizontal, 20)
         .padding(.bottom, 30)
     }
     
@@ -1024,7 +948,7 @@ struct ProfileView: View {
                 ZStack {
                     Circle()
                         .fill(color.opacity(0.15))
-                        .frame(width: 40, height: 40)
+                        .frame(width: 44, height: 44)
                     
                     Image(systemName: icon)
                         .font(.body)
@@ -1040,13 +964,21 @@ struct ProfileView: View {
                 
                 Image(systemName: "chevron.right")
                     .font(.caption)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondary)
             }
             .padding(16)
             .background(Color.white)
-            .cornerRadius(14)
-            .shadow(color: .black.opacity(0.05), radius: 5)
+            .cornerRadius(16)
+            .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
         }
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        return formatter.string(from: date)
     }
 }
 
@@ -1071,13 +1003,13 @@ struct PhotoViewerView: View {
                                 .scaledToFit()
                         default:
                             ProgressView()
+                                .tint(.white)
                         }
                     }
                     .tag(index)
                 }
             }
-            .tabViewStyle(.page)
-            .indexViewStyle(.page(backgroundDisplayMode: .always))
+            .tabViewStyle(.page(indexDisplayMode: .always))
             
             VStack {
                 HStack {
@@ -1086,7 +1018,7 @@ struct PhotoViewerView: View {
                         dismiss()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.title)
+                            .font(.largeTitle)
                             .foregroundColor(.white)
                             .padding()
                     }

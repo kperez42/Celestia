@@ -1,16 +1,8 @@
 //
-//  MessagesView.swift - ENHANCED VERSION
+//  MessagesView.swift
 //  Celestia
 //
-//  ✨ Improvements:
-//  - Beautiful header with stats
-//  - Animated message rows
-//  - Search with live filtering
-//  - Swipe to delete/archive
-//  - Online status indicators
-//  - Typing indicators
-//  - Better empty states
-//  - Pull to refresh
+//  ELITE MESSAGES VIEW - Premium Chat Experience
 //
 
 import SwiftUI
@@ -24,8 +16,28 @@ struct MessagesView: View {
     @State private var matchedUsers: [String: User] = [:]
     @State private var searchText = ""
     @State private var showSearch = false
-    @State private var isRefreshing = false
-    @State private var selectedConversation: (Match, User)? = nil
+    @State private var selectedMatch: (Match, User)?
+    @State private var showingChat = false
+    
+    var conversations: [(Match, User)] {
+        matchService.matches.compactMap { match in
+            guard let user = getMatchedUser(match) else { return nil }
+            return (match, user)
+        }
+    }
+    
+    var filteredConversations: [(Match, User)] {
+        guard !searchText.isEmpty else { return conversations }
+        return conversations.filter { _, user in
+            user.fullName.localizedCaseInsensitiveContains(searchText) ||
+            user.location.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+    
+    var totalUnread: Int {
+        guard let userId = authService.currentUser?.id else { return 0 }
+        return matchService.matches.reduce(0) { $0 + ($1.unreadCount[userId] ?? 0) }
+    }
     
     var body: some View {
         NavigationStack {
@@ -34,22 +46,22 @@ struct MessagesView: View {
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    // Custom animated header
-                    animatedHeader
+                    // Header
+                    headerView
                     
-                    // Search bar (conditional)
+                    // Search bar
                     if showSearch {
                         searchBar
                             .transition(.move(edge: .top).combined(with: .opacity))
                     }
                     
                     // Content
-                    if isLoading {
+                    if matchService.isLoading && conversations.isEmpty {
                         loadingView
                     } else if conversations.isEmpty {
-                        enhancedEmptyState
+                        emptyStateView
                     } else {
-                        conversationsList
+                        conversationsListView
                     }
                 }
             }
@@ -59,109 +71,133 @@ struct MessagesView: View {
                 await loadData()
             }
             .refreshable {
-                await refreshData()
+                HapticManager.shared.impact(.light)
+                await loadData()
             }
-            .onDisappear {
-                matchService.stopListening()
+            .sheet(item: Binding(
+                get: { selectedMatch.map { IdentifiableMatchUser(match: $0.0, user: $0.1) } },
+                set: { selectedMatch = $0.map { ($0.match, $0.user) } }
+            )) { item in
+                NavigationStack {
+                    ChatView(match: item.match, otherUser: item.user)
+                }
             }
         }
     }
     
-    // MARK: - Animated Header
+    // MARK: - Header
     
-    private var animatedHeader: some View {
+    private var headerView: some View {
         ZStack {
             // Gradient background
             LinearGradient(
                 colors: [
-                    Color.purple.opacity(0.85),
-                    Color.pink.opacity(0.75),
-                    Color.blue.opacity(0.65)
+                    Color.purple.opacity(0.9),
+                    Color.pink.opacity(0.7),
+                    Color.blue.opacity(0.6)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            .frame(height: 140)
-            .overlay {
-                // Decorative circles
-                GeometryReader { geo in
-                    Circle()
-                        .fill(Color.white.opacity(0.1))
-                        .frame(width: 100, height: 100)
-                        .offset(x: -30, y: 20)
-                    
-                    Circle()
-                        .fill(Color.yellow.opacity(0.15))
-                        .frame(width: 60, height: 60)
-                        .offset(x: geo.size.width - 40, y: 40)
-                }
+            
+            // Decorative elements
+            GeometryReader { geo in
+                Circle()
+                    .fill(Color.white.opacity(0.1))
+                    .frame(width: 100, height: 100)
+                    .blur(radius: 20)
+                    .offset(x: -30, y: 20)
+                
+                Circle()
+                    .fill(Color.yellow.opacity(0.15))
+                    .frame(width: 60, height: 60)
+                    .blur(radius: 15)
+                    .offset(x: geo.size.width - 50, y: 40)
             }
             
             VStack(spacing: 12) {
                 HStack(alignment: .center) {
-                    // Icon and title
+                    // Title section
                     HStack(spacing: 12) {
                         Image(systemName: "message.circle.fill")
-                            .font(.title)
+                            .font(.system(size: 34))
                             .foregroundStyle(
                                 LinearGradient(
-                                    colors: [.white, .yellow.opacity(0.8)],
+                                    colors: [.white, .yellow.opacity(0.9)],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 )
                             )
-                            .shadow(color: .white.opacity(0.3), radius: 5)
+                            .shadow(color: .white.opacity(0.4), radius: 10)
                         
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Messages")
-                                .font(.system(size: 32, weight: .bold))
+                                .font(.system(size: 34, weight: .bold))
                                 .foregroundColor(.white)
                             
                             if !conversations.isEmpty {
                                 HStack(spacing: 6) {
-                                    Text("\(conversations.count) conversations")
-                                        .font(.subheadline)
+                                    Text("\(conversations.count)")
+                                        .fontWeight(.semibold)
+                                    Text("chats")
                                     
-                                    if unreadTotal > 0 {
+                                    if totalUnread > 0 {
                                         Text("•")
-                                        Text("\(unreadTotal) unread")
+                                        HStack(spacing: 4) {
+                                            Circle()
+                                                .fill(Color.white)
+                                                .frame(width: 6, height: 6)
+                                            Text("\(totalUnread) unread")
+                                                .fontWeight(.semibold)
+                                        }
                                     }
                                 }
-                                .foregroundColor(.white.opacity(0.9))
+                                .font(.subheadline)
+                                .foregroundColor(.white.opacity(0.95))
                             }
                         }
                     }
                     
                     Spacer()
                     
-                    // Action buttons
+                    // Actions
                     HStack(spacing: 12) {
                         // Search toggle
                         Button {
                             withAnimation(.spring(response: 0.3)) {
                                 showSearch.toggle()
+                                if !showSearch {
+                                    searchText = ""
+                                }
                             }
                             HapticManager.shared.impact(.light)
                         } label: {
                             Image(systemName: showSearch ? "xmark.circle.fill" : "magnifyingglass")
                                 .font(.title3)
                                 .foregroundColor(.white)
-                                .frame(width: 40, height: 40)
-                                .background(Color.white.opacity(0.2))
+                                .frame(width: 44, height: 44)
+                                .background(Color.white.opacity(showSearch ? 0.25 : 0.15))
                                 .clipShape(Circle())
                         }
                         
-                        // Unread count badge
-                        if unreadTotal > 0 {
+                        // Unread indicator
+                        if totalUnread > 0 {
                             ZStack {
                                 Circle()
                                     .fill(Color.white)
-                                    .frame(width: 40, height: 40)
+                                    .frame(width: 44, height: 44)
+                                    .shadow(color: .white.opacity(0.4), radius: 8)
                                 
-                                Text("\(unreadTotal)")
-                                    .font(.subheadline)
+                                Text("\(totalUnread)")
+                                    .font(.headline)
                                     .fontWeight(.bold)
-                                    .foregroundColor(.purple)
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [.purple, .pink],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
                             }
                         }
                     }
@@ -171,6 +207,7 @@ struct MessagesView: View {
             }
             .padding(.bottom, 16)
         }
+        .frame(height: 140)
     }
     
     // MARK: - Search Bar
@@ -179,7 +216,6 @@ struct MessagesView: View {
         HStack(spacing: 12) {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.gray)
-                .font(.body)
             
             TextField("Search conversations...", text: $searchText)
                 .autocorrectionDisabled()
@@ -187,7 +223,10 @@ struct MessagesView: View {
             
             if !searchText.isEmpty {
                 Button {
-                    searchText = ""
+                    withAnimation {
+                        searchText = ""
+                    }
+                    HapticManager.shared.impact(.light)
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundColor(.gray)
@@ -204,29 +243,25 @@ struct MessagesView: View {
     
     // MARK: - Conversations List
     
-    private var conversationsList: some View {
+    private var conversationsListView: some View {
         ScrollView(showsIndicators: false) {
             LazyVStack(spacing: 12) {
                 ForEach(Array(filteredConversations.enumerated()), id: \.element.0.id) { index, conversation in
                     let (match, user) = conversation
                     
-                    NavigationLink(destination: ChatView(match: match, otherUser: user)) {
-                        AnimatedMessageRow(
-                            match: match,
-                            user: user,
-                            unreadCount: getUnreadCount(for: match),
-                            index: index
-                        )
+                    ConversationRow(
+                        match: match,
+                        user: user,
+                        currentUserId: authService.currentUser?.id ?? "",
+                        index: index
+                    )
+                    .onTapGesture {
+                        HapticManager.shared.impact(.medium)
+                        selectedMatch = (match, user)
                     }
-                    .buttonStyle(PlainButtonStyle())
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .trailing).combined(with: .opacity),
-                        removal: .move(edge: .leading).combined(with: .opacity)
-                    ))
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
+            .padding(20)
             .padding(.bottom, 80)
         }
     }
@@ -234,59 +269,30 @@ struct MessagesView: View {
     // MARK: - Loading View
     
     private var loadingView: some View {
-        VStack(spacing: 25) {
-            ZStack {
-                // Outer ring
-                Circle()
-                    .stroke(Color.purple.opacity(0.2), lineWidth: 3)
-                    .frame(width: 60, height: 60)
-                
-                // Animated ring
-                Circle()
-                    .trim(from: 0, to: 0.7)
-                    .stroke(
-                        LinearGradient(
-                            colors: [.purple, .pink, .blue],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        style: StrokeStyle(lineWidth: 3, lineCap: .round)
-                    )
-                    .frame(width: 60, height: 60)
-                    .rotationEffect(.degrees(-90))
-                    .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: UUID())
-            }
+        VStack(spacing: 20) {
+            ProgressView()
+                .scaleEffect(1.5)
+                .tint(.purple)
             
-            VStack(spacing: 8) {
-                Text("Loading conversations...")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.primary)
-                
-                Text("This won't take long")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-            }
+            Text("Loading messages...")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
         }
-        .frame(maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
-    // MARK: - Enhanced Empty State
+    // MARK: - Empty State
     
-    private var enhancedEmptyState: some View {
-        VStack(spacing: 30) {
+    private var emptyStateView: some View {
+        VStack(spacing: 24) {
             Spacer()
             
-            // Animated icon
+            // Icon
             ZStack {
                 Circle()
                     .fill(
                         LinearGradient(
-                            colors: [
-                                Color.purple.opacity(0.2),
-                                Color.pink.opacity(0.15),
-                                Color.blue.opacity(0.1)
-                            ],
+                            colors: [Color.purple.opacity(0.2), Color.pink.opacity(0.1)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -297,7 +303,7 @@ struct MessagesView: View {
                     .font(.system(size: 70))
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [Color.purple, Color.pink, Color.blue],
+                            colors: [.purple, .pink],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -309,28 +315,28 @@ struct MessagesView: View {
                     .font(.title2)
                     .fontWeight(.bold)
                 
-                Text("Start swiping to match with people\nand begin chatting!")
+                Text("When you match with someone, you'll be able to chat here")
                     .font(.subheadline)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
-                    .lineSpacing(4)
+                    .padding(.horizontal, 40)
             }
             
             // CTA Button
-            NavigationLink(destination: Text("Discover View")) {
+            Button {
+                // Navigate to discover
+            } label: {
                 HStack(spacing: 10) {
-                    Image(systemName: "flame.fill")
-                        .font(.headline)
-                    Text("Start Discovering")
-                        .font(.headline)
+                    Image(systemName: "heart.fill")
+                    Text("Start Swiping")
                         .fontWeight(.semibold)
                 }
                 .foregroundColor(.white)
-                .padding(.horizontal, 32)
-                .padding(.vertical, 16)
+                .padding(.horizontal, 28)
+                .padding(.vertical, 14)
                 .background(
                     LinearGradient(
-                        colors: [Color.purple, Color.pink, Color.blue],
+                        colors: [Color.purple, Color.pink],
                         startPoint: .leading,
                         endPoint: .trailing
                     )
@@ -338,130 +344,84 @@ struct MessagesView: View {
                 .cornerRadius(25)
                 .shadow(color: .purple.opacity(0.4), radius: 15, y: 8)
             }
+            .padding(.top, 10)
             
             Spacer()
-            Spacer()
         }
-        .padding(.horizontal, 40)
-    }
-    
-    // MARK: - Helper Computed Properties
-    
-    private var isLoading: Bool {
-        matchService.isLoading && matchService.matches.isEmpty
-    }
-    
-    private var conversations: [(Match, User)] {
-        matchService.matches.compactMap { match in
-            guard let otherUserId = getOtherUserId(match: match),
-                  let user = matchedUsers[otherUserId] else {
-                return nil
-            }
-            return (match, user)
-        }
-        .sorted { lhs, rhs in
-            let lhsTimestamp = lhs.0.lastMessageTimestamp ?? lhs.0.timestamp
-            let rhsTimestamp = rhs.0.lastMessageTimestamp ?? rhs.0.timestamp
-            return lhsTimestamp > rhsTimestamp
-        }
-    }
-    
-    private var filteredConversations: [(Match, User)] {
-        if searchText.isEmpty {
-            return conversations
-        } else {
-            return conversations.filter { _, user in
-                user.fullName.localizedCaseInsensitiveContains(searchText) ||
-                user.location.localizedCaseInsensitiveContains(searchText) ||
-                user.country.localizedCaseInsensitiveContains(searchText)
-            }
-        }
-    }
-    
-    private var unreadTotal: Int {
-        guard let currentUserId = authService.currentUser?.id else { return 0 }
-        return matchService.matches.reduce(0) { total, match in
-            total + (match.unreadCount[currentUserId] ?? 0)
-        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     // MARK: - Helper Functions
     
-    private func getUnreadCount(for match: Match) -> Int {
-        guard let currentUserId = authService.currentUser?.id else { return 0 }
-        return match.unreadCount[currentUserId] ?? 0
-    }
-    
-    private func getOtherUserId(match: Match) -> String? {
-        guard let currentUserId = authService.currentUser?.id else { return nil }
-        return match.user1Id == currentUserId ? match.user2Id : match.user1Id
-    }
-    
     private func loadData() async {
-        guard let currentUserId = authService.currentUser?.id else { return }
+        guard let userId = authService.currentUser?.id else { return }
         
         do {
-            try await matchService.fetchMatches(userId: currentUserId)
+            try await matchService.fetchMatches(userId: userId)
             
+            // Load users for all matches
             for match in matchService.matches {
-                if let otherUserId = getOtherUserId(match: match) {
-                    if matchedUsers[otherUserId] == nil {
-                        if let user = try await userService.fetchUser(userId: otherUserId) {
-                            await MainActor.run {
-                                matchedUsers[otherUserId] = user
-                            }
+                let otherUserId = match.user1Id == userId ? match.user2Id : match.user1Id
+                if matchedUsers[otherUserId] == nil {
+                    if let user = try? await userService.fetchUser(userId: otherUserId) {
+                        await MainActor.run {
+                            matchedUsers[otherUserId] = user
                         }
                     }
                 }
             }
-            
-            matchService.listenToMatches(userId: currentUserId)
         } catch {
-            print("❌ Error loading messages: \(error)")
+            print("Error loading messages: \(error)")
         }
     }
     
-    private func refreshData() async {
-        isRefreshing = true
-        HapticManager.shared.impact(.light)
-        await loadData()
-        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-        isRefreshing = false
+    private func getMatchedUser(_ match: Match) -> User? {
+        guard let currentUserId = authService.currentUser?.id else { return nil }
+        let otherUserId = match.user1Id == currentUserId ? match.user2Id : match.user1Id
+        return matchedUsers[otherUserId]
     }
 }
 
-// MARK: - Animated Message Row
+// MARK: - Conversation Row
 
-struct AnimatedMessageRow: View {
+struct ConversationRow: View {
     let match: Match
     let user: User
-    let unreadCount: Int
+    let currentUserId: String
     let index: Int
     
     @State private var isPressed = false
     @State private var appeared = false
     
+    private var unreadCount: Int {
+        match.unreadCount[currentUserId] ?? 0
+    }
+    
+    private var isNewMatch: Bool {
+        match.lastMessage == nil
+    }
+    
     var body: some View {
         HStack(spacing: 16) {
-            // Profile Image with online indicator
-            ZStack(alignment: .bottomTrailing) {
+            // Profile image with online indicator
+            ZStack(alignment: .topTrailing) {
                 profileImage
                 
                 if user.isOnline {
                     Circle()
                         .fill(Color.green)
                         .frame(width: 18, height: 18)
-                        .overlay {
+                        .overlay(
                             Circle()
                                 .stroke(Color.white, lineWidth: 3)
-                        }
-                        .offset(x: 3, y: 3)
+                        )
+                        .offset(x: 4, y: -4)
                 }
             }
             
-            // Message Info
+            // Message content
             VStack(alignment: .leading, spacing: 8) {
-                // Name and time row
+                // Name and time
                 HStack {
                     HStack(spacing: 6) {
                         Text(user.fullName)
@@ -473,13 +433,13 @@ struct AnimatedMessageRow: View {
                         if user.isVerified {
                             Image(systemName: "checkmark.seal.fill")
                                 .font(.caption)
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [.blue, .cyan],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
+                                .foregroundColor(.blue)
+                        }
+                        
+                        if user.isPremium {
+                            Image(systemName: "crown.fill")
+                                .font(.caption2)
+                                .foregroundColor(.yellow)
                         }
                     }
                     
@@ -488,19 +448,13 @@ struct AnimatedMessageRow: View {
                     if let timestamp = match.lastMessageTimestamp {
                         Text(timeAgo(from: timestamp))
                             .font(.caption)
-                            .foregroundColor(.gray)
+                            .foregroundColor(.secondary)
                     }
                 }
                 
-                // Last message or new match
-                HStack(alignment: .center, spacing: 0) {
-                    if let lastMessage = match.lastMessage {
-                        Text(lastMessage)
-                            .font(.subheadline)
-                            .foregroundColor(unreadCount > 0 ? .primary : .gray)
-                            .fontWeight(unreadCount > 0 ? .semibold : .regular)
-                            .lineLimit(2)
-                    } else {
+                // Last message or new match indicator
+                HStack(spacing: 0) {
+                    if isNewMatch {
                         HStack(spacing: 6) {
                             Image(systemName: "sparkles")
                                 .font(.caption)
@@ -515,10 +469,17 @@ struct AnimatedMessageRow: View {
                                 endPoint: .trailing
                             )
                         )
+                    } else if let lastMessage = match.lastMessage {
+                        Text(lastMessage)
+                            .font(.subheadline)
+                            .foregroundColor(unreadCount > 0 ? .primary : .secondary)
+                            .fontWeight(unreadCount > 0 ? .semibold : .regular)
+                            .lineLimit(2)
                     }
                     
                     Spacer()
                     
+                    // Unread badge
                     if unreadCount > 0 {
                         unreadBadge
                     }
@@ -531,8 +492,8 @@ struct AnimatedMessageRow: View {
                 if unreadCount > 0 {
                     LinearGradient(
                         colors: [
-                            Color.purple.opacity(0.05),
-                            Color.pink.opacity(0.03)
+                            Color.purple.opacity(0.08),
+                            Color.pink.opacity(0.05)
                         ],
                         startPoint: .leading,
                         endPoint: .trailing
@@ -548,6 +509,19 @@ struct AnimatedMessageRow: View {
             radius: isPressed ? 12 : 8,
             y: isPressed ? 6 : 4
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(
+                    unreadCount > 0 || isNewMatch ?
+                    LinearGradient(
+                        colors: [Color.purple.opacity(0.3), Color.pink.opacity(0.2)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ) :
+                    LinearGradient(colors: [Color.clear], startPoint: .leading, endPoint: .trailing),
+                    lineWidth: 1.5
+                )
+        )
         .scaleEffect(isPressed ? 0.97 : 1.0)
         .offset(x: appeared ? 0 : 300)
         .opacity(appeared ? 1 : 0)
@@ -558,9 +532,7 @@ struct AnimatedMessageRow: View {
                     isPressed = true
                     HapticManager.shared.impact(.light)
                 }
-                .onEnded { _ in
-                    isPressed = false
-                }
+                .onEnded { _ in isPressed = false }
         )
         .onAppear {
             withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(Double(index) * 0.05)) {
@@ -568,8 +540,6 @@ struct AnimatedMessageRow: View {
             }
         }
     }
-    
-    // MARK: - Profile Image
     
     private var profileImage: some View {
         Group {
@@ -590,7 +560,7 @@ struct AnimatedMessageRow: View {
         }
         .frame(width: 70, height: 70)
         .clipShape(Circle())
-        .overlay {
+        .overlay(
             Circle()
                 .stroke(
                     LinearGradient(
@@ -603,7 +573,7 @@ struct AnimatedMessageRow: View {
                     ),
                     lineWidth: 2
                 )
-        }
+        )
     }
     
     private var placeholderImage: some View {
@@ -624,8 +594,6 @@ struct AnimatedMessageRow: View {
         }
     }
     
-    // MARK: - Unread Badge
-    
     private var unreadBadge: some View {
         Text("\(unreadCount)")
             .font(.caption2)
@@ -641,29 +609,26 @@ struct AnimatedMessageRow: View {
                 )
             )
             .clipShape(Capsule())
+            .shadow(color: .purple.opacity(0.3), radius: 5)
     }
-    
-    // MARK: - Time Ago
     
     private func timeAgo(from date: Date) -> String {
         let interval = Date().timeIntervalSince(date)
         
-        if interval < 60 {
-            return "now"
-        } else if interval < 3600 {
-            let minutes = Int(interval / 60)
-            return "\(minutes)m"
-        } else if interval < 86400 {
-            let hours = Int(interval / 3600)
-            return "\(hours)h"
-        } else if interval < 604800 {
-            let days = Int(interval / 86400)
-            return "\(days)d"
-        } else {
-            let weeks = Int(interval / 604800)
-            return "\(weeks)w"
-        }
+        if interval < 60 { return "now" }
+        else if interval < 3600 { return "\(Int(interval / 60))m" }
+        else if interval < 86400 { return "\(Int(interval / 3600))h" }
+        else if interval < 604800 { return "\(Int(interval / 86400))d" }
+        else { return "\(Int(interval / 604800))w" }
     }
+}
+
+// MARK: - Helper Struct
+
+struct IdentifiableMatchUser: Identifiable {
+    let id = UUID()
+    let match: Match
+    let user: User
 }
 
 #Preview {
