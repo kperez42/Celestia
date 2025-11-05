@@ -10,7 +10,7 @@ import SwiftUI
 struct ChatDetailView: View {
     let otherUser: User
     @StateObject private var viewModel: ChatViewModel
-    @EnvironmentObject var authViewModel: AuthViewModel
+    @EnvironmentObject var authService: AuthService
     @State private var messageText = ""
     @FocusState private var isInputFocused: Bool
     
@@ -26,9 +26,9 @@ struct ChatDetailView: View {
                 ScrollView {
                     LazyVStack(spacing: 12) {
                         ForEach(viewModel.messages) { message in
-                            MessageBubble(
+                            MessageBubbleGradient(
                                 message: message,
-                                isFromCurrentUser: message.senderID == authViewModel.currentUser?.id
+                                isFromCurrentUser: message.senderID == authService.currentUser?.id
                             )
                             .id(message.id)
                         }
@@ -56,17 +56,21 @@ struct ChatDetailView: View {
                 Button(action: sendMessage) {
                     Image(systemName: "arrow.up.circle.fill")
                         .font(.system(size: 32))
-                        .foregroundColor(messageText.isEmpty ? .gray : .blue)
+                        .foregroundStyle(
+                            messageText.isEmpty ? 
+                            LinearGradient(colors: [.gray, .gray], startPoint: .leading, endPoint: .trailing) :
+                            LinearGradient(colors: [.purple, .pink], startPoint: .leading, endPoint: .trailing)
+                        )
                 }
                 .disabled(messageText.isEmpty)
             }
             .padding()
             .background(Color(.systemBackground))
         }
-        .navigationTitle(otherUser.fullName) // FIXED: Changed from .name to .fullName
+        .navigationTitle(otherUser.fullName)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            if let currentUserId = authViewModel.currentUser?.id {
+            if let currentUserId = authService.currentUser?.id {
                 viewModel.updateCurrentUserId(currentUserId)
                 viewModel.loadMessages()
             }
@@ -81,58 +85,11 @@ struct ChatDetailView: View {
     }
 }
 
-struct MessageBubble: View {
-    let message: Message
-    let isFromCurrentUser: Bool
-    
-    var body: some View {
-        HStack {
-            if isFromCurrentUser {
-                Spacer()
-            }
-            
-            VStack(alignment: isFromCurrentUser ? .trailing : .leading, spacing: 4) {
-                Text(message.text)
-                    .padding(12)
-                    .background(isFromCurrentUser ? Color.blue : Color(.systemGray5))
-                    .foregroundColor(isFromCurrentUser ? .white : .primary)
-                    .cornerRadius(16)
-                
-                Text(message.timestamp.timeAgoDisplay())
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
-            
-            if !isFromCurrentUser {
-                Spacer()
-            }
-        }
-    }
-}
-
-extension Date {
-    func timeAgoDisplay() -> String {
-        let calendar = Calendar.current
-        let now = Date()
-        let components = calendar.dateComponents([.minute, .hour, .day], from: self, to: now)
-        
-        if let day = components.day, day > 0 {
-            return day == 1 ? "1 day ago" : "\(day) days ago"
-        } else if let hour = components.hour, hour > 0 {
-            return hour == 1 ? "1 hour ago" : "\(hour) hours ago"
-        } else if let minute = components.minute, minute > 0 {
-            return minute == 1 ? "1 minute ago" : "\(minute) minutes ago"
-        } else {
-            return "Just now"
-        }
-    }
-}
-
 #Preview {
     NavigationView {
         ChatDetailView(otherUser: User(
             email: "test@test.com",
-            fullName: "Sarah", // FIXED: Changed from 'name' to 'fullName'
+            fullName: "Sarah",
             age: 25,
             gender: "Female",
             lookingFor: "Men",
@@ -140,5 +97,5 @@ extension Date {
             country: "France"
         ))
     }
-    .environmentObject(AuthViewModel())
+    .environmentObject(AuthService.shared)
 }

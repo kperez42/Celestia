@@ -2,7 +2,7 @@
 //  Interest.swift
 //  Celestia
 //
-//  Model for tracking user interests/likes
+//  Model for user interests/likes
 //
 
 import Foundation
@@ -14,7 +14,7 @@ struct Interest: Identifiable, Codable {
     var toUserId: String
     var message: String?
     var timestamp: Date
-    var isAccepted: Bool?
+    var status: String // "pending", "accepted", "rejected"
     
     init(
         id: String? = nil,
@@ -22,13 +22,13 @@ struct Interest: Identifiable, Codable {
         toUserId: String,
         message: String? = nil,
         timestamp: Date = Date(),
-        isAccepted: Bool? = nil
+        status: String = "pending"
     ) {
         self.id = id
         self.fromUserId = fromUserId
         self.toUserId = toUserId
         self.message = message
         self.timestamp = timestamp
-        self.isAccepted = isAccepted
+        self.status = status
     }
 }
