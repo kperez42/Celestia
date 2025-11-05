@@ -2,17 +2,7 @@
 //  MatchesView.swift
 //  Celestia
 //
-//  🎯 ENHANCED VERSION - Drop-in replacement
-//  Simply replace your existing MatchesView.swift with this file
-//
-//  NEW FEATURES:
-//  - Separate tabs for New Matches vs Active Chats
-//  - Sortable conversations (Most Recent, Unread First, Alphabetical)
-//  - Batch actions (Mark all as read, Archive)
-//  - Match suggestions based on common interests
-//  - Enhanced animations and transitions
-//  - Pull to refresh with haptic
-//  - Empty state with suggestions
+//  ELITE MATCHES VIEW - Premium Dating Experience
 //
 
 import SwiftUI
@@ -21,785 +11,325 @@ struct MatchesView: View {
     @EnvironmentObject var authService: AuthService
     @StateObject private var matchService = MatchService.shared
     @StateObject private var userService = UserService.shared
-    @StateObject private var interestService = InterestService.shared
+    @StateObject private var messageService = MessageService.shared
     
     @State private var matchedUsers: [String: User] = [:]
-    @State private var selectedTab = 0  // 0: Matches, 1: Interests, 2: Archived
+    @State private var selectedTab = 0
     @State private var searchText = ""
     @State private var sortOption: SortOption = .recent
-    @State private var showingSortOptions = false
-    @State private var isRefreshing = false
-    
-    // 🆕 NEW: Enhanced filtering
+    @State private var showingSortMenu = false
     @State private var showOnlyUnread = false
-    @State private var showOnlyNewMatches = false
+    @State private var selectedMatch: Match?
+    @State private var showMatchDetail = false
     
     enum SortOption: String, CaseIterable {
         case recent = "Most Recent"
         case unread = "Unread First"
         case alphabetical = "A-Z"
+        case newMatches = "New Matches"
     }
     
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                // Custom gradient header
-                headerView
-                
-                // Tab picker
-                tabPickerView
-                
-                // 🆕 NEW: Filter and sort bar
-                if selectedTab == 0 && !matchService.matches.isEmpty {
-                    filterSortBar
-                }
-                
-                // Content
-                Group {
-                    if selectedTab == 0 {
-                        matchesTab
-                    } else if selectedTab == 1 {
-                        InterestsView()
-                    } else {
-                        archivedTab
-                    }
-                }
+    var filteredAndSortedMatches: [Match] {
+        var matches = matchService.matches
+        
+        // Apply search filter
+        if !searchText.isEmpty {
+            matches = matches.filter { match in
+                guard let user = getMatchedUser(match) else { return false }
+                return user.fullName.localizedCaseInsensitiveContains(searchText) ||
+                       user.location.localizedCaseInsensitiveContains(searchText)
             }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle("")
-            .navigationBarHidden(true)
-            .task {
-                await loadData()
-            }
-            .refreshable {
-                HapticManager.shared.impact(.light)
-                await loadData()
+        }
+        
+        // Apply unread filter
+        if showOnlyUnread, let userId = authService.currentUser?.id {
+            matches = matches.filter { ($0.unreadCount[userId] ?? 0) > 0 }
+        }
+        
+        // Apply sorting
+        let currentUserId = authService.currentUser?.id ?? ""
+        return matches.sorted { match1, match2 in
+            switch sortOption {
+            case .recent:
+                let time1 = match1.lastMessageTimestamp ?? match1.timestamp
+                let time2 = match2.lastMessageTimestamp ?? match2.timestamp
+                return time1 > time2
+            case .unread:
+                let unread1 = match1.unreadCount[currentUserId] ?? 0
+                let unread2 = match2.unreadCount[currentUserId] ?? 0
+                if unread1 != unread2 {
+                    return unread1 > unread2
+                }
+                return (match1.lastMessageTimestamp ?? match1.timestamp) > (match2.lastMessageTimestamp ?? match2.timestamp)
+            case .alphabetical:
+                let name1 = getMatchedUser(match1)?.fullName ?? ""
+                let name2 = getMatchedUser(match2)?.fullName ?? ""
+                return name1 < name2
+            case .newMatches:
+                let hasMessage1 = match1.lastMessage != nil
+                let hasMessage2 = match2.lastMessage != nil
+                if hasMessage1 != hasMessage2 {
+                    return !hasMessage1
+                }
+                return match1.timestamp > match2.timestamp
             }
         }
     }
     
-    // MARK: - Header View
+    var unreadCount: Int {
+        guard let userId = authService.currentUser?.id else { return 0 }
+        return matchService.matches.reduce(0) { $0 + ($1.unreadCount[userId] ?? 0) }
+    }
+    
+    var newMatchesCount: Int {
+        matchService.matches.filter { $0.lastMessage == nil }.count
+    }
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color(.systemGroupedBackground)
+                    .ignoresSafeArea()
+                
+                VStack(spacing: 0) {
+                    // Header
+                    headerView
+                    
+                    // Tabs
+                    if !matchService.matches.isEmpty {
+                        tabsView
+                    }
+                    
+                    // Content
+                    if matchService.isLoading && matchService.matches.isEmpty {
+                        loadingView
+                    } else if matchService.matches.isEmpty {
+                        emptyStateView
+                    } else {
+                        matchesListView
+                    }
+                }
+            }
+            .navigationTitle("")
+            .navigationBarHidden(true)
+            .task {
+                await loadMatches()
+            }
+            .refreshable {
+                HapticManager.shared.impact(.light)
+                await loadMatches()
+            }
+            .sheet(item: $selectedMatch) { match in
+                if let user = getMatchedUser(match) {
+                    NavigationStack {
+                        ChatView(match: match, otherUser: user)
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Header
     
     private var headerView: some View {
         ZStack {
+            // Gradient background
             LinearGradient(
-                colors: [Color.purple.opacity(0.8), Color.blue.opacity(0.6)],
+                colors: [
+                    Color.purple.opacity(0.9),
+                    Color.purple.opacity(0.7),
+                    Color.blue.opacity(0.5)
+                ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
             
-            VStack(spacing: 8) {
-                HStack {
+            VStack(spacing: 12) {
+                HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Matches")
-                            .font(.system(size: 34, weight: .bold))
+                            .font(.system(size: 36, weight: .bold))
                             .foregroundColor(.white)
                         
-                        // 🆕 NEW: Subtitle with stats
-                        if selectedTab == 0 {
-                            Text("\(filteredMatches.count) active • \(unreadCount) unread")
-                                .font(.subheadline)
-                                .foregroundColor(.white.opacity(0.9))
+                        if !matchService.matches.isEmpty {
+                            HStack(spacing: 8) {
+                                // Match count
+                                HStack(spacing: 4) {
+                                    Image(systemName: "heart.fill")
+                                        .font(.caption)
+                                    Text("\(matchService.matches.count)")
+                                        .fontWeight(.semibold)
+                                }
+                                
+                                // Separator
+                                Circle()
+                                    .fill(Color.white.opacity(0.5))
+                                    .frame(width: 4, height: 4)
+                                
+                                // Unread count
+                                if unreadCount > 0 {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "message.fill")
+                                            .font(.caption)
+                                        Text("\(unreadCount) unread")
+                                            .fontWeight(.semibold)
+                                    }
+                                }
+                                
+                                // New matches
+                                if newMatchesCount > 0 {
+                                    Circle()
+                                        .fill(Color.white.opacity(0.5))
+                                        .frame(width: 4, height: 4)
+                                    
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "sparkles")
+                                            .font(.caption)
+                                        Text("\(newMatchesCount) new")
+                                            .fontWeight(.semibold)
+                                    }
+                                }
+                            }
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.95))
                         }
                     }
                     
                     Spacer()
                     
-                    // 🆕 NEW: Premium badge
-                    if let user = authService.currentUser, user.isPremium {
-                        HStack(spacing: 6) {
-                            Image(systemName: "crown.fill")
-                                .font(.caption)
-                            Text("Premium")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                        }
-                        .foregroundColor(.yellow)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.yellow.opacity(0.2))
-                        .cornerRadius(20)
+                    // Premium badge
+                    if authService.currentUser?.isPremium == true {
+                        premiumBadge
                     }
                 }
-                .padding(.horizontal)
                 .padding(.top, 50)
+                .padding(.horizontal, 20)
                 
-                if selectedTab == 0 && !matchService.matches.isEmpty {
+                // Search bar (only show when there are matches)
+                if !matchService.matches.isEmpty {
                     searchBar
                 }
             }
-            .padding(.bottom, 15)
+            .padding(.bottom, 16)
         }
-        .frame(height: selectedTab == 0 && !matchService.matches.isEmpty ? 150 : 110)
+        .frame(height: matchService.matches.isEmpty ? 110 : 160)
     }
     
-    // MARK: - Search Bar
+    private var premiumBadge: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "crown.fill")
+                .font(.caption)
+            Text("Premium")
+                .font(.caption)
+                .fontWeight(.semibold)
+        }
+        .foregroundColor(.yellow)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(
+            Capsule()
+                .fill(Color.yellow.opacity(0.2))
+                .overlay(
+                    Capsule()
+                        .stroke(Color.yellow.opacity(0.5), lineWidth: 1)
+                )
+        )
+    }
     
     private var searchBar: some View {
-        HStack {
+        HStack(spacing: 12) {
             Image(systemName: "magnifyingglass")
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(.white.opacity(0.8))
             
             TextField("Search matches...", text: $searchText)
                 .foregroundColor(.white)
                 .accentColor(.white)
+                .placeholder(when: searchText.isEmpty) {
+                    Text("Search matches...")
+                        .foregroundColor(.white.opacity(0.6))
+                }
             
             if !searchText.isEmpty {
                 Button {
-                    searchText = ""
+                    withAnimation {
+                        searchText = ""
+                    }
                     HapticManager.shared.impact(.light)
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(.white.opacity(0.8))
                 }
             }
         }
         .padding(12)
         .background(Color.white.opacity(0.2))
         .cornerRadius(12)
-        .padding(.horizontal)
+        .padding(.horizontal, 20)
     }
     
-    // MARK: - Tab Picker
+    // MARK: - Tabs
     
-    private var tabPickerView: some View {
-        HStack(spacing: 0) {
-            tabButton(title: "Matches", icon: "heart.fill", tag: 0, badge: newMatchesCount)
-            tabButton(title: "Interests", icon: "star.fill", tag: 1, badge: interestService.receivedInterests.count)
-            tabButton(title: "Archived", icon: "archivebox.fill", tag: 2)
-        }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
-        .background(Color.white)
-    }
-    
-    private func tabButton(title: String, icon: String, tag: Int, badge: Int = 0) -> some View {
-        Button {
-            withAnimation(.spring(response: 0.3)) {
-                selectedTab = tag
-                HapticManager.shared.selection()
-            }
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.subheadline)
-                
-                Text(title)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                
-                // Badge
-                if badge > 0 {
-                    Text("\(badge)")
-                        .font(.caption2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.red)
-                        .clipShape(Capsule())
-                }
-            }
-            .foregroundColor(selectedTab == tag ? .white : .gray)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(
-                selectedTab == tag ?
-                LinearGradient(
-                    colors: [Color.purple, Color.blue],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                ) : LinearGradient(colors: [Color.clear], startPoint: .leading, endPoint: .trailing)
-            )
-            .cornerRadius(10)
-        }
-    }
-    
-    // MARK: - 🆕 NEW: Filter and Sort Bar
-    
-    private var filterSortBar: some View {
-        HStack(spacing: 12) {
-            // Unread filter
-            FilterButton(
-                icon: "circle.fill",
-                title: "Unread",
-                isActive: showOnlyUnread
-            ) {
-                withAnimation {
-                    showOnlyUnread.toggle()
-                    HapticManager.shared.impact(.light)
-                }
-            }
-            
-            // New matches filter
-            FilterButton(
-                icon: "sparkles",
-                title: "New",
-                isActive: showOnlyNewMatches
-            ) {
-                withAnimation {
-                    showOnlyNewMatches.toggle()
-                    HapticManager.shared.impact(.light)
-                }
-            }
-            
-            Spacer()
-            
-            // Sort menu
-            Menu {
-                ForEach(SortOption.allCases, id: \.self) { option in
-                    Button {
-                        sortOption = option
+    private var tabsView: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                // Unread filter
+                filterChip(
+                    icon: unreadCount > 0 ? "circle.fill" : "circle",
+                    title: "Unread",
+                    count: unreadCount,
+                    isActive: showOnlyUnread
+                ) {
+                    withAnimation(.spring(response: 0.3)) {
+                        showOnlyUnread.toggle()
                         HapticManager.shared.selection()
-                    } label: {
-                        HStack {
-                            Text(option.rawValue)
-                            if sortOption == option {
-                                Image(systemName: "checkmark")
+                    }
+                }
+                
+                Spacer()
+                
+                // Sort menu
+                Menu {
+                    ForEach(SortOption.allCases, id: \.self) { option in
+                        Button {
+                            withAnimation {
+                                sortOption = option
+                                HapticManager.shared.selection()
+                            }
+                        } label: {
+                            HStack {
+                                Text(option.rawValue)
+                                if sortOption == option {
+                                    Image(systemName: "checkmark")
+                                }
                             }
                         }
                     }
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.up.arrow.down")
-                        .font(.caption)
-                    Text(sortOption.rawValue)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                }
-                .foregroundColor(.purple)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Color.purple.opacity(0.1))
-                .cornerRadius(20)
-            }
-        }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
-        .background(Color.white)
-    }
-    
-    // MARK: - Matches Tab
-    
-    private var matchesTab: some View {
-        Group {
-            if matchService.isLoading && matchService.matches.isEmpty {
-                loadingView
-            } else if matchService.matches.isEmpty {
-                emptyMatchesView
-            } else {
-                matchesList
-            }
-        }
-    }
-    
-    private var loadingView: some View {
-        VStack(spacing: 20) {
-            ProgressView()
-                .scaleEffect(1.5)
-                .tint(.purple)
-            
-            Text("Loading matches...")
-                .font(.subheadline)
-                .foregroundColor(.gray)
-        }
-        .frame(maxHeight: .infinity)
-    }
-    
-    private var matchesList: some View {
-        ScrollView(showsIndicators: false) {
-            LazyVStack(spacing: 16) {
-                // 🆕 NEW: Quick stats card
-                if !filteredMatches.isEmpty && searchText.isEmpty {
-                    quickStatsCard
-                }
-                
-                ForEach(sortedAndFilteredMatches) { match in
-                    if let otherUserId = getOtherUserId(match: match),
-                       let user = matchedUsers[otherUserId] {
-                        NavigationLink(destination: ChatView(match: match, otherUser: user)) {
-                            EnhancedMatchCard(
-                                match: match,
-                                user: user,
-                                currentUserId: authService.currentUser?.id ?? ""
-                            )
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .transition(.asymmetric(
-                            insertion: .scale.combined(with: .opacity),
-                            removal: .opacity
-                        ))
-                    }
-                }
-            }
-            .padding()
-            .padding(.top, 8)
-            .padding(.bottom, 80)
-        }
-        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: sortedAndFilteredMatches.count)
-    }
-    
-    // 🆕 NEW: Quick Stats Card
-    private var quickStatsCard: some View {
-        HStack(spacing: 20) {
-            StatBubble(
-                icon: "heart.fill",
-                value: "\(matchService.matches.count)",
-                label: "Total",
-                color: .purple
-            )
-            
-            StatBubble(
-                icon: "message.fill",
-                value: "\(unreadCount)",
-                label: "Unread",
-                color: .blue
-            )
-            
-            StatBubble(
-                icon: "sparkles",
-                value: "\(newMatchesCount)",
-                label: "New",
-                color: .pink
-            )
-        }
-        .padding(20)
-        .background(
-            LinearGradient(
-                colors: [Color.purple.opacity(0.1), Color.blue.opacity(0.1)],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-        )
-        .cornerRadius(16)
-    }
-    
-    private var filteredMatches: [Match] {
-        var matches = matchService.matches
-        
-        // Apply search filter
-        if !searchText.isEmpty {
-            matches = matches.filter { match in
-                guard let otherUserId = getOtherUserId(match: match),
-                      let user = matchedUsers[otherUserId] else {
-                    return false
-                }
-                return user.fullName.lowercased().contains(searchText.lowercased()) ||
-                       user.location.lowercased().contains(searchText.lowercased())
-            }
-        }
-        
-        // Apply unread filter
-        if showOnlyUnread, let currentUserId = authService.currentUser?.id {
-            matches = matches.filter { match in
-                (match.unreadCount[currentUserId] ?? 0) > 0
-            }
-        }
-        
-        // Apply new matches filter
-        if showOnlyNewMatches {
-            matches = matches.filter { $0.lastMessageTimestamp == nil }
-        }
-        
-        return matches
-    }
-    
-    private var sortedAndFilteredMatches: [Match] {
-        let filtered = filteredMatches
-        
-        switch sortOption {
-        case .recent:
-            return filtered.sorted {
-                ($0.lastMessageTimestamp ?? $0.timestamp) > ($1.lastMessageTimestamp ?? $1.timestamp)
-            }
-            
-        case .unread:
-            guard let currentUserId = authService.currentUser?.id else { return filtered }
-            return filtered.sorted { match1, match2 in
-                let unread1 = match1.unreadCount[currentUserId] ?? 0
-                let unread2 = match2.unreadCount[currentUserId] ?? 0
-                
-                if unread1 == unread2 {
-                    return (match1.lastMessageTimestamp ?? match1.timestamp) > (match2.lastMessageTimestamp ?? match2.timestamp)
-                }
-                return unread1 > unread2
-            }
-            
-        case .alphabetical:
-            return filtered.sorted { match1, match2 in
-                guard let id1 = getOtherUserId(match: match1),
-                      let id2 = getOtherUserId(match: match2),
-                      let user1 = matchedUsers[id1],
-                      let user2 = matchedUsers[id2] else {
-                    return false
-                }
-                return user1.fullName < user2.fullName
-            }
-        }
-    }
-    
-    // 🆕 NEW: Archived Tab
-    private var archivedTab: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "archivebox")
-                .font(.system(size: 60))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [Color.gray.opacity(0.6), Color.gray.opacity(0.4)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-            
-            Text("No Archived Matches")
-                .font(.title2)
-                .fontWeight(.semibold)
-            
-            Text("Matches you archive will appear here")
-                .font(.subheadline)
-                .foregroundColor(.gray)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxHeight: .infinity)
-        .padding()
-    }
-    
-    private var emptyMatchesView: some View {
-        VStack(spacing: 25) {
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.purple.opacity(0.2), Color.blue.opacity(0.2)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 120, height: 120)
-                
-                Image(systemName: "heart.circle.fill")
-                    .font(.system(size: 60))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [Color.purple, Color.blue],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            }
-            
-            VStack(spacing: 12) {
-                Text("No Matches Yet")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                
-                Text("Start swiping in Discover to find your matches")
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(4)
-            }
-            
-            // 🆕 NEW: Suggestion cards
-            VStack(spacing: 12) {
-                Text("💡 Tips to get more matches:")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.secondary)
-                
-                TipCard(icon: "photo", text: "Add more photos to your profile")
-                TipCard(icon: "text.alignleft", text: "Write an interesting bio")
-                TipCard(icon: "star", text: "Use Super Likes strategically")
-            }
-            .padding(.top, 20)
-        }
-        .frame(maxHeight: .infinity)
-        .padding()
-    }
-    
-    // MARK: - Computed Properties
-    
-    private var unreadCount: Int {
-        guard let currentUserId = authService.currentUser?.id else { return 0 }
-        return matchService.matches.reduce(0) { total, match in
-            total + (match.unreadCount[currentUserId] ?? 0)
-        }
-    }
-    
-    private var newMatchesCount: Int {
-        matchService.matches.filter { $0.lastMessageTimestamp == nil }.count
-    }
-    
-    // MARK: - Helper Methods
-    
-    private func loadData() async {
-        guard let currentUserId = authService.currentUser?.id else { return }
-        
-        do {
-            try await matchService.fetchMatches(userId: currentUserId)
-            
-            // Fetch user details for each match
-            await withTaskGroup(of: (String, User?).self) { group in
-                for match in matchService.matches {
-                    if let otherUserId = getOtherUserId(match: match) {
-                        group.addTask {
-                            let user = try? await userService.fetchUser(userId: otherUserId)
-                            return (otherUserId, user)
-                        }
-                    }
-                }
-                
-                for await (userId, user) in group {
-                    if let user = user {
-                        await MainActor.run {
-                            matchedUsers[userId] = user
-                        }
-                    }
-                }
-            }
-            
-            // Load interests
-            try await interestService.fetchReceivedInterests(userId: currentUserId)
-        } catch {
-            print("Error loading matches: \(error)")
-        }
-    }
-    
-    private func getOtherUserId(match: Match) -> String? {
-        guard let currentUserId = authService.currentUser?.id else { return nil }
-        return match.user1Id == currentUserId ? match.user2Id : match.user1Id
-    }
-}
-
-// MARK: - Enhanced Match Card
-
-struct EnhancedMatchCard: View {
-    let match: Match
-    let user: User
-    let currentUserId: String
-    
-    @State private var isPressed = false
-    
-    var body: some View {
-        HStack(spacing: 16) {
-            // Profile Image with online indicator
-            ZStack(alignment: .bottomTrailing) {
-                profileImage
-                
-                if user.isOnline {
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 16, height: 16)
-                        .overlay {
-                            Circle()
-                                .stroke(Color.white, lineWidth: 2)
-                        }
-                        .offset(x: 2, y: 2)
-                }
-            }
-            
-            // User Info
-            VStack(alignment: .leading, spacing: 6) {
-                // Name and verification
-                HStack(spacing: 6) {
-                    Text(user.fullName)
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-                    
-                    if user.isVerified {
-                        Image(systemName: "checkmark.seal.fill")
-                            .font(.subheadline)
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [Color.purple, Color.blue],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                    }
-                    
-                    Spacer()
-                    
-                    // Time or unread badge
-                    if let unreadCount = match.unreadCount[currentUserId], unreadCount > 0 {
-                        unreadBadge(count: unreadCount)
-                    } else if let timestamp = match.lastMessageTimestamp {
-                        Text(timeAgo(from: timestamp))
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.up.arrow.down")
                             .font(.caption)
-                            .foregroundColor(.gray)
+                        Text(sortOption.rawValue)
+                            .font(.caption)
+                            .fontWeight(.medium)
+                        Image(systemName: "chevron.down")
+                            .font(.caption2)
                     }
+                    .foregroundColor(.purple)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.purple.opacity(0.1))
+                    .cornerRadius(20)
                 }
-                
-                // Location
-                HStack(spacing: 4) {
-                    Image(systemName: "mappin.circle.fill")
-                        .font(.caption)
-                        .foregroundColor(.purple.opacity(0.7))
-                    
-                    Text("\(user.age) • \(user.location)")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                }
-                
-                // Status
-                statusView
             }
-        }
-        .padding(16)
-        .background(
-            match.unreadCount[currentUserId] ?? 0 > 0 ?
-            Color.purple.opacity(0.05) : Color.white
-        )
-        .cornerRadius(16)
-        .shadow(color: Color.black.opacity(isPressed ? 0.08 : 0.05), radius: isPressed ? 12 : 8, y: isPressed ? 6 : 4)
-        .scaleEffect(isPressed ? 0.98 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in
-                    isPressed = true
-                    HapticManager.shared.impact(.light)
-                }
-                .onEnded { _ in isPressed = false }
-        )
-    }
-    
-    private var profileImage: some View {
-        Group {
-            if let imageURL = URL(string: user.profileImageURL), !user.profileImageURL.isEmpty {
-                AsyncImage(url: imageURL) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    case .failure(_), .empty:
-                        placeholderImage
-                    @unknown default:
-                        placeholderImage
-                    }
-                }
-            } else {
-                placeholderImage
-            }
-        }
-        .frame(width: 75, height: 75)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(
-                    LinearGradient(
-                        colors: [Color.purple.opacity(0.3), Color.blue.opacity(0.3)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 2
-                )
-        )
-    }
-    
-    private var placeholderImage: some View {
-        ZStack {
-            LinearGradient(
-                colors: [Color.purple.opacity(0.7), Color.blue.opacity(0.5)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .background(Color.white)
             
-            Text(user.fullName.prefix(1))
-                .font(.system(size: 32, weight: .bold))
-                .foregroundColor(.white)
+            Divider()
         }
     }
     
-    private var statusView: some View {
-        Group {
-            if match.lastMessageTimestamp != nil {
-                if let lastMessage = match.lastMessage {
-                    Text(lastMessage)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                }
-            } else {
-                HStack(spacing: 6) {
-                    Image(systemName: "sparkles")
-                        .font(.caption)
-                    
-                    Text("New match!")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                }
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [Color.purple, Color.blue],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(
-                    LinearGradient(
-                        colors: [Color.purple.opacity(0.1), Color.blue.opacity(0.1)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .cornerRadius(12)
-            }
-        }
-    }
-    
-    private func unreadBadge(count: Int) -> some View {
-        Text("\(count)")
-            .font(.caption2)
-            .fontWeight(.bold)
-            .foregroundColor(.white)
-            .frame(minWidth: 20, minHeight: 20)
-            .padding(.horizontal, 6)
-            .background(
-                LinearGradient(
-                    colors: [Color.purple, Color.blue],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
-            .clipShape(Capsule())
-    }
-    
-    private func timeAgo(from date: Date) -> String {
-        let interval = Date().timeIntervalSince(date)
-        
-        if interval < 60 {
-            return "now"
-        } else if interval < 3600 {
-            let minutes = Int(interval / 60)
-            return "\(minutes)m"
-        } else if interval < 86400 {
-            let hours = Int(interval / 3600)
-            return "\(hours)h"
-        } else if interval < 604800 {
-            let days = Int(interval / 86400)
-            return "\(days)d"
-        } else {
-            let weeks = Int(interval / 604800)
-            return "\(weeks)w"
-        }
-    }
-}
-
-// MARK: - 🆕 NEW: Support Components
-
-struct FilterButton: View {
-    let icon: String
-    let title: String
-    let isActive: Bool
-    let action: () -> Void
-    
-    var body: some View {
+    private func filterChip(icon: String, title: String, count: Int = 0, isActive: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
@@ -807,6 +337,16 @@ struct FilterButton: View {
                 Text(title)
                     .font(.caption)
                     .fontWeight(.medium)
+                if count > 0 {
+                    Text("\(count)")
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(isActive ? Color.white.opacity(0.3) : Color.red)
+                        .clipShape(Capsule())
+                }
             }
             .foregroundColor(isActive ? .white : .purple)
             .padding(.horizontal, 12)
@@ -823,40 +363,108 @@ struct FilterButton: View {
             .cornerRadius(20)
         }
     }
-}
-
-struct StatBubble: View {
-    let icon: String
-    let value: String
-    let label: String
-    let color: Color
     
-    var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundColor(color)
+    // MARK: - Matches List
+    
+    private var matchesListView: some View {
+        ScrollView(showsIndicators: false) {
+            LazyVStack(spacing: 12) {
+                ForEach(filteredAndSortedMatches) { match in
+                    if let user = getMatchedUser(match) {
+                        MatchCardRow(
+                            match: match,
+                            user: user,
+                            currentUserId: authService.currentUser?.id ?? ""
+                        )
+                        .onTapGesture {
+                            HapticManager.shared.impact(.light)
+                            selectedMatch = match
+                        }
+                    }
+                }
+            }
+            .padding(20)
+            .padding(.bottom, 80)
+        }
+    }
+    
+    // MARK: - Loading State
+    
+    private var loadingView: some View {
+        VStack(spacing: 20) {
+            ProgressView()
+                .scaleEffect(1.5)
+                .tint(.purple)
             
-            Text(value)
-                .font(.title3)
-                .fontWeight(.bold)
-            
-            Text(label)
-                .font(.caption)
+            Text("Loading matches...")
+                .font(.subheadline)
                 .foregroundColor(.secondary)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-}
-
-struct TipCard: View {
-    let icon: String
-    let text: String
     
-    var body: some View {
+    // MARK: - Empty State
+    
+    private var emptyStateView: some View {
+        VStack(spacing: 24) {
+            Spacer()
+            
+            // Icon
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.purple.opacity(0.2), Color.blue.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 140, height: 140)
+                
+                Image(systemName: "heart.circle.fill")
+                    .font(.system(size: 70))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .blue],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+            
+            VStack(spacing: 12) {
+                Text("No Matches Yet")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                
+                Text("Start swiping to find your perfect match!")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+            }
+            
+            // Tips
+            VStack(spacing: 12) {
+                tipRow(icon: "photo.fill", text: "Add more photos to your profile")
+                tipRow(icon: "text.alignleft", text: "Write an interesting bio")
+                tipRow(icon: "heart.fill", text: "Be active and swipe regularly")
+            }
+            .padding(20)
+            .background(Color.white)
+            .cornerRadius(16)
+            .padding(.horizontal, 30)
+            
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemGroupedBackground))
+    }
+    
+    private func tipRow(icon: String, text: String) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.title3)
+                .font(.callout)
                 .foregroundStyle(
                     LinearGradient(
                         colors: [.purple, .blue],
@@ -864,9 +472,9 @@ struct TipCard: View {
                         endPoint: .trailing
                     )
                 )
-                .frame(width: 40, height: 40)
+                .frame(width: 36, height: 36)
                 .background(Color.purple.opacity(0.1))
-                .cornerRadius(10)
+                .cornerRadius(8)
             
             Text(text)
                 .font(.subheadline)
@@ -874,15 +482,241 @@ struct TipCard: View {
             
             Spacer()
         }
-        .padding(12)
-        .background(Color.white)
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.05), radius: 5)
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func loadMatches() async {
+        guard let userId = authService.currentUser?.id else { return }
+        
+        do {
+            try await matchService.fetchMatches(userId: userId)
+            
+            // Load user data for each match
+            for match in matchService.matches {
+                let otherUserId = match.user1Id == userId ? match.user2Id : match.user1Id
+                if matchedUsers[otherUserId] == nil {
+                    if let user = try? await userService.fetchUser(userId: otherUserId) {
+                        await MainActor.run {
+                            matchedUsers[otherUserId] = user
+                        }
+                    }
+                }
+            }
+        } catch {
+            print("Error loading matches: \(error)")
+        }
+    }
+    
+    private func getMatchedUser(_ match: Match) -> User? {
+        guard let currentUserId = authService.currentUser?.id else { return nil }
+        let otherUserId = match.user1Id == currentUserId ? match.user2Id : match.user1Id
+        return matchedUsers[otherUserId]
     }
 }
 
-// Note: InterestsView should already exist in your project
-// If not, create a simple placeholder view
+// MARK: - Match Card Row
+
+struct MatchCardRow: View {
+    let match: Match
+    let user: User
+    let currentUserId: String
+    
+    @State private var isPressed = false
+    
+    private var unreadCount: Int {
+        match.unreadCount[currentUserId] ?? 0
+    }
+    
+    private var isNewMatch: Bool {
+        match.lastMessage == nil
+    }
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            // Profile image
+            ZStack(alignment: .topTrailing) {
+                profileImage
+                
+                // Online indicator
+                if user.isOnline {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 16, height: 16)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.white, lineWidth: 2)
+                        )
+                        .offset(x: 4, y: -4)
+                }
+            }
+            
+            // User info
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Text(user.fullName)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    if user.isVerified {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                    }
+                    
+                    if user.isPremium {
+                        Image(systemName: "crown.fill")
+                            .font(.caption2)
+                            .foregroundColor(.yellow)
+                    }
+                }
+                
+                // Last message or new match indicator
+                if isNewMatch {
+                    HStack(spacing: 6) {
+                        Image(systemName: "sparkles")
+                            .font(.caption2)
+                        Text("New match! Say hello")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                    }
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [Color.purple, Color.blue],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                } else if let lastMessage = match.lastMessage {
+                    Text(lastMessage)
+                        .font(.subheadline)
+                        .foregroundColor(unreadCount > 0 ? .primary : .secondary)
+                        .fontWeight(unreadCount > 0 ? .semibold : .regular)
+                        .lineLimit(1)
+                }
+                
+                // Time and location
+                HStack(spacing: 6) {
+                    if let lastTime = match.lastMessageTimestamp ?? (isNewMatch ? match.timestamp : nil) {
+                        Text(timeAgo(from: lastTime))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    if !isNewMatch {
+                        Text("•")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        Text(user.location)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            
+            Spacer()
+            
+            // Right side indicators
+            VStack(alignment: .trailing, spacing: 8) {
+                if unreadCount > 0 {
+                    Text("\(unreadCount)")
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                        .frame(minWidth: 22, minHeight: 22)
+                        .background(
+                            LinearGradient(
+                                colors: [Color.purple, Color.blue],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .clipShape(Circle())
+                }
+                
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white)
+                .shadow(
+                    color: Color.black.opacity(isPressed ? 0.1 : 0.05),
+                    radius: isPressed ? 10 : 6,
+                    y: isPressed ? 4 : 2
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(
+                    unreadCount > 0 || isNewMatch ?
+                    LinearGradient(
+                        colors: [Color.purple.opacity(0.3), Color.blue.opacity(0.3)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ) :
+                    LinearGradient(colors: [Color.clear], startPoint: .leading, endPoint: .trailing),
+                    lineWidth: 2
+                )
+        )
+        .scaleEffect(isPressed ? 0.98 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in isPressed = true }
+                .onEnded { _ in isPressed = false }
+        )
+    }
+    
+    private var profileImage: some View {
+        Group {
+            if let imageURL = URL(string: user.profileImageURL), !user.profileImageURL.isEmpty {
+                AsyncImage(url: imageURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    default:
+                        placeholderImage
+                    }
+                }
+            } else {
+                placeholderImage
+            }
+        }
+        .frame(width: 70, height: 70)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+    
+    private var placeholderImage: some View {
+        ZStack {
+            LinearGradient(
+                colors: [Color.purple.opacity(0.7), Color.blue.opacity(0.5)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            
+            Text(user.fullName.prefix(1))
+                .font(.system(size: 28, weight: .bold))
+                .foregroundColor(.white)
+        }
+    }
+    
+    private func timeAgo(from date: Date) -> String {
+        let interval = Date().timeIntervalSince(date)
+        
+        if interval < 60 { return "now" }
+        else if interval < 3600 { return "\(Int(interval / 60))m" }
+        else if interval < 86400 { return "\(Int(interval / 3600))h" }
+        else if interval < 604800 { return "\(Int(interval / 86400))d" }
+        else { return "\(Int(interval / 604800))w" }
+    }
+}
 
 #Preview {
     NavigationStack {
