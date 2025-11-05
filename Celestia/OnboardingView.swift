@@ -2,6 +2,8 @@
 //  OnboardingView.swift
 //  Celestia
 //
+//  ELITE ONBOARDING - First Impressions Matter
+//
 
 import SwiftUI
 import PhotosUI
@@ -10,14 +12,17 @@ struct OnboardingView: View {
     @EnvironmentObject var authService: AuthService
     @Environment(\.dismiss) var dismiss
     
+    private let imageUploadService = ImageUploadService.shared
+    
     @State private var currentStep = 0
+    @State private var progress: CGFloat = 0
     
     // Step 1: Basics
     @State private var fullName = ""
-    @State private var birthday = Date()
+    @State private var birthday = Calendar.current.date(byAdding: .year, value: -25, to: Date()) ?? Date()
     @State private var gender = "Male"
     
-    // Step 2: About & Location
+    // Step 2: Location & About
     @State private var bio = ""
     @State private var location = ""
     @State private var country = ""
@@ -25,48 +30,87 @@ struct OnboardingView: View {
     // Step 3: Photos
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var photoImages: [UIImage] = []
+    @State private var isUploadingPhotos = false
     
     // Step 4: Preferences
     @State private var lookingFor = "Everyone"
+    @State private var selectedInterests: [String] = []
+    @State private var selectedLanguages: [String] = []
     
     @State private var isLoading = false
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var animateContent = false
     
-    let genderOptions = ["Male", "Female", "Non-binary"]
+    let genderOptions = ["Male", "Female", "Non-binary", "Other"]
     let lookingForOptions = ["Men", "Women", "Everyone"]
-    let totalSteps = 4
+    let totalSteps = 5
+    
+    let availableInterests = [
+        "Travel", "Music", "Movies", "Sports", "Food",
+        "Art", "Photography", "Reading", "Gaming", "Fitness",
+        "Cooking", "Dancing", "Nature", "Technology", "Fashion"
+    ]
+    
+    let availableLanguages = [
+        "English", "Spanish", "French", "German", "Italian",
+        "Portuguese", "Chinese", "Japanese", "Korean", "Arabic"
+    ]
     
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(.systemGroupedBackground)
-                    .ignoresSafeArea()
+                // Animated background gradient
+                LinearGradient(
+                    colors: [
+                        Color.purple.opacity(0.1),
+                        Color.pink.opacity(0.05),
+                        Color.blue.opacity(0.08)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    // Progress bar
+                    // Animated progress bar
                     progressBar
                     
-                    // Content
+                    // Content with transitions
                     TabView(selection: $currentStep) {
                         step1View.tag(0)
                         step2View.tag(1)
                         step3View.tag(2)
                         step4View.tag(3)
+                        step5View.tag(4)
                     }
                     .tabViewStyle(.page(indexDisplayMode: .never))
+                    .animation(.easeInOut, value: currentStep)
                     
                     // Navigation buttons
                     navigationButtons
                 }
             }
-            .navigationTitle("Setup Profile")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
+                    Button {
                         dismiss()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "xmark")
+                            Text("Cancel")
+                                .fontWeight(.medium)
+                        }
+                        .foregroundColor(.purple)
                     }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Text("Step \(currentStep + 1)/\(totalSteps)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
             }
             .alert("Error", isPresented: $showError) {
@@ -74,249 +118,661 @@ struct OnboardingView: View {
             } message: {
                 Text(errorMessage)
             }
+            .onAppear {
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                    animateContent = true
+                    progress = CGFloat(currentStep + 1) / CGFloat(totalSteps)
+                }
+            }
         }
     }
     
     // MARK: - Progress Bar
     
     private var progressBar: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 16) {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.gray.opacity(0.2))
+                    // Background
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.gray.opacity(0.15))
                         .frame(height: 8)
                     
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.purple)
+                    // Progress
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.purple, Color.pink],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
                         .frame(width: geo.size.width * CGFloat(currentStep + 1) / CGFloat(totalSteps), height: 8)
+                        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentStep)
                 }
             }
             .frame(height: 8)
             
-            Text("Step \(currentStep + 1) of \(totalSteps)")
-                .font(.caption)
-                .foregroundColor(.secondary)
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(stepTitle)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    Text(stepSubtitle)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                // Percentage
+                Text("\(Int(CGFloat(currentStep + 1) / CGFloat(totalSteps) * 100))%")
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+            }
         }
-        .padding()
+        .padding(20)
+        .background(Color.white)
+        .shadow(color: .black.opacity(0.05), radius: 5, y: 2)
+    }
+    
+    private var stepTitle: String {
+        switch currentStep {
+        case 0: return "Basic Info"
+        case 1: return "About You"
+        case 2: return "Your Photos"
+        case 3: return "Preferences"
+        case 4: return "Finishing Up"
+        default: return ""
+        }
+    }
+    
+    private var stepSubtitle: String {
+        switch currentStep {
+        case 0: return "Tell us who you are"
+        case 1: return "Share your story"
+        case 2: return "Show your best self"
+        case 3: return "What you're looking for"
+        case 4: return "Almost there!"
+        default: return ""
+        }
     }
     
     // MARK: - Step 1: Basics
     
     private var step1View: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                Image(systemName: "person.fill")
-                    .font(.system(size: 60))
-                    .foregroundColor(.purple)
-                
-                Text("Let's start with the basics")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                
-                VStack(spacing: 16) {
-                    TextField("Full Name", text: $fullName)
-                        .textFieldStyle(.roundedBorder)
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 30) {
+                // Icon
+                ZStack {
+                    Circle()
+                        .fill(Color.purple.opacity(0.15))
+                        .frame(width: 100, height: 100)
                     
-                    DatePicker(
-                        "Birthday",
-                        selection: $birthday,
-                        in: ...Date().addingTimeInterval(-18 * 365 * 24 * 60 * 60),
-                        displayedComponents: .date
-                    )
-                    .datePickerStyle(.compact)
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 50))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+                .scaleEffect(animateContent ? 1 : 0.5)
+                .opacity(animateContent ? 1 : 0)
+                
+                VStack(spacing: 8) {
+                    Text("Let's Get Started")
+                        .font(.title)
+                        .fontWeight(.bold)
                     
+                    Text("We need a few details to create your profile")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                
+                VStack(spacing: 20) {
+                    // Full Name
                     VStack(alignment: .leading, spacing: 8) {
+                        Text("Full Name")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondary)
+                        
+                        TextField("Enter your name", text: $fullName)
+                            .padding()
+                            .background(Color.white)
+                            .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.purple.opacity(0.2), lineWidth: 1)
+                            )
+                    }
+                    
+                    // Birthday
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Birthday")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondary)
+                        
+                        DatePicker(
+                            "",
+                            selection: $birthday,
+                            in: ...Date().addingTimeInterval(-18 * 365 * 24 * 60 * 60),
+                            displayedComponents: .date
+                        )
+                        .datePickerStyle(.compact)
+                        .padding()
+                        .background(Color.white)
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.purple.opacity(0.2), lineWidth: 1)
+                        )
+                    }
+                    
+                    // Gender
+                    VStack(alignment: .leading, spacing: 12) {
                         Text("I am")
                             .font(.subheadline)
+                            .fontWeight(.medium)
                             .foregroundColor(.secondary)
                         
                         ForEach(genderOptions, id: \.self) { option in
                             Button {
-                                gender = option
+                                withAnimation(.spring(response: 0.3)) {
+                                    gender = option
+                                    HapticManager.shared.selection()
+                                }
                             } label: {
                                 HStack {
                                     Text(option)
+                                        .fontWeight(.medium)
+                                    
                                     Spacer()
+                                    
                                     if gender == option {
-                                        Image(systemName: "checkmark")
+                                        Image(systemName: "checkmark.circle.fill")
                                             .foregroundColor(.purple)
+                                    } else {
+                                        Image(systemName: "circle")
+                                            .foregroundColor(.gray.opacity(0.3))
                                     }
                                 }
                                 .padding()
                                 .background(
                                     gender == option ?
-                                    Color.purple.opacity(0.1) :
-                                    Color(.systemGray6)
+                                    LinearGradient(
+                                        colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.05)],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    ) :
+                                    LinearGradient(colors: [Color.white], startPoint: .leading, endPoint: .trailing)
                                 )
                                 .cornerRadius(12)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(
+                                            gender == option ? Color.purple.opacity(0.5) : Color.gray.opacity(0.2),
+                                            lineWidth: 1
+                                        )
+                                )
                             }
                             .foregroundColor(.primary)
                         }
                     }
                 }
             }
-            .padding()
+            .padding(20)
+            .padding(.top, 20)
         }
     }
     
     // MARK: - Step 2: About & Location
     
     private var step2View: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                Image(systemName: "text.alignleft")
-                    .font(.system(size: 60))
-                    .foregroundColor(.purple)
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 30) {
+                // Icon
+                ZStack {
+                    Circle()
+                        .fill(Color.purple.opacity(0.15))
+                        .frame(width: 100, height: 100)
+                    
+                    Image(systemName: "text.bubble.fill")
+                        .font(.system(size: 50))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
                 
-                Text("About you")
-                    .font(.title2)
-                    .fontWeight(.bold)
+                VStack(spacing: 8) {
+                    Text("About You")
+                        .font(.title)
+                        .fontWeight(.bold)
+                    
+                    Text("Share a bit about yourself and where you're from")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
                 
-                VStack(spacing: 16) {
+                VStack(spacing: 20) {
+                    // Bio
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Bio")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                        HStack {
+                            Text("Bio")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundColor(.secondary)
+                            
+                            Spacer()
+                            
+                            Text("\(bio.count)/500")
+                                .font(.caption)
+                                .foregroundColor(bio.count > 500 ? .red : .secondary)
+                        }
                         
                         TextEditor(text: $bio)
-                            .frame(height: 120)
-                            .padding(8)
-                            .background(Color(.systemGray6))
+                            .frame(height: 140)
+                            .padding(12)
+                            .background(Color.white)
                             .cornerRadius(12)
-                        
-                        Text("\(bio.count)/500")
-                            .font(.caption)
-                            .foregroundColor(bio.count > 500 ? .red : .secondary)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.purple.opacity(0.2), lineWidth: 1)
+                            )
+                            .overlay(alignment: .topLeading) {
+                                if bio.isEmpty {
+                                    Text("Tell others about yourself...")
+                                        .foregroundColor(.gray.opacity(0.5))
+                                        .padding(.top, 20)
+                                        .padding(.leading, 16)
+                                        .allowsHitTesting(false)
+                                }
+                            }
                     }
                     
-                    TextField("City", text: $location)
-                        .textFieldStyle(.roundedBorder)
+                    // Location
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("City")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondary)
+                        
+                        TextField("e.g. Los Angeles", text: $location)
+                            .padding()
+                            .background(Color.white)
+                            .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.purple.opacity(0.2), lineWidth: 1)
+                            )
+                    }
                     
-                    TextField("Country", text: $country)
-                        .textFieldStyle(.roundedBorder)
+                    // Country
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Country")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondary)
+                        
+                        TextField("e.g. United States", text: $country)
+                            .padding()
+                            .background(Color.white)
+                            .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.purple.opacity(0.2), lineWidth: 1)
+                            )
+                    }
                 }
             }
-            .padding()
+            .padding(20)
+            .padding(.top, 20)
         }
     }
     
     // MARK: - Step 3: Photos
     
     private var step3View: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                Image(systemName: "photo.on.rectangle")
-                    .font(.system(size: 60))
-                    .foregroundColor(.purple)
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 30) {
+                // Icon
+                ZStack {
+                    Circle()
+                        .fill(Color.purple.opacity(0.15))
+                        .frame(width: 100, height: 100)
+                    
+                    Image(systemName: "photo.on.rectangle.fill")
+                        .font(.system(size: 50))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
                 
-                Text("Add photos")
-                    .font(.title2)
-                    .fontWeight(.bold)
+                VStack(spacing: 8) {
+                    Text("Add Your Photos")
+                        .font(.title)
+                        .fontWeight(.bold)
+                    
+                    Text("Add at least 2 photos to continue")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
                 
-                Text("Add at least 2 photos")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                
+                // Photo grid
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                    ForEach(0..<4, id: \.self) { index in
+                    ForEach(0..<6, id: \.self) { index in
                         if index < photoImages.count {
-                            Image(uiImage: photoImages[index])
-                                .resizable()
-                                .scaledToFill()
-                                .frame(height: 150)
-                                .clipped()
-                                .cornerRadius(12)
-                                .overlay(alignment: .topTrailing) {
-                                    Button {
+                            ZStack(alignment: .topTrailing) {
+                                Image(uiImage: photoImages[index])
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(height: 180)
+                                    .clipped()
+                                    .cornerRadius(16)
+                                
+                                Button {
+                                    withAnimation {
                                         photoImages.remove(at: index)
-                                    } label: {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .font(.title3)
-                                            .foregroundColor(.white)
-                                            .padding(8)
+                                        HapticManager.shared.impact(.light)
                                     }
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.title2)
+                                        .foregroundColor(.white)
+                                        .background(Circle().fill(Color.black.opacity(0.5)).padding(4))
+                                        .padding(8)
                                 }
+                            }
                         } else {
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color(.systemGray6))
-                                .frame(height: 150)
-                                .overlay {
-                                    Image(systemName: "plus")
-                                        .font(.title)
-                                        .foregroundColor(.gray)
-                                }
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color.white)
+                                .frame(height: 180)
+                                .overlay(
+                                    VStack(spacing: 8) {
+                                        Image(systemName: index == 0 ? "person.crop.circle.badge.plus" : "plus")
+                                            .font(.title)
+                                            .foregroundColor(.purple.opacity(0.5))
+                                        
+                                        if index == 0 {
+                                            Text("Main Photo")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .stroke(style: StrokeStyle(lineWidth: 2, dash: [5]))
+                                        .foregroundColor(.purple.opacity(0.3))
+                                )
                         }
                     }
                 }
                 
+                // Add photos button
                 PhotosPicker(
                     selection: $selectedPhotos,
-                    maxSelectionCount: 4 - photoImages.count,
+                    maxSelectionCount: 6 - photoImages.count,
                     matching: .images
                 ) {
-                    Label("Add Photos", systemImage: "plus.circle.fill")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.purple)
-                        .cornerRadius(12)
+                    HStack(spacing: 10) {
+                        if isUploadingPhotos {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Image(systemName: "photo.badge.plus")
+                            Text("Add Photos")
+                                .fontWeight(.semibold)
+                        }
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(
+                        LinearGradient(
+                            colors: [Color.purple, Color.pink],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(16)
+                    .shadow(color: .purple.opacity(0.3), radius: 10, y: 5)
                 }
-                .disabled(photoImages.count >= 4)
+                .disabled(photoImages.count >= 6 || isUploadingPhotos)
                 .onChange(of: selectedPhotos) { _, newValue in
                     Task {
+                        isUploadingPhotos = true
                         await loadPhotos(newValue)
+                        isUploadingPhotos = false
                     }
                 }
             }
-            .padding()
+            .padding(20)
+            .padding(.top, 20)
         }
     }
     
     // MARK: - Step 4: Preferences
     
     private var step4View: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                Image(systemName: "heart.fill")
-                    .font(.system(size: 60))
-                    .foregroundColor(.purple)
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 30) {
+                // Icon
+                ZStack {
+                    Circle()
+                        .fill(Color.purple.opacity(0.15))
+                        .frame(width: 100, height: 100)
+                    
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 50))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
                 
-                Text("Dating preferences")
-                    .font(.title2)
-                    .fontWeight(.bold)
+                VStack(spacing: 8) {
+                    Text("Dating Preferences")
+                        .font(.title)
+                        .fontWeight(.bold)
+                    
+                    Text("Who are you interested in?")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
                 
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 12) {
                     Text("Interested in")
                         .font(.subheadline)
+                        .fontWeight(.medium)
                         .foregroundColor(.secondary)
                     
                     ForEach(lookingForOptions, id: \.self) { option in
                         Button {
-                            lookingFor = option
+                            withAnimation(.spring(response: 0.3)) {
+                                lookingFor = option
+                                HapticManager.shared.selection()
+                            }
                         } label: {
                             HStack {
                                 Text(option)
+                                    .fontWeight(.medium)
+                                
                                 Spacer()
+                                
                                 if lookingFor == option {
-                                    Image(systemName: "checkmark")
+                                    Image(systemName: "checkmark.circle.fill")
                                         .foregroundColor(.purple)
+                                } else {
+                                    Image(systemName: "circle")
+                                        .foregroundColor(.gray.opacity(0.3))
                                 }
                             }
                             .padding()
                             .background(
                                 lookingFor == option ?
-                                Color.purple.opacity(0.1) :
-                                Color(.systemGray6)
+                                LinearGradient(
+                                    colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.05)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                ) :
+                                LinearGradient(colors: [Color.white], startPoint: .leading, endPoint: .trailing)
                             )
                             .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(
+                                        lookingFor == option ? Color.purple.opacity(0.5) : Color.gray.opacity(0.2),
+                                        lineWidth: 1
+                                    )
+                            )
                         }
                         .foregroundColor(.primary)
                     }
                 }
             }
-            .padding()
+            .padding(20)
+            .padding(.top, 20)
+        }
+    }
+    
+    // MARK: - Step 5: Interests & Languages
+    
+    private var step5View: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 30) {
+                // Icon
+                ZStack {
+                    Circle()
+                        .fill(Color.purple.opacity(0.15))
+                        .frame(width: 100, height: 100)
+                    
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 50))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+                
+                VStack(spacing: 8) {
+                    Text("Almost Done!")
+                        .font(.title)
+                        .fontWeight(.bold)
+                    
+                    Text("Add your interests and languages")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                
+                // Interests
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Interests (Optional)")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                    
+                    FlowLayout3(spacing: 8) {
+                        ForEach(availableInterests, id: \.self) { interest in
+                            Button {
+                                withAnimation {
+                                    if selectedInterests.contains(interest) {
+                                        selectedInterests.removeAll { $0 == interest }
+                                    } else {
+                                        selectedInterests.append(interest)
+                                    }
+                                    HapticManager.shared.selection()
+                                }
+                            } label: {
+                                Text(interest)
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(selectedInterests.contains(interest) ? .white : .purple)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 8)
+                                    .background(
+                                        selectedInterests.contains(interest) ?
+                                        LinearGradient(
+                                            colors: [Color.purple, Color.pink],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        ) :
+                                        LinearGradient(colors: [Color.purple.opacity(0.1)], startPoint: .leading, endPoint: .trailing)
+                                    )
+                                    .cornerRadius(20)
+                            }
+                        }
+                    }
+                }
+                
+                // Languages
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Languages (Optional)")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                    
+                    FlowLayout3(spacing: 8) {
+                        ForEach(availableLanguages, id: \.self) { language in
+                            Button {
+                                withAnimation {
+                                    if selectedLanguages.contains(language) {
+                                        selectedLanguages.removeAll { $0 == language }
+                                    } else {
+                                        selectedLanguages.append(language)
+                                    }
+                                    HapticManager.shared.selection()
+                                }
+                            } label: {
+                                Text(language)
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(selectedLanguages.contains(language) ? .white : .blue)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 8)
+                                    .background(
+                                        selectedLanguages.contains(language) ?
+                                        LinearGradient(
+                                            colors: [Color.blue, Color.cyan],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        ) :
+                                        LinearGradient(colors: [Color.blue.opacity(0.1)], startPoint: .leading, endPoint: .trailing)
+                                    )
+                                    .cornerRadius(20)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(20)
+            .padding(.top, 20)
         }
     }
     
@@ -326,49 +782,91 @@ struct OnboardingView: View {
         HStack(spacing: 12) {
             if currentStep > 0 {
                 Button {
-                    withAnimation {
+                    withAnimation(.spring(response: 0.3)) {
                         currentStep -= 1
+                        HapticManager.shared.impact(.light)
                     }
                 } label: {
-                    Text("Back")
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color(.systemGray6))
-                        .cornerRadius(12)
+                    HStack {
+                        Image(systemName: "chevron.left")
+                        Text("Back")
+                            .fontWeight(.semibold)
+                    }
+                    .foregroundColor(.purple)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(Color.white)
+                    .cornerRadius(16)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.purple, lineWidth: 2)
+                    )
                 }
             }
             
             Button {
                 if currentStep < totalSteps - 1 {
-                    withAnimation {
+                    withAnimation(.spring(response: 0.3)) {
                         currentStep += 1
+                        HapticManager.shared.impact(.medium)
                     }
                 } else {
                     completeOnboarding()
                 }
             } label: {
-                Text(currentStep < totalSteps - 1 ? "Continue" : "Complete")
-                    .fontWeight(.semibold)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(canProceed ? Color.purple : Color.gray)
-                    .cornerRadius(12)
+                HStack(spacing: 8) {
+                    if isLoading {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Text(currentStep < totalSteps - 1 ? "Continue" : "Complete")
+                            .fontWeight(.semibold)
+                        
+                        if currentStep < totalSteps - 1 {
+                            Image(systemName: "chevron.right")
+                        } else {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(
+                    canProceed ?
+                    LinearGradient(
+                        colors: [Color.purple, Color.pink],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ) :
+                    LinearGradient(colors: [Color.gray.opacity(0.5)], startPoint: .leading, endPoint: .trailing)
+                )
+                .cornerRadius(16)
+                .shadow(color: canProceed ? .purple.opacity(0.3) : .clear, radius: 10, y: 5)
             }
-            .disabled(!canProceed)
+            .disabled(!canProceed || isLoading)
         }
-        .padding()
+        .padding(20)
+        .background(Color.white)
+        .shadow(color: .black.opacity(0.05), radius: 5, y: -2)
     }
     
     // MARK: - Helper Functions
     
     private var canProceed: Bool {
         switch currentStep {
-        case 0: return !fullName.isEmpty && calculateAge(from: birthday) >= 18
-        case 1: return !bio.isEmpty && !location.isEmpty && !country.isEmpty && bio.count <= 500
-        case 2: return photoImages.count >= 2
-        case 3: return true
-        default: return false
+        case 0:
+            return !fullName.isEmpty && calculateAge(from: birthday) >= 18
+        case 1:
+            return !bio.isEmpty && !location.isEmpty && !country.isEmpty && bio.count <= 500
+        case 2:
+            return photoImages.count >= 2
+        case 3:
+            return true
+        case 4:
+            return true
+        default:
+            return false
         }
     }
     
@@ -381,7 +879,7 @@ struct OnboardingView: View {
             if let data = try? await item.loadTransferable(type: Data.self),
                let image = UIImage(data: data) {
                 await MainActor.run {
-                    if photoImages.count < 4 {
+                    if photoImages.count < 6 {
                         photoImages.append(image)
                     }
                 }
@@ -396,17 +894,16 @@ struct OnboardingView: View {
         Task {
             do {
                 guard var user = authService.currentUser else { return }
+                guard let userId = user.id else { return }
                 
                 // Upload photos
                 var photoURLs: [String] = []
-                if let userId = user.id {
-                    for image in photoImages {
-                        // You'll need to implement image upload
-                        // let url = try await uploadImage(image, userId: userId)
-                        // photoURLs.append(url)
-                    }
+                for image in photoImages {
+                    let url = try await imageUploadService.uploadProfileImage(image, userId: userId)
+                    photoURLs.append(url)
                 }
                 
+                // Update user
                 user.fullName = fullName
                 user.age = calculateAge(from: birthday)
                 user.gender = gender
@@ -416,11 +913,14 @@ struct OnboardingView: View {
                 user.lookingFor = lookingFor
                 user.photos = photoURLs
                 user.profileImageURL = photoURLs.first ?? ""
+                user.interests = selectedInterests
+                user.languages = selectedLanguages
                 
                 try await authService.updateUser(user)
                 
                 await MainActor.run {
                     isLoading = false
+                    HapticManager.shared.notification(.success)
                     dismiss()
                 }
             } catch {
