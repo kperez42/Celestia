@@ -78,12 +78,11 @@ struct MessagesView: View {
                 HapticManager.shared.impact(.light)
                 await loadData()
             }
-            .sheet(item: Binding(
-                get: { selectedMatch.map { IdentifiableMatchUser(match: $0.0, user: $0.1) } },
-                set: { selectedMatch = $0.map { ($0.match, $0.user) } }
-            )) { item in
-                NavigationStack {
-                    ChatView(match: item.match, otherUser: item.user)
+            .sheet(isPresented: $showingChat) {
+                if let selectedMatch = selectedMatch {
+                    NavigationStack {
+                        ChatView(match: selectedMatch.0, otherUser: selectedMatch.1)
+                    }
                 }
             }
         }
@@ -256,12 +255,13 @@ struct MessagesView: View {
                     ConversationRow(
                         match: match,
                         user: user,
-                        currentUserId: authService.currentUser?.id ?? "",
+                        currentUserId: authService.currentUser?.id ?? "current_user",
                         index: index
                     )
                     .onTapGesture {
                         HapticManager.shared.impact(.medium)
                         selectedMatch = (match, user)
+                        showingChat = true
                     }
                 }
             }
@@ -425,7 +425,6 @@ struct ConversationRow: View {
     let currentUserId: String
     let index: Int
     
-    @State private var isPressed = false
     @State private var appeared = false
     
     private var unreadCount: Int {
@@ -541,8 +540,8 @@ struct ConversationRow: View {
         .cornerRadius(20)
         .shadow(
             color: unreadCount > 0 ? Color.purple.opacity(0.15) : Color.black.opacity(0.05),
-            radius: isPressed ? 12 : 8,
-            y: isPressed ? 6 : 4
+            radius: 8,
+            y: 4
         )
         .overlay(
             RoundedRectangle(cornerRadius: 20)
@@ -557,18 +556,8 @@ struct ConversationRow: View {
                     lineWidth: 1.5
                 )
         )
-        .scaleEffect(isPressed ? 0.97 : 1.0)
         .offset(x: appeared ? 0 : 300)
         .opacity(appeared ? 1 : 0)
-        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: isPressed)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in
-                    isPressed = true
-                    HapticManager.shared.impact(.light)
-                }
-                .onEnded { _ in isPressed = false }
-        )
         .onAppear {
             withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(Double(index) * 0.05)) {
                 appeared = true
