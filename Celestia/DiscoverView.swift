@@ -25,6 +25,8 @@ struct DiscoverView: View {
     @State private var matchedUser: User?
     @State private var swipeHistory: [SwipeAction] = []
     @State private var showUndoButton = false
+    @State private var selectedUser: User?
+    @State private var showingUserDetail = false
     
     var body: some View {
         NavigationStack {
@@ -65,6 +67,11 @@ struct DiscoverView: View {
             }
             .refreshable {
                 await loadUsers()
+            }
+            .sheet(isPresented: $showingUserDetail) {
+                if let user = selectedUser {
+                    UserDetailView(user: user)
+                }
             }
         }
     }
@@ -116,6 +123,13 @@ struct DiscoverView: View {
                     .zIndex(Double(3 - cardIndex))
                     .offset(cardIndex == 0 ? dragOffset : .zero)
                     .rotationEffect(.degrees(cardIndex == 0 ? Double(dragOffset.width / 20) : 0))
+                    .onTapGesture {
+                        if cardIndex == 0 {
+                            selectedUser = user
+                            showingUserDetail = true
+                            HapticManager.shared.impact(.medium)
+                        }
+                    }
                     .gesture(
                         cardIndex == 0 ? DragGesture()
                             .onChanged { value in
