@@ -161,11 +161,10 @@ extension View {
 
 // MARK: - Custom Shapes
 
-/// Custom corner radius shape
 struct RoundedCorner: Shape {
     var radius: CGFloat = .infinity
     var corners: UIRectCorner = .allCorners
-    
+
     func path(in rect: CGRect) -> Path {
         let path = UIBezierPath(
             roundedRect: rect,
@@ -209,11 +208,6 @@ extension Color {
 // MARK: - Array Extensions
 
 extension Array {
-    /// Safely access array element
-    subscript(safe index: Int) -> Element? {
-        indices.contains(index) ? self[index] : nil
-    }
-    
     /// Remove duplicates while preserving order
     func removingDuplicates<T: Hashable>(by keyPath: KeyPath<Element, T>) -> [Element] {
         var seen = Set<T>()
@@ -346,40 +340,6 @@ struct ScaleButtonStyle2: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
             .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
-    }
-}
-
-// MARK: - Haptic Feedback
-
-struct HapticManager {
-    static let shared = HapticManager()
-    
-    private init() {}
-    
-    func impact(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .medium) {
-        let generator = UIImpactFeedbackGenerator(style: style)
-        generator.impactOccurred()
-    }
-    
-    func notification(_ type: UINotificationFeedbackGenerator.FeedbackType) {
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(type)
-    }
-    
-    func selection() {
-        let generator = UISelectionFeedbackGenerator()
-        generator.selectionChanged()
-    }
-}
-
-// MARK: - View Extension for Haptics
-
-extension View {
-    /// Add haptic feedback on tap
-    func hapticFeedback(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .medium) -> some View {
-        self.onTapGesture {
-            HapticManager.shared.impact(style)
-        }
     }
 }
 

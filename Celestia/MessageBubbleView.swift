@@ -182,24 +182,6 @@ struct MessageBubbleGradient: View {
 // MARK: - Date Extension
 
 extension Date {
-    func timeAgoDisplay() -> String {
-        let calendar = Calendar.current
-        let now = Date()
-        let components = calendar.dateComponents([.minute, .hour, .day, .weekOfYear], from: self, to: now)
-        
-        if let week = components.weekOfYear, week > 0 {
-            return week == 1 ? "1 week ago" : "\(week) weeks ago"
-        } else if let day = components.day, day > 0 {
-            return day == 1 ? "1 day ago" : "\(day) days ago"
-        } else if let hour = components.hour, hour > 0 {
-            return hour == 1 ? "1 hour ago" : "\(hour) hours ago"
-        } else if let minute = components.minute, minute > 0 {
-            return minute == 1 ? "1 min ago" : "\(minute) mins ago"
-        } else {
-            return "Just now"
-        }
-    }
-    
     /// Format as "3:45 PM"
     func formattedTime() -> String {
         let formatter = DateFormatter()

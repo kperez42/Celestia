@@ -5,17 +5,25 @@
 
 import SwiftUI
 
+struct SwipeAction {
+    let user: User
+    let index: Int
+    let wasLike: Bool
+}
+
 struct DiscoverView: View {
     @EnvironmentObject var authService: AuthService
     @StateObject private var userService = UserService.shared
     @StateObject private var matchService = MatchService.shared
-    
+
     @State private var currentIndex = 0
     @State private var users: [User] = []
     @State private var isLoading = false
     @State private var dragOffset: CGSize = .zero
     @State private var showingMatchAnimation = false
     @State private var matchedUser: User?
+    @State private var swipeHistory: [SwipeAction] = []
+    @State private var showUndoButton = false
     
     var body: some View {
         NavigationStack {
@@ -118,10 +126,26 @@ struct DiscoverView: View {
             // Action buttons
             VStack {
                 Spacer()
-                
+
                 HStack(spacing: 20) {
+                    // Undo button (premium feature)
+                    if showUndoButton && !swipeHistory.isEmpty {
+                        Button {
+                            handleUndo()
+                        } label: {
+                            Image(systemName: "arrow.uturn.left")
+                                .font(.title3)
+                                .foregroundColor(.white)
+                                .frame(width: 50, height: 50)
+                                .background(Color.yellow)
+                                .clipShape(Circle())
+                                .shadow(radius: 5)
+                        }
+                        .transition(.scale.combined(with: .opacity))
+                    }
+
                     Spacer()
-                    
+
                     // Pass button
                     Button {
                         handlePass()
@@ -134,7 +158,26 @@ struct DiscoverView: View {
                             .clipShape(Circle())
                             .shadow(radius: 5)
                     }
-                    
+
+                    // Super Like button (premium)
+                    Button {
+                        handleSuperLike()
+                    } label: {
+                        Image(systemName: "star.fill")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                            .frame(width: 60, height: 60)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color.blue, Color.cyan],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .clipShape(Circle())
+                            .shadow(radius: 5)
+                    }
+
                     // Like button
                     Button {
                         handleLike()
@@ -147,7 +190,7 @@ struct DiscoverView: View {
                             .clipShape(Circle())
                             .shadow(radius: 5)
                     }
-                    
+
                     Spacer()
                 }
                 .padding(.bottom, 30)
@@ -268,27 +311,39 @@ struct DiscoverView: View {
         }
     }
     
-    private func handleLike() {
+    private func handleLike(isSuperLike: Bool = false) {
         guard currentIndex < users.count else { return }
         let user = users[currentIndex]
-        
+
+        // Save to history for undo
+        swipeHistory.append(SwipeAction(user: user, index: currentIndex, wasLike: true))
+        showUndoButton = true
+
+        // Haptic feedback
+        if isSuperLike {
+            HapticManager.shared.superLike()
+        } else {
+            HapticManager.shared.swipeRight()
+        }
+
         Task {
             guard let currentUserId = authService.currentUser?.id,
                   let userId = user.id else { return }
-            
+
             // Check for match
             let hasMatched = try? await matchService.hasMatched(
                 user1Id: currentUserId,
                 user2Id: userId
             )
-            
+
             if hasMatched == true {
                 await MainActor.run {
                     matchedUser = user
                     showingMatchAnimation = true
+                    HapticManager.shared.match()
                 }
             }
-            
+
             await MainActor.run {
                 withAnimation {
                     currentIndex += 1
@@ -296,10 +351,52 @@ struct DiscoverView: View {
             }
         }
     }
-    
+
     private func handlePass() {
+        guard currentIndex < users.count else { return }
+        let user = users[currentIndex]
+
+        // Save to history for undo
+        swipeHistory.append(SwipeAction(user: user, index: currentIndex, wasLike: false))
+        showUndoButton = true
+
+        // Haptic feedback
+        HapticManager.shared.swipeLeft()
+
         withAnimation {
             currentIndex += 1
+        }
+    }
+
+    private func handleSuperLike() {
+        guard currentIndex < users.count else { return }
+
+        // Check if user is premium
+        if authService.currentUser?.isPremium == true {
+            handleLike(isSuperLike: true)
+        } else {
+            // Show premium upgrade prompt
+            // For now, just treat as regular like
+            handleLike(isSuperLike: false)
+        }
+    }
+
+    private func handleUndo() {
+        guard !swipeHistory.isEmpty else { return }
+
+        // Check if user has premium for unlimited undo, otherwise allow 1 free undo
+        let isPremium = authService.currentUser?.isPremium ?? false
+        let freeUndoCount = 1
+
+        if isPremium || swipeHistory.count <= freeUndoCount {
+            let lastAction = swipeHistory.removeLast()
+
+            withAnimation(.spring(response: 0.3)) {
+                currentIndex = lastAction.index
+                showUndoButton = !swipeHistory.isEmpty
+            }
+
+            HapticManager.shared.impact(.medium)
         }
     }
 }
@@ -316,30 +413,25 @@ struct UserCardView: View {
                 .fill(Color.white)
                 .shadow(radius: 10)
             
-            // User image
-            AsyncImage(url: URL(string: user.profileImageURL)) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                case .failure(_), .empty:
-                    LinearGradient(
-                        colors: [Color.purple.opacity(0.6), Color.pink.opacity(0.5)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .overlay {
-                        Text(user.fullName.prefix(1))
-                            .font(.system(size: 80, weight: .bold))
-                            .foregroundColor(.white.opacity(0.5))
-                    }
-                @unknown default:
-                    Color.gray.opacity(0.3)
+            // User image with caching
+            CachedAsyncImage(url: URL(string: user.profileImageURL)) { image in
+                image
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+            } placeholder: {
+                LinearGradient(
+                    colors: [Color.purple.opacity(0.6), Color.pink.opacity(0.5)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .overlay {
+                    Text(user.fullName.prefix(1))
+                        .font(.system(size: 80, weight: .bold))
+                        .foregroundColor(.white.opacity(0.5))
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .clipped()
             
             // Gradient overlay
             LinearGradient(
