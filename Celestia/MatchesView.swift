@@ -489,12 +489,16 @@ struct MatchesView: View {
     private func loadMatches() async {
         #if DEBUG
         // Use test data in preview/debug mode
-        matchService.matches = TestData.testMatches.map { $0.match }
-        for (user, match) in TestData.testMatches {
-            let otherUserId = match.user2Id
-            matchedUsers[otherUserId] = user
+        await MainActor.run {
+            matchService.matches = TestData.testMatches.map { $0.match }
+            for (user, match) in TestData.testMatches {
+                let otherUserId = match.user2Id
+                matchedUsers[otherUserId] = user
+            }
         }
-        #else
+        return
+        #endif
+
         guard let userId = authService.currentUser?.id else { return }
 
         do {
@@ -514,7 +518,6 @@ struct MatchesView: View {
         } catch {
             print("Error loading matches: \(error)")
         }
-        #endif
     }
     
     private func getMatchedUser(_ match: Match) -> User? {

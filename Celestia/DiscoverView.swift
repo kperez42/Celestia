@@ -412,80 +412,131 @@ struct DiscoverView: View {
 
 struct UserCardView: View {
     let user: User
-    
+
     var body: some View {
-        ZStack(alignment: .bottom) {
-            // Background
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.white)
-                .shadow(radius: 10)
-            
-            // User image with caching
-            CachedAsyncImage(url: URL(string: user.profileImageURL)) { image in
-                image
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
-            } placeholder: {
-                LinearGradient(
-                    colors: [Color.purple.opacity(0.6), Color.pink.opacity(0.5)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .overlay {
-                    Text(user.fullName.prefix(1))
-                        .font(.system(size: 80, weight: .bold))
-                        .foregroundColor(.white.opacity(0.5))
-                }
-            }
-            
-            // Gradient overlay
-            LinearGradient(
-                colors: [Color.clear, Color.black.opacity(0.7)],
-                startPoint: .center,
-                endPoint: .bottom
-            )
-            
-            // User info
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text(user.fullName)
-                        .font(.title)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                    
-                    Text("\(user.age)")
-                        .font(.title2)
-                        .foregroundColor(.white.opacity(0.9))
-                    
-                    if user.isVerified {
-                        Image(systemName: "checkmark.seal.fill")
-                            .foregroundColor(.blue)
+        GeometryReader { geometry in
+            ZStack(alignment: .bottom) {
+                // Background
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color.white)
+                    .shadow(radius: 10)
+
+                // User image with caching
+                CachedAsyncImage(url: URL(string: user.profileImageURL)) { image in
+                    image
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .clipped()
+                } placeholder: {
+                    LinearGradient(
+                        colors: [Color.purple.opacity(0.6), Color.pink.opacity(0.5)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .overlay {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                            .tint(.white)
                     }
                 }
-                
-                HStack(spacing: 4) {
-                    Image(systemName: "mappin.circle.fill")
-                        .font(.caption)
-                    Text("\(user.location), \(user.country)")
-                        .font(.subheadline)
+
+                // Gradient overlay for better text readability
+                LinearGradient(
+                    colors: [
+                        Color.clear,
+                        Color.black.opacity(0.3),
+                        Color.black.opacity(0.8)
+                    ],
+                    startPoint: .init(x: 0.5, y: 0.6),
+                    endPoint: .bottom
+                )
+
+                // User info overlay
+                VStack(alignment: .leading, spacing: 12) {
+                    // Name and age
+                    HStack(alignment: .top, spacing: 8) {
+                        Text(user.fullName)
+                            .font(.system(size: 32, weight: .bold))
+                            .foregroundColor(.white)
+
+                        Text("\(user.age)")
+                            .font(.system(size: 28, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.9))
+
+                        if user.isVerified {
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(.title3)
+                                .foregroundColor(.blue)
+                        }
+
+                        if user.isPremium {
+                            Image(systemName: "crown.fill")
+                                .font(.title3)
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.yellow, .orange],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                        }
+
+                        Spacer()
+                    }
+
+                    // Location
+                    HStack(spacing: 6) {
+                        Image(systemName: "mappin.and.ellipse")
+                            .font(.subheadline)
+                        Text(user.location)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                    }
+                    .foregroundColor(.white)
+
+                    // Bio
+                    if !user.bio.isEmpty {
+                        Text(user.bio)
+                            .font(.subheadline)
+                            .foregroundColor(.white.opacity(0.95))
+                            .lineLimit(3)
+                            .multilineTextAlignment(.leading)
+                    }
+
+                    // Interests preview
+                    if !user.interests.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(user.interests.prefix(4), id: \.self) { interest in
+                                    Text(interest)
+                                        .font(.caption)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(
+                                            Capsule()
+                                                .fill(Color.white.opacity(0.2))
+                                                .overlay(
+                                                    Capsule()
+                                                        .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                                )
+                                        )
+                                }
+                            }
+                        }
+                    }
                 }
-                .foregroundColor(.white.opacity(0.9))
-                
-                if !user.bio.isEmpty {
-                    Text(user.bio)
-                        .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.85))
-                        .lineLimit(2)
-                }
+                .padding(24)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .cornerRadius(20)
         }
-        .cornerRadius(20)
+        .frame(height: 580) // Fixed height for cards
     }
 }
+
 
 #Preview {
     DiscoverView()
