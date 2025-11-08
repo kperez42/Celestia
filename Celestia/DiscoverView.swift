@@ -99,13 +99,15 @@ struct DiscoverView: View {
     }
     
     // MARK: - Card Stack
-    
+
     private var cardStackView: some View {
         ZStack {
             ForEach(Array(users.enumerated().filter { $0.offset >= currentIndex && $0.offset < currentIndex + 3 }), id: \.offset) { index, user in
                 let cardIndex = index - currentIndex
-                
+
                 UserCardView(user: user)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 120) // Space for buttons
                     .offset(y: CGFloat(cardIndex * 8))
                     .scaleEffect(1.0 - CGFloat(cardIndex) * 0.05)
                     .opacity(1.0 - Double(cardIndex) * 0.2)
@@ -122,12 +124,12 @@ struct DiscoverView: View {
                             } : nil
                     )
             }
-            
-            // Action buttons
+
+            // Action buttons overlay
             VStack {
                 Spacer()
 
-                HStack(spacing: 20) {
+                HStack(spacing: 24) {
                     // Undo button (premium feature)
                     if showUndoButton && !swipeHistory.isEmpty {
                         Button {
@@ -136,10 +138,10 @@ struct DiscoverView: View {
                             Image(systemName: "arrow.uturn.left")
                                 .font(.title3)
                                 .foregroundColor(.white)
-                                .frame(width: 50, height: 50)
+                                .frame(width: 56, height: 56)
                                 .background(Color.yellow)
                                 .clipShape(Circle())
-                                .shadow(radius: 5)
+                                .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
                         }
                         .transition(.scale.combined(with: .opacity))
                     }
@@ -151,12 +153,19 @@ struct DiscoverView: View {
                         handlePass()
                     } label: {
                         Image(systemName: "xmark")
-                            .font(.title2)
+                            .font(.title)
+                            .fontWeight(.bold)
                             .foregroundColor(.white)
-                            .frame(width: 60, height: 60)
-                            .background(Color.red)
+                            .frame(width: 64, height: 64)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color.red.opacity(0.9), Color.red],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
                             .clipShape(Circle())
-                            .shadow(radius: 5)
+                            .shadow(color: .red.opacity(0.4), radius: 8, y: 4)
                     }
 
                     // Super Like button (premium)
@@ -166,7 +175,7 @@ struct DiscoverView: View {
                         Image(systemName: "star.fill")
                             .font(.title2)
                             .foregroundColor(.white)
-                            .frame(width: 60, height: 60)
+                            .frame(width: 56, height: 56)
                             .background(
                                 LinearGradient(
                                     colors: [Color.blue, Color.cyan],
@@ -175,7 +184,7 @@ struct DiscoverView: View {
                                 )
                             )
                             .clipShape(Circle())
-                            .shadow(radius: 5)
+                            .shadow(color: .blue.opacity(0.4), radius: 8, y: 4)
                     }
 
                     // Like button
@@ -183,20 +192,27 @@ struct DiscoverView: View {
                         handleLike()
                     } label: {
                         Image(systemName: "heart.fill")
-                            .font(.title2)
+                            .font(.title)
+                            .fontWeight(.bold)
                             .foregroundColor(.white)
-                            .frame(width: 60, height: 60)
-                            .background(Color.green)
+                            .frame(width: 64, height: 64)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color.green.opacity(0.9), Color.green],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
                             .clipShape(Circle())
-                            .shadow(radius: 5)
+                            .shadow(color: .green.opacity(0.4), radius: 8, y: 4)
                     }
 
                     Spacer()
                 }
-                .padding(.bottom, 30)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 40)
             }
         }
-        .padding()
     }
     
     // MARK: - Empty State
@@ -533,7 +549,7 @@ struct UserCardView: View {
             }
             .cornerRadius(20)
         }
-        .frame(height: 580) // Fixed height for cards
+        .frame(maxHeight: .infinity) // Fill available space
     }
 }
 
