@@ -1,0 +1,429 @@
+//
+//  Utilities.swift
+//  Celestia
+//
+//  Created by Claude
+//  General utility functions and helpers
+//
+
+import Foundation
+import SwiftUI
+
+// MARK: - Date Utilities
+
+extension Date {
+    func timeAgoDisplay() -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: self, relativeTo: Date())
+    }
+
+    func shortTimeAgo() -> String {
+        let seconds = Date().timeIntervalSince(self)
+        let minutes = Int(seconds / 60)
+        let hours = Int(seconds / 3600)
+        let days = Int(seconds / 86400)
+
+        if seconds < 60 {
+            return "Just now"
+        } else if minutes < 60 {
+            return "\(minutes)m"
+        } else if hours < 24 {
+            return "\(hours)h"
+        } else if days < 7 {
+            return "\(days)d"
+        } else {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "MMM d"
+            return formatter.string(from: self)
+        }
+    }
+
+    func isSameDay(as date: Date) -> Bool {
+        Calendar.current.isDate(self, inSameDayAs: date)
+    }
+
+    var isToday: Bool {
+        Calendar.current.isDateInToday(self)
+    }
+
+    var isYesterday: Bool {
+        Calendar.current.isDateInYesterday(self)
+    }
+}
+
+// MARK: - String Utilities
+
+extension String {
+    func trimmed() -> String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var isValidEmail: Bool {
+        let emailRegex = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
+        let emailPredicate = NSPredicate(format: "SELF MATCHES %@", emailRegex)
+        return emailPredicate.evaluate(with: self)
+    }
+
+    var isValidPassword: Bool {
+        count >= 8
+    }
+
+    func initials() -> String {
+        let components = self.components(separatedBy: " ")
+        let initials = components.compactMap { $0.first }.map { String($0) }
+        return initials.prefix(2).joined()
+    }
+
+    func truncated(to length: Int, trailing: String = "...") -> String {
+        if self.count > length {
+            return String(self.prefix(length)) + trailing
+        }
+        return self
+    }
+}
+
+// MARK: - Array Utilities
+
+extension Array {
+    subscript(safe index: Index) -> Element? {
+        indices.contains(index) ? self[index] : nil
+    }
+}
+
+// MARK: - Number Formatting
+
+extension Int {
+    func abbreviated() -> String {
+        let thousand = self / 1000
+        let million = self / 1_000_000
+
+        if million >= 1 {
+            return "\(million)M"
+        } else if thousand >= 1 {
+            return "\(thousand)K"
+        } else {
+            return "\(self)"
+        }
+    }
+}
+
+extension Double {
+    func formatted(decimals: Int = 1) -> String {
+        String(format: "%.\(decimals)f", self)
+    }
+}
+
+// MARK: - Distance Calculation
+
+extension User {
+    func distance(from otherUser: User) -> Double? {
+        guard let lat1 = self.latitude, let lon1 = self.longitude,
+              let lat2 = otherUser.latitude, let lon2 = otherUser.longitude else {
+            return nil
+        }
+
+        return calculateDistance(
+            lat1: lat1, lon1: lon1,
+            lat2: lat2, lon2: lon2
+        )
+    }
+
+    func distanceString(from otherUser: User) -> String {
+        guard let distance = distance(from: otherUser) else {
+            return "Unknown"
+        }
+
+        let km = distance
+        if km < 1 {
+            return "Less than 1 km away"
+        } else if km < 10 {
+            return "\(Int(km)) km away"
+        } else {
+            return "\(Int(km/10)*10)+ km away"
+        }
+    }
+}
+
+func calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double) -> Double {
+    let R = 6371.0 // Radius of Earth in kilometers
+
+    let dLat = (lat2 - lat1) * .pi / 180
+    let dLon = (lon2 - lon1) * .pi / 180
+
+    let a = sin(dLat/2) * sin(dLat/2) +
+            cos(lat1 * .pi / 180) * cos(lat2 * .pi / 180) *
+            sin(dLon/2) * sin(dLon/2)
+
+    let c = 2 * atan2(sqrt(a), sqrt(1-a))
+
+    return R * c
+}
+
+// MARK: - Color Utilities
+
+extension Color {
+    static var random: Color {
+        Color(
+            red: .random(in: 0...1),
+            green: .random(in: 0...1),
+            blue: .random(in: 0...1)
+        )
+    }
+
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3: // RGB (12-bit)
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: // RGB (24-bit)
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: // ARGB (32-bit)
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (255, 0, 0, 0)
+        }
+
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue: Double(b) / 255,
+            opacity: Double(a) / 255
+        )
+    }
+}
+
+// MARK: - View Utilities
+
+extension View {
+    func hideKeyboard() {
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+        )
+    }
+
+    @ViewBuilder
+    func `if`<Transform: View>(
+        _ condition: Bool,
+        transform: (Self) -> Transform
+    ) -> some View {
+        if condition {
+            transform(self)
+        } else {
+            self
+        }
+    }
+
+    func cardStyle() -> some View {
+        self
+            .padding()
+            .background(Color.white)
+            .cornerRadius(16)
+            .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
+    }
+}
+
+// MARK: - Image Validation
+
+enum ImageValidator {
+    static let maxImageSize: Int = 10 * 1024 * 1024 // 10 MB
+    static let supportedFormats = ["jpg", "jpeg", "png", "heic"]
+
+    static func validate(_ data: Data) throws {
+        guard data.count <= maxImageSize else {
+            throw CelestiaError.imageTooBig
+        }
+
+        guard let image = UIImage(data: data) else {
+            throw CelestiaError.invalidImageFormat
+        }
+
+        // Additional validation
+        let maxDimension: CGFloat = 4096
+        if image.size.width > maxDimension || image.size.height > maxDimension {
+            throw CelestiaError.imageTooBig
+        }
+    }
+
+    static func compress(_ image: UIImage, maxSizeKB: Int = 500) -> Data? {
+        var compression: CGFloat = 1.0
+        var imageData = image.jpegData(compressionQuality: compression)
+
+        while let data = imageData, data.count > maxSizeKB * 1024, compression > 0.1 {
+            compression -= 0.1
+            imageData = image.jpegData(compressionQuality: compression)
+        }
+
+        return imageData
+    }
+}
+
+// MARK: - Debouncer
+
+class Debouncer {
+    private var workItem: DispatchWorkItem?
+    private let delay: TimeInterval
+
+    init(delay: TimeInterval = 0.3) {
+        self.delay = delay
+    }
+
+    func debounce(action: @escaping () -> Void) {
+        workItem?.cancel()
+        workItem = DispatchWorkItem(block: action)
+
+        if let workItem = workItem {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
+        }
+    }
+
+    func cancel() {
+        workItem?.cancel()
+    }
+}
+
+// MARK: - Safe Area Insets
+
+extension UIApplication {
+    var safeAreaInsets: UIEdgeInsets {
+        let scene = connectedScenes.first as? UIWindowScene
+        return scene?.windows.first?.safeAreaInsets ?? .zero
+    }
+}
+
+// MARK: - App Version
+
+struct AppInfo {
+    static var version: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    }
+
+    static var build: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+    }
+
+    static var fullVersion: String {
+        "\(version) (\(build))"
+    }
+
+    static var appName: String {
+        Bundle.main.infoDictionary?["CFBundleName"] as? String ?? "Celestia"
+    }
+}
+
+// MARK: - Profile Completion
+
+extension User {
+    var profileCompletionPercentage: Int {
+        var completed = 0
+        let total = 10
+
+        if !fullName.isEmpty { completed += 1 }
+        if !bio.isEmpty { completed += 1 }
+        if !location.isEmpty { completed += 1 }
+        if !interests.isEmpty { completed += 1 }
+        if !languages.isEmpty { completed += 1 }
+        if !photos.isEmpty { completed += 1 }
+        if photos.count >= 3 { completed += 1 }
+        if !profileImageURL.isEmpty { completed += 1 }
+        if age >= 18 { completed += 1 }
+        if !gender.isEmpty { completed += 1 }
+
+        return (completed * 100) / total
+    }
+
+    var isProfileComplete: Bool {
+        profileCompletionPercentage >= 70
+    }
+}
+
+// MARK: - Notifications
+
+extension Notification.Name {
+    static let userDidUpdate = Notification.Name("userDidUpdate")
+    static let newMatchReceived = Notification.Name("newMatchReceived")
+    static let newMessageReceived = Notification.Name("newMessageReceived")
+}
+
+// MARK: - URL Schemes
+
+enum DeepLink {
+    case profile(userId: String)
+    case chat(matchId: String)
+    case premium
+    case settings
+
+    var url: URL? {
+        switch self {
+        case .profile(let userId):
+            return URL(string: "celestia://profile/\(userId)")
+        case .chat(let matchId):
+            return URL(string: "celestia://chat/\(matchId)")
+        case .premium:
+            return URL(string: "celestia://premium")
+        case .settings:
+            return URL(string: "celestia://settings")
+        }
+    }
+}
+
+// MARK: - Preview Helpers
+
+#if DEBUG
+extension User {
+    static var preview: User {
+        User(
+            id: "preview",
+            email: "test@celestia.app",
+            fullName: "Alex Johnson",
+            age: 28,
+            gender: "Male",
+            lookingFor: "Female",
+            bio: "Love hiking, coffee, and good conversations. Always up for an adventure!",
+            location: "San Francisco",
+            country: "USA",
+            latitude: 37.7749,
+            longitude: -122.4194,
+            languages: ["English", "Spanish"],
+            interests: ["Travel", "Photography", "Hiking", "Coffee"],
+            photos: ["photo1", "photo2", "photo3"],
+            profileImageURL: "https://picsum.photos/400/500",
+            isPremium: true,
+            isVerified: true
+        )
+    }
+
+    static var previews: [User] {
+        [
+            preview,
+            User(
+                email: "sarah@test.com",
+                fullName: "Sarah Miller",
+                age: 25,
+                gender: "Female",
+                lookingFor: "Male",
+                bio: "Artist and dreamer",
+                location: "Los Angeles",
+                country: "USA"
+            ),
+            User(
+                email: "mike@test.com",
+                fullName: "Mike Chen",
+                age: 30,
+                gender: "Male",
+                lookingFor: "Female",
+                bio: "Tech enthusiast",
+                location: "Seattle",
+                country: "USA"
+            )
+        ]
+    }
+}
+#endif
