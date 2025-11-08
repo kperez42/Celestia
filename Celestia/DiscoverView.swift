@@ -15,6 +15,7 @@ struct DiscoverView: View {
     @EnvironmentObject var authService: AuthService
     @StateObject private var userService = UserService.shared
     @StateObject private var matchService = MatchService.shared
+    @StateObject private var swipeService = SwipeService.shared
 
     @State private var currentIndex = 0
     @State private var users: [User] = []
@@ -332,21 +333,47 @@ struct DiscoverView: View {
 
         Task {
             guard let currentUserId = authService.currentUser?.id,
-                  let userId = user.id else { return }
+                  let userId = user.id else {
+                await MainActor.run {
+                    withAnimation {
+                        currentIndex += 1
+                    }
+                }
+                return
+            }
 
-            // Check for match
-            let hasMatched = try? await matchService.hasMatched(
-                user1Id: currentUserId,
-                user2Id: userId
-            )
-
-            if hasMatched == true {
+            #if DEBUG
+            // In debug mode with test data, just show match animation for demonstration
+            print("💕 DEBUG: Simulating like from \(currentUserId) to \(userId)")
+            // Simulate match on every 3rd like for testing
+            if currentIndex % 3 == 0 {
                 await MainActor.run {
                     matchedUser = user
                     showingMatchAnimation = true
                     HapticManager.shared.match()
                 }
             }
+            #else
+            // Production: Create like and check for mutual match
+            do {
+                let isMatch = try await swipeService.likeUser(
+                    fromUserId: currentUserId,
+                    toUserId: userId,
+                    isSuperLike: isSuperLike
+                )
+
+                if isMatch {
+                    await MainActor.run {
+                        matchedUser = user
+                        showingMatchAnimation = true
+                        HapticManager.shared.match()
+                    }
+                    print("🎉 It's a match with \(user.fullName)!")
+                }
+            } catch {
+                print("❌ Error creating like: \(error)")
+            }
+            #endif
 
             await MainActor.run {
                 withAnimation {
@@ -367,8 +394,31 @@ struct DiscoverView: View {
         // Haptic feedback
         HapticManager.shared.swipeLeft()
 
-        withAnimation {
-            currentIndex += 1
+        Task {
+            guard let currentUserId = authService.currentUser?.id,
+                  let userId = user.id else {
+                withAnimation {
+                    currentIndex += 1
+                }
+                return
+            }
+
+            #if DEBUG
+            print("👋 DEBUG: Simulating pass from \(currentUserId) to \(userId)")
+            #else
+            // Production: Record the pass
+            do {
+                try await swipeService.passUser(fromUserId: currentUserId, toUserId: userId)
+            } catch {
+                print("❌ Error recording pass: \(error)")
+            }
+            #endif
+
+            await MainActor.run {
+                withAnimation {
+                    currentIndex += 1
+                }
+            }
         }
     }
 
