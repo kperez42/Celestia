@@ -126,29 +126,11 @@ struct DiscoverView: View {
                     )
             }
 
-            // Action buttons overlay
+            // Action buttons overlay - Fixed centered position
             VStack {
                 Spacer()
 
-                HStack(spacing: 24) {
-                    // Undo button (premium feature)
-                    if showUndoButton && !swipeHistory.isEmpty {
-                        Button {
-                            handleUndo()
-                        } label: {
-                            Image(systemName: "arrow.uturn.left")
-                                .font(.title3)
-                                .foregroundColor(.white)
-                                .frame(width: 56, height: 56)
-                                .background(Color.yellow)
-                                .clipShape(Circle())
-                                .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
-                        }
-                        .transition(.scale.combined(with: .opacity))
-                    }
-
-                    Spacer()
-
+                HStack(spacing: 20) {
                     // Pass button
                     Button {
                         handlePass()
@@ -169,7 +151,7 @@ struct DiscoverView: View {
                             .shadow(color: .red.opacity(0.4), radius: 8, y: 4)
                     }
 
-                    // Super Like button (premium)
+                    // Super Like button
                     Button {
                         handleSuperLike()
                     } label: {
@@ -207,11 +189,9 @@ struct DiscoverView: View {
                             .clipShape(Circle())
                             .shadow(color: .green.opacity(0.4), radius: 8, y: 4)
                     }
-
-                    Spacer()
                 }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 100) // Increased to stay above tab bar
+                .frame(maxWidth: .infinity) // Center the buttons
+                .padding(.bottom, 100) // Stay above tab bar
             }
         }
     }
