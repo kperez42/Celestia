@@ -107,7 +107,8 @@ struct DiscoverView: View {
 
                 UserCardView(user: user)
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 120) // Space for buttons
+                    .padding(.top, 16) // Reduce card height from top
+                    .padding(.bottom, 180) // Increased space for buttons and tab bar
                     .offset(y: CGFloat(cardIndex * 8))
                     .scaleEffect(1.0 - CGFloat(cardIndex) * 0.05)
                     .opacity(1.0 - Double(cardIndex) * 0.2)
@@ -210,7 +211,7 @@ struct DiscoverView: View {
                     Spacer()
                 }
                 .padding(.horizontal, 24)
-                .padding(.bottom, 40)
+                .padding(.bottom, 100) // Increased to stay above tab bar
             }
         }
     }
