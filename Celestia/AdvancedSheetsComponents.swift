@@ -350,7 +350,8 @@ struct AdvancedFiltersSheet: View {
     
     private func applyFilters() {
         // Filters are bound, so they're already updated
-        HapticManager.shared.notification(.success)
+        let haptics = HapticManager.shared
+        haptics.notification(.success)
         dismiss()
     }
     
@@ -364,8 +365,9 @@ struct AdvancedFiltersSheet: View {
         hasPhotos = true
         hasBio = false
         sortBy = .distance
-        
-        HapticManager.shared.impact(.medium)
+
+        let haptics = HapticManager.shared
+        haptics.impact(.medium)
     }
 }
 
@@ -658,10 +660,11 @@ struct BoostProfileSheet: View {
     }
     
     // MARK: - Actions
-    
+
     private func activateBoost() {
         // In a real app, this would process the payment
-        HapticManager.shared.notification(.success)
+        let haptics = HapticManager.shared
+        haptics.notification(.success)
         showPurchaseSuccess = true
     }
 }
