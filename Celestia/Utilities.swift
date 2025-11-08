@@ -64,21 +64,6 @@ extension Array {
 
 // MARK: - Number Formatting
 
-extension Int {
-    func abbreviated() -> String {
-        let thousand = self / 1000
-        let million = self / 1_000_000
-
-        if million >= 1 {
-            return "\(million)M"
-        } else if thousand >= 1 {
-            return "\(thousand)K"
-        } else {
-            return "\(self)"
-        }
-    }
-}
-
 extension Double {
     func formatted(decimals: Int = 1) -> String {
         String(format: "%.\(decimals)f", self)

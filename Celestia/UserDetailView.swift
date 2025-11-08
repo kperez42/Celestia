@@ -103,8 +103,8 @@ struct UserDetailView: View {
                             Label("Languages", systemImage: "globe")
                                 .font(.headline)
                                 .foregroundColor(.purple)
-                            
-                            FlowLayout(spacing: 8) {
+
+                            FlowLayout2(spacing: 8) {
                                 ForEach(user.languages, id: \.self) { language in
                                     Text(language)
                                         .font(.subheadline)
@@ -124,8 +124,8 @@ struct UserDetailView: View {
                             Label("Interests", systemImage: "star.fill")
                                 .font(.headline)
                                 .foregroundColor(.purple)
-                            
-                            FlowLayout(spacing: 8) {
+
+                            FlowLayout2(spacing: 8) {
                                 ForEach(user.interests, id: \.self) { interest in
                                     Text(interest)
                                         .font(.subheadline)
@@ -220,7 +220,7 @@ struct UserDetailView: View {
 }
 
 // Simple FlowLayout for tags
-struct FlowLayout: Layout {
+struct FlowLayout2: Layout {
     var spacing: CGFloat = 8
     
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {

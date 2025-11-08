@@ -314,7 +314,7 @@ enum SwipeDirection {
     case left, right
 }
 
-enum SwipeAction {
+enum CardSwipeAction {
     case like, pass
 }
 

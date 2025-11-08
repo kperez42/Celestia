@@ -192,11 +192,6 @@ extension Color {
 // MARK: - Array Extensions
 
 extension Array {
-    /// Safely access array element
-    subscript(safe index: Int) -> Element? {
-        indices.contains(index) ? self[index] : nil
-    }
-    
     /// Remove duplicates while preserving order
     func removingDuplicates<T: Hashable>(by keyPath: KeyPath<Element, T>) -> [Element] {
         var seen = Set<T>()
