@@ -42,14 +42,15 @@ struct MatchesView: View {
         }
         
         // Apply unread filter
-        #if DEBUG
-        let filterUserId = authService.currentUser?.id ?? "current_user"
-        #else
-        let filterUserId = authService.currentUser?.id
-        #endif
-
-        if showOnlyUnread, let userId = filterUserId {
+        if showOnlyUnread {
+            #if DEBUG
+            let userId = authService.currentUser?.id ?? "current_user"
             matches = matches.filter { ($0.unreadCount[userId] ?? 0) > 0 }
+            #else
+            if let userId = authService.currentUser?.id {
+                matches = matches.filter { ($0.unreadCount[userId] ?? 0) > 0 }
+            }
+            #endif
         }
 
         // Apply sorting
