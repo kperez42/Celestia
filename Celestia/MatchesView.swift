@@ -136,9 +136,7 @@ struct MatchesView: View {
             }
             .sheet(item: $selectedMatch) { match in
                 if let user = getMatchedUser(match) {
-                    NavigationStack {
-                        ChatView(match: match, otherUser: user)
-                    }
+                    UserDetailView(user: user)
                 }
             }
         }
@@ -383,22 +381,25 @@ struct MatchesView: View {
     
     private var matchesListView: some View {
         ScrollView(showsIndicators: false) {
-            LazyVStack(spacing: 12) {
+            LazyVGrid(columns: [
+                GridItem(.flexible(), spacing: 12),
+                GridItem(.flexible(), spacing: 12)
+            ], spacing: 12) {
                 ForEach(filteredAndSortedMatches) { match in
                     if let user = getMatchedUser(match) {
-                        MatchCardRow(
+                        MatchProfileCard(
                             match: match,
                             user: user,
-                            currentUserId: authService.currentUser?.id ?? ""
+                            currentUserId: authService.currentUser?.id ?? "current_user"
                         )
                         .onTapGesture {
-                            HapticManager.shared.impact(.light)
+                            HapticManager.shared.impact(.medium)
                             selectedMatch = match
                         }
                     }
                 }
             }
-            .padding(20)
+            .padding(16)
             .padding(.bottom, 80)
         }
     }
@@ -563,158 +564,123 @@ struct MatchesView: View {
 
 // MARK: - Match Card Row
 
-struct MatchCardRow: View {
+// MARK: - Match Profile Card
+
+struct MatchProfileCard: View {
     let match: Match
     let user: User
     let currentUserId: String
-    
-    @State private var isPressed = false
-    
+
+    private var isNewMatch: Bool {
+        match.lastMessage == nil
+    }
+
     private var unreadCount: Int {
         match.unreadCount[currentUserId] ?? 0
     }
     
-    private var isNewMatch: Bool {
-        match.lastMessage == nil
-    }
-    
     var body: some View {
-        HStack(spacing: 16) {
-            // Profile image
+        VStack(spacing: 0) {
+            // Profile image with badges
             ZStack(alignment: .topTrailing) {
                 profileImage
-                
-                // Online indicator
-                if user.isOnline {
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 16, height: 16)
-                        .overlay(
-                            Circle()
-                                .stroke(Color.white, lineWidth: 2)
-                        )
-                        .offset(x: 4, y: -4)
-                }
-            }
-            
-            // User info
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) {
-                    Text(user.fullName)
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    if user.isVerified {
-                        Image(systemName: "checkmark.seal.fill")
-                            .font(.caption)
-                            .foregroundColor(.blue)
-                    }
-                    
-                    if user.isPremium {
-                        Image(systemName: "crown.fill")
-                            .font(.caption2)
-                            .foregroundColor(.yellow)
-                    }
-                }
-                
-                // Last message or new match indicator
+                    .frame(height: 220)
+
+                // New match or unread badge
                 if isNewMatch {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 4) {
                         Image(systemName: "sparkles")
-                            .font(.caption2)
-                        Text("New match! Say hello")
-                            .font(.caption)
-                            .fontWeight(.semibold)
+                            .font(.system(size: 10))
+                        Text("NEW")
+                            .font(.system(size: 11, weight: .bold))
                     }
-                    .foregroundStyle(
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
                         LinearGradient(
-                            colors: [Color.purple, Color.blue],
+                            colors: [Color.purple, Color.pink],
                             startPoint: .leading,
                             endPoint: .trailing
                         )
                     )
-                } else if let lastMessage = match.lastMessage {
-                    Text(lastMessage)
-                        .font(.subheadline)
-                        .foregroundColor(unreadCount > 0 ? .primary : .secondary)
-                        .fontWeight(unreadCount > 0 ? .semibold : .regular)
+                    .clipShape(Capsule())
+                    .padding(8)
+                } else if unreadCount > 0 {
+                    Text("\(unreadCount)")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.white)
+                        .frame(minWidth: 24, minHeight: 24)
+                        .background(Circle().fill(Color.red))
+                        .padding(8)
+                }
+            }
+
+            // User info section
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Text(user.fullName)
+                        .font(.system(size: 17, weight: .semibold))
+                        .lineLimit(1)
+
+                    Text("\(user.age)")
+                        .font(.system(size: 17))
+                        .foregroundColor(.secondary)
+
+                    Spacer()
+
+                    if user.isVerified {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(.blue)
+                    }
+                }
+
+                HStack(spacing: 4) {
+                    Image(systemName: "mappin.circle.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(.purple)
+                    Text(user.location)
+                        .font(.system(size: 13))
+                        .foregroundColor(.secondary)
                         .lineLimit(1)
                 }
-                
-                // Time and location
-                HStack(spacing: 6) {
-                    if let lastTime = match.lastMessageTimestamp ?? (isNewMatch ? match.timestamp : nil) {
-                        Text(timeAgo(from: lastTime))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    if !isNewMatch {
-                        Text("•")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        
-                        Text(user.location)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-            }
-            
-            Spacer()
-            
-            // Right side indicators
-            VStack(alignment: .trailing, spacing: 8) {
-                if unreadCount > 0 {
-                    Text("\(unreadCount)")
-                        .font(.caption2)
-                        .fontWeight(.bold)
+
+                // First interest or bio preview
+                if let firstInterest = user.interests.first {
+                    Text(firstInterest)
+                        .font(.system(size: 12))
                         .foregroundColor(.white)
-                        .frame(minWidth: 22, minHeight: 22)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
                         .background(
                             LinearGradient(
-                                colors: [Color.purple, Color.blue],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
+                                colors: [Color.purple.opacity(0.8), Color.pink.opacity(0.8)],
+                                startPoint: .leading,
+                                endPoint: .trailing
                             )
                         )
-                        .clipShape(Circle())
+                        .clipShape(Capsule())
                 }
-                
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
             }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white)
-                .shadow(
-                    color: Color.black.opacity(isPressed ? 0.1 : 0.05),
-                    radius: isPressed ? 10 : 6,
-                    y: isPressed ? 4 : 2
-                )
-        )
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
         .overlay(
             RoundedRectangle(cornerRadius: 16)
                 .stroke(
-                    unreadCount > 0 || isNewMatch ?
+                    isNewMatch ?
                     LinearGradient(
-                        colors: [Color.purple.opacity(0.3), Color.blue.opacity(0.3)],
+                        colors: [Color.purple.opacity(0.4), Color.pink.opacity(0.4)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ) :
                     LinearGradient(colors: [Color.clear], startPoint: .leading, endPoint: .trailing),
                     lineWidth: 2
                 )
-        )
-        .scaleEffect(isPressed ? 0.98 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in isPressed = true }
-                .onEnded { _ in isPressed = false }
         )
     }
     
@@ -735,8 +701,8 @@ struct MatchCardRow: View {
                 placeholderImage
             }
         }
-        .frame(width: 70, height: 70)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .frame(maxWidth: .infinity)
+        .clipped()
     }
     
     private var placeholderImage: some View {
