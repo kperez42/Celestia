@@ -35,7 +35,11 @@ struct MessagesView: View {
     }
     
     var totalUnread: Int {
+        #if DEBUG
+        let userId = authService.currentUser?.id ?? "current_user"
+        #else
         guard let userId = authService.currentUser?.id else { return 0 }
+        #endif
         return matchService.matches.reduce(0) { $0 + ($1.unreadCount[userId] ?? 0) }
     }
     
@@ -401,7 +405,13 @@ struct MessagesView: View {
     }
     
     private func getMatchedUser(_ match: Match) -> User? {
+        #if DEBUG
+        // In debug mode, use "current_user" as default if not authenticated
+        let currentUserId = authService.currentUser?.id ?? "current_user"
+        #else
         guard let currentUserId = authService.currentUser?.id else { return nil }
+        #endif
+
         let otherUserId = match.user1Id == currentUserId ? match.user2Id : match.user1Id
         return matchedUsers[otherUserId]
     }
