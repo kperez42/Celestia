@@ -106,8 +106,8 @@ struct MainTabView: View {
             }
         }
         .padding(.horizontal, 8)
-        .padding(.top, 4)
-        .padding(.bottom, 4)
+        .padding(.top, 2)
+        .padding(.bottom, 0)
         .background(
             ZStack {
                 // Blur effect
@@ -217,7 +217,7 @@ struct TabBarButton: View {
                     .foregroundColor(isSelected ? .purple : .gray)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 2)
+            .padding(.vertical, 0)
             .background(
                 RoundedRectangle(cornerRadius: 12)
                     .fill(
