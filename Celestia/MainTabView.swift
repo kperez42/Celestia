@@ -106,8 +106,8 @@ struct MainTabView: View {
             }
         }
         .padding(.horizontal, 8)
-        .padding(.top, 8)
-        .padding(.bottom, 20)
+        .padding(.top, 4)
+        .padding(.bottom, 8)
         .background(
             ZStack {
                 // Blur effect
@@ -172,11 +172,11 @@ struct TabBarButton: View {
     
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 6) {
+            VStack(spacing: 4) {
                 ZStack(alignment: .topTrailing) {
                     // Icon
                     Image(systemName: icon)
-                        .font(.system(size: 22))
+                        .font(.system(size: 20))
                         .foregroundStyle(
                             isSelected ?
                             LinearGradient(
@@ -186,9 +186,9 @@ struct TabBarButton: View {
                             ) :
                             LinearGradient(colors: [Color.gray.opacity(0.5)], startPoint: .leading, endPoint: .trailing)
                         )
-                        .frame(height: 28)
+                        .frame(height: 24)
                         .scaleEffect(isPressed ? 0.85 : 1.0)
-                        .scaleEffect(isSelected ? 1.1 : 1.0)
+                        .scaleEffect(isSelected ? 1.05 : 1.0)
                     
                     // Badge
                     if badgeCount > 0 {
@@ -214,11 +214,11 @@ struct TabBarButton: View {
                 
                 // Title
                 Text(title)
-                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
+                    .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
                     .foregroundColor(isSelected ? .purple : .gray)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 4)
+            .padding(.vertical, 2)
             .background(
                 RoundedRectangle(cornerRadius: 12)
                     .fill(
