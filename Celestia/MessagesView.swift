@@ -354,11 +354,19 @@ struct MessagesView: View {
     // MARK: - Helper Functions
     
     private func loadData() async {
+        #if DEBUG
+        // Use test data in preview/debug mode
+        matchService.matches = TestData.testMatches.map { $0.match }
+        for (user, match) in TestData.testMatches {
+            let otherUserId = match.user2Id
+            matchedUsers[otherUserId] = user
+        }
+        #else
         guard let userId = authService.currentUser?.id else { return }
-        
+
         do {
             try await matchService.fetchMatches(userId: userId)
-            
+
             // Load users for all matches
             for match in matchService.matches {
                 let otherUserId = match.user1Id == userId ? match.user2Id : match.user1Id
@@ -373,6 +381,7 @@ struct MessagesView: View {
         } catch {
             print("Error loading messages: \(error)")
         }
+        #endif
     }
     
     private func getMatchedUser(_ match: Match) -> User? {

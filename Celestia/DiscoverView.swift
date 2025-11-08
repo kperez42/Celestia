@@ -269,11 +269,17 @@ struct DiscoverView: View {
     // MARK: - Helper Functions
     
     private func loadUsers() async {
+        #if DEBUG
+        // Use test data in preview/debug mode
+        users = TestData.discoverUsers
+        currentIndex = 0
+        isLoading = false
+        #else
         guard let currentUserId = authService.currentUser?.id else { return }
-        
+
         isLoading = true
         defer { isLoading = false }
-        
+
         do {
             try await userService.fetchUsers(
                 excludingUserId: currentUserId,
@@ -285,6 +291,7 @@ struct DiscoverView: View {
         } catch {
             print("Error loading users: \(error)")
         }
+        #endif
     }
     
     private func handleSwipeEnd(value: DragGesture.Value, user: User) {
