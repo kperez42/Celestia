@@ -94,14 +94,20 @@ struct ChatView: View {
     
     private func setupChat() {
         guard let matchId = match.id else { return }
+
+        #if DEBUG
+        // Use test messages in preview/debug mode
+        messageService.messages = TestData.messagesForMatch(matchId)
+        #else
         messageService.listenToMessages(matchId: matchId)
-        
+
         // Mark messages as read
         if let userId = authService.currentUser?.id {
             Task {
                 await messageService.markMessagesAsRead(matchId: matchId, userId: userId)
             }
         }
+        #endif
     }
     
     private func sendMessage() {

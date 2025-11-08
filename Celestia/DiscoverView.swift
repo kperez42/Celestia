@@ -15,6 +15,7 @@ struct DiscoverView: View {
     @EnvironmentObject var authService: AuthService
     @StateObject private var userService = UserService.shared
     @StateObject private var matchService = MatchService.shared
+    @StateObject private var swipeService = SwipeService.shared
 
     @State private var currentIndex = 0
     @State private var users: [User] = []
@@ -99,13 +100,16 @@ struct DiscoverView: View {
     }
     
     // MARK: - Card Stack
-    
+
     private var cardStackView: some View {
         ZStack {
             ForEach(Array(users.enumerated().filter { $0.offset >= currentIndex && $0.offset < currentIndex + 3 }), id: \.offset) { index, user in
                 let cardIndex = index - currentIndex
-                
+
                 UserCardView(user: user)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16) // Reduce card height from top
+                    .padding(.bottom, 180) // Increased space for buttons and tab bar
                     .offset(y: CGFloat(cardIndex * 8))
                     .scaleEffect(1.0 - CGFloat(cardIndex) * 0.05)
                     .opacity(1.0 - Double(cardIndex) * 0.2)
@@ -122,51 +126,40 @@ struct DiscoverView: View {
                             } : nil
                     )
             }
-            
-            // Action buttons
+
+            // Action buttons overlay - Fixed centered position
             VStack {
                 Spacer()
 
                 HStack(spacing: 20) {
-                    // Undo button (premium feature)
-                    if showUndoButton && !swipeHistory.isEmpty {
-                        Button {
-                            handleUndo()
-                        } label: {
-                            Image(systemName: "arrow.uturn.left")
-                                .font(.title3)
-                                .foregroundColor(.white)
-                                .frame(width: 50, height: 50)
-                                .background(Color.yellow)
-                                .clipShape(Circle())
-                                .shadow(radius: 5)
-                        }
-                        .transition(.scale.combined(with: .opacity))
-                    }
-
-                    Spacer()
-
                     // Pass button
                     Button {
                         handlePass()
                     } label: {
                         Image(systemName: "xmark")
-                            .font(.title2)
+                            .font(.title)
+                            .fontWeight(.bold)
                             .foregroundColor(.white)
-                            .frame(width: 60, height: 60)
-                            .background(Color.red)
+                            .frame(width: 64, height: 64)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color.red.opacity(0.9), Color.red],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
                             .clipShape(Circle())
-                            .shadow(radius: 5)
+                            .shadow(color: .red.opacity(0.4), radius: 8, y: 4)
                     }
 
-                    // Super Like button (premium)
+                    // Super Like button
                     Button {
                         handleSuperLike()
                     } label: {
                         Image(systemName: "star.fill")
                             .font(.title2)
                             .foregroundColor(.white)
-                            .frame(width: 60, height: 60)
+                            .frame(width: 56, height: 56)
                             .background(
                                 LinearGradient(
                                     colors: [Color.blue, Color.cyan],
@@ -175,7 +168,7 @@ struct DiscoverView: View {
                                 )
                             )
                             .clipShape(Circle())
-                            .shadow(radius: 5)
+                            .shadow(color: .blue.opacity(0.4), radius: 8, y: 4)
                     }
 
                     // Like button
@@ -183,20 +176,25 @@ struct DiscoverView: View {
                         handleLike()
                     } label: {
                         Image(systemName: "heart.fill")
-                            .font(.title2)
+                            .font(.title)
+                            .fontWeight(.bold)
                             .foregroundColor(.white)
-                            .frame(width: 60, height: 60)
-                            .background(Color.green)
+                            .frame(width: 64, height: 64)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color.green.opacity(0.9), Color.green],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
                             .clipShape(Circle())
-                            .shadow(radius: 5)
+                            .shadow(color: .green.opacity(0.4), radius: 8, y: 4)
                     }
-
-                    Spacer()
                 }
-                .padding(.bottom, 30)
+                .frame(maxWidth: .infinity) // Center the buttons
+                .padding(.bottom, 100) // Stay above tab bar
             }
         }
-        .padding()
     }
     
     // MARK: - Empty State
@@ -269,11 +267,17 @@ struct DiscoverView: View {
     // MARK: - Helper Functions
     
     private func loadUsers() async {
+        #if DEBUG
+        // Use test data in preview/debug mode
+        users = TestData.discoverUsers
+        currentIndex = 0
+        isLoading = false
+        #else
         guard let currentUserId = authService.currentUser?.id else { return }
-        
+
         isLoading = true
         defer { isLoading = false }
-        
+
         do {
             try await userService.fetchUsers(
                 excludingUserId: currentUserId,
@@ -285,6 +289,7 @@ struct DiscoverView: View {
         } catch {
             print("Error loading users: \(error)")
         }
+        #endif
     }
     
     private func handleSwipeEnd(value: DragGesture.Value, user: User) {
@@ -328,21 +333,47 @@ struct DiscoverView: View {
 
         Task {
             guard let currentUserId = authService.currentUser?.id,
-                  let userId = user.id else { return }
+                  let userId = user.id else {
+                await MainActor.run {
+                    withAnimation {
+                        currentIndex += 1
+                    }
+                }
+                return
+            }
 
-            // Check for match
-            let hasMatched = try? await matchService.hasMatched(
-                user1Id: currentUserId,
-                user2Id: userId
-            )
-
-            if hasMatched == true {
+            #if DEBUG
+            // In debug mode with test data, just show match animation for demonstration
+            print("💕 DEBUG: Simulating like from \(currentUserId) to \(userId)")
+            // Simulate match on every 3rd like for testing
+            if currentIndex % 3 == 0 {
                 await MainActor.run {
                     matchedUser = user
                     showingMatchAnimation = true
                     HapticManager.shared.match()
                 }
             }
+            #else
+            // Production: Create like and check for mutual match
+            do {
+                let isMatch = try await swipeService.likeUser(
+                    fromUserId: currentUserId,
+                    toUserId: userId,
+                    isSuperLike: isSuperLike
+                )
+
+                if isMatch {
+                    await MainActor.run {
+                        matchedUser = user
+                        showingMatchAnimation = true
+                        HapticManager.shared.match()
+                    }
+                    print("🎉 It's a match with \(user.fullName)!")
+                }
+            } catch {
+                print("❌ Error creating like: \(error)")
+            }
+            #endif
 
             await MainActor.run {
                 withAnimation {
@@ -363,8 +394,31 @@ struct DiscoverView: View {
         // Haptic feedback
         HapticManager.shared.swipeLeft()
 
-        withAnimation {
-            currentIndex += 1
+        Task {
+            guard let currentUserId = authService.currentUser?.id,
+                  let userId = user.id else {
+                withAnimation {
+                    currentIndex += 1
+                }
+                return
+            }
+
+            #if DEBUG
+            print("👋 DEBUG: Simulating pass from \(currentUserId) to \(userId)")
+            #else
+            // Production: Record the pass
+            do {
+                try await swipeService.passUser(fromUserId: currentUserId, toUserId: userId)
+            } catch {
+                print("❌ Error recording pass: \(error)")
+            }
+            #endif
+
+            await MainActor.run {
+                withAnimation {
+                    currentIndex += 1
+                }
+            }
         }
     }
 
@@ -405,80 +459,131 @@ struct DiscoverView: View {
 
 struct UserCardView: View {
     let user: User
-    
+
     var body: some View {
-        ZStack(alignment: .bottom) {
-            // Background
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.white)
-                .shadow(radius: 10)
-            
-            // User image with caching
-            CachedAsyncImage(url: URL(string: user.profileImageURL)) { image in
-                image
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
-            } placeholder: {
-                LinearGradient(
-                    colors: [Color.purple.opacity(0.6), Color.pink.opacity(0.5)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .overlay {
-                    Text(user.fullName.prefix(1))
-                        .font(.system(size: 80, weight: .bold))
-                        .foregroundColor(.white.opacity(0.5))
-                }
-            }
-            
-            // Gradient overlay
-            LinearGradient(
-                colors: [Color.clear, Color.black.opacity(0.7)],
-                startPoint: .center,
-                endPoint: .bottom
-            )
-            
-            // User info
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text(user.fullName)
-                        .font(.title)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                    
-                    Text("\(user.age)")
-                        .font(.title2)
-                        .foregroundColor(.white.opacity(0.9))
-                    
-                    if user.isVerified {
-                        Image(systemName: "checkmark.seal.fill")
-                            .foregroundColor(.blue)
+        GeometryReader { geometry in
+            ZStack(alignment: .bottom) {
+                // Background
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color.white)
+                    .shadow(radius: 10)
+
+                // User image with caching
+                CachedAsyncImage(url: URL(string: user.profileImageURL)) { image in
+                    image
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .clipped()
+                } placeholder: {
+                    LinearGradient(
+                        colors: [Color.purple.opacity(0.6), Color.pink.opacity(0.5)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .overlay {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                            .tint(.white)
                     }
                 }
-                
-                HStack(spacing: 4) {
-                    Image(systemName: "mappin.circle.fill")
-                        .font(.caption)
-                    Text("\(user.location), \(user.country)")
-                        .font(.subheadline)
+
+                // Gradient overlay for better text readability
+                LinearGradient(
+                    colors: [
+                        Color.clear,
+                        Color.black.opacity(0.3),
+                        Color.black.opacity(0.8)
+                    ],
+                    startPoint: .init(x: 0.5, y: 0.6),
+                    endPoint: .bottom
+                )
+
+                // User info overlay
+                VStack(alignment: .leading, spacing: 12) {
+                    // Name and age
+                    HStack(alignment: .top, spacing: 8) {
+                        Text(user.fullName)
+                            .font(.system(size: 32, weight: .bold))
+                            .foregroundColor(.white)
+
+                        Text("\(user.age)")
+                            .font(.system(size: 28, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.9))
+
+                        if user.isVerified {
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(.title3)
+                                .foregroundColor(.blue)
+                        }
+
+                        if user.isPremium {
+                            Image(systemName: "crown.fill")
+                                .font(.title3)
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.yellow, .orange],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                        }
+
+                        Spacer()
+                    }
+
+                    // Location
+                    HStack(spacing: 6) {
+                        Image(systemName: "mappin.and.ellipse")
+                            .font(.subheadline)
+                        Text(user.location)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                    }
+                    .foregroundColor(.white)
+
+                    // Bio
+                    if !user.bio.isEmpty {
+                        Text(user.bio)
+                            .font(.subheadline)
+                            .foregroundColor(.white.opacity(0.95))
+                            .lineLimit(3)
+                            .multilineTextAlignment(.leading)
+                    }
+
+                    // Interests preview
+                    if !user.interests.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(user.interests.prefix(4), id: \.self) { interest in
+                                    Text(interest)
+                                        .font(.caption)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(
+                                            Capsule()
+                                                .fill(Color.white.opacity(0.2))
+                                                .overlay(
+                                                    Capsule()
+                                                        .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                                )
+                                        )
+                                }
+                            }
+                        }
+                    }
                 }
-                .foregroundColor(.white.opacity(0.9))
-                
-                if !user.bio.isEmpty {
-                    Text(user.bio)
-                        .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.85))
-                        .lineLimit(2)
-                }
+                .padding(24)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .cornerRadius(20)
         }
-        .cornerRadius(20)
+        .frame(maxHeight: .infinity) // Fill available space
     }
 }
+
 
 #Preview {
     DiscoverView()

@@ -487,11 +487,36 @@ struct MatchesView: View {
     // MARK: - Helper Functions
     
     private func loadMatches() async {
-        guard let userId = authService.currentUser?.id else { return }
-        
+        // Check if we should use test data (no user ID or DEBUG mode)
+        guard let userId = authService.currentUser?.id else {
+            // Load test data when no authenticated user
+            #if DEBUG
+            await MainActor.run {
+                matchService.matches = TestData.testMatches.map { $0.match }
+                for (user, match) in TestData.testMatches {
+                    let otherUserId = match.user2Id
+                    matchedUsers[otherUserId] = user
+                }
+            }
+            #endif
+            return
+        }
+
+        #if DEBUG
+        // Use test data in debug mode even with authenticated user
+        await MainActor.run {
+            matchService.matches = TestData.testMatches.map { $0.match }
+            for (user, match) in TestData.testMatches {
+                let otherUserId = match.user2Id
+                matchedUsers[otherUserId] = user
+            }
+        }
+        return
+        #endif
+
         do {
             try await matchService.fetchMatches(userId: userId)
-            
+
             // Load user data for each match
             for match in matchService.matches {
                 let otherUserId = match.user1Id == userId ? match.user2Id : match.user1Id
