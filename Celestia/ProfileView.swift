@@ -139,6 +139,10 @@ struct ProfileView: View {
                     profileCompletion = userService.profileCompletionPercentage(user)
                 }
             }
+            .detectScreenshots(
+                context: .profile(userId: authService.currentUser?.id ?? ""),
+                userName: authService.currentUser?.fullName ?? "User"
+            )
         }
     }
 
