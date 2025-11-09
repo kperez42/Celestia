@@ -76,7 +76,9 @@ struct FeedDiscoverView: View {
                             emptyStateView
                         }
                     }
-                    .padding()
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+                    .padding(.bottom)
                 }
                 .refreshable {
                     await refreshFeed()
@@ -103,10 +105,11 @@ struct FeedDiscoverView: View {
                                 Circle()
                                     .fill(Color.red)
                                     .frame(width: 8, height: 8)
-                                    .offset(x: 4, y: -4)
+                                    .offset(x: 2, y: -2)
                             }
                         }
                     }
+                    .padding(.trailing, 4)
                 }
             }
             .sheet(isPresented: $showFilters) {
