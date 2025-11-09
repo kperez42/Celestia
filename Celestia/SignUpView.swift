@@ -27,7 +27,10 @@ struct SignUpView: View {
     // Step 3: Location
     @State private var location = ""
     @State private var country = ""
-    
+
+    // Referral code (optional)
+    @State private var referralCode = ""
+
     let genderOptions = ["Male", "Female", "Non-binary", "Other"]
     let lookingForOptions = ["Men", "Women", "Everyone"]
     
@@ -261,24 +264,56 @@ struct SignUpView: View {
                 Text("City")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
-                
+
                 TextField("e.g. Los Angeles", text: $location)
                     .padding()
                     .background(Color(.systemBackground))
                     .cornerRadius(10)
             }
-            
+
             VStack(alignment: .leading, spacing: 8) {
                 Text("Country")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
-                
+
                 TextField("e.g. United States", text: $country)
                     .padding()
                     .background(Color(.systemBackground))
                     .cornerRadius(10)
             }
-            
+
+            // Referral Code (Optional)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Image(systemName: "gift.fill")
+                        .foregroundColor(.purple)
+                        .font(.caption)
+                    Text("Referral Code (Optional)")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+
+                TextField("CEL-XXXXXXXX", text: $referralCode)
+                    .textInputAutocapitalization(.characters)
+                    .padding()
+                    .background(Color(.systemBackground))
+                    .cornerRadius(10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.purple.opacity(0.3), lineWidth: 1)
+                    )
+
+                HStack(spacing: 4) {
+                    Image(systemName: "sparkles")
+                        .font(.caption2)
+                        .foregroundColor(.purple)
+                    Text("Get 3 days of Premium free!")
+                        .font(.caption)
+                        .foregroundColor(.purple)
+                }
+            }
+            .padding(.top, 8)
+
             Text("Your location helps connect you with people nearby and around the world")
                 .font(.caption)
                 .foregroundColor(.secondary)
@@ -337,7 +372,8 @@ struct SignUpView: View {
                 gender: gender,
                 lookingFor: lookingFor,
                 location: location,
-                country: country
+                country: country,
+                referralCode: referralCode.trimmingCharacters(in: .whitespaces)
             )
         }
     }

@@ -72,6 +72,10 @@ struct User: Identifiable, Codable {
     // Profile Prompts
     var prompts: [ProfilePrompt] = []
 
+    // Referral System
+    var referralStats: ReferralStats = ReferralStats()
+    var referredByCode: String?  // Code used during signup
+
     // Helper computed property for backward compatibility
     var name: String {
         get { fullName }
@@ -154,6 +158,14 @@ struct User: Identifiable, Codable {
         } else {
             self.prompts = []
         }
+
+        // Referral System
+        if let referralStatsDict = dictionary["referralStats"] as? [String: Any] {
+            self.referralStats = ReferralStats(dictionary: referralStatsDict)
+        } else {
+            self.referralStats = ReferralStats()
+        }
+        self.referredByCode = dictionary["referredByCode"] as? String
     }
     
     // Standard initializer

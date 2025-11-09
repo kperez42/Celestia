@@ -10,8 +10,10 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var authService: AuthService
-    
+
     @State private var showDeleteConfirmation = false
+    @State private var showReferralDashboard = false
+    @State private var showPremiumUpgrade = false
     
     var body: some View {
         NavigationStack {
@@ -23,7 +25,7 @@ struct SettingsView: View {
                         Text(authService.currentUser?.email ?? "")
                             .foregroundColor(.gray)
                     }
-                    
+
                     HStack {
                         Text("Account Type")
                         Spacer()
@@ -31,7 +33,56 @@ struct SettingsView: View {
                             .foregroundColor(.gray)
                     }
                 }
-                
+
+                Section {
+                    Button {
+                        showPremiumUpgrade = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "crown.fill")
+                                .foregroundColor(.orange)
+                            Text("Upgrade to Premium")
+                                .foregroundColor(.primary)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                    }
+
+                    Button {
+                        showReferralDashboard = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "gift.fill")
+                                .foregroundColor(.purple)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Invite Friends")
+                                    .foregroundColor(.primary)
+                                Text("Earn 7 days per referral")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            if let referrals = authService.currentUser?.referralStats.totalReferrals, referrals > 0 {
+                                Text("\(referrals)")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.purple)
+                                    .cornerRadius(10)
+                            }
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                    }
+                } header: {
+                    Text("Premium & Rewards")
+                }
+
                 Section("Preferences") {
                     NavigationLink {
                         FilterView()
@@ -139,6 +190,14 @@ struct SettingsView: View {
                 }
             } message: {
                 Text("Are you sure you want to delete your account? This action cannot be undone.")
+            }
+            .sheet(isPresented: $showReferralDashboard) {
+                ReferralDashboardView()
+                    .environmentObject(authService)
+            }
+            .sheet(isPresented: $showPremiumUpgrade) {
+                PremiumUpgradeView()
+                    .environmentObject(authService)
             }
         }
     }
