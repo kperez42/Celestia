@@ -55,7 +55,7 @@ class AnalyticsManager: ObservableObject {
 
     // MARK: - Swipe Tracking
 
-    func trackSwipe(swipedUserId: String, swiperUserId: String, direction: SwipeDirection) async throws {
+    func trackSwipe(swipedUserId: String, swiperUserId: String, direction: AnalyticsSwipeDirection) async throws {
         // Use retry logic for Firestore operations
         try await RetryManager.shared.retryDatabaseOperation {
             let swipeAction: [String: Any] = [
@@ -232,6 +232,7 @@ class AnalyticsManager: ObservableObject {
             // Fetch viewer user data
             if let viewerUser = try? await fetchUser(userId: viewerUserId) {
                 let viewer = ProfileViewer(
+                    id: UUID().uuidString,
                     userId: viewerUserId,
                     userName: viewerUser.fullName,
                     userPhoto: viewerUser.profileImageURL,
@@ -269,10 +270,13 @@ class AnalyticsManager: ObservableObject {
                 ($0.data()["interactionType"] as? String) == "like"
             }.count
 
+            let swipeRightRate = views > 0 ? Double(likes) / Double(views) : 0.0
             let performance = PhotoPerformance(
+                id: UUID().uuidString,
                 photoURL: photoURL,
                 views: views,
                 likes: likes,
+                swipeRightRate: swipeRightRate,
                 position: index
             )
             photoPerformanceList.append(performance)
@@ -327,40 +331,48 @@ class AnalyticsManager: ObservableObject {
         // Photos suggestions
         if user.photos.count < 3 {
             suggestions.append(ProfileSuggestion(
+                id: UUID().uuidString,
                 title: "Add More Photos",
                 description: "Profiles with 6+ photos get 3x more matches. Add \(6 - user.photos.count) more!",
                 priority: .high,
-                icon: "photo.fill"
+                category: .photos,
+                actionType: .addPhotos
             ))
         }
 
         // Bio suggestions
         if user.bio.isEmpty || user.bio.count < 50 {
             suggestions.append(ProfileSuggestion(
+                id: UUID().uuidString,
                 title: "Complete Your Bio",
                 description: "A detailed bio helps others connect with you better.",
                 priority: .high,
-                icon: "text.alignleft"
+                category: .bio,
+                actionType: .improveBio
             ))
         }
 
         // Prompts suggestions
         if user.prompts.count < 3 {
             suggestions.append(ProfileSuggestion(
+                id: UUID().uuidString,
                 title: "Answer Profile Prompts",
                 description: "Prompts generate 2x more conversations. Add \(3 - user.prompts.count) more!",
                 priority: .medium,
-                icon: "bubble.left.and.bubble.right.fill"
+                category: .bio,
+                actionType: .improveBio
             ))
         }
 
         // Verification
         if !user.isVerified {
             suggestions.append(ProfileSuggestion(
+                id: UUID().uuidString,
                 title: "Get Verified",
                 description: "Verified profiles are trusted more and get 40% more matches.",
                 priority: .medium,
-                icon: "checkmark.seal.fill"
+                category: .verification,
+                actionType: .getVerified
             ))
         }
 
@@ -368,20 +380,24 @@ class AnalyticsManager: ObservableObject {
         let daysSinceActive = Calendar.current.dateComponents([.day], from: user.lastActive, to: Date()).day ?? 0
         if daysSinceActive > 7 {
             suggestions.append(ProfileSuggestion(
+                id: UUID().uuidString,
                 title: "Stay Active",
                 description: "Active users are shown more often. Open the app daily for better visibility.",
                 priority: .low,
-                icon: "chart.line.uptrend.xyaxis"
+                category: .activity,
+                actionType: .beMoreActive
             ))
         }
 
         // Low view count
         if insights.viewsThisWeek < 10 {
             suggestions.append(ProfileSuggestion(
+                id: UUID().uuidString,
                 title: "Boost Your Profile",
                 description: "Your profile isn't getting many views. Try adjusting your photos or bio.",
                 priority: .medium,
-                icon: "bolt.fill"
+                category: .activity,
+                actionType: .beMoreActive
             ))
         }
 
@@ -416,7 +432,9 @@ class AnalyticsManager: ObservableObject {
 
 // MARK: - Enums
 
-enum SwipeDirection: String, Codable {
+// Note: SwipeDirection enum also exists in ImprovedUserCard.swift
+// This is the Codable version for analytics/database storage
+enum AnalyticsSwipeDirection: String, Codable {
     case left = "left"
     case right = "right"
 }

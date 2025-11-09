@@ -497,7 +497,7 @@ struct DiscoverView: View {
                 try await AnalyticsManager.shared.trackSwipe(
                     swipedUserId: userId,
                     swiperUserId: currentUserId,
-                    direction: .right
+                    direction: AnalyticsSwipeDirection.right
                 )
             } catch {
                 print("❌ Error tracking swipe: \(error)")
@@ -573,7 +573,7 @@ struct DiscoverView: View {
                 try await AnalyticsManager.shared.trackSwipe(
                     swipedUserId: userId,
                     swiperUserId: currentUserId,
-                    direction: .left
+                    direction: AnalyticsSwipeDirection.left
                 )
             } catch {
                 print("❌ Error tracking swipe: \(error)")
