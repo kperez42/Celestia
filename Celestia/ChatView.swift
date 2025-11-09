@@ -17,6 +17,7 @@ struct ChatView: View {
     @State private var messageText = ""
     @FocusState private var isInputFocused: Bool
     @State private var isOtherUserTyping = false
+    @State private var showingUnmatchConfirmation = false
     @Environment(\.dismiss) var dismiss
 
     var body: some View {
@@ -39,6 +40,18 @@ struct ChatView: View {
         }
         .onDisappear {
             messageService.stopListening()
+        }
+        .confirmationDialog("Unmatch with \(otherUser.fullName)?", isPresented: $showingUnmatchConfirmation, titleVisibility: .visible) {
+            Button("Unmatch", role: .destructive) {
+                HapticManager.shared.notification(.warning)
+                // TODO: Implement unmatch functionality
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) {
+                HapticManager.shared.impact(.light)
+            }
+        } message: {
+            Text("You won't be able to message each other anymore, and this match will be removed from your list.")
         }
     }
 
@@ -105,7 +118,7 @@ struct ChatView: View {
                             .foregroundColor(.secondary)
                     }
                 } else {
-                    Text("Active recently")
+                    Text("Active \(otherUser.lastActive.timeAgoShort())")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -122,7 +135,7 @@ struct ChatView: View {
                 }
 
                 Button(role: .destructive) {
-                    // Unmatch
+                    showingUnmatchConfirmation = true
                 } label: {
                     Label("Unmatch", systemImage: "xmark.circle")
                 }

@@ -48,9 +48,20 @@ struct DiscoverView: View {
                     
                     // Main content
                     if isLoading {
-                        ProgressView()
-                            .scaleEffect(1.5)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        // Skeleton loading state
+                        ZStack {
+                            ForEach(0..<3, id: \.self) { index in
+                                CardSkeleton()
+                                    .padding(.horizontal, 16)
+                                    .padding(.top, 16)
+                                    .padding(.bottom, 180)
+                                    .offset(y: CGFloat(index * 8))
+                                    .scaleEffect(1.0 - CGFloat(index) * 0.05)
+                                    .opacity(1.0 - Double(index) * 0.2)
+                                    .zIndex(Double(3 - index))
+                            }
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else if users.isEmpty || currentIndex >= users.count {
                         emptyStateView
                     } else {
@@ -69,7 +80,9 @@ struct DiscoverView: View {
                 await loadUsers()
             }
             .refreshable {
+                HapticManager.shared.impact(.light)
                 await loadUsers()
+                HapticManager.shared.notification(.success)
             }
             .sheet(isPresented: $showingUserDetail) {
                 if let user = selectedUser {
