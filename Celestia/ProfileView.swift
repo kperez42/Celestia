@@ -116,8 +116,8 @@ struct ProfileView: View {
                 }
             }
             .fullScreenCover(isPresented: $showingPhotoVerification) {
-                if let user = authService.currentUser {
-                    PhotoVerificationView(userId: user.id)
+                if let user = authService.currentUser, let userId = user.id {
+                    PhotoVerificationView(userId: userId)
                 }
             }
             .confirmationDialog("Are you sure you want to sign out?", isPresented: $showingLogoutConfirmation, titleVisibility: .visible) {
