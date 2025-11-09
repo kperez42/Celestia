@@ -74,7 +74,7 @@ struct MainTabView: View {
             ) {
                 selectedTab = 0
             }
-            
+
             // Matches
             TabBarButton(
                 icon: "heart.fill",
@@ -84,7 +84,7 @@ struct MainTabView: View {
             ) {
                 selectedTab = 1
             }
-            
+
             // Messages
             TabBarButton(
                 icon: "message.fill",
@@ -94,7 +94,7 @@ struct MainTabView: View {
             ) {
                 selectedTab = 2
             }
-            
+
             // Profile
             TabBarButton(
                 icon: "person.fill",
@@ -106,13 +106,13 @@ struct MainTabView: View {
             }
         }
         .padding(.horizontal, 8)
-        .padding(.top, 12)
-        .padding(.bottom, 24)
+        .padding(.top, 2)
+        .padding(.bottom, -15)
         .background(
             ZStack {
                 // Blur effect
                 Color.white
-                
+
                 // Gradient overlay
                 LinearGradient(
                     colors: [
@@ -123,9 +123,8 @@ struct MainTabView: View {
                     endPoint: .bottom
                 )
             }
-            .ignoresSafeArea(edges: .bottom)
         )
-        .shadow(color: .black.opacity(0.08), radius: 15, y: -5)
+        
     }
     
     // MARK: - Helper Functions
@@ -172,11 +171,11 @@ struct TabBarButton: View {
     
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 6) {
+            VStack(spacing: 4) {
                 ZStack(alignment: .topTrailing) {
                     // Icon
                     Image(systemName: icon)
-                        .font(.system(size: 22))
+                        .font(.system(size: 20))
                         .foregroundStyle(
                             isSelected ?
                             LinearGradient(
@@ -186,9 +185,9 @@ struct TabBarButton: View {
                             ) :
                             LinearGradient(colors: [Color.gray.opacity(0.5)], startPoint: .leading, endPoint: .trailing)
                         )
-                        .frame(height: 28)
+                        .frame(height: 24)
                         .scaleEffect(isPressed ? 0.85 : 1.0)
-                        .scaleEffect(isSelected ? 1.1 : 1.0)
+                        .scaleEffect(isSelected ? 1.05 : 1.0)
                     
                     // Badge
                     if badgeCount > 0 {
@@ -214,11 +213,11 @@ struct TabBarButton: View {
                 
                 // Title
                 Text(title)
-                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
+                    .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
                     .foregroundColor(isSelected ? .purple : .gray)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 4)
+            .padding(.vertical, 15)
             .background(
                 RoundedRectangle(cornerRadius: 12)
                     .fill(

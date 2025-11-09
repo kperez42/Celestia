@@ -2,135 +2,55 @@
 //  DiscoveryFilters.swift
 //  Celestia
 //
-//  Service for managing discovery filters
+//  Discovery filter preferences
 //
 
 import Foundation
-import Combine
 
 class DiscoveryFilters: ObservableObject {
     static let shared = DiscoveryFilters()
 
-    @Published var maxDistance: Double {
-        didSet {
-            saveToUserDefaults()
-        }
-    }
-
-    @Published var minAge: Int {
-        didSet {
-            // Ensure minAge is not greater than maxAge
-            if minAge > maxAge {
-                maxAge = minAge
-            }
-            saveToUserDefaults()
-        }
-    }
-
-    @Published var maxAge: Int {
-        didSet {
-            // Ensure maxAge is not less than minAge
-            if maxAge < minAge {
-                minAge = maxAge
-            }
-            saveToUserDefaults()
-        }
-    }
-
-    @Published var showVerifiedOnly: Bool {
-        didSet {
-            saveToUserDefaults()
-        }
-    }
-
-    @Published var selectedInterests: Set<String> {
-        didSet {
-            saveToUserDefaults()
-        }
-    }
+    @Published var maxDistance: Double = 50 // miles
+    @Published var minAge: Int = 18
+    @Published var maxAge: Int = 65
+    @Published var showVerifiedOnly: Bool = false
+    @Published var selectedInterests: Set<String> = []
+    @Published var dealBreakers: Set<String> = []
 
     private init() {
-        // Load from UserDefaults or use defaults
-        self.maxDistance = UserDefaults.standard.double(forKey: "maxDistance") > 0
-            ? UserDefaults.standard.double(forKey: "maxDistance")
-            : 50.0
+        loadFromUserDefaults()
+    }
 
-        self.minAge = UserDefaults.standard.integer(forKey: "minAge") > 0
-            ? UserDefaults.standard.integer(forKey: "minAge")
-            : 18
+    // MARK: - Filter Logic
 
-        self.maxAge = UserDefaults.standard.integer(forKey: "maxAge") > 0
-            ? UserDefaults.standard.integer(forKey: "maxAge")
-            : 35
-
-        self.showVerifiedOnly = UserDefaults.standard.bool(forKey: "showVerifiedOnly")
-
-        if let interestsData = UserDefaults.standard.data(forKey: "selectedInterests"),
-           let interests = try? JSONDecoder().decode(Set<String>.self, from: interestsData) {
-            self.selectedInterests = interests
-        } else {
-            self.selectedInterests = []
+    func matchesFilters(user: User, currentUserLocation: (lat: Double, lon: Double)?) -> Bool {
+        // Age filter
+        if user.age < minAge || user.age > maxAge {
+            return false
         }
-    }
 
-    func saveToUserDefaults() {
-        UserDefaults.standard.set(maxDistance, forKey: "maxDistance")
-        UserDefaults.standard.set(minAge, forKey: "minAge")
-        UserDefaults.standard.set(maxAge, forKey: "maxAge")
-        UserDefaults.standard.set(showVerifiedOnly, forKey: "showVerifiedOnly")
-
-        if let interestsData = try? JSONEncoder().encode(selectedInterests) {
-            UserDefaults.standard.set(interestsData, forKey: "selectedInterests")
+        // Verification filter
+        if showVerifiedOnly && !user.isVerified {
+            return false
         }
-    }
 
-    func resetFilters() {
-        maxDistance = 50.0
-        minAge = 18
-        maxAge = 35
-        showVerifiedOnly = false
-        selectedInterests = []
-    }
-
-    var hasActiveFilters: Bool {
-        maxDistance != 50.0 ||
-        minAge != 18 ||
-        maxAge != 35 ||
-        showVerifiedOnly ||
-        !selectedInterests.isEmpty
-    }
-
-    func matches(user: User, currentUser: User) -> Bool {
-        // Distance check
-        if let userLat = user.latitude,
-           let userLong = user.longitude,
-           let currentLat = currentUser.latitude,
-           let currentLong = currentUser.longitude {
+        // Distance filter
+        if let currentLocation = currentUserLocation,
+           let userLat = user.latitude,
+           let userLon = user.longitude {
             let distance = calculateDistance(
-                lat1: currentLat,
-                lon1: currentLong,
-                lat2: userLat,
-                lon2: userLong
+                from: currentLocation,
+                to: (userLat, userLon)
             )
             if distance > maxDistance {
                 return false
             }
         }
 
-        // Age check
-        if user.age < minAge || user.age > maxAge {
-            return false
-        }
-
-        // Verification check
-        if showVerifiedOnly && !user.isVerified {
-            return false
-        }
-
-        // Interest check
+        // Interest filter (if any selected, user must have at least one match)
         if !selectedInterests.isEmpty {
-            let hasMatchingInterest = !Set(user.interests).intersection(selectedInterests).isEmpty
-            if !hasMatchingInterest {
+            let userInterests = Set(user.interests)
+            if selectedInterests.intersection(userInterests).isEmpty {
                 return false
             }
         }
@@ -138,18 +58,59 @@ class DiscoveryFilters: ObservableObject {
         return true
     }
 
-    private func calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double) -> Double {
-        let earthRadius = 3958.8 // miles
+    private func calculateDistance(from: (lat: Double, lon: Double), to: (lat: Double, lon: Double)) -> Double {
+        let earthRadiusMiles = 3958.8
 
-        let dLat = (lat2 - lat1) * .pi / 180
-        let dLon = (lon2 - lon1) * .pi / 180
+        let lat1 = from.lat * .pi / 180
+        let lon1 = from.lon * .pi / 180
+        let lat2 = to.lat * .pi / 180
+        let lon2 = to.lon * .pi / 180
 
-        let a = sin(dLat/2) * sin(dLat/2) +
-                cos(lat1 * .pi / 180) * cos(lat2 * .pi / 180) *
-                sin(dLon/2) * sin(dLon/2)
+        let dLat = lat2 - lat1
+        let dLon = lon2 - lon1
 
+        let a = sin(dLat/2) * sin(dLat/2) + cos(lat1) * cos(lat2) * sin(dLon/2) * sin(dLon/2)
         let c = 2 * atan2(sqrt(a), sqrt(1-a))
 
-        return earthRadius * c
+        return earthRadiusMiles * c
+    }
+
+    // MARK: - Persistence
+
+    func saveToUserDefaults() {
+        UserDefaults.standard.set(maxDistance, forKey: "maxDistance")
+        UserDefaults.standard.set(minAge, forKey: "minAge")
+        UserDefaults.standard.set(maxAge, forKey: "maxAge")
+        UserDefaults.standard.set(showVerifiedOnly, forKey: "showVerifiedOnly")
+        UserDefaults.standard.set(Array(selectedInterests), forKey: "selectedInterests")
+    }
+
+    private func loadFromUserDefaults() {
+        if let distance = UserDefaults.standard.object(forKey: "maxDistance") as? Double {
+            maxDistance = distance
+        }
+        if let min = UserDefaults.standard.object(forKey: "minAge") as? Int {
+            minAge = min
+        }
+        if let max = UserDefaults.standard.object(forKey: "maxAge") as? Int {
+            maxAge = max
+        }
+        showVerifiedOnly = UserDefaults.standard.bool(forKey: "showVerifiedOnly")
+        if let interests = UserDefaults.standard.array(forKey: "selectedInterests") as? [String] {
+            selectedInterests = Set(interests)
+        }
+    }
+
+    func resetFilters() {
+        maxDistance = 50
+        minAge = 18
+        maxAge = 65
+        showVerifiedOnly = false
+        selectedInterests.removeAll()
+        saveToUserDefaults()
+    }
+
+    var hasActiveFilters: Bool {
+        return maxDistance < 100 || minAge > 18 || maxAge < 65 || showVerifiedOnly || !selectedInterests.isEmpty
     }
 }

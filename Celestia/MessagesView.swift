@@ -35,7 +35,11 @@ struct MessagesView: View {
     }
     
     var totalUnread: Int {
+        #if DEBUG
+        let userId = authService.currentUser?.id ?? "current_user"
+        #else
         guard let userId = authService.currentUser?.id else { return 0 }
+        #endif
         return matchService.matches.reduce(0) { $0 + ($1.unreadCount[userId] ?? 0) }
     }
     
@@ -73,13 +77,13 @@ struct MessagesView: View {
             .refreshable {
                 HapticManager.shared.impact(.light)
                 await loadData()
+                HapticManager.shared.notification(.success)
             }
-            .sheet(item: Binding(
-                get: { selectedMatch.map { IdentifiableMatchUser(match: $0.0, user: $0.1) } },
-                set: { selectedMatch = $0.map { ($0.match, $0.user) } }
-            )) { item in
-                NavigationStack {
-                    ChatView(match: item.match, otherUser: item.user)
+            .sheet(isPresented: $showingChat) {
+                if let selectedMatch = selectedMatch {
+                    NavigationStack {
+                        ChatView(match: selectedMatch.0, otherUser: selectedMatch.1)
+                    }
                 }
             }
         }
@@ -252,12 +256,13 @@ struct MessagesView: View {
                     ConversationRow(
                         match: match,
                         user: user,
-                        currentUserId: authService.currentUser?.id ?? "",
+                        currentUserId: authService.currentUser?.id ?? "current_user",
                         index: index
                     )
                     .onTapGesture {
                         HapticManager.shared.impact(.medium)
                         selectedMatch = (match, user)
+                        showingChat = true
                     }
                 }
             }
@@ -267,18 +272,17 @@ struct MessagesView: View {
     }
     
     // MARK: - Loading View
-    
+
     private var loadingView: some View {
-        VStack(spacing: 20) {
-            ProgressView()
-                .scaleEffect(1.5)
-                .tint(.purple)
-            
-            Text("Loading messages...")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+        ScrollView(showsIndicators: false) {
+            LazyVStack(spacing: 12) {
+                ForEach(0..<8, id: \.self) { _ in
+                    ConversationRowSkeleton()
+                }
+            }
+            .padding(20)
+            .padding(.bottom, 80)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     // MARK: - Empty State
@@ -354,11 +358,36 @@ struct MessagesView: View {
     // MARK: - Helper Functions
     
     private func loadData() async {
-        guard let userId = authService.currentUser?.id else { return }
-        
+        // Check if we should use test data (no user ID or DEBUG mode)
+        guard let userId = authService.currentUser?.id else {
+            // Load test data when no authenticated user
+            #if DEBUG
+            await MainActor.run {
+                matchService.matches = TestData.testMatches.map { $0.match }
+                for (user, match) in TestData.testMatches {
+                    let otherUserId = match.user2Id
+                    matchedUsers[otherUserId] = user
+                }
+            }
+            #endif
+            return
+        }
+
+        #if DEBUG
+        // Use test data in debug mode even with authenticated user
+        await MainActor.run {
+            matchService.matches = TestData.testMatches.map { $0.match }
+            for (user, match) in TestData.testMatches {
+                let otherUserId = match.user2Id
+                matchedUsers[otherUserId] = user
+            }
+        }
+        return
+        #endif
+
         do {
             try await matchService.fetchMatches(userId: userId)
-            
+
             // Load users for all matches
             for match in matchService.matches {
                 let otherUserId = match.user1Id == userId ? match.user2Id : match.user1Id
@@ -376,7 +405,13 @@ struct MessagesView: View {
     }
     
     private func getMatchedUser(_ match: Match) -> User? {
+        #if DEBUG
+        // In debug mode, use "current_user" as default if not authenticated
+        let currentUserId = authService.currentUser?.id ?? "current_user"
+        #else
         guard let currentUserId = authService.currentUser?.id else { return nil }
+        #endif
+
         let otherUserId = match.user1Id == currentUserId ? match.user2Id : match.user1Id
         return matchedUsers[otherUserId]
     }
@@ -390,7 +425,6 @@ struct ConversationRow: View {
     let currentUserId: String
     let index: Int
     
-    @State private var isPressed = false
     @State private var appeared = false
     
     private var unreadCount: Int {
@@ -506,8 +540,8 @@ struct ConversationRow: View {
         .cornerRadius(20)
         .shadow(
             color: unreadCount > 0 ? Color.purple.opacity(0.15) : Color.black.opacity(0.05),
-            radius: isPressed ? 12 : 8,
-            y: isPressed ? 6 : 4
+            radius: 8,
+            y: 4
         )
         .overlay(
             RoundedRectangle(cornerRadius: 20)
@@ -522,18 +556,8 @@ struct ConversationRow: View {
                     lineWidth: 1.5
                 )
         )
-        .scaleEffect(isPressed ? 0.97 : 1.0)
         .offset(x: appeared ? 0 : 300)
         .opacity(appeared ? 1 : 0)
-        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: isPressed)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in
-                    isPressed = true
-                    HapticManager.shared.impact(.light)
-                }
-                .onEnded { _ in isPressed = false }
-        )
         .onAppear {
             withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(Double(index) * 0.05)) {
                 appeared = true

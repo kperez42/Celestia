@@ -2,374 +2,452 @@
 //  TestData.swift
 //  Celestia
 //
-//  Test data for SwiftUI previews
+//  Created by Claude
+//  Test data for previews and development
 //
 
 import Foundation
+import FirebaseFirestore
+
+#if DEBUG
 
 struct TestData {
-    static let currentUser = User(
-        id: "test-user-1",
-        email: "alex@test.com",
-        fullName: "Alex Johnson",
-        age: 28,
-        gender: "Male",
-        lookingFor: "Relationship",
-        bio: "Love traveling, hiking, and good coffee. Always up for an adventure!",
-        location: "San Francisco",
-        country: "USA",
-        latitude: 37.7749,
-        longitude: -122.4194,
-        languages: ["English", "Spanish"],
-        interests: ["Travel", "Hiking", "Coffee", "Photography", "Music"],
-        photos: [],
-        profileImageURL: "",
-        timestamp: Date(),
-        isPremium: false,
-        isVerified: false,
-        lastActive: Date(),
-        ageRangeMin: 24,
-        ageRangeMax: 35,
-        maxDistance: 50
-    )
 
-    static let discoverUsers = [
+    // MARK: - Test Users for Discover Page
+
+    static let discoverUsers: [User] = [
         User(
-            id: "test-user-2",
-            email: "sarah@test.com",
-            fullName: "Sarah Martinez",
-            age: 26,
+            id: "test_user_1",
+            email: "sarah.johnson@test.com",
+            fullName: "Sarah Johnson",
+            age: 24,
             gender: "Female",
-            lookingFor: "Relationship",
-            bio: "Adventure seeker and coffee enthusiast. Let's explore the city together!",
+            lookingFor: "Male",
+            bio: "Adventure seeker 🏔️ | Coffee enthusiast ☕ | Love hiking, photography, and spontaneous road trips. Always up for trying new restaurants!",
             location: "San Francisco",
             country: "USA",
             latitude: 37.7749,
             longitude: -122.4194,
-            languages: ["English"],
-            interests: ["Coffee", "Hiking", "Food", "Art", "Yoga"],
-            photos: [],
-            profileImageURL: "",
-            timestamp: Date(),
+            languages: ["English", "Spanish"],
+            interests: ["Hiking", "Photography", "Coffee", "Travel", "Food"],
+            photos: [
+                "https://picsum.photos/seed/sarah1/400/500",
+                "https://picsum.photos/seed/sarah2/400/500",
+                "https://picsum.photos/seed/sarah3/400/500"
+            ],
+            profileImageURL: "https://picsum.photos/seed/sarah1/400/500",
             isPremium: false,
-            isVerified: true,
-            lastActive: Date(),
-            ageRangeMin: 24,
-            ageRangeMax: 32,
-            maxDistance: 30
+            isVerified: true
         ),
+
         User(
-            id: "test-user-3",
-            email: "michael@test.com",
-            fullName: "Michael Chen",
-            age: 30,
+            id: "test_user_2",
+            email: "mike.chen@test.com",
+            fullName: "Mike Chen",
+            age: 28,
             gender: "Male",
-            lookingFor: "Casual",
-            bio: "Tech enthusiast, foodie, and weekend traveler.",
+            lookingFor: "Female",
+            bio: "Tech entrepreneur 💻 | Fitness junkie 💪 | Building the future one line of code at a time. Love cooking, gaming, and good conversations.",
+            location: "San Francisco",
+            country: "USA",
+            latitude: 37.7849,
+            longitude: -122.4094,
+            languages: ["English", "Mandarin"],
+            interests: ["Technology", "Fitness", "Cooking", "Gaming", "Startups"],
+            photos: [
+                "https://picsum.photos/seed/mike1/400/500",
+                "https://picsum.photos/seed/mike2/400/500",
+                "https://picsum.photos/seed/mike3/400/500"
+            ],
+            profileImageURL: "https://picsum.photos/seed/mike1/400/500",
+            isPremium: true,
+            isVerified: true
+        ),
+
+        User(
+            id: "test_user_3",
+            email: "emma.wilson@test.com",
+            fullName: "Emma Wilson",
+            age: 26,
+            gender: "Female",
+            lookingFor: "Male",
+            bio: "Artist & dreamer 🎨 | Yoga instructor 🧘‍♀️ | Plant mom 🌱 | Looking for someone who appreciates art, nature, and deep conversations under the stars.",
             location: "Oakland",
             country: "USA",
             latitude: 37.8044,
             longitude: -122.2712,
-            languages: ["English", "Mandarin"],
-            interests: ["Travel", "Food", "Gaming", "Movies", "Fitness"],
-            photos: [],
-            profileImageURL: "",
-            timestamp: Date(),
-            isPremium: true,
-            isVerified: true,
-            lastActive: Date(),
-            ageRangeMin: 25,
-            ageRangeMax: 35,
-            maxDistance: 40
+            languages: ["English", "French"],
+            interests: ["Art", "Yoga", "Plants", "Meditation", "Music"],
+            photos: [
+                "https://picsum.photos/seed/emma1/400/500",
+                "https://picsum.photos/seed/emma2/400/500",
+                "https://picsum.photos/seed/emma3/400/500",
+                "https://picsum.photos/seed/emma4/400/500"
+            ],
+            profileImageURL: "https://picsum.photos/seed/emma1/400/500",
+            isPremium: false,
+            isVerified: false
         ),
+
         User(
-            id: "test-user-4",
-            email: "emma@test.com",
-            fullName: "Emma Wilson",
-            age: 27,
-            gender: "Female",
-            lookingFor: "Relationship",
-            bio: "Yoga instructor and nature lover. Looking for someone to share sunsets with 🌅",
+            id: "test_user_4",
+            email: "alex.rodriguez@test.com",
+            fullName: "Alex Rodriguez",
+            age: 30,
+            gender: "Male",
+            lookingFor: "Female",
+            bio: "Marketing director by day, DJ by night 🎧 | Music lover | Foodie | Looking for a partner in crime to explore the city's best hidden gems.",
             location: "Berkeley",
             country: "USA",
             latitude: 37.8715,
             longitude: -122.2730,
-            languages: ["English", "French"],
-            interests: ["Yoga", "Hiking", "Photography", "Travel", "Music"],
-            photos: [],
-            profileImageURL: "",
-            timestamp: Date(),
-            isPremium: false,
-            isVerified: true,
-            lastActive: Date(),
-            ageRangeMin: 25,
-            ageRangeMax: 33,
-            maxDistance: 25
-        ),
-        User(
-            id: "test-user-5",
-            email: "david@test.com",
-            fullName: "David Rodriguez",
-            age: 29,
-            gender: "Male",
-            lookingFor: "Casual",
-            bio: "Musician and craft beer enthusiast. Always down for live shows and good vibes.",
-            location: "San Jose",
-            country: "USA",
-            latitude: 37.3382,
-            longitude: -121.8863,
-            languages: ["English", "Spanish"],
-            interests: ["Music", "Beer", "Food", "Concerts", "Dogs"],
-            photos: [],
-            profileImageURL: "",
-            timestamp: Date(),
+            languages: ["English", "Spanish", "Portuguese"],
+            interests: ["Music", "DJing", "Food", "Travel", "Nightlife"],
+            photos: [
+                "https://picsum.photos/seed/alex1/400/500",
+                "https://picsum.photos/seed/alex2/400/500",
+                "https://picsum.photos/seed/alex3/400/500",
+                "https://picsum.photos/seed/alex4/400/500",
+                "https://picsum.photos/seed/alex5/400/500"
+            ],
+            profileImageURL: "https://picsum.photos/seed/alex1/400/500",
             isPremium: true,
-            isVerified: false,
-            lastActive: Date(),
-            ageRangeMin: 24,
-            ageRangeMax: 32,
-            maxDistance: 45
+            isVerified: true
         ),
+
         User(
-            id: "test-user-6",
-            email: "jessica@test.com",
-            fullName: "Jessica Kim",
-            age: 25,
+            id: "test_user_5",
+            email: "jessica.lee@test.com",
+            fullName: "Jessica Lee",
+            age: 27,
             gender: "Female",
-            lookingFor: "Relationship",
-            bio: "Bookworm, coffee addict, and aspiring chef. Let's grab coffee and talk about our favorite books!",
+            lookingFor: "Male",
+            bio: "Doctor saving lives 👩‍⚕️ | Bookworm 📚 | Dog lover 🐕 | When I'm not at the hospital, you'll find me with a good book and my golden retriever.",
             location: "San Francisco",
             country: "USA",
-            latitude: 37.7749,
-            longitude: -122.4194,
+            latitude: 37.7649,
+            longitude: -122.4294,
             languages: ["English", "Korean"],
-            interests: ["Reading", "Coffee", "Cooking", "Art", "Wine"],
-            photos: [],
-            profileImageURL: "",
-            timestamp: Date(),
+            interests: ["Medicine", "Reading", "Dogs", "Volunteering", "Netflix"],
+            photos: [
+                "https://picsum.photos/seed/jessica1/400/500",
+                "https://picsum.photos/seed/jessica2/400/500",
+                "https://picsum.photos/seed/jessica3/400/500",
+                "https://picsum.photos/seed/jessica4/400/500",
+                "https://picsum.photos/seed/jessica5/400/500",
+                "https://picsum.photos/seed/jessica6/400/500"
+            ],
+            profileImageURL: "https://picsum.photos/seed/jessica1/400/500",
             isPremium: false,
-            isVerified: true,
-            lastActive: Date(),
-            ageRangeMin: 23,
-            ageRangeMax: 30,
-            maxDistance: 20
+            isVerified: true
         )
     ]
 
     // MARK: - Test Matches
 
-    static let matches = [
-        Match(
-            id: "match-1",
-            user1Id: "test-user-1",
-            user2Id: "test-user-2",
-            timestamp: Date().addingTimeInterval(-86400 * 2), // 2 days ago
-            lastMessageTimestamp: Date().addingTimeInterval(-3600), // 1 hour ago
-            lastMessage: "Sounds great! Looking forward to it 😊",
-            unreadCount: ["test-user-1": 1],
-            isActive: true
+    static let testMatches: [(user: User, match: Match)] = [
+        (
+            user: discoverUsers[0], // Sarah
+            match: Match(
+                id: "match_1",
+                user1Id: "current_user",
+                user2Id: "test_user_1",
+                timestamp: Date().addingTimeInterval(-86400 * 2), // 2 days ago
+                lastMessageTimestamp: Date().addingTimeInterval(-3600 * 2), // 2 hours ago
+                lastMessage: "Sounds great! See you at 7pm 😊",
+                unreadCount: ["current_user": 2],
+                isActive: true
+            )
         ),
-        Match(
-            id: "match-2",
-            user1Id: "test-user-1",
-            user2Id: "test-user-4",
-            timestamp: Date().addingTimeInterval(-86400 * 5), // 5 days ago
-            lastMessageTimestamp: Date().addingTimeInterval(-7200), // 2 hours ago
-            lastMessage: "That sunset spot sounds amazing!",
-            unreadCount: ["test-user-1": 2],
-            isActive: true
+        (
+            user: discoverUsers[1], // Mike
+            match: Match(
+                id: "match_2",
+                user1Id: "current_user",
+                user2Id: "test_user_2",
+                timestamp: Date().addingTimeInterval(-86400 * 5), // 5 days ago
+                lastMessageTimestamp: Date().addingTimeInterval(-3600 * 8), // 8 hours ago
+                lastMessage: "That startup idea sounds awesome! Let's grab coffee and discuss more.",
+                unreadCount: [:],
+                isActive: true
+            )
         ),
-        Match(
-            id: "match-3",
-            user1Id: "test-user-1",
-            user2Id: "test-user-6",
-            timestamp: Date().addingTimeInterval(-86400), // 1 day ago
-            lastMessageTimestamp: Date().addingTimeInterval(-14400), // 4 hours ago
-            lastMessage: "I love that author too! Have you read their latest?",
-            unreadCount: [:],
-            isActive: true
+        (
+            user: discoverUsers[2], // Emma
+            match: Match(
+                id: "match_3",
+                user1Id: "current_user",
+                user2Id: "test_user_3",
+                timestamp: Date().addingTimeInterval(-86400), // 1 day ago
+                lastMessageTimestamp: Date().addingTimeInterval(-3600 * 5), // 5 hours ago
+                lastMessage: "I'd love to see your artwork! Do you have an Instagram for your art?",
+                unreadCount: [:],
+                isActive: true
+            )
         ),
-        Match(
-            id: "match-4",
-            user1Id: "test-user-1",
-            user2Id: "test-user-3",
-            timestamp: Date().addingTimeInterval(-86400 * 7), // 7 days ago
-            lastMessageTimestamp: Date().addingTimeInterval(-86400 * 3), // 3 days ago
-            lastMessage: "Cool, let me know when you're free",
-            unreadCount: [:],
-            isActive: true
+        (
+            user: discoverUsers[3], // Alex
+            match: Match(
+                id: "match_4",
+                user1Id: "current_user",
+                user2Id: "test_user_4",
+                timestamp: Date().addingTimeInterval(-3600), // 1 hour ago
+                lastMessageTimestamp: Date().addingTimeInterval(-1800), // 30 mins ago
+                lastMessage: "Just matched! What kind of music do you spin? 🎵",
+                unreadCount: [:],
+                isActive: true
+            )
         ),
-        Match(
-            id: "match-5",
-            user1Id: "test-user-1",
-            user2Id: "test-user-5",
-            timestamp: Date().addingTimeInterval(-86400 * 3), // 3 days ago
-            lastMessageTimestamp: Date().addingTimeInterval(-300), // 5 minutes ago
-            lastMessage: "Just sent you the playlist!",
-            unreadCount: ["test-user-1": 3],
-            isActive: true
+        (
+            user: discoverUsers[4], // Jessica
+            match: Match(
+                id: "match_5",
+                user1Id: "current_user",
+                user2Id: "test_user_5",
+                timestamp: Date().addingTimeInterval(-86400 * 3), // 3 days ago
+                lastMessageTimestamp: Date().addingTimeInterval(-60 * 10), // 10 mins ago
+                lastMessage: "Hey! What's your dog's name? I have a golden too! 🐕",
+                unreadCount: ["current_user": 1],
+                isActive: true
+            )
         )
     ]
 
     // MARK: - Test Messages
 
-    static let messages = [
-        // Conversation with Sarah (match-1)
-        Message(
-            id: "msg-1",
-            matchId: "match-1",
-            senderId: "test-user-2",
-            receiverId: "test-user-1",
-            text: "Hey! I saw you're into hiking too. Have you done any trails around here?",
-            timestamp: Date().addingTimeInterval(-86400), // 1 day ago
-            isRead: true,
-            isDelivered: true
-        ),
-        Message(
-            id: "msg-2",
-            matchId: "match-1",
-            senderId: "test-user-1",
-            receiverId: "test-user-2",
-            text: "Yes! I love the trails in Marin. Have you been to Mount Tamalpais?",
-            timestamp: Date().addingTimeInterval(-82800), // 23 hours ago
-            isRead: true,
-            isDelivered: true
-        ),
-        Message(
-            id: "msg-3",
-            matchId: "match-1",
-            senderId: "test-user-2",
-            receiverId: "test-user-1",
-            text: "Not yet, but it's on my list! Maybe we could go sometime?",
-            timestamp: Date().addingTimeInterval(-79200), // 22 hours ago
-            isRead: true,
-            isDelivered: true
-        ),
-        Message(
-            id: "msg-4",
-            matchId: "match-1",
-            senderId: "test-user-1",
-            receiverId: "test-user-2",
-            text: "That would be awesome! How about next weekend?",
-            timestamp: Date().addingTimeInterval(-7200), // 2 hours ago
-            isRead: true,
-            isDelivered: true
-        ),
-        Message(
-            id: "msg-5",
-            matchId: "match-1",
-            senderId: "test-user-2",
-            receiverId: "test-user-1",
-            text: "Sounds great! Looking forward to it 😊",
-            timestamp: Date().addingTimeInterval(-3600), // 1 hour ago
-            isRead: false,
-            isDelivered: true
-        ),
+    static func messagesForMatch(_ matchId: String) -> [Message] {
+        switch matchId {
+        case "match_1": // Sarah
+            return [
+                Message(
+                    id: "msg_1_1",
+                    matchId: matchId,
+                    senderId: "current_user",
+                    receiverId: "test_user_1",
+                    text: "Hey Sarah! Love your hiking photos! What's your favorite trail in the Bay Area?",
+                    timestamp: Date().addingTimeInterval(-86400 * 2),
+                    isRead: true
+                ),
+                Message(
+                    id: "msg_1_2",
+                    matchId: matchId,
+                    senderId: "test_user_1",
+                    receiverId: "current_user",
+                    text: "Thanks! 😊 I'd say the Lands End trail is my favorite - the views are incredible!",
+                    timestamp: Date().addingTimeInterval(-86400 * 2 + 600),
+                    isRead: true
+                ),
+                Message(
+                    id: "msg_1_3",
+                    matchId: matchId,
+                    senderId: "current_user",
+                    receiverId: "test_user_1",
+                    text: "Oh I love that one! Have you done the Dipsea Trail?",
+                    timestamp: Date().addingTimeInterval(-86400 * 2 + 1200),
+                    isRead: true
+                ),
+                Message(
+                    id: "msg_1_4",
+                    matchId: matchId,
+                    senderId: "test_user_1",
+                    receiverId: "current_user",
+                    text: "Yes! That's on my list for this weekend actually. Want to join? ⛰️",
+                    timestamp: Date().addingTimeInterval(-86400 * 2 + 1800),
+                    isRead: true
+                ),
+                Message(
+                    id: "msg_1_5",
+                    matchId: matchId,
+                    senderId: "current_user",
+                    receiverId: "test_user_1",
+                    text: "That would be awesome! What time were you thinking?",
+                    timestamp: Date().addingTimeInterval(-3600 * 3),
+                    isRead: true
+                ),
+                Message(
+                    id: "msg_1_6",
+                    matchId: matchId,
+                    senderId: "test_user_1",
+                    receiverId: "current_user",
+                    text: "How about 7am on Saturday? Early start to beat the crowds!",
+                    timestamp: Date().addingTimeInterval(-3600 * 2.5),
+                    isRead: false
+                ),
+                Message(
+                    id: "msg_1_7",
+                    matchId: matchId,
+                    senderId: "test_user_1",
+                    receiverId: "current_user",
+                    text: "Sounds great! See you at 7pm 😊",
+                    timestamp: Date().addingTimeInterval(-3600 * 2),
+                    isRead: false
+                )
+            ]
 
-        // Conversation with Emma (match-2)
-        Message(
-            id: "msg-6",
-            matchId: "match-2",
-            senderId: "test-user-1",
-            receiverId: "test-user-4",
-            text: "I love your photos! That sunset is incredible.",
-            timestamp: Date().addingTimeInterval(-86400 * 4), // 4 days ago
-            isRead: true,
-            isDelivered: true
-        ),
-        Message(
-            id: "msg-7",
-            matchId: "match-2",
-            senderId: "test-user-4",
-            receiverId: "test-user-1",
-            text: "Thank you! That was at Lands End. It's my favorite spot in the city.",
-            timestamp: Date().addingTimeInterval(-86400 * 4 + 3600), // 4 days ago + 1 hour
-            isRead: true,
-            isDelivered: true
-        ),
-        Message(
-            id: "msg-8",
-            matchId: "match-2",
-            senderId: "test-user-4",
-            receiverId: "test-user-1",
-            text: "That sunset spot sounds amazing!",
-            timestamp: Date().addingTimeInterval(-7200), // 2 hours ago
-            isRead: false,
-            isDelivered: true
-        ),
+        case "match_2": // Mike
+            return [
+                Message(
+                    id: "msg_2_1",
+                    matchId: matchId,
+                    senderId: "test_user_2",
+                    receiverId: "current_user",
+                    text: "Hey! Saw you're into tech too. What are you building?",
+                    timestamp: Date().addingTimeInterval(-86400 * 5),
+                    isRead: true
+                ),
+                Message(
+                    id: "msg_2_2",
+                    matchId: matchId,
+                    senderId: "current_user",
+                    receiverId: "test_user_2",
+                    text: "Working on an AI-powered productivity app! What about you?",
+                    timestamp: Date().addingTimeInterval(-86400 * 5 + 1800),
+                    isRead: true
+                ),
+                Message(
+                    id: "msg_2_3",
+                    matchId: matchId,
+                    senderId: "test_user_2",
+                    receiverId: "current_user",
+                    text: "Nice! I'm building a fintech platform for Gen Z. Been at it for 2 years now.",
+                    timestamp: Date().addingTimeInterval(-86400 * 5 + 3600),
+                    isRead: true
+                ),
+                Message(
+                    id: "msg_2_4",
+                    matchId: matchId,
+                    senderId: "current_user",
+                    receiverId: "test_user_2",
+                    text: "That startup idea sounds awesome! Let's grab coffee and discuss more.",
+                    timestamp: Date().addingTimeInterval(-3600 * 8),
+                    isRead: true
+                )
+            ]
 
-        // Conversation with Jessica (match-3)
-        Message(
-            id: "msg-9",
-            matchId: "match-3",
-            senderId: "test-user-6",
-            receiverId: "test-user-1",
-            text: "Hi! I noticed we both love coffee. What's your favorite spot?",
-            timestamp: Date().addingTimeInterval(-43200), // 12 hours ago
-            isRead: true,
-            isDelivered: true
-        ),
-        Message(
-            id: "msg-10",
-            matchId: "match-3",
-            senderId: "test-user-1",
-            receiverId: "test-user-6",
-            text: "There's this amazing place in North Beach called Caffe Trieste. You?",
-            timestamp: Date().addingTimeInterval(-39600), // 11 hours ago
-            isRead: true,
-            isDelivered: true
-        ),
-        Message(
-            id: "msg-11",
-            matchId: "match-3",
-            senderId: "test-user-6",
-            receiverId: "test-user-1",
-            text: "I love that author too! Have you read their latest?",
-            timestamp: Date().addingTimeInterval(-14400), // 4 hours ago
-            isRead: true,
-            isDelivered: true
-        ),
+        case "match_3": // Emma
+            return [
+                Message(
+                    id: "msg_3_1",
+                    matchId: matchId,
+                    senderId: "current_user",
+                    receiverId: "test_user_3",
+                    text: "Your bio caught my eye! What kind of art do you create?",
+                    timestamp: Date().addingTimeInterval(-86400),
+                    isRead: true
+                ),
+                Message(
+                    id: "msg_3_2",
+                    matchId: matchId,
+                    senderId: "test_user_3",
+                    receiverId: "current_user",
+                    text: "Thank you! 🎨 I mostly do abstract paintings and mixed media. How about you, are you into art?",
+                    timestamp: Date().addingTimeInterval(-86400 + 3600),
+                    isRead: true
+                ),
+                Message(
+                    id: "msg_3_3",
+                    matchId: matchId,
+                    senderId: "current_user",
+                    receiverId: "test_user_3",
+                    text: "I appreciate art but I'm definitely not talented enough to create it haha. More of an admirer!",
+                    timestamp: Date().addingTimeInterval(-3600 * 6),
+                    isRead: true
+                ),
+                Message(
+                    id: "msg_3_4",
+                    matchId: matchId,
+                    senderId: "current_user",
+                    receiverId: "test_user_3",
+                    text: "I'd love to see your artwork! Do you have an Instagram for your art?",
+                    timestamp: Date().addingTimeInterval(-3600 * 5),
+                    isRead: true
+                )
+            ]
 
-        // Conversation with David (match-5)
-        Message(
-            id: "msg-12",
-            matchId: "match-5",
-            senderId: "test-user-5",
-            receiverId: "test-user-1",
-            text: "Hey! Saw you're into music too. What have you been listening to lately?",
-            timestamp: Date().addingTimeInterval(-3600), // 1 hour ago
-            isRead: true,
-            isDelivered: true
-        ),
-        Message(
-            id: "msg-13",
-            matchId: "match-5",
-            senderId: "test-user-1",
-            receiverId: "test-user-5",
-            text: "Lots of indie and alternative rock. Just discovered this band called The Marias.",
-            timestamp: Date().addingTimeInterval(-1800), // 30 minutes ago
-            isRead: true,
-            isDelivered: true
-        ),
-        Message(
-            id: "msg-14",
-            matchId: "match-5",
-            senderId: "test-user-5",
-            receiverId: "test-user-1",
-            text: "Oh nice! I actually saw them live last month. Let me send you a playlist.",
-            timestamp: Date().addingTimeInterval(-600), // 10 minutes ago
-            isRead: true,
-            isDelivered: true
-        ),
-        Message(
-            id: "msg-15",
-            matchId: "match-5",
-            senderId: "test-user-5",
-            receiverId: "test-user-1",
-            text: "Just sent you the playlist!",
-            timestamp: Date().addingTimeInterval(-300), // 5 minutes ago
-            isRead: false,
-            isDelivered: true
-        )
-    ]
+        case "match_4": // Alex
+            return [
+                Message(
+                    id: "msg_4_1",
+                    matchId: matchId,
+                    senderId: "current_user",
+                    receiverId: "test_user_4",
+                    text: "Just matched! What kind of music do you spin? 🎵",
+                    timestamp: Date().addingTimeInterval(-1800),
+                    isRead: true
+                )
+            ]
+
+        case "match_5": // Jessica
+            return [
+                Message(
+                    id: "msg_5_1",
+                    matchId: matchId,
+                    senderId: "test_user_5",
+                    receiverId: "current_user",
+                    text: "Hi! Thanks for the match 😊",
+                    timestamp: Date().addingTimeInterval(-86400 * 3),
+                    isRead: true
+                ),
+                Message(
+                    id: "msg_5_2",
+                    matchId: matchId,
+                    senderId: "current_user",
+                    receiverId: "test_user_5",
+                    text: "Hey Jessica! How's your week going?",
+                    timestamp: Date().addingTimeInterval(-86400 * 3 + 7200),
+                    isRead: true
+                ),
+                Message(
+                    id: "msg_5_3",
+                    matchId: matchId,
+                    senderId: "test_user_5",
+                    receiverId: "current_user",
+                    text: "Busy as always at the hospital, but loving it! How about you?",
+                    timestamp: Date().addingTimeInterval(-86400 * 2),
+                    isRead: true
+                ),
+                Message(
+                    id: "msg_5_4",
+                    matchId: matchId,
+                    senderId: "test_user_5",
+                    receiverId: "current_user",
+                    text: "Hey! What's your dog's name? I have a golden too! 🐕",
+                    timestamp: Date().addingTimeInterval(-60 * 10),
+                    isRead: false
+                )
+            ]
+
+        default:
+            return []
+        }
+    }
+
+    // MARK: - Helper to get current user for testing
+
+    static let currentUser = User(
+        id: "current_user",
+        email: "you@test.com",
+        fullName: "Kevin Perez",
+        age: 25,
+        gender: "Male",
+        lookingFor: "Female",
+        bio: "iOS Developer | Tech enthusiast | Love building cool apps and meeting interesting people!",
+        location: "San Francisco",
+        country: "USA",
+        latitude: 37.7749,
+        longitude: -122.4194,
+        languages: ["English"],
+        interests: ["Coding", "Tech", "Apps", "Music", "Travel"],
+        photos: [
+            "https://picsum.photos/seed/kevin1/400/500",
+            "https://picsum.photos/seed/kevin2/400/500",
+            "https://picsum.photos/seed/kevin3/400/500"
+        ],
+        profileImageURL: "https://picsum.photos/seed/kevin1/400/500",
+        isPremium: true,
+        isVerified: true
+    )
 }
+
+#endif
+

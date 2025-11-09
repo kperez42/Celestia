@@ -1064,7 +1064,7 @@ struct ProfileView: View {
                 title: "Sign Out",
                 color: .red
             ) {
-                authService.signOut()
+                showingLogoutConfirmation = true
             }
         }
         .padding(.horizontal, 20)
