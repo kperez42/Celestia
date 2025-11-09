@@ -58,6 +58,31 @@ class BlockReportService: ObservableObject {
         blockedUserIds.contains(userId)
     }
 
+    func getBlockedUsers() async throws -> [User] {
+        guard let currentUserId = AuthService.shared.currentUser?.id else {
+            return []
+        }
+
+        let snapshot = try await db.collection("blockedUsers")
+            .whereField("blockerId", isEqualTo: currentUserId)
+            .getDocuments()
+
+        let blockedUserIds = snapshot.documents.compactMap { doc -> String? in
+            doc.data()["blockedUserId"] as? String
+        }
+
+        // Fetch user details for each blocked user
+        var users: [User] = []
+        for userId in blockedUserIds {
+            if let userSnapshot = try? await db.collection("users").document(userId).getDocument(),
+               let user = try? userSnapshot.data(as: User.self) {
+                users.append(user)
+            }
+        }
+
+        return users
+    }
+
     private func loadBlockedUsers() {
         guard let currentUserId = AuthService.shared.currentUser?.id else { return }
 

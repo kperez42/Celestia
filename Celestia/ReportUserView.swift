@@ -161,7 +161,8 @@ struct ReportUserView: View {
     }
 
     private func submitReport() {
-        guard let userId = user.id else { return }
+        guard let userId = user.id,
+              let currentUserId = AuthService.shared.currentUser?.id else { return }
 
         isSubmitting = true
         HapticManager.shared.impact(.medium)
@@ -170,8 +171,9 @@ struct ReportUserView: View {
             do {
                 try await reportService.reportUser(
                     userId: userId,
+                    currentUserId: currentUserId,
                     reason: selectedReason,
-                    additionalInfo: additionalInfo
+                    additionalDetails: additionalInfo.isEmpty ? nil : additionalInfo
                 )
 
                 await MainActor.run {
@@ -191,14 +193,15 @@ struct ReportUserView: View {
     }
 
     private func blockUserOnly() {
-        guard let userId = user.id else { return }
+        guard let userId = user.id,
+              let currentUserId = AuthService.shared.currentUser?.id else { return }
 
         isSubmitting = true
         HapticManager.shared.impact(.medium)
 
         Task {
             do {
-                try await reportService.blockUser(userId: userId)
+                try await reportService.blockUser(userId: userId, currentUserId: currentUserId)
 
                 await MainActor.run {
                     isSubmitting = false
@@ -220,7 +223,7 @@ struct ReportUserView: View {
 // MARK: - Blocked Users List View
 
 struct BlockedUsersView: View {
-    @StateObject private var reportService = ReportBlockService.shared
+    @StateObject private var reportService = BlockReportService.shared
     @State private var blockedUsers: [User] = []
     @State private var isLoading = true
     @State private var showUnblockConfirmation = false
@@ -323,11 +326,12 @@ struct BlockedUsersView: View {
     }
 
     private func unblockUser(_ user: User) {
-        guard let userId = user.id else { return }
+        guard let userId = user.id,
+              let currentUserId = AuthService.shared.currentUser?.id else { return }
 
         Task {
             do {
-                try await reportService.unblockUser(userId: userId)
+                try await reportService.unblockUser(userId: userId, currentUserId: currentUserId)
                 await MainActor.run {
                     blockedUsers.removeAll { $0.id == userId }
                     HapticManager.shared.success()
