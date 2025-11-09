@@ -35,10 +35,12 @@ class DiscoveryFilters: ObservableObject {
         }
 
         // Distance filter
-        if let currentLocation = currentUserLocation {
+        if let currentLocation = currentUserLocation,
+           let userLat = user.latitude,
+           let userLon = user.longitude {
             let distance = calculateDistance(
                 from: currentLocation,
-                to: (user.latitude, user.longitude)
+                to: (userLat, userLon)
             )
             if distance > maxDistance {
                 return false
