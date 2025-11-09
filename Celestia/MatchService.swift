@@ -103,15 +103,39 @@ class MatchService: ObservableObject {
             print("Match already exists: \(existingMatch.id ?? "unknown")")
             return
         }
-        
+
         let match = Match(user1Id: user1Id, user2Id: user2Id)
-        
+
         do {
             let docRef = try db.collection("matches").addDocument(from: match)
             print("✅ Match created: \(docRef.documentID)")
-            
+
             // Update match counts for both users
             try await updateMatchCounts(user1Id: user1Id, user2Id: user2Id)
+
+            // Fetch user data for notifications
+            let user1Snapshot = try? await db.collection("users").document(user1Id).getDocument()
+            let user2Snapshot = try? await db.collection("users").document(user2Id).getDocument()
+
+            if let user1Data = user1Snapshot?.data(),
+               let user2Data = user2Snapshot?.data(),
+               let user1Name = user1Data["fullName"] as? String,
+               let user2Name = user2Data["fullName"] as? String {
+
+                // Create match object with ID for notifications
+                var matchWithId = match
+                matchWithId.id = docRef.documentID
+
+                // Send notifications to both users
+                let notificationService = NotificationService.shared
+
+                // Create temporary user objects for notifications
+                let user1 = User(id: user1Id, email: user1Data["email"] as? String ?? "", fullName: user1Name, age: user1Data["age"] as? Int ?? 0, gender: user1Data["gender"] as? String ?? "", lookingFor: user1Data["lookingFor"] as? String ?? "", location: user1Data["location"] as? String ?? "", country: user1Data["country"] as? String ?? "")
+                let user2 = User(id: user2Id, email: user2Data["email"] as? String ?? "", fullName: user2Name, age: user2Data["age"] as? Int ?? 0, gender: user2Data["gender"] as? String ?? "", lookingFor: user2Data["lookingFor"] as? String ?? "", location: user2Data["location"] as? String ?? "", country: user2Data["country"] as? String ?? "")
+
+                await notificationService.sendNewMatchNotification(match: matchWithId, otherUser: user2)
+                await notificationService.sendNewMatchNotification(match: matchWithId, otherUser: user1)
+            }
         } catch {
             print("❌ Error creating match: \(error)")
             self.error = error

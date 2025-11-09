@@ -5,6 +5,7 @@
 //  Service for detecting screenshots and notifying users
 //
 
+import SwiftUI
 import Foundation
 import UIKit
 import FirebaseFirestore

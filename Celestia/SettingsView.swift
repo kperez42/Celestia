@@ -43,6 +43,17 @@ struct SettingsView: View {
                     }
                 }
 
+                Section("Notifications") {
+                    NavigationLink {
+                        NotificationSettingsView()
+                    } label: {
+                        HStack {
+                            Image(systemName: "bell.badge.fill")
+                            Text("Notification Preferences")
+                        }
+                    }
+                }
+
                 Section("Safety & Privacy") {
                     NavigationLink {
                         PrivacySettingsView()

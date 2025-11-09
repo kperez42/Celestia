@@ -64,29 +64,39 @@ class MessageService: ObservableObject {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw NSError(domain: "MessageService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Message text cannot be empty"])
         }
-        
+
         guard text.count <= 1000 else {
             throw NSError(domain: "MessageService", code: -2, userInfo: [NSLocalizedDescriptionKey: "Message is too long"])
         }
-        
+
         let message = Message(
             matchId: matchId,
             senderId: senderId,
             receiverId: receiverId,
             text: text.trimmingCharacters(in: .whitespacesAndNewlines)
         )
-        
+
         do {
             // Add message to Firestore
             _ = try db.collection("messages").addDocument(from: message)
-            
+
             // Update match with last message info
             try await db.collection("matches").document(matchId).updateData([
                 "lastMessage": text.trimmingCharacters(in: .whitespacesAndNewlines),
                 "lastMessageTimestamp": FieldValue.serverTimestamp(),
                 "unreadCount.\(receiverId)": FieldValue.increment(Int64(1))
             ])
-            
+
+            // Send notification to receiver
+            let senderSnapshot = try? await db.collection("users").document(senderId).getDocument()
+            if let senderName = senderSnapshot?.data()?["fullName"] as? String {
+                await NotificationService.shared.sendMessageNotification(
+                    message: message,
+                    senderName: senderName,
+                    matchId: matchId
+                )
+            }
+
             print("✅ Message sent successfully")
         } catch {
             print("❌ Error sending message: \(error)")

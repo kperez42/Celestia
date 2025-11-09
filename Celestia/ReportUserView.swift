@@ -11,9 +11,9 @@ import SwiftUI
 struct ReportUserView: View {
     let user: User
     @Environment(\.dismiss) var dismiss
-    @StateObject private var reportService = ReportBlockService.shared
+    @StateObject private var reportService = BlockReportService.shared
 
-    @State private var selectedReason: ReportReason = .inappropriateContent
+    @State private var selectedReason: ReportReason = .inappropriatePhotos
     @State private var additionalInfo = ""
     @State private var showBlockConfirmation = false
     @State private var showReportSuccess = false
