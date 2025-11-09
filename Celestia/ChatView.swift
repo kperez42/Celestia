@@ -53,6 +53,13 @@ struct ChatView: View {
         } message: {
             Text("You won't be able to message each other anymore, and this match will be removed from your list.")
         }
+        .detectScreenshots(
+            context: .chat(
+                matchId: match.id ?? "",
+                otherUserId: otherUser.id ?? ""
+            ),
+            userName: otherUser.fullName
+        )
     }
 
     // MARK: - Custom Header

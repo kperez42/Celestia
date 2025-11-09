@@ -42,6 +42,35 @@ struct SettingsView: View {
                         }
                     }
                 }
+
+                Section("Safety & Privacy") {
+                    NavigationLink {
+                        PrivacySettingsView()
+                    } label: {
+                        HStack {
+                            Image(systemName: "hand.raised.shield")
+                            Text("Privacy Controls")
+                        }
+                    }
+
+                    NavigationLink {
+                        SafetyCenterView()
+                    } label: {
+                        HStack {
+                            Image(systemName: "shield.checkered")
+                            Text("Safety Center")
+                        }
+                    }
+
+                    NavigationLink {
+                        BlockedUsersView()
+                    } label: {
+                        HStack {
+                            Image(systemName: "hand.raised.slash")
+                            Text("Blocked Users")
+                        }
+                    }
+                }
                 
                 Section("Support") {
                     Link(destination: URL(string: "mailto:support@celestia.app")!) {
