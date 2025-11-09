@@ -251,19 +251,35 @@ struct FeedDiscoverView: View {
     // MARK: - Data Loading
 
     private func loadUsers() async {
+        #if DEBUG
+        // Use test data in preview/debug mode
+        await MainActor.run {
+            users = TestData.discoverUsers
+            loadMoreUsers()
+        }
+        #else
+        guard let currentUserId = authService.currentUser?.id else { return }
+
         isLoading = true
         defer { isLoading = false }
 
         do {
-            // Simulate loading from backend
-            // In production, fetch from Firestore with filters
-            let testUsers = generateTestUsers()
+            // Fetch from Firestore with filters
+            let currentLocation: (lat: Double, lon: Double)? = {
+                if let user = authService.currentUser {
+                    return (user.latitude, user.longitude)
+                }
+                return nil
+            }()
 
+            // TODO: Implement actual Firestore query
+            // For now, use test data
             await MainActor.run {
-                users = testUsers
+                users = TestData.discoverUsers
                 loadMoreUsers()
             }
         }
+        #endif
     }
 
     private func loadMoreUsers() {
@@ -344,36 +360,6 @@ struct FeedDiscoverView: View {
         selectedUser = user
         // TODO: Navigate to messaging
         print("Message user: \(user.fullName)")
-    }
-
-    // MARK: - Test Data
-
-    private func generateTestUsers() -> [User] {
-        let names = ["Emma", "Olivia", "Ava", "Isabella", "Sophia", "Mia", "Charlotte", "Amelia", "Harper", "Evelyn", "Michael", "James", "David", "William", "Alexander", "Daniel", "Matthew", "Henry", "Jackson", "Sebastian"]
-        let cities = ["New York", "Los Angeles", "Chicago", "Houston", "Phoenix", "Philadelphia", "San Antonio", "San Diego", "Dallas", "San Jose"]
-        let countries = ["USA", "Canada", "UK", "Australia"]
-
-        return names.map { name in
-            User(
-                id: UUID().uuidString,
-                email: "\(name.lowercased())@test.com",
-                fullName: name,
-                age: Int.random(in: 22...35),
-                gender: ["Male", "Female"].randomElement()!,
-                lookingFor: ["Men", "Women", "Everyone"].randomElement()!,
-                bio: "Love adventure and good coffee ☕️",
-                location: cities.randomElement()!,
-                country: countries.randomElement()!,
-                languages: ["English"],
-                interests: ["Travel", "Coffee", "Music", "Hiking"].shuffled().prefix(3).map { $0 },
-                photos: [],
-                profileImageURL: "",
-                isPremium: Bool.random(),
-                isVerified: Bool.random(),
-                ageRangeMin: 22,
-                ageRangeMax: 35
-            )
-        }
     }
 }
 
