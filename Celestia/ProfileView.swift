@@ -16,6 +16,7 @@ struct ProfileView: View {
     @State private var showingPremiumUpgrade = false
     @State private var showingPhotoViewer = false
     @State private var showingPhotoVerification = false
+    @State private var showingInsights = false
     @State private var selectedPhotoIndex = 0
     @State private var animateStats = false
     @State private var profileCompletion = 0
@@ -43,7 +44,10 @@ struct ProfileView: View {
                                 
                                 // Stats row
                                 statsRow(user: user)
-                                
+
+                                // Profile insights card
+                                profileInsightsCard
+
                                 // Edit profile button
                                 editButton
                                 
@@ -119,6 +123,9 @@ struct ProfileView: View {
                 if let user = authService.currentUser, let userId = user.id {
                     PhotoVerificationView(userId: userId)
                 }
+            }
+            .sheet(isPresented: $showingInsights) {
+                ProfileInsightsView()
             }
             .confirmationDialog("Are you sure you want to sign out?", isPresented: $showingLogoutConfirmation, titleVisibility: .visible) {
                 Button("Sign Out", role: .destructive) {
@@ -515,8 +522,92 @@ struct ProfileView: View {
         .frame(maxWidth: .infinity)
     }
     
+    // MARK: - Profile Insights Card
+
+    private var profileInsightsCard: some View {
+        Button {
+            showingInsights = true
+            HapticManager.shared.impact(.medium)
+        } label: {
+            HStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [.purple.opacity(0.2), .pink.opacity(0.2)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 60, height: 60)
+
+                    Image(systemName: "chart.bar.fill")
+                        .font(.title)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 6) {
+                        Text("Profile Insights")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+
+                        Image(systemName: "sparkles")
+                            .font(.caption)
+                            .foregroundColor(.purple)
+                    }
+
+                    Text("See who viewed your profile & performance analytics")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                }
+
+                Spacer()
+
+                Image(systemName: "arrow.right.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+            .padding(20)
+            .background(
+                LinearGradient(
+                    colors: [Color.purple.opacity(0.08), Color.pink.opacity(0.06)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .cornerRadius(20)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(
+                        LinearGradient(
+                            colors: [Color.purple.opacity(0.3), Color.pink.opacity(0.2)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 2
+                    )
+            )
+            .shadow(color: .purple.opacity(0.15), radius: 15, y: 8)
+        }
+        .padding(.horizontal, 20)
+    }
+
     // MARK: - Edit Button
-    
+
     private var editButton: some View {
         Button {
             showingEditProfile = true
