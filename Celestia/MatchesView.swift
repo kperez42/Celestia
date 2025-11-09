@@ -133,6 +133,7 @@ struct MatchesView: View {
             .refreshable {
                 HapticManager.shared.impact(.light)
                 await loadMatches()
+                HapticManager.shared.notification(.success)
             }
             .sheet(item: $selectedMatch) { match in
                 if let user = getMatchedUser(match) {
@@ -405,18 +406,20 @@ struct MatchesView: View {
     }
     
     // MARK: - Loading State
-    
+
     private var loadingView: some View {
-        VStack(spacing: 20) {
-            ProgressView()
-                .scaleEffect(1.5)
-                .tint(.purple)
-            
-            Text("Loading matches...")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+        ScrollView(showsIndicators: false) {
+            LazyVGrid(columns: [
+                GridItem(.flexible(), spacing: 12),
+                GridItem(.flexible(), spacing: 12)
+            ], spacing: 12) {
+                ForEach(0..<6, id: \.self) { _ in
+                    MatchCardSkeleton()
+                }
+            }
+            .padding(16)
+            .padding(.bottom, 80)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     // MARK: - Empty State

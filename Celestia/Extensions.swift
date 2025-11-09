@@ -16,7 +16,7 @@ extension Date {
     /// Returns a human-readable "time ago" string
     func timeAgo() -> String {
         let interval = Date().timeIntervalSince(self)
-        
+
         if interval < 60 {
             return "just now"
         } else if interval < 3600 {
@@ -31,6 +31,29 @@ extension Date {
         } else {
             let weeks = Int(interval / 604800)
             return "\(weeks)w ago"
+        }
+    }
+
+    /// Returns a short "time ago" string for compact display
+    func timeAgoShort() -> String {
+        let interval = Date().timeIntervalSince(self)
+
+        if interval < 60 {
+            return "now"
+        } else if interval < 3600 {
+            let minutes = Int(interval / 60)
+            return "\(minutes)m"
+        } else if interval < 86400 {
+            let hours = Int(interval / 3600)
+            return "\(hours)h"
+        } else if interval < 604800 {
+            let days = Int(interval / 86400)
+            return "\(days)d"
+        } else if interval < 2592000 {
+            let weeks = Int(interval / 604800)
+            return "\(weeks)w"
+        } else {
+            return "1mo+"
         }
     }
     

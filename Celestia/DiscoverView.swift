@@ -16,9 +16,11 @@ struct DiscoverView: View {
     @StateObject private var userService = UserService.shared
     @StateObject private var matchService = MatchService.shared
     @StateObject private var swipeService = SwipeService.shared
+    @StateObject private var filters = DiscoveryFilters.shared
 
     @State private var currentIndex = 0
     @State private var users: [User] = []
+    @State private var allUsers: [User] = [] // Unfiltered list
     @State private var isLoading = false
     @State private var dragOffset: CGSize = .zero
     @State private var showingMatchAnimation = false
@@ -27,6 +29,7 @@ struct DiscoverView: View {
     @State private var showUndoButton = false
     @State private var selectedUser: User?
     @State private var showingUserDetail = false
+    @State private var showingFilters = false
     
     var body: some View {
         NavigationStack {
@@ -45,9 +48,20 @@ struct DiscoverView: View {
                     
                     // Main content
                     if isLoading {
-                        ProgressView()
-                            .scaleEffect(1.5)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        // Skeleton loading state
+                        ZStack {
+                            ForEach(0..<3, id: \.self) { index in
+                                CardSkeleton()
+                                    .padding(.horizontal, 16)
+                                    .padding(.top, 16)
+                                    .padding(.bottom, 180)
+                                    .offset(y: CGFloat(index * 8))
+                                    .scaleEffect(1.0 - CGFloat(index) * 0.05)
+                                    .opacity(1.0 - Double(index) * 0.2)
+                                    .zIndex(Double(3 - index))
+                            }
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else if users.isEmpty || currentIndex >= users.count {
                         emptyStateView
                     } else {
@@ -66,12 +80,20 @@ struct DiscoverView: View {
                 await loadUsers()
             }
             .refreshable {
+                HapticManager.shared.impact(.light)
                 await loadUsers()
+                HapticManager.shared.notification(.success)
             }
             .sheet(isPresented: $showingUserDetail) {
                 if let user = selectedUser {
                     UserDetailView(user: user)
                 }
+            }
+            .sheet(isPresented: $showingFilters) {
+                DiscoverFiltersView()
+            }
+            .onChange(of: filters.hasActiveFilters) { _ in
+                applyFilters()
             }
         }
     }
@@ -84,22 +106,50 @@ struct DiscoverView: View {
                 Text("Discover")
                     .font(.largeTitle)
                     .fontWeight(.bold)
-                
+
                 if !users.isEmpty {
-                    Text("\(users.count - currentIndex) people nearby")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                    HStack(spacing: 4) {
+                        Text("\(users.count - currentIndex) people")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+
+                        if filters.hasActiveFilters {
+                            Image(systemName: "line.3.horizontal.decrease.circle.fill")
+                                .font(.caption)
+                                .foregroundColor(.purple)
+                        }
+                    }
                 }
             }
-            
+
             Spacer()
-            
+
+            // Shuffle button
             Button {
-                // Filters
+                shuffleUsers()
             } label: {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.title2)
+                Image(systemName: "shuffle")
+                    .font(.title3)
                     .foregroundColor(.purple)
+            }
+            .padding(.trailing, 8)
+
+            // Filter button
+            Button {
+                showingFilters = true
+            } label: {
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: filters.hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                        .font(.title2)
+                        .foregroundColor(.purple)
+
+                    if filters.hasActiveFilters {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 8, height: 8)
+                            .offset(x: 2, y: -2)
+                    }
+                }
             }
         }
         .padding()
@@ -214,26 +264,79 @@ struct DiscoverView: View {
     // MARK: - Empty State
     
     private var emptyStateView: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "person.2.slash")
+        VStack(spacing: 24) {
+            Spacer()
+
+            Image(systemName: filters.hasActiveFilters ? "line.3.horizontal.decrease.circle" : "person.2.slash")
                 .font(.system(size: 80))
-                .foregroundColor(.purple.opacity(0.5))
-            
-            Text("No More Profiles")
-                .font(.title2)
-                .fontWeight(.bold)
-            
-            Text("Check back later for new people")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-            
-            Button("Refresh") {
-                Task {
-                    await loadUsers()
-                }
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.purple.opacity(0.6), .pink.opacity(0.4)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            VStack(spacing: 12) {
+                Text(filters.hasActiveFilters ? "No Matches Found" : "No More Profiles")
+                    .font(.title2)
+                    .fontWeight(.bold)
+
+                Text(filters.hasActiveFilters ?
+                     "Try adjusting your filters to see more people" :
+                     "Check back later for new people nearby")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.purple)
+
+            VStack(spacing: 12) {
+                if filters.hasActiveFilters {
+                    Button {
+                        HapticManager.shared.impact(.medium)
+                        filters.resetFilters()
+                        applyFilters()
+                    } label: {
+                        HStack {
+                            Image(systemName: "arrow.counterclockwise")
+                            Text("Clear Filters")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .foregroundColor(.white)
+                        .background(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .cornerRadius(16)
+                    }
+                    .padding(.horizontal, 40)
+                }
+
+                Button {
+                    HapticManager.shared.impact(.light)
+                    Task {
+                        await loadUsers()
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: "arrow.clockwise")
+                        Text("Refresh")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .foregroundColor(.purple)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(16)
+                }
+                .padding(.horizontal, 40)
+            }
+
+            Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -283,7 +386,8 @@ struct DiscoverView: View {
     private func loadUsers() async {
         #if DEBUG
         // Use test data in preview/debug mode
-        users = TestData.discoverUsers
+        allUsers = TestData.discoverUsers
+        applyFilters()
         currentIndex = 0
         isLoading = false
         #else
@@ -295,15 +399,47 @@ struct DiscoverView: View {
         do {
             try await userService.fetchUsers(
                 excludingUserId: currentUserId,
-                limit: 20,
+                limit: 50,
                 reset: true
             )
-            users = userService.users
+            allUsers = userService.users
+            applyFilters()
             currentIndex = 0
         } catch {
             print("Error loading users: \(error)")
         }
         #endif
+    }
+
+    private func applyFilters() {
+        let currentLocation: (lat: Double, lon: Double)? = {
+            #if DEBUG
+            // Use San Francisco as default for testing
+            return (37.7749, -122.4194)
+            #else
+            if let user = authService.currentUser {
+                return (user.latitude, user.longitude)
+            }
+            return nil
+            #endif
+        }()
+
+        users = allUsers.filter { user in
+            filters.matchesFilters(user: user, currentUserLocation: currentLocation)
+        }
+
+        // Reset index if needed
+        if currentIndex >= users.count {
+            currentIndex = 0
+        }
+    }
+
+    private func shuffleUsers() {
+        HapticManager.shared.impact(.medium)
+        withAnimation {
+            users.shuffle()
+            currentIndex = 0
+        }
     }
     
     private func handleSwipeEnd(value: DragGesture.Value, user: User) {

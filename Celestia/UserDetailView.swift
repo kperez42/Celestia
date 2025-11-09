@@ -78,6 +78,24 @@ struct UserDetailView: View {
                                     .foregroundColor(.secondary)
                             }
                             .font(.subheadline)
+
+                            // Last active status
+                            HStack(spacing: 4) {
+                                if user.isOnline {
+                                    Circle()
+                                        .fill(Color.green)
+                                        .frame(width: 8, height: 8)
+                                    Text("Active now")
+                                        .foregroundColor(.green)
+                                        .fontWeight(.medium)
+                                } else {
+                                    Image(systemName: "clock.fill")
+                                        .foregroundColor(.secondary)
+                                    Text("Active \(user.lastActive.timeAgoShort()) ago")
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .font(.caption)
                         }
                         
                         Spacer()

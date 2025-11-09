@@ -74,7 +74,7 @@ struct MainTabView: View {
             ) {
                 selectedTab = 0
             }
-            
+
             // Matches
             TabBarButton(
                 icon: "heart.fill",
@@ -84,7 +84,7 @@ struct MainTabView: View {
             ) {
                 selectedTab = 1
             }
-            
+
             // Messages
             TabBarButton(
                 icon: "message.fill",
@@ -94,7 +94,7 @@ struct MainTabView: View {
             ) {
                 selectedTab = 2
             }
-            
+
             // Profile
             TabBarButton(
                 icon: "person.fill",
@@ -106,13 +106,13 @@ struct MainTabView: View {
             }
         }
         .padding(.horizontal, 8)
-        .padding(.top, 4)
-        .padding(.bottom, 8)
+        .padding(.top, 2)
+        .padding(.bottom, -15)
         .background(
             ZStack {
                 // Blur effect
                 Color.white
-                
+
                 // Gradient overlay
                 LinearGradient(
                     colors: [
@@ -123,9 +123,8 @@ struct MainTabView: View {
                     endPoint: .bottom
                 )
             }
-            .ignoresSafeArea(edges: .bottom)
         )
-        .shadow(color: .black.opacity(0.08), radius: 15, y: -5)
+        
     }
     
     // MARK: - Helper Functions
@@ -218,7 +217,7 @@ struct TabBarButton: View {
                     .foregroundColor(isSelected ? .purple : .gray)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 2)
+            .padding(.vertical, 15)
             .background(
                 RoundedRectangle(cornerRadius: 12)
                     .fill(

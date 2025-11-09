@@ -18,6 +18,7 @@ struct ProfileView: View {
     @State private var selectedPhotoIndex = 0
     @State private var animateStats = false
     @State private var profileCompletion = 0
+    @State private var showingLogoutConfirmation = false
     
     var body: some View {
         NavigationStack {
@@ -107,6 +108,17 @@ struct ProfileView: View {
                         selectedIndex: $selectedPhotoIndex
                     )
                 }
+            }
+            .confirmationDialog("Are you sure you want to sign out?", isPresented: $showingLogoutConfirmation, titleVisibility: .visible) {
+                Button("Sign Out", role: .destructive) {
+                    HapticManager.shared.notification(.warning)
+                    authService.signOut()
+                }
+                Button("Cancel", role: .cancel) {
+                    HapticManager.shared.impact(.light)
+                }
+            } message: {
+                Text("You'll need to sign in again to access your account.")
             }
             .onAppear {
                 withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
@@ -935,7 +947,7 @@ struct ProfileView: View {
                 title: "Sign Out",
                 color: .red
             ) {
-                authService.signOut()
+                showingLogoutConfirmation = true
             }
         }
         .padding(.horizontal, 20)

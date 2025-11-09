@@ -218,10 +218,10 @@ struct ProfileHeaderSkeleton: View {
                         .frame(width: 100, height: 20)
                         .cornerRadius(6)
 
-                    FlowLayout(spacing: 8) {
-                        ForEach(0..<6, id: \.self) { _ in
+                    HStack(spacing: 8) {
+                        ForEach(0..<3, id: \.self) { _ in
                             SkeletonView()
-                                .frame(width: CGFloat.random(in: 80...140), height: 36)
+                                .frame(width: CGFloat.random(in: 80...120), height: 36)
                                 .cornerRadius(18)
                         }
                     }
@@ -259,66 +259,87 @@ struct GridSkeleton: View {
     }
 }
 
-// MARK: - Helper: Flow Layout
+// MARK: - Match Card Skeleton
 
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
+struct MatchCardSkeleton: View {
+    var body: some View {
+        VStack(spacing: 0) {
+            // Profile image skeleton
+            SkeletonView()
+                .frame(height: 220)
 
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let result = FlowLayoutResult(
-            in: proposal.replacingUnspecifiedDimensions().width,
-            subviews: subviews,
-            spacing: spacing
-        )
-        return result.size
-    }
+            // User info section
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    SkeletonView()
+                        .frame(width: 80, height: 18)
+                        .cornerRadius(6)
 
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let result = FlowLayoutResult(
-            in: bounds.width,
-            subviews: subviews,
-            spacing: spacing
-        )
+                    SkeletonView()
+                        .frame(width: 30, height: 18)
+                        .cornerRadius(6)
 
-        for (index, subview) in subviews.enumerated() {
-            subview.place(at: result.positions[index], proposal: .unspecified)
-        }
-    }
-
-    struct FlowLayoutResult {
-        var size: CGSize
-        var positions: [CGPoint]
-
-        init(in maxWidth: CGFloat, subviews: Subviews, spacing: CGFloat) {
-            var positions: [CGPoint] = []
-            var currentX: CGFloat = 0
-            var currentY: CGFloat = 0
-            var lineHeight: CGFloat = 0
-
-            for subview in subviews {
-                let size = subview.sizeThatFits(.unspecified)
-
-                if currentX + size.width > maxWidth && currentX > 0 {
-                    currentX = 0
-                    currentY += lineHeight + spacing
-                    lineHeight = 0
+                    Spacer()
                 }
 
-                positions.append(CGPoint(x: currentX, y: currentY))
-                lineHeight = max(lineHeight, size.height)
-                currentX += size.width + spacing
-            }
+                SkeletonView()
+                    .frame(width: 120, height: 14)
+                    .cornerRadius(6)
 
-            self.positions = positions
-            self.size = CGSize(
-                width: maxWidth,
-                height: currentY + lineHeight
-            )
+                SkeletonView()
+                    .frame(width: 90, height: 24)
+                    .cornerRadius(12)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
     }
 }
 
-// MARK: - Corner Radius Extension
+// MARK: - Conversation Row Skeleton
+
+struct ConversationRowSkeleton: View {
+    var body: some View {
+        HStack(spacing: 16) {
+            // Profile image
+            SkeletonView()
+                .frame(width: 70, height: 70)
+                .clipShape(Circle())
+
+            // Message content
+            VStack(alignment: .leading, spacing: 8) {
+                // Name and time
+                HStack {
+                    SkeletonView()
+                        .frame(width: 140, height: 18)
+                        .cornerRadius(6)
+
+                    Spacer()
+
+                    SkeletonView()
+                        .frame(width: 40, height: 14)
+                        .cornerRadius(6)
+                }
+
+                // Message preview
+                SkeletonView()
+                    .frame(height: 16)
+                    .cornerRadius(6)
+
+                SkeletonView()
+                    .frame(width: 180, height: 16)
+                    .cornerRadius(6)
+            }
+        }
+        .padding(18)
+        .background(Color.white)
+        .cornerRadius(20)
+        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+    }
+}
 
 // MARK: - Preview
 

@@ -77,6 +77,7 @@ struct MessagesView: View {
             .refreshable {
                 HapticManager.shared.impact(.light)
                 await loadData()
+                HapticManager.shared.notification(.success)
             }
             .sheet(isPresented: $showingChat) {
                 if let selectedMatch = selectedMatch {
@@ -271,18 +272,17 @@ struct MessagesView: View {
     }
     
     // MARK: - Loading View
-    
+
     private var loadingView: some View {
-        VStack(spacing: 20) {
-            ProgressView()
-                .scaleEffect(1.5)
-                .tint(.purple)
-            
-            Text("Loading messages...")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+        ScrollView(showsIndicators: false) {
+            LazyVStack(spacing: 12) {
+                ForEach(0..<8, id: \.self) { _ in
+                    ConversationRowSkeleton()
+                }
+            }
+            .padding(20)
+            .padding(.bottom, 80)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     // MARK: - Empty State
