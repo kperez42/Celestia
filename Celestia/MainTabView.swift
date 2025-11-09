@@ -23,7 +23,7 @@ struct MainTabView: View {
             // Main content
             TabView(selection: $selectedTab) {
                 // Discover
-                DiscoverView()
+                FeedDiscoverView()
                     .tag(0)
                 
                 // Matches
