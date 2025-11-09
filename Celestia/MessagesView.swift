@@ -286,81 +286,34 @@ struct MessagesView: View {
     }
     
     // MARK: - Empty State
-    
+
     private var emptyStateView: some View {
-        VStack(spacing: 24) {
-            Spacer()
-            
-            // Icon
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.purple.opacity(0.2), Color.pink.opacity(0.1)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 140, height: 140)
-                
-                Image(systemName: "message.circle.fill")
-                    .font(.system(size: 70))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.purple, .pink],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            }
-            
-            VStack(spacing: 12) {
-                Text("No Messages Yet")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                
-                Text("When you match with someone, you'll be able to chat here")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-            }
-            
-            // CTA Button
-            Button {
-                // Navigate to discover
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "heart.fill")
-                    Text("Start Swiping")
-                        .fontWeight(.semibold)
+        ZStack {
+            EnhancedEmptyState(
+                config: .noMessages,
+                primaryAction: {
+                    // Navigate to discover - would need navigation coordination
+                    // For now, just trigger haptics
+                    HapticManager.shared.notification(.success)
+                },
+                secondaryAction: {
+                    // Navigate to profile
+                    HapticManager.shared.impact(.medium)
                 }
-                .foregroundColor(.white)
-                .padding(.horizontal, 28)
-                .padding(.vertical, 14)
-                .background(
-                    LinearGradient(
-                        colors: [Color.purple, Color.pink],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .cornerRadius(25)
-                .shadow(color: .purple.opacity(0.4), radius: 15, y: 8)
-            }
-            .padding(.top, 10)
+            )
 
-            // Profile strength card
+            // Profile strength card at bottom
             if let currentUser = authService.currentUser {
-                CompactProfileStrengthCard(user: currentUser) {
-                    // Navigate to profile view
-                    // Note: This would need proper navigation handling
+                VStack {
+                    Spacer()
+                    CompactProfileStrengthCard(user: currentUser) {
+                        // Navigate to profile view
+                        // Note: This would need proper navigation handling
+                    }
+                    .padding(.horizontal, 30)
+                    .padding(.bottom, 20)
                 }
-                .padding(.horizontal, 30)
-                .padding(.top, 12)
             }
-
-            Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

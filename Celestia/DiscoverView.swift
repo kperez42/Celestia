@@ -262,91 +262,47 @@ struct DiscoverView: View {
     }
     
     // MARK: - Empty State
-    
+
     private var emptyStateView: some View {
-        VStack(spacing: 24) {
-            Spacer()
-
-            Image(systemName: filters.hasActiveFilters ? "line.3.horizontal.decrease.circle" : "person.2.slash")
-                .font(.system(size: 80))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [.purple.opacity(0.6), .pink.opacity(0.4)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-
-            VStack(spacing: 12) {
-                Text(filters.hasActiveFilters ? "No Matches Found" : "No More Profiles")
-                    .font(.title2)
-                    .fontWeight(.bold)
-
-                Text(filters.hasActiveFilters ?
-                     "Try adjusting your filters to see more people" :
-                     "Check back later for new people nearby")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-            }
-
-            VStack(spacing: 12) {
-                if filters.hasActiveFilters {
-                    Button {
-                        HapticManager.shared.impact(.medium)
+        ZStack {
+            // Enhanced empty state
+            if filters.hasActiveFilters {
+                EnhancedEmptyState(
+                    config: .noMatchingFilters,
+                    primaryAction: {
                         filters.resetFilters()
                         applyFilters()
-                    } label: {
-                        HStack {
-                            Image(systemName: "arrow.counterclockwise")
-                            Text("Clear Filters")
+                    },
+                    secondaryAction: {
+                        showingFilters = true
+                    }
+                )
+            } else {
+                EnhancedEmptyState(
+                    config: .noUsersDiscover,
+                    primaryAction: {
+                        Task {
+                            await loadUsers()
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .foregroundColor(.white)
-                        .background(
-                            LinearGradient(
-                                colors: [.purple, .pink],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .cornerRadius(16)
+                    },
+                    secondaryAction: {
+                        showingFilters = true
                     }
-                    .padding(.horizontal, 40)
-                }
-
-                Button {
-                    HapticManager.shared.impact(.light)
-                    Task {
-                        await loadUsers()
-                    }
-                } label: {
-                    HStack {
-                        Image(systemName: "arrow.clockwise")
-                        Text("Refresh")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .foregroundColor(.purple)
-                    .background(Color(.systemGray6))
-                    .cornerRadius(16)
-                }
-                .padding(.horizontal, 40)
+                )
             }
 
-            // Profile strength tip (when not filtered)
+            // Profile strength card at bottom (when not filtered)
             if !filters.hasActiveFilters, let currentUser = authService.currentUser {
-                CompactProfileStrengthCard(user: currentUser) {
-                    // Navigate to profile view
-                    // Note: This would need proper navigation handling
+                VStack {
+                    Spacer()
+                    CompactProfileStrengthCard(user: currentUser) {
+                        // Navigate to profile view
+                        // Note: This would need proper navigation handling
+                    }
+                    .padding(.horizontal, 30)
+                    .padding(.bottom, 20)
                 }
-                .padding(.horizontal, 40)
-                .padding(.top, 12)
             }
-
-            Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

@@ -423,59 +423,36 @@ struct MatchesView: View {
     }
     
     // MARK: - Empty State
-    
-    private var emptyStateView: some View {
-        VStack(spacing: 24) {
-            Spacer()
-            
-            // Icon
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.purple.opacity(0.2), Color.blue.opacity(0.1)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 140, height: 140)
-                
-                Image(systemName: "heart.circle.fill")
-                    .font(.system(size: 70))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.purple, .blue],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            }
-            
-            VStack(spacing: 12) {
-                Text("No Matches Yet")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                
-                Text("Start swiping to find your perfect match!")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-            }
-            
-            // Profile strength card
-            if let currentUser = authService.currentUser {
-                CompactProfileStrengthCard(user: currentUser) {
-                    // Navigate to profile view
-                    // Note: This would need proper navigation handling
-                }
-                .padding(.horizontal, 30)
-            }
 
-            Spacer()
+    private var emptyStateView: some View {
+        ZStack {
+            Color(.systemGroupedBackground)
+                .ignoresSafeArea()
+
+            EnhancedEmptyState(
+                config: .noMatches,
+                primaryAction: {
+                    // Navigate to discover - would need navigation coordination
+                    // For now, just trigger haptics
+                    HapticManager.shared.notification(.success)
+                },
+                secondaryAction: nil
+            )
+
+            // Profile strength card at bottom
+            if let currentUser = authService.currentUser {
+                VStack {
+                    Spacer()
+                    CompactProfileStrengthCard(user: currentUser) {
+                        // Navigate to profile view
+                        // Note: This would need proper navigation handling
+                    }
+                    .padding(.horizontal, 30)
+                    .padding(.bottom, 20)
+                }
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemGroupedBackground))
     }
     
     // MARK: - Helper Functions
