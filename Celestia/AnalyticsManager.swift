@@ -29,21 +29,24 @@ class AnalyticsManager: ObservableObject {
         // Don't track if user has disabled profile view tracking (future feature)
         // For now, always track
 
-        let profileView: [String: Any] = [
-            "viewedUserId": viewedUserId,
-            "viewerUserId": viewerUserId,
-            "timestamp": Timestamp(date: Date()),
-            "deviceType": "iOS"
-        ]
+        // Use retry logic for Firestore operations
+        try await RetryManager.shared.retryDatabaseOperation {
+            let profileView: [String: Any] = [
+                "viewedUserId": viewedUserId,
+                "viewerUserId": viewerUserId,
+                "timestamp": Timestamp(date: Date()),
+                "deviceType": "iOS"
+            ]
 
-        try await db.collection("profileViews").addDocument(data: profileView)
+            try await self.db.collection("profileViews").addDocument(data: profileView)
 
-        // Update user's view count
-        try await db.collection("users").document(viewedUserId).updateData([
-            "profileViews": FieldValue.increment(Int64(1))
-        ])
+            // Update user's view count
+            try await self.db.collection("users").document(viewedUserId).updateData([
+                "profileViews": FieldValue.increment(Int64(1))
+            ])
+        }
 
-        // Log to Firebase Analytics
+        // Log to Firebase Analytics (non-critical, don't retry)
         Analytics.logEvent("profile_view", parameters: [
             "viewed_user_id": viewedUserId,
             "viewer_user_id": viewerUserId
@@ -53,28 +56,31 @@ class AnalyticsManager: ObservableObject {
     // MARK: - Swipe Tracking
 
     func trackSwipe(swipedUserId: String, swiperUserId: String, direction: SwipeDirection) async throws {
-        let swipeAction: [String: Any] = [
-            "swipedUserId": swipedUserId,
-            "swiperUserId": swiperUserId,
-            "direction": direction.rawValue,
-            "timestamp": Timestamp(date: Date())
-        ]
+        // Use retry logic for Firestore operations
+        try await RetryManager.shared.retryDatabaseOperation {
+            let swipeAction: [String: Any] = [
+                "swipedUserId": swipedUserId,
+                "swiperUserId": swiperUserId,
+                "direction": direction.rawValue,
+                "timestamp": Timestamp(date: Date())
+            ]
 
-        try await db.collection("swipeActions").addDocument(data: swipeAction)
+            try await self.db.collection("swipeActions").addDocument(data: swipeAction)
 
-        // Update swiper stats
-        try await db.collection("users").document(swiperUserId).updateData([
-            "likesGiven": direction == .right ? FieldValue.increment(Int64(1)) : FieldValue.increment(Int64(0))
-        ])
-
-        // Update swiped user stats
-        if direction == .right {
-            try await db.collection("users").document(swipedUserId).updateData([
-                "likesReceived": FieldValue.increment(Int64(1))
+            // Update swiper stats
+            try await self.db.collection("users").document(swiperUserId).updateData([
+                "likesGiven": direction == .right ? FieldValue.increment(Int64(1)) : FieldValue.increment(Int64(0))
             ])
+
+            // Update swiped user stats
+            if direction == .right {
+                try await self.db.collection("users").document(swipedUserId).updateData([
+                    "likesReceived": FieldValue.increment(Int64(1))
+                ])
+            }
         }
 
-        // Log to Firebase Analytics
+        // Log to Firebase Analytics (non-critical, don't retry)
         Analytics.logEvent("swipe_action", parameters: [
             "swiped_user_id": swipedUserId,
             "swiper_user_id": swiperUserId,

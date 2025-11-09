@@ -36,6 +36,12 @@ class DiscoveryFilters: ObservableObject {
     // MARK: - Filter Logic
 
     func matchesFilters(user: User, currentUserLocation: (lat: Double, lon: Double)?) -> Bool {
+        // Validate age bounds to prevent crashes
+        guard user.age > 0, user.age < 150 else {
+            print("⚠️ Invalid user age: \(user.age)")
+            return false
+        }
+
         // Age filter
         if user.age < minAge || user.age > maxAge {
             return false
@@ -166,6 +172,13 @@ class DiscoveryFilters: ObservableObject {
     }
 
     private func calculateDistance(from: (lat: Double, lon: Double), to: (lat: Double, lon: Double)) -> Double {
+        // Validate coordinates
+        guard isValidLatitude(from.lat), isValidLongitude(from.lon),
+              isValidLatitude(to.lat), isValidLongitude(to.lon) else {
+            print("⚠️ Invalid coordinates: from(\(from.lat), \(from.lon)) to(\(to.lat), \(to.lon))")
+            return Double.infinity // Return max distance for invalid coordinates
+        }
+
         let earthRadiusMiles = 3958.8
 
         let lat1 = from.lat * .pi / 180
@@ -179,7 +192,23 @@ class DiscoveryFilters: ObservableObject {
         let a = sin(dLat/2) * sin(dLat/2) + cos(lat1) * cos(lat2) * sin(dLon/2) * sin(dLon/2)
         let c = 2 * atan2(sqrt(a), sqrt(1-a))
 
-        return earthRadiusMiles * c
+        let distance = earthRadiusMiles * c
+
+        // Validate result
+        guard distance.isFinite, distance >= 0 else {
+            print("⚠️ Invalid distance calculation result: \(distance)")
+            return Double.infinity
+        }
+
+        return distance
+    }
+
+    private func isValidLatitude(_ lat: Double) -> Bool {
+        return lat >= -90 && lat <= 90 && lat.isFinite
+    }
+
+    private func isValidLongitude(_ lon: Double) -> Bool {
+        return lon >= -180 && lon <= 180 && lon.isFinite
     }
 
     // MARK: - Persistence
