@@ -47,7 +47,7 @@ struct NotificationData: Codable {
 
 // MARK: - Notification Preferences
 
-struct NotificationPreferences: Codable {
+struct NotificationPreferences: Codable, Equatable {
     var newMatches: Bool = true
     var messages: Bool = true
     var secretAdmirer: Bool = true
