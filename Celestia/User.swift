@@ -57,7 +57,18 @@ struct User: Identifiable, Codable {
     // Notifications
     var fcmToken: String?
     var notificationsEnabled: Bool = true
-    
+
+    // Advanced Profile Fields
+    var educationLevel: String?
+    var height: Int? // in cm
+    var religion: String?
+    var relationshipGoal: String?
+    var smoking: String?
+    var drinking: String?
+    var pets: String?
+    var exercise: String?
+    var diet: String?
+
     // Helper computed property for backward compatibility
     var name: String {
         get { fullName }
@@ -115,6 +126,17 @@ struct User: Identifiable, Codable {
         
         self.fcmToken = dictionary["fcmToken"] as? String
         self.notificationsEnabled = dictionary["notificationsEnabled"] as? Bool ?? true
+
+        // Advanced Profile Fields
+        self.educationLevel = dictionary["educationLevel"] as? String
+        self.height = dictionary["height"] as? Int
+        self.religion = dictionary["religion"] as? String
+        self.relationshipGoal = dictionary["relationshipGoal"] as? String
+        self.smoking = dictionary["smoking"] as? String
+        self.drinking = dictionary["drinking"] as? String
+        self.pets = dictionary["pets"] as? String
+        self.exercise = dictionary["exercise"] as? String
+        self.diet = dictionary["diet"] as? String
     }
     
     // Standard initializer

@@ -17,6 +17,18 @@ class DiscoveryFilters: ObservableObject {
     @Published var selectedInterests: Set<String> = []
     @Published var dealBreakers: Set<String> = []
 
+    // Advanced Filters
+    @Published var educationLevels: Set<String> = []
+    @Published var minHeight: Int? = nil // cm
+    @Published var maxHeight: Int? = nil // cm
+    @Published var religions: Set<String> = []
+    @Published var relationshipGoals: Set<String> = []
+    @Published var smokingPreferences: Set<String> = []
+    @Published var drinkingPreferences: Set<String> = []
+    @Published var petPreferences: Set<String> = []
+    @Published var exercisePreferences: Set<String> = []
+    @Published var dietPreferences: Set<String> = []
+
     private init() {
         loadFromUserDefaults()
     }
@@ -55,6 +67,101 @@ class DiscoveryFilters: ObservableObject {
             }
         }
 
+        // Education level filter
+        if !educationLevels.isEmpty {
+            guard let userEducation = user.educationLevel else {
+                return false
+            }
+            if !educationLevels.contains(userEducation) {
+                return false
+            }
+        }
+
+        // Height filter
+        if let userHeight = user.height {
+            if let min = minHeight, userHeight < min {
+                return false
+            }
+            if let max = maxHeight, userHeight > max {
+                return false
+            }
+        } else {
+            // If user hasn't set height and we have height filters, exclude them
+            if minHeight != nil || maxHeight != nil {
+                return false
+            }
+        }
+
+        // Religion filter
+        if !religions.isEmpty {
+            guard let userReligion = user.religion else {
+                return false
+            }
+            if !religions.contains(userReligion) {
+                return false
+            }
+        }
+
+        // Relationship goal filter
+        if !relationshipGoals.isEmpty {
+            guard let userGoal = user.relationshipGoal else {
+                return false
+            }
+            if !relationshipGoals.contains(userGoal) {
+                return false
+            }
+        }
+
+        // Smoking preference filter
+        if !smokingPreferences.isEmpty {
+            guard let userSmoking = user.smoking else {
+                return false
+            }
+            if !smokingPreferences.contains(userSmoking) {
+                return false
+            }
+        }
+
+        // Drinking preference filter
+        if !drinkingPreferences.isEmpty {
+            guard let userDrinking = user.drinking else {
+                return false
+            }
+            if !drinkingPreferences.contains(userDrinking) {
+                return false
+            }
+        }
+
+        // Pet preference filter
+        if !petPreferences.isEmpty {
+            guard let userPets = user.pets else {
+                return false
+            }
+            if !petPreferences.contains(userPets) {
+                return false
+            }
+        }
+
+        // Exercise preference filter
+        if !exercisePreferences.isEmpty {
+            guard let userExercise = user.exercise else {
+                return false
+            }
+            if !exercisePreferences.contains(userExercise) {
+                return false
+            }
+        }
+
+        // Diet preference filter
+        if !dietPreferences.isEmpty {
+            guard let userDiet = user.diet else {
+                return false
+            }
+            if !dietPreferences.contains(userDiet) {
+                return false
+            }
+        }
+
         return true
     }
 
@@ -83,6 +190,18 @@ class DiscoveryFilters: ObservableObject {
         UserDefaults.standard.set(maxAge, forKey: "maxAge")
         UserDefaults.standard.set(showVerifiedOnly, forKey: "showVerifiedOnly")
         UserDefaults.standard.set(Array(selectedInterests), forKey: "selectedInterests")
+
+        // Advanced Filters
+        UserDefaults.standard.set(Array(educationLevels), forKey: "educationLevels")
+        UserDefaults.standard.set(minHeight, forKey: "minHeight")
+        UserDefaults.standard.set(maxHeight, forKey: "maxHeight")
+        UserDefaults.standard.set(Array(religions), forKey: "religions")
+        UserDefaults.standard.set(Array(relationshipGoals), forKey: "relationshipGoals")
+        UserDefaults.standard.set(Array(smokingPreferences), forKey: "smokingPreferences")
+        UserDefaults.standard.set(Array(drinkingPreferences), forKey: "drinkingPreferences")
+        UserDefaults.standard.set(Array(petPreferences), forKey: "petPreferences")
+        UserDefaults.standard.set(Array(exercisePreferences), forKey: "exercisePreferences")
+        UserDefaults.standard.set(Array(dietPreferences), forKey: "dietPreferences")
     }
 
     private func loadFromUserDefaults() {
@@ -99,6 +218,34 @@ class DiscoveryFilters: ObservableObject {
         if let interests = UserDefaults.standard.array(forKey: "selectedInterests") as? [String] {
             selectedInterests = Set(interests)
         }
+
+        // Advanced Filters
+        if let education = UserDefaults.standard.array(forKey: "educationLevels") as? [String] {
+            educationLevels = Set(education)
+        }
+        minHeight = UserDefaults.standard.object(forKey: "minHeight") as? Int
+        maxHeight = UserDefaults.standard.object(forKey: "maxHeight") as? Int
+        if let religionArray = UserDefaults.standard.array(forKey: "religions") as? [String] {
+            religions = Set(religionArray)
+        }
+        if let goals = UserDefaults.standard.array(forKey: "relationshipGoals") as? [String] {
+            relationshipGoals = Set(goals)
+        }
+        if let smoking = UserDefaults.standard.array(forKey: "smokingPreferences") as? [String] {
+            smokingPreferences = Set(smoking)
+        }
+        if let drinking = UserDefaults.standard.array(forKey: "drinkingPreferences") as? [String] {
+            drinkingPreferences = Set(drinking)
+        }
+        if let pets = UserDefaults.standard.array(forKey: "petPreferences") as? [String] {
+            petPreferences = Set(pets)
+        }
+        if let exercise = UserDefaults.standard.array(forKey: "exercisePreferences") as? [String] {
+            exercisePreferences = Set(exercise)
+        }
+        if let diet = UserDefaults.standard.array(forKey: "dietPreferences") as? [String] {
+            dietPreferences = Set(diet)
+        }
     }
 
     func resetFilters() {
@@ -107,10 +254,27 @@ class DiscoveryFilters: ObservableObject {
         maxAge = 65
         showVerifiedOnly = false
         selectedInterests.removeAll()
+
+        // Reset Advanced Filters
+        educationLevels.removeAll()
+        minHeight = nil
+        maxHeight = nil
+        religions.removeAll()
+        relationshipGoals.removeAll()
+        smokingPreferences.removeAll()
+        drinkingPreferences.removeAll()
+        petPreferences.removeAll()
+        exercisePreferences.removeAll()
+        dietPreferences.removeAll()
+
         saveToUserDefaults()
     }
 
     var hasActiveFilters: Bool {
-        return maxDistance < 100 || minAge > 18 || maxAge < 65 || showVerifiedOnly || !selectedInterests.isEmpty
+        return maxDistance < 100 || minAge > 18 || maxAge < 65 || showVerifiedOnly || !selectedInterests.isEmpty ||
+               !educationLevels.isEmpty || minHeight != nil || maxHeight != nil ||
+               !religions.isEmpty || !relationshipGoals.isEmpty ||
+               !smokingPreferences.isEmpty || !drinkingPreferences.isEmpty ||
+               !petPreferences.isEmpty || !exercisePreferences.isEmpty || !dietPreferences.isEmpty
     }
 }

@@ -18,6 +18,27 @@ struct DiscoverFiltersView: View {
         "Wine", "Dogs", "Cats", "Beach", "Mountains"
     ]
 
+    let educationOptions = [
+        "High School", "Some College", "Associate's", "Bachelor's",
+        "Master's", "Doctorate", "Trade School"
+    ]
+
+    let religionOptions = [
+        "Agnostic", "Atheist", "Buddhist", "Catholic", "Christian",
+        "Hindu", "Jewish", "Muslim", "Spiritual", "Other", "Prefer not to say"
+    ]
+
+    let relationshipGoalOptions = [
+        "Casual Dating", "Long-term Relationship", "Marriage",
+        "Friendship", "Not Sure Yet"
+    ]
+
+    let smokingOptions = ["Never", "Socially", "Regularly", "Trying to Quit"]
+    let drinkingOptions = ["Never", "Socially", "Regularly", "Rarely"]
+    let petOptions = ["Dog", "Cat", "Both", "Other Pets", "No Pets", "Want Pets"]
+    let exerciseOptions = ["Daily", "Often", "Sometimes", "Rarely", "Never"]
+    let dietOptions = ["Vegan", "Vegetarian", "Pescatarian", "Kosher", "Halal", "No Restrictions"]
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -39,6 +60,54 @@ struct DiscoverFiltersView: View {
 
                     // Interest filter
                     interestsSection
+
+                    Divider()
+
+                    // Advanced Filters Header
+                    Text("Advanced Filters")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+
+                    // Education filter
+                    educationSection
+
+                    Divider()
+
+                    // Height filter
+                    heightSection
+
+                    Divider()
+
+                    // Religion filter
+                    religionSection
+
+                    Divider()
+
+                    // Relationship goals filter
+                    relationshipGoalsSection
+
+                    Divider()
+
+                    // Lifestyle filters
+                    Text("Lifestyle Preferences")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+
+                    smokingSection
+                    Divider()
+                    drinkingSection
+                    Divider()
+                    petSection
+                    Divider()
+                    exerciseSection
+                    Divider()
+                    dietSection
 
                     // Reset button
                     if filters.hasActiveFilters {
@@ -256,6 +325,384 @@ struct DiscoverFiltersView: View {
         .cornerRadius(16)
     }
 
+    // MARK: - Education Section
+
+    private var educationSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "graduationcap.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+
+                Text("Education Level")
+                    .font(.headline)
+
+                Spacer()
+
+                if !filters.educationLevels.isEmpty {
+                    Text("\(filters.educationLevels.count)")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .clipShape(Capsule())
+                }
+            }
+
+            FlowLayout(spacing: 8) {
+                ForEach(educationOptions, id: \.self) { option in
+                    InterestChip(
+                        interest: option,
+                        isSelected: filters.educationLevels.contains(option)
+                    ) {
+                        toggleEducation(option)
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+    }
+
+    // MARK: - Height Section
+
+    private var heightSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "ruler.fill")
+                    .font(.title3)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+
+                Text("Height Range")
+                    .font(.headline)
+
+                Spacer()
+
+                if let min = filters.minHeight, let max = filters.maxHeight {
+                    Text("\(min) - \(max) cm")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                } else if let min = filters.minHeight {
+                    Text("\(min)+ cm")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                } else if let max = filters.maxHeight {
+                    Text("≤\(max) cm")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            // Min height slider
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Minimum: \(filters.minHeight ?? 140) cm")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    if filters.minHeight != nil {
+                        Button("Clear") {
+                            filters.minHeight = nil
+                        }
+                        .font(.caption)
+                        .foregroundColor(.purple)
+                    }
+                }
+
+                Slider(value: Binding(
+                    get: { Double(filters.minHeight ?? 140) },
+                    set: { filters.minHeight = Int($0) }
+                ), in: 140...220, step: 1)
+                .accentColor(.purple)
+            }
+
+            // Max height slider
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Maximum: \(filters.maxHeight ?? 220) cm")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    if filters.maxHeight != nil {
+                        Button("Clear") {
+                            filters.maxHeight = nil
+                        }
+                        .font(.caption)
+                        .foregroundColor(.purple)
+                    }
+                }
+
+                Slider(value: Binding(
+                    get: { Double(filters.maxHeight ?? 220) },
+                    set: { filters.maxHeight = Int($0) }
+                ), in: 140...220, step: 1)
+                .accentColor(.purple)
+            }
+
+            HStack {
+                Text("140 cm (4'7\")")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text("220 cm (7'3\")")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+    }
+
+    // MARK: - Religion Section
+
+    private var religionSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "heart.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+
+                Text("Religion/Spirituality")
+                    .font(.headline)
+
+                Spacer()
+
+                if !filters.religions.isEmpty {
+                    Text("\(filters.religions.count)")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .clipShape(Capsule())
+                }
+            }
+
+            FlowLayout(spacing: 8) {
+                ForEach(religionOptions, id: \.self) { option in
+                    InterestChip(
+                        interest: option,
+                        isSelected: filters.religions.contains(option)
+                    ) {
+                        toggleReligion(option)
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+    }
+
+    // MARK: - Relationship Goals Section
+
+    private var relationshipGoalsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "heart.text.square.fill")
+                    .font(.title3)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+
+                Text("Relationship Goals")
+                    .font(.headline)
+
+                Spacer()
+
+                if !filters.relationshipGoals.isEmpty {
+                    Text("\(filters.relationshipGoals.count)")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .clipShape(Capsule())
+                }
+            }
+
+            FlowLayout(spacing: 8) {
+                ForEach(relationshipGoalOptions, id: \.self) { option in
+                    InterestChip(
+                        interest: option,
+                        isSelected: filters.relationshipGoals.contains(option)
+                    ) {
+                        toggleRelationshipGoal(option)
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+    }
+
+    // MARK: - Smoking Section
+
+    private var smokingSection: some View {
+        filterOptionSection(
+            title: "Smoking",
+            icon: "smoke.fill",
+            options: smokingOptions,
+            selectedOptions: filters.smokingPreferences,
+            toggle: toggleSmoking
+        )
+    }
+
+    // MARK: - Drinking Section
+
+    private var drinkingSection: some View {
+        filterOptionSection(
+            title: "Drinking",
+            icon: "wineglass.fill",
+            options: drinkingOptions,
+            selectedOptions: filters.drinkingPreferences,
+            toggle: toggleDrinking
+        )
+    }
+
+    // MARK: - Pet Section
+
+    private var petSection: some View {
+        filterOptionSection(
+            title: "Pets",
+            icon: "pawprint.fill",
+            options: petOptions,
+            selectedOptions: filters.petPreferences,
+            toggle: togglePet
+        )
+    }
+
+    // MARK: - Exercise Section
+
+    private var exerciseSection: some View {
+        filterOptionSection(
+            title: "Exercise",
+            icon: "figure.run",
+            options: exerciseOptions,
+            selectedOptions: filters.exercisePreferences,
+            toggle: toggleExercise
+        )
+    }
+
+    // MARK: - Diet Section
+
+    private var dietSection: some View {
+        filterOptionSection(
+            title: "Diet",
+            icon: "leaf.fill",
+            options: dietOptions,
+            selectedOptions: filters.dietPreferences,
+            toggle: toggleDiet
+        )
+    }
+
+    // MARK: - Generic Filter Option Section
+
+    private func filterOptionSection(
+        title: String,
+        icon: String,
+        options: [String],
+        selectedOptions: Set<String>,
+        toggle: @escaping (String) -> Void
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: icon)
+                    .font(.title3)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+
+                Text(title)
+                    .font(.headline)
+
+                Spacer()
+
+                if !selectedOptions.isEmpty {
+                    Text("\(selectedOptions.count)")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .clipShape(Capsule())
+                }
+            }
+
+            FlowLayout(spacing: 8) {
+                ForEach(options, id: \.self) { option in
+                    InterestChip(
+                        interest: option,
+                        isSelected: selectedOptions.contains(option)
+                    ) {
+                        toggle(option)
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+    }
+
     // MARK: - Reset Button
 
     private var resetButton: some View {
@@ -283,6 +730,78 @@ struct DiscoverFiltersView: View {
             filters.selectedInterests.remove(interest)
         } else {
             filters.selectedInterests.insert(interest)
+        }
+    }
+
+    private func toggleEducation(_ option: String) {
+        HapticManager.shared.impact(.light)
+        if filters.educationLevels.contains(option) {
+            filters.educationLevels.remove(option)
+        } else {
+            filters.educationLevels.insert(option)
+        }
+    }
+
+    private func toggleReligion(_ option: String) {
+        HapticManager.shared.impact(.light)
+        if filters.religions.contains(option) {
+            filters.religions.remove(option)
+        } else {
+            filters.religions.insert(option)
+        }
+    }
+
+    private func toggleRelationshipGoal(_ option: String) {
+        HapticManager.shared.impact(.light)
+        if filters.relationshipGoals.contains(option) {
+            filters.relationshipGoals.remove(option)
+        } else {
+            filters.relationshipGoals.insert(option)
+        }
+    }
+
+    private func toggleSmoking(_ option: String) {
+        HapticManager.shared.impact(.light)
+        if filters.smokingPreferences.contains(option) {
+            filters.smokingPreferences.remove(option)
+        } else {
+            filters.smokingPreferences.insert(option)
+        }
+    }
+
+    private func toggleDrinking(_ option: String) {
+        HapticManager.shared.impact(.light)
+        if filters.drinkingPreferences.contains(option) {
+            filters.drinkingPreferences.remove(option)
+        } else {
+            filters.drinkingPreferences.insert(option)
+        }
+    }
+
+    private func togglePet(_ option: String) {
+        HapticManager.shared.impact(.light)
+        if filters.petPreferences.contains(option) {
+            filters.petPreferences.remove(option)
+        } else {
+            filters.petPreferences.insert(option)
+        }
+    }
+
+    private func toggleExercise(_ option: String) {
+        HapticManager.shared.impact(.light)
+        if filters.exercisePreferences.contains(option) {
+            filters.exercisePreferences.remove(option)
+        } else {
+            filters.exercisePreferences.insert(option)
+        }
+    }
+
+    private func toggleDiet(_ option: String) {
+        HapticManager.shared.impact(.light)
+        if filters.dietPreferences.contains(option) {
+            filters.dietPreferences.remove(option)
+        } else {
+            filters.dietPreferences.insert(option)
         }
     }
 }
