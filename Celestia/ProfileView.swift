@@ -15,9 +15,11 @@ struct ProfileView: View {
     @State private var showingSettings = false
     @State private var showingPremiumUpgrade = false
     @State private var showingPhotoViewer = false
+    @State private var showingPhotoVerification = false
     @State private var selectedPhotoIndex = 0
     @State private var animateStats = false
     @State private var profileCompletion = 0
+    @State private var showingLogoutConfirmation = false
     
     var body: some View {
         NavigationStack {
@@ -45,6 +47,11 @@ struct ProfileView: View {
                                 // Edit profile button
                                 editButton
                                 
+                                // Verification card (if not verified)
+                                if !user.isVerified {
+                                    verificationCard
+                                }
+
                                 // Premium badge or upgrade
                                 if user.isPremium {
                                     premiumBadgeCard
@@ -108,6 +115,22 @@ struct ProfileView: View {
                     )
                 }
             }
+            .fullScreenCover(isPresented: $showingPhotoVerification) {
+                if let user = authService.currentUser {
+                    PhotoVerificationView(userId: user.id)
+                }
+            }
+            .confirmationDialog("Are you sure you want to sign out?", isPresented: $showingLogoutConfirmation, titleVisibility: .visible) {
+                Button("Sign Out", role: .destructive) {
+                    HapticManager.shared.notification(.warning)
+                    authService.signOut()
+                }
+                Button("Cancel", role: .cancel) {
+                    HapticManager.shared.impact(.light)
+                }
+            } message: {
+                Text("You'll need to sign in again to access your account.")
+            }
             .onAppear {
                 withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
                     animateStats = true
@@ -118,7 +141,35 @@ struct ProfileView: View {
             }
         }
     }
-    
+
+    // MARK: - Tip Action Handler
+
+    private func handleTipAction(_ action: ProfileTip.TipAction) {
+        HapticManager.shared.impact(.medium)
+
+        switch action {
+        case .addPhotos:
+            // Open edit profile to photos section
+            showingEditProfile = true
+
+        case .writeBio:
+            // Open edit profile to bio section
+            showingEditProfile = true
+
+        case .addInterests:
+            // Open edit profile to interests section
+            showingEditProfile = true
+
+        case .addLanguages:
+            // Open edit profile to languages section
+            showingEditProfile = true
+
+        case .getVerified:
+            // Open photo verification flow
+            showingPhotoVerification = true
+        }
+    }
+
     // MARK: - Hero Section
     
     private func heroSection(user: User) -> some View {
@@ -489,8 +540,86 @@ struct ProfileView: View {
         .padding(.horizontal, 20)
     }
     
+    // MARK: - Verification Card
+
+    private var verificationCard: some View {
+        Button {
+            showingPhotoVerification = true
+            HapticManager.shared.impact(.medium)
+        } label: {
+            HStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(Color.blue.opacity(0.2))
+                        .frame(width: 60, height: 60)
+
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.title)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.blue, .cyan],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 6) {
+                        Text("Get Verified")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+
+                        Image(systemName: "sparkles")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                    }
+
+                    Text("Stand out with the blue checkmark • 3x more matches")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                }
+
+                Spacer()
+
+                Image(systemName: "arrow.right.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.blue, .cyan],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+            .padding(20)
+            .background(
+                LinearGradient(
+                    colors: [Color.blue.opacity(0.1), Color.cyan.opacity(0.08)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .cornerRadius(20)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(
+                        LinearGradient(
+                            colors: [Color.blue.opacity(0.3), Color.cyan.opacity(0.2)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 2
+                    )
+            )
+            .shadow(color: .blue.opacity(0.15), radius: 15, y: 8)
+        }
+        .padding(.horizontal, 20)
+    }
+
     // MARK: - Premium Badge Card
-    
+
     private var premiumBadgeCard: some View {
         HStack(spacing: 16) {
             ZStack {
