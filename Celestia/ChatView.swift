@@ -156,6 +156,40 @@ struct ChatView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 12) {
+                    // Conversation starters (show when no messages)
+                    if messageService.messages.isEmpty, let currentUser = authService.currentUser {
+                        VStack(spacing: 20) {
+                            // Welcome section
+                            VStack(spacing: 12) {
+                                Text("🎉")
+                                    .font(.system(size: 60))
+
+                                Text("You matched with \(otherUser.fullName)!")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                    .multilineTextAlignment(.center)
+
+                                Text("Start a conversation and see where it goes")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                            }
+                            .padding(.top, 40)
+                            .padding(.horizontal, 20)
+
+                            // Conversation starters
+                            CompactConversationStartersView(
+                                currentUser: currentUser,
+                                otherUser: otherUser
+                            ) { starterText in
+                                messageText = starterText
+                                isInputFocused = true
+                            }
+                            .padding(.horizontal, 20)
+                        }
+                        .padding(.bottom, 20)
+                    }
+
                     ForEach(groupedMessages(), id: \.0) { section in
                         // Date divider
                         Text(section.0)

@@ -342,40 +342,80 @@ struct DiscoverView: View {
     }
     
     // MARK: - Match Animation
-    
+
     private var matchCelebrationView: some View {
         ZStack {
             Color.black.opacity(0.8)
                 .ignoresSafeArea()
-            
+
             VStack(spacing: 30) {
+                // Animated sparkles
                 Image(systemName: "sparkles")
                     .font(.system(size: 80))
                     .foregroundColor(.yellow)
-                
+                    .symbolEffect(.bounce, options: .repeating)
+
                 Text("It's a Match! 🎉")
                     .font(.largeTitle)
                     .fontWeight(.bold)
                     .foregroundColor(.white)
-                
+
                 if let user = matchedUser {
-                    Text("You and \(user.fullName) liked each other!")
-                        .font(.title3)
+                    VStack(spacing: 16) {
+                        Text("You and \(user.fullName) liked each other!")
+                            .font(.title3)
+                            .foregroundColor(.white)
+                            .multilineTextAlignment(.center)
+
+                        // Preview of shared interest
+                        if let currentUser = authService.currentUser {
+                            let sharedInterests = Set(currentUser.interests).intersection(Set(user.interests))
+                            if let interest = sharedInterests.first {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "star.fill")
+                                        .foregroundColor(.yellow)
+                                    Text("You both love \(interest)")
+                                        .font(.subheadline)
+                                        .foregroundColor(.white.opacity(0.9))
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(Color.white.opacity(0.15))
+                                .cornerRadius(20)
+                            }
+                        }
+                    }
+                }
+
+                VStack(spacing: 12) {
+                    Button {
+                        showingMatchAnimation = false
+                        // TODO: Navigate to chat with the matched user
+                    } label: {
+                        HStack {
+                            Image(systemName: "message.fill")
+                            Text("Send Message")
+                        }
+                        .frame(maxWidth: 280)
+                        .padding()
+                        .background(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
                         .foregroundColor(.white)
-                        .multilineTextAlignment(.center)
+                        .cornerRadius(25)
+                        .shadow(color: .purple.opacity(0.5), radius: 15, y: 8)
+                    }
+
+                    Button("Keep Swiping") {
+                        showingMatchAnimation = false
+                    }
+                    .foregroundColor(.white.opacity(0.8))
+                    .padding()
                 }
-                
-                Button("Send Message") {
-                    showingMatchAnimation = false
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.purple)
-                .controlSize(.large)
-                
-                Button("Keep Swiping") {
-                    showingMatchAnimation = false
-                }
-                .foregroundColor(.white)
             }
             .padding(40)
         }
