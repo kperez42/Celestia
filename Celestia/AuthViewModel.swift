@@ -29,39 +29,43 @@ class AuthViewModel: ObservableObject {
         }
     }
     
-    func signUp(email: String, password: String, name: String, age: Int, gender: String, lookingFor: String, location: String, country: String) {
+    func signUp(email: String, password: String, name: String, age: Int, gender: String, lookingFor: String, location: String, country: String, referralCode: String = "") {
         isLoading = true
         errorMessage = ""
-        
+
         auth.createUser(withEmail: email, password: password) { [weak self] result, error in
             guard let self = self else { return }
-            
+
             if let error = error {
                 self.errorMessage = error.localizedDescription
                 self.isLoading = false
                 return
             }
-            
+
             guard let firebaseUser = result?.user else {
                 self.errorMessage = "Failed to create user"
                 self.isLoading = false
                 return
             }
-            
+
             // Create user document in Firestore
-            // FIXED: Changed 'name:' to 'fullName:'
-            let user = User(
+            var user = User(
                 id: firebaseUser.uid,
                 email: email,
-                fullName: name,  // FIXED: was 'name:', now 'fullName:'
+                fullName: name,
                 age: age,
                 gender: gender,
                 lookingFor: lookingFor,
                 location: location,
                 country: country
             )
-            
-            self.saveUserToFirestore(user: user)
+
+            // Store referral code if provided
+            if !referralCode.isEmpty {
+                user.referredByCode = referralCode.uppercased().trimmingCharacters(in: .whitespaces)
+            }
+
+            self.saveUserToFirestore(user: user, referralCode: referralCode)
         }
     }
     
@@ -106,20 +110,36 @@ class AuthViewModel: ObservableObject {
         }
     }
     
-    private func saveUserToFirestore(user: User) {
+    private func saveUserToFirestore(user: User, referralCode: String = "") {
         do {
             try firestore.collection("users").document(user.id!).setData(from: user) { [weak self] error in
                 guard let self = self else { return }
-                
+
                 if let error = error {
                     self.errorMessage = error.localizedDescription
                     self.isLoading = false
                     return
                 }
-                
-                self.currentUser = user
-                self.isAuthenticated = true
-                self.isLoading = false
+
+                // Initialize referral code and process referral asynchronously
+                Task { @MainActor in
+                    var updatedUser = user
+
+                    // Generate unique referral code for new user
+                    try? await ReferralManager.shared.initializeReferralCode(for: &updatedUser)
+
+                    // Process referral if code was provided
+                    if !referralCode.isEmpty {
+                        try? await ReferralManager.shared.processReferralSignup(
+                            newUser: updatedUser,
+                            referralCode: referralCode.uppercased().trimmingCharacters(in: .whitespaces)
+                        )
+                    }
+
+                    self.currentUser = updatedUser
+                    self.isAuthenticated = true
+                    self.isLoading = false
+                }
             }
         } catch {
             errorMessage = error.localizedDescription

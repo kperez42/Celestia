@@ -492,6 +492,17 @@ struct DiscoverView: View {
                 return
             }
 
+            // Track swipe analytics
+            do {
+                try await AnalyticsManager.shared.trackSwipe(
+                    swipedUserId: userId,
+                    swiperUserId: currentUserId,
+                    direction: AnalyticsSwipeDirection.right
+                )
+            } catch {
+                print("❌ Error tracking swipe: \(error)")
+            }
+
             #if DEBUG
             // In debug mode with test data, just show match animation for demonstration
             print("💕 DEBUG: Simulating like from \(currentUserId) to \(userId)")
@@ -502,6 +513,8 @@ struct DiscoverView: View {
                     showingMatchAnimation = true
                     HapticManager.shared.match()
                 }
+                // Track match
+                try? await AnalyticsManager.shared.trackMatch(user1Id: currentUserId, user2Id: userId)
             }
             #else
             // Production: Create like and check for mutual match
@@ -519,6 +532,8 @@ struct DiscoverView: View {
                         HapticManager.shared.match()
                     }
                     print("🎉 It's a match with \(user.fullName)!")
+                    // Track match
+                    try await AnalyticsManager.shared.trackMatch(user1Id: currentUserId, user2Id: userId)
                 }
             } catch {
                 print("❌ Error creating like: \(error)")
@@ -551,6 +566,17 @@ struct DiscoverView: View {
                     currentIndex += 1
                 }
                 return
+            }
+
+            // Track swipe analytics
+            do {
+                try await AnalyticsManager.shared.trackSwipe(
+                    swipedUserId: userId,
+                    swiperUserId: currentUserId,
+                    direction: AnalyticsSwipeDirection.left
+                )
+            } catch {
+                print("❌ Error tracking swipe: \(error)")
             }
 
             #if DEBUG

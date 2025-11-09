@@ -206,6 +206,22 @@ struct UserDetailView: View {
             }
             .padding(.bottom, 30)
         }
+        .onAppear {
+            // Track profile view
+            Task {
+                guard let currentUserId = authViewModel.currentUser?.id,
+                      let viewedUserId = user.id else { return }
+
+                do {
+                    try await AnalyticsManager.shared.trackProfileView(
+                        viewedUserId: viewedUserId,
+                        viewerUserId: currentUserId
+                    )
+                } catch {
+                    print("❌ Error tracking profile view: \(error)")
+                }
+            }
+        }
         .alert("Interest Sent! 💫", isPresented: $showingInterestSent) {
             Button("OK") { dismiss() }
         } message: {
