@@ -21,7 +21,8 @@ struct EditProfileView: View {
     @State private var lookingFor: String
     @State private var languages: [String]
     @State private var interests: [String]
-    
+    @State private var prompts: [ProfilePrompt]
+
     @State private var newLanguage = ""
     @State private var newInterest = ""
     @State private var isLoading = false
@@ -33,6 +34,7 @@ struct EditProfileView: View {
     @State private var errorMessage = ""
     @State private var showLanguagePicker = false
     @State private var showInterestPicker = false
+    @State private var showPromptsEditor = false
     
     let genderOptions = ["Male", "Female", "Non-binary", "Other"]
     let lookingForOptions = ["Men", "Women", "Everyone"]
@@ -57,6 +59,7 @@ struct EditProfileView: View {
         _lookingFor = State(initialValue: user?.lookingFor ?? "Everyone")
         _languages = State(initialValue: user?.languages ?? [])
         _interests = State(initialValue: user?.interests ?? [])
+        _prompts = State(initialValue: user?.prompts ?? [])
     }
     
     var body: some View {
@@ -87,7 +90,10 @@ struct EditProfileView: View {
                         
                         // Interests Card
                         interestsSection
-                        
+
+                        // Prompts Card
+                        promptsSection
+
                         // Save Button
                         saveButton
                     }
@@ -140,6 +146,9 @@ struct EditProfileView: View {
                     selectedInterests: $interests,
                     availableInterests: predefinedInterests
                 )
+            }
+            .sheet(isPresented: $showPromptsEditor) {
+                ProfilePromptsEditorView(prompts: $prompts)
             }
         }
     }
@@ -526,8 +535,80 @@ struct EditProfileView: View {
         .shadow(color: .black.opacity(0.05), radius: 8)
     }
     
+    // MARK: - Prompts Section
+
+    private var promptsSection: some View {
+        VStack(spacing: 15) {
+            HStack {
+                SectionHeader(icon: "quote.bubble.fill", title: "Profile Prompts", color: .purple)
+
+                Spacer()
+
+                Button {
+                    showPromptsEditor = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: prompts.isEmpty ? "plus.circle.fill" : "pencil.circle.fill")
+                        Text(prompts.isEmpty ? "Add" : "Edit")
+                    }
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                }
+            }
+
+            if prompts.isEmpty {
+                EmptyStateView(
+                    icon: "quote.bubble.fill",
+                    message: "Add prompts to showcase your personality",
+                    action: { showPromptsEditor = true }
+                )
+            } else {
+                VStack(spacing: 12) {
+                    ForEach(prompts) { prompt in
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(prompt.question)
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.purple)
+
+                            Text(prompt.answer)
+                                .font(.subheadline)
+                                .foregroundColor(.primary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .background(
+                            LinearGradient(
+                                colors: [Color.purple.opacity(0.05), Color.pink.opacity(0.03)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .cornerRadius(12)
+                    }
+
+                    Text("\(prompts.count)/3 prompts")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                }
+            }
+        }
+        .padding(20)
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 8)
+    }
+
     // MARK: - Save Button
-    
+
     private var saveButton: some View {
         Button {
             saveProfile()
@@ -627,7 +708,8 @@ struct EditProfileView: View {
                 user.lookingFor = lookingFor
                 user.languages = languages
                 user.interests = interests
-                
+                user.prompts = prompts
+
                 try await authService.updateUser(user)
                 
                 await MainActor.run {
