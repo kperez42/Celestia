@@ -33,6 +33,7 @@ struct FeedDiscoverView: View {
                 Color(.systemGroupedBackground)
                     .ignoresSafeArea()
 
+                // Main scroll view
                 ScrollView {
                     LazyVStack(spacing: 16) {
                         ForEach(Array(displayedUsers.enumerated()), id: \.element.id) { index, user in
@@ -80,6 +81,11 @@ struct FeedDiscoverView: View {
                 .refreshable {
                     await refreshFeed()
                 }
+
+                // Match animation overlay
+                if showMatchAnimation {
+                    matchCelebrationView
+                }
             }
             .navigationTitle("Discover")
             .navigationBarTitleDisplayMode(.large)
@@ -114,11 +120,6 @@ struct FeedDiscoverView: View {
             .sheet(isPresented: $showPhotoGallery) {
                 if let user = selectedUser {
                     PhotoGalleryView(user: user)
-                }
-            }
-            .fullScreenCover(isPresented: $showMatchAnimation) {
-                if let user = matchedUser {
-                    MatchAnimationView(matchedUser: user)
                 }
             }
             .onAppear {
@@ -204,6 +205,47 @@ struct FeedDiscoverView: View {
             }
         }
         .padding(40)
+    }
+
+    // MARK: - Match Animation
+
+    private var matchCelebrationView: some View {
+        ZStack {
+            Color.black.opacity(0.8)
+                .ignoresSafeArea()
+
+            VStack(spacing: 30) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 80))
+                    .foregroundColor(.yellow)
+
+                Text("It's a Match! 🎉")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+
+                if let user = matchedUser {
+                    Text("You and \(user.fullName) liked each other!")
+                        .font(.title3)
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                }
+
+                Button("Send Message") {
+                    showMatchAnimation = false
+                    // TODO: Navigate to messages
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.purple)
+                .controlSize(.large)
+
+                Button("Keep Browsing") {
+                    showMatchAnimation = false
+                }
+                .foregroundColor(.white)
+            }
+            .padding(40)
+        }
     }
 
     // MARK: - Data Loading
