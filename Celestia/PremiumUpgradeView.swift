@@ -857,7 +857,7 @@ class StoreManager: ObservableObject {
         }
     }
     
-    private func checkVerified<T>(_ result: Product.VerificationResult<T>) throws -> T {
+    private func checkVerified<T>(_ result: VerificationResult<T>) throws -> T {
         switch result {
         case .unverified:
             throw PurchaseError.failedVerification
