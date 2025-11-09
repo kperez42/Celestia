@@ -88,7 +88,7 @@ struct FeedDiscoverView: View {
                 }
             }
             .navigationTitle("Discover")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
