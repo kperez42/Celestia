@@ -788,38 +788,64 @@ struct ProfileInsightsView: View {
     // MARK: - Helper Functions
 
     private func loadInsights() {
-        // Load from user data
-        if let user = authService.currentUser {
-            insights.profileViews = user.profileViews
-            insights.viewsThisWeek = Int.random(in: 15...50)
-            insights.viewsLastWeek = Int.random(in: 10...40)
-            insights.likesReceived = user.likesReceived
-            insights.matchCount = user.matchCount
-            insights.swipesReceived = user.likesReceived + Int.random(in: 10...30)
-            insights.passesReceived = insights.swipesReceived - insights.likesReceived
+        // Load real analytics data from backend
+        guard let userId = authService.currentUser?.id else { return }
 
-            if insights.swipesReceived > 0 {
-                insights.likeRate = Double(insights.likesReceived) / Double(insights.swipesReceived)
+        Task {
+            do {
+                // Fetch real insights from AnalyticsManager
+                insights = try await AnalyticsManager.shared.fetchProfileInsights(for: userId)
+
+                // Calculate additional metrics
+                insights.passesReceived = insights.swipesReceived - insights.likesReceived
+                insights.matchCount = authService.currentUser?.matchCount ?? 0
+
+                // Mock data for features not yet tracked (will be implemented later)
+                insights.responseRate = Double.random(in: 0.60...0.95)
+                insights.averageResponseTime = Double.random(in: 300...7200)
+                insights.daysActive = Int.random(in: 7...60)
+                insights.peakActivityHours = [20, 21, 19]
+            } catch {
+                print("Error loading insights: \(error)")
+                // Fall back to basic data from user profile
+                if let user = authService.currentUser {
+                    loadBasicInsights(user: user)
+                }
             }
-
-            insights.matchRate = Double.random(in: 0.15...0.45)
-            insights.responseRate = Double.random(in: 0.60...0.95)
-            insights.averageResponseTime = Double.random(in: 300...7200)
-            insights.daysActive = Int.random(in: 7...60)
-            insights.peakActivityHours = [20, 21, 19]
-
-            // Calculate profile score
-            calculateProfileScore(user: user)
-
-            // Generate suggestions
-            generateSuggestions(user: user)
-
-            // Generate sample viewers (in real app, load from backend)
-            generateSampleViewers()
-
-            // Generate photo performance (in real app, load from analytics)
-            generatePhotoPerformance(user: user)
         }
+    }
+
+    // Fallback method for basic insights
+    private func loadBasicInsights(user: User) {
+        insights.profileViews = user.profileViews
+        insights.likesReceived = user.likesReceived
+        insights.matchCount = user.matchCount
+        insights.viewsThisWeek = Int.random(in: 15...50)
+        insights.viewsLastWeek = Int.random(in: 10...40)
+        insights.swipesReceived = user.likesReceived + Int.random(in: 10...30)
+        insights.passesReceived = insights.swipesReceived - insights.likesReceived
+
+        if insights.swipesReceived > 0 {
+            insights.likeRate = Double(insights.likesReceived) / Double(insights.swipesReceived)
+        }
+
+        insights.matchRate = Double.random(in: 0.15...0.45)
+        insights.responseRate = Double.random(in: 0.60...0.95)
+        insights.averageResponseTime = Double.random(in: 300...7200)
+        insights.daysActive = Int.random(in: 7...60)
+        insights.peakActivityHours = [20, 21, 19]
+
+        // Calculate profile score
+        calculateProfileScore(user: user)
+
+        // Generate suggestions
+        generateSuggestions(user: user)
+
+        // Generate sample viewers (temporary)
+        generateSampleViewers()
+
+        // Generate photo performance (temporary)
+        generatePhotoPerformance(user: user)
     }
 
     private func calculateProfileScore(user: User) {
