@@ -117,19 +117,19 @@ struct PhotoVerificationView: View {
 
                 // Benefits
                 VStack(spacing: 20) {
-                    BenefitRow(
+                    VerificationBenefitRow(
                         icon: "checkmark.shield.fill",
                         title: "Build Trust",
                         description: "Show you're real and serious about dating"
                     )
 
-                    BenefitRow(
+                    VerificationBenefitRow(
                         icon: "eye.fill",
                         title: "Stand Out",
                         description: "Get priority visibility in Discovery"
                     )
 
-                    BenefitRow(
+                    VerificationBenefitRow(
                         icon: "heart.fill",
                         title: "More Matches",
                         description: "People prefer verified profiles"
@@ -462,7 +462,7 @@ struct PhotoVerificationView: View {
 
 // MARK: - Supporting Views
 
-struct BenefitRow: View {
+struct VerificationBenefitRow: View {
     let icon: String
     let title: String
     let description: String
