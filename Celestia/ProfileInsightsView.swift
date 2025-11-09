@@ -709,9 +709,11 @@ struct ProfileInsightsView: View {
     private var suggestionsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             if insights.suggestions.isEmpty {
-                emptyPage title: "All Good!",
-                           icon: "checkmark.circle.fill",
-                           message: "Your profile looks great!\nKeep it updated for best results."
+                emptyPage(
+                    title: "All Good!",
+                    icon: "checkmark.circle.fill",
+                    message: "Your profile looks great!\nKeep it updated for best results."
+                )
             } else {
                 ForEach(insights.suggestions) { suggestion in
                     suggestionCard(suggestion: suggestion)
