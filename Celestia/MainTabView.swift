@@ -25,22 +25,29 @@ struct MainTabView: View {
                 // Discover
                 DiscoverView()
                     .tag(0)
-                
+
                 // Matches
                 MatchesView()
                     .tag(1)
-                
+
                 // Messages
                 MessagesView()
                     .tag(2)
-                
+
                 // Profile
                 ProfileView()
                     .tag(3)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .ignoresSafeArea(.keyboard)
-            
+
+            // Network status banner (overlay at top)
+            VStack {
+                NetworkStatusBanner()
+                Spacer()
+            }
+            .allowsHitTesting(false) // Allow taps to pass through
+
             // Custom Tab Bar
             customTabBar
         }

@@ -14,11 +14,14 @@ class MessageService: ObservableObject {
     @Published var messages: [Message] = []
     @Published var isLoading = false
     @Published var error: Error?
-    
+
     static let shared = MessageService()
     private let db = Firestore.firestore()
     private var listener: ListenerRegistration?
-    
+    private let networkMonitor = NetworkMonitor.shared
+    private let offlineQueue = OfflineMessageQueue.shared
+    private let errorHandler = ErrorHandler.shared
+
     private init() {}
     
     /// Listen to messages in real-time for a specific match
@@ -64,32 +67,57 @@ class MessageService: ObservableObject {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw NSError(domain: "MessageService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Message text cannot be empty"])
         }
-        
+
         guard text.count <= 1000 else {
             throw NSError(domain: "MessageService", code: -2, userInfo: [NSLocalizedDescriptionKey: "Message is too long"])
         }
-        
+
+        // Check network connectivity
+        if !networkMonitor.isConnected {
+            // Queue message for later
+            offlineQueue.enqueueMessage(
+                matchId: matchId,
+                senderId: senderId,
+                receiverId: receiverId,
+                text: text.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+            print("📤 Message queued for offline sending")
+            return
+        }
+
         let message = Message(
             matchId: matchId,
             senderId: senderId,
             receiverId: receiverId,
             text: text.trimmingCharacters(in: .whitespacesAndNewlines)
         )
-        
+
         do {
-            // Add message to Firestore
-            _ = try db.collection("messages").addDocument(from: message)
-            
-            // Update match with last message info
-            try await db.collection("matches").document(matchId).updateData([
-                "lastMessage": text.trimmingCharacters(in: .whitespacesAndNewlines),
-                "lastMessageTimestamp": FieldValue.serverTimestamp(),
-                "unreadCount.\(receiverId)": FieldValue.increment(Int64(1))
-            ])
-            
+            // Use retry logic for sending
+            try await errorHandler.retry(maxAttempts: 3, delay: 1.0) {
+                // Add message to Firestore
+                _ = try self.db.collection("messages").addDocument(from: message)
+
+                // Update match with last message info
+                try await self.db.collection("matches").document(matchId).updateData([
+                    "lastMessage": text.trimmingCharacters(in: .whitespacesAndNewlines),
+                    "lastMessageTimestamp": FieldValue.serverTimestamp(),
+                    "unreadCount.\(receiverId)": FieldValue.increment(Int64(1))
+                ])
+            }
+
             print("✅ Message sent successfully")
         } catch {
             print("❌ Error sending message: \(error)")
+
+            // Queue message if send failed
+            offlineQueue.enqueueMessage(
+                matchId: matchId,
+                senderId: senderId,
+                receiverId: receiverId,
+                text: text.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+
             self.error = error
             throw error
         }
