@@ -823,15 +823,18 @@ struct ProfileInsightsView: View {
     }
 
     private func calculateProfileScore(user: User) {
-        var score = 50 // Base score
+        var score = 40 // Base score (reduced to make room for prompts)
 
         // Photos (max 15 points)
         score += min(user.photos.count * 5, 15)
 
-        // Bio (max 10 points)
+        // Bio (max 8 points)
         if !user.bio.isEmpty {
-            score += min(user.bio.count / 10, 10)
+            score += min(user.bio.count / 10, 8)
         }
+
+        // Prompts (max 15 points) - NEW!
+        score += user.prompts.count * 5
 
         // Interests (max 10 points)
         score += min(user.interests.count * 2, 10)
@@ -871,6 +874,17 @@ struct ProfileInsightsView: View {
                 id: UUID().uuidString,
                 title: "Improve Your Bio",
                 description: "A detailed bio helps others connect with you. Aim for at least 100 characters.",
+                priority: .high,
+                category: .bio,
+                actionType: .improveBio
+            ))
+        }
+
+        if user.prompts.count < 2 {
+            suggestions.append(ProfileSuggestion(
+                id: UUID().uuidString,
+                title: "Add Profile Prompts",
+                description: "Answer personality prompts to stand out! Profiles with prompts get 2x more matches.",
                 priority: .high,
                 category: .bio,
                 actionType: .improveBio

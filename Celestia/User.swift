@@ -69,6 +69,9 @@ struct User: Identifiable, Codable {
     var exercise: String?
     var diet: String?
 
+    // Profile Prompts
+    var prompts: [ProfilePrompt] = []
+
     // Helper computed property for backward compatibility
     var name: String {
         get { fullName }
@@ -137,6 +140,20 @@ struct User: Identifiable, Codable {
         self.pets = dictionary["pets"] as? String
         self.exercise = dictionary["exercise"] as? String
         self.diet = dictionary["diet"] as? String
+
+        // Profile Prompts
+        if let promptsData = dictionary["prompts"] as? [[String: Any]] {
+            self.prompts = promptsData.compactMap { promptDict in
+                guard let question = promptDict["question"] as? String,
+                      let answer = promptDict["answer"] as? String else {
+                    return nil
+                }
+                let id = promptDict["id"] as? String ?? UUID().uuidString
+                return ProfilePrompt(id: id, question: question, answer: answer)
+            }
+        } else {
+            self.prompts = []
+        }
     }
     
     // Standard initializer

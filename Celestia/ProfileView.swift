@@ -67,7 +67,12 @@ struct ProfileView: View {
                                 if !user.bio.isEmpty {
                                     aboutSection(bio: user.bio)
                                 }
-                                
+
+                                // Profile prompts
+                                if !user.prompts.isEmpty {
+                                    promptsSection(prompts: user.prompts)
+                                }
+
                                 // Details grid
                                 detailsCard(user: user)
                                 
@@ -870,8 +875,51 @@ struct ProfileView: View {
         .padding(.horizontal, 20)
     }
     
+    // MARK: - Prompts Section
+
+    private func promptsSection(prompts: [ProfilePrompt]) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 8) {
+                Image(systemName: "quote.bubble.fill")
+                    .foregroundColor(.purple)
+                Text("About Me")
+                    .font(.headline)
+            }
+            .padding(.horizontal, 20)
+
+            ForEach(prompts) { prompt in
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(prompt.question)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.purple)
+
+                    Text(prompt.answer)
+                        .font(.body)
+                        .foregroundColor(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(20)
+                .background(
+                    LinearGradient(
+                        colors: [Color.purple.opacity(0.05), Color.pink.opacity(0.03)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .cornerRadius(16)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.purple.opacity(0.15), lineWidth: 1)
+                )
+                .padding(.horizontal, 20)
+            }
+        }
+    }
+
     // MARK: - Details Card
-    
+
     private func detailsCard(user: User) -> some View {
         VStack(spacing: 16) {
             detailRow(icon: "person.fill", label: "Gender", value: user.gender)
