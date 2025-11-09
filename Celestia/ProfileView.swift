@@ -34,10 +34,13 @@ struct ProfileView: View {
                             
                             // Content sections
                             VStack(spacing: 20) {
-                                // Profile completion
+                                // Profile strength card
                                 if profileCompletion < 100 {
-                                    profileCompletionCard(user: user)
-                                        .padding(.top, 20)
+                                    ProfileStrengthCard(user: user) { action in
+                                        handleTipAction(action)
+                                    }
+                                    .padding(.horizontal, 20)
+                                    .padding(.top, 20)
                                 }
                                 
                                 // Stats row
@@ -130,7 +133,36 @@ struct ProfileView: View {
             }
         }
     }
-    
+
+    // MARK: - Tip Action Handler
+
+    private func handleTipAction(_ action: ProfileTip.TipAction) {
+        HapticManager.shared.impact(.medium)
+
+        switch action {
+        case .addPhotos:
+            // Open edit profile to photos section
+            showingEditProfile = true
+
+        case .writeBio:
+            // Open edit profile to bio section
+            showingEditProfile = true
+
+        case .addInterests:
+            // Open edit profile to interests section
+            showingEditProfile = true
+
+        case .addLanguages:
+            // Open edit profile to languages section
+            showingEditProfile = true
+
+        case .getVerified:
+            // TODO: Open verification flow
+            // For now, show edit profile
+            showingEditProfile = true
+        }
+    }
+
     // MARK: - Hero Section
     
     private func heroSection(user: User) -> some View {
@@ -330,83 +362,6 @@ struct ProfileView: View {
         }
     }
     
-    // MARK: - Profile Completion Card
-    
-    private func profileCompletionCard(user: User) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Profile Completion")
-                        .font(.headline)
-                    Text("Complete your profile to get more matches")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
-                Spacer()
-                
-                ZStack {
-                    Circle()
-                        .stroke(Color.gray.opacity(0.2), lineWidth: 6)
-                    
-                    Circle()
-                        .trim(from: 0, to: CGFloat(profileCompletion) / 100)
-                        .stroke(
-                            LinearGradient(
-                                colors: [.purple, .pink],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            style: StrokeStyle(lineWidth: 6, lineCap: .round)
-                        )
-                        .rotationEffect(.degrees(-90))
-                        .animation(.spring(response: 1.0, dampingFraction: 0.7), value: profileCompletion)
-                    
-                    Text("\(profileCompletion)%")
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundColor(.purple)
-                }
-                .frame(width: 50, height: 50)
-            }
-            
-            // Missing items
-            if profileCompletion < 100 {
-                VStack(alignment: .leading, spacing: 8) {
-                    if user.bio.isEmpty {
-                        missingItem(icon: "text.alignleft", text: "Add a bio")
-                    }
-                    if user.photos.count < 3 {
-                        missingItem(icon: "photo.on.rectangle", text: "Add more photos")
-                    }
-                    if user.interests.count < 3 {
-                        missingItem(icon: "star", text: "Add interests")
-                    }
-                    if user.languages.isEmpty {
-                        missingItem(icon: "globe", text: "Add languages")
-                    }
-                }
-            }
-        }
-        .padding(20)
-        .background(Color.white)
-        .cornerRadius(20)
-        .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
-        .padding(.horizontal, 20)
-    }
-    
-    private func missingItem(icon: String, text: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.caption)
-                .foregroundColor(.purple)
-                .frame(width: 20)
-            
-            Text(text)
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-    }
     
     // MARK: - Stats Row
     

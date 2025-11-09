@@ -336,6 +336,16 @@ struct DiscoverView: View {
                 .padding(.horizontal, 40)
             }
 
+            // Profile strength tip (when not filtered)
+            if !filters.hasActiveFilters, let currentUser = authService.currentUser {
+                CompactProfileStrengthCard(user: currentUser) {
+                    // Navigate to profile view
+                    // Note: This would need proper navigation handling
+                }
+                .padding(.horizontal, 40)
+                .padding(.top, 12)
+            }
+
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

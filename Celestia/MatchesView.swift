@@ -463,44 +463,19 @@ struct MatchesView: View {
                     .padding(.horizontal, 40)
             }
             
-            // Tips
-            VStack(spacing: 12) {
-                tipRow(icon: "photo.fill", text: "Add more photos to your profile")
-                tipRow(icon: "text.alignleft", text: "Write an interesting bio")
-                tipRow(icon: "heart.fill", text: "Be active and swipe regularly")
+            // Profile strength card
+            if let currentUser = authService.currentUser {
+                CompactProfileStrengthCard(user: currentUser) {
+                    // Navigate to profile view
+                    // Note: This would need proper navigation handling
+                }
+                .padding(.horizontal, 30)
             }
-            .padding(20)
-            .background(Color.white)
-            .cornerRadius(16)
-            .padding(.horizontal, 30)
-            
+
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemGroupedBackground))
-    }
-    
-    private func tipRow(icon: String, text: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.callout)
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [.purple, .blue],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .frame(width: 36, height: 36)
-                .background(Color.purple.opacity(0.1))
-                .cornerRadius(8)
-            
-            Text(text)
-                .font(.subheadline)
-                .foregroundColor(.primary)
-            
-            Spacer()
-        }
     }
     
     // MARK: - Helper Functions

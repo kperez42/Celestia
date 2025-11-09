@@ -349,7 +349,17 @@ struct MessagesView: View {
                 .shadow(color: .purple.opacity(0.4), radius: 15, y: 8)
             }
             .padding(.top, 10)
-            
+
+            // Profile strength card
+            if let currentUser = authService.currentUser {
+                CompactProfileStrengthCard(user: currentUser) {
+                    // Navigate to profile view
+                    // Note: This would need proper navigation handling
+                }
+                .padding(.horizontal, 30)
+                .padding(.top, 12)
+            }
+
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
