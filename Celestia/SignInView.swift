@@ -10,10 +10,13 @@ import SwiftUI
 struct SignInView: View {
     @StateObject private var authViewModel = AuthViewModel()
     @Environment(\.dismiss) var dismiss
-    
+
     @State private var email = ""
     @State private var password = ""
     @State private var showPassword = false
+    @State private var showForgotPassword = false
+    @State private var resetEmail = ""
+    @State private var showResetSuccess = false
     
     var body: some View {
         NavigationView {
@@ -116,7 +119,7 @@ struct SignInView: View {
                             
                             // Forgot Password
                             Button {
-                                // TODO: Implement forgot password
+                                showForgotPassword = true
                             } label: {
                                 Text("Forgot Password?")
                                     .font(.subheadline)
@@ -145,6 +148,35 @@ struct SignInView: View {
             if isAuth {
                 dismiss()
             }
+        }
+        .alert("Reset Password", isPresented: $showForgotPassword) {
+            TextField("Email", text: $resetEmail)
+                .textContentType(.emailAddress)
+                .keyboardType(.emailAddress)
+                .autocapitalization(.none)
+
+            Button("Cancel", role: .cancel) {
+                resetEmail = ""
+            }
+
+            Button("Send Reset Link") {
+                Task {
+                    do {
+                        try await AuthService.shared.resetPassword(email: resetEmail)
+                        resetEmail = ""
+                        showResetSuccess = true
+                    } catch {
+                        // Error is handled by AuthService
+                    }
+                }
+            }
+        } message: {
+            Text("Enter your email address and we'll send you a link to reset your password.")
+        }
+        .alert("Email Sent", isPresented: $showResetSuccess) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Password reset link has been sent to your email.")
         }
     }
 }

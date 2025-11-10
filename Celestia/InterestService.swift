@@ -34,12 +34,28 @@ class InterestService: ObservableObject {
         toUserId: String,
         message: String? = nil
     ) async throws {
+        // Check rate limiting
+        guard RateLimiter.shared.canSendLike() else {
+            if let timeRemaining = RateLimiter.shared.timeUntilReset(for: .like) {
+                throw CelestiaError.rateLimitExceeded(timeRemaining: timeRemaining)
+            }
+            throw CelestiaError.rateLimitExceeded
+        }
+
         // Check if interest already exists
         if let existingInterest = try? await fetchInterest(fromUserId: fromUserId, toUserId: toUserId) {
             print("Interest already sent to this user: \(existingInterest.id ?? "unknown")")
             return
         }
-        
+
+        // Validate message if provided
+        if let msg = message, !msg.isEmpty {
+            guard ContentModerator.shared.isAppropriate(msg) else {
+                let violations = ContentModerator.shared.getViolations(msg)
+                throw CelestiaError.inappropriateContent(reasons: violations)
+            }
+        }
+
         let interest = Interest(
             fromUserId: fromUserId,
             toUserId: toUserId,

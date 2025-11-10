@@ -86,6 +86,14 @@ class MessageService: ObservableObject {
         receiverId: String,
         text: String
     ) async throws {
+        // Check rate limiting
+        guard RateLimiter.shared.canSendMessage() else {
+            if let timeRemaining = RateLimiter.shared.timeUntilReset(for: .message) {
+                throw CelestiaError.rateLimitExceeded(timeRemaining: timeRemaining)
+            }
+            throw CelestiaError.rateLimitExceeded
+        }
+
         // Sanitize and validate input
         let sanitizedText = sanitizeInput(text)
 
@@ -95,6 +103,12 @@ class MessageService: ObservableObject {
 
         guard sanitizedText.count <= AppConstants.Limits.maxMessageLength else {
             throw CelestiaError.messageTooLong
+        }
+
+        // Content moderation
+        guard ContentModerator.shared.isAppropriate(sanitizedText) else {
+            let violations = ContentModerator.shared.getViolations(sanitizedText)
+            throw CelestiaError.inappropriateContent(reasons: violations)
         }
 
         let message = Message(

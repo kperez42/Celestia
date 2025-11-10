@@ -168,14 +168,30 @@ class MatchService: ObservableObject {
         ])
     }
     
+    /// Unmatch - Deactivate match and clean up related data
+    func unmatch(matchId: String, userId: String) async throws {
+        // Deactivate the match
+        try await db.collection("matches").document(matchId).updateData([
+            "isActive": false,
+            "unmatchedBy": userId,
+            "unmatchedAt": FieldValue.serverTimestamp()
+        ])
+
+        // Optionally delete all messages (for privacy)
+        // Uncomment if you want to delete messages on unmatch
+        // try await MessageService.shared.deleteAllMessages(matchId: matchId)
+
+        print("✅ Unmatched successfully")
+    }
+
     /// Deactivate a match (soft delete)
     func deactivateMatch(matchId: String) async throws {
         try await db.collection("matches").document(matchId).updateData([
             "isActive": false
         ])
     }
-    
-    /// Delete a match permanently
+
+    /// Delete a match permanently (use with caution)
     func deleteMatch(matchId: String) async throws {
         try await db.collection("matches").document(matchId).delete()
     }

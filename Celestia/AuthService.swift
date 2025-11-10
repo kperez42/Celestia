@@ -127,7 +127,45 @@ class AuthService: ObservableObject {
             throw error
         }
     }
-    
+
+    @MainActor
+    func resetPassword(email: String) async throws {
+        // Sanitize email input
+        let sanitizedEmail = sanitizeInput(email)
+
+        // Validate email format
+        guard isValidEmail(sanitizedEmail) else {
+            errorMessage = AppConstants.ErrorMessages.invalidEmail
+            throw CelestiaError.invalidCredentials
+        }
+
+        do {
+            try await Auth.auth().sendPasswordReset(withEmail: sanitizedEmail)
+            print("✅ Password reset email sent to: \(sanitizedEmail)")
+        } catch let error as NSError {
+            print("❌ Password reset error:")
+            print("  - Domain: \(error.domain)")
+            print("  - Code: \(error.code)")
+            print("  - Description: \(error.localizedDescription)")
+
+            // User-friendly error messages
+            if error.domain == "FIRAuthErrorDomain" {
+                switch error.code {
+                case 17008: // Invalid email
+                    errorMessage = "Please enter a valid email address."
+                case 17011: // User not found
+                    errorMessage = "No account found with this email."
+                default:
+                    errorMessage = "Failed to send password reset email: \(error.localizedDescription)"
+                }
+            } else {
+                errorMessage = error.localizedDescription
+            }
+
+            throw error
+        }
+    }
+
     @MainActor
     func createUser(withEmail email: String, password: String, fullName: String, age: Int, gender: String, lookingFor: String, location: String, country: String) async throws {
         isLoading = true
