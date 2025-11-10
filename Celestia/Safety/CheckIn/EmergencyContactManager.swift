@@ -67,7 +67,7 @@ class EmergencyContactManager: ObservableObject {
             email: email,
             relationship: relationship,
             addedAt: Date(),
-            notificationPreferences: NotificationPreferences()
+            notificationPreferences: EmergencyNotificationPreferences()
         )
 
         contacts.append(contact)
@@ -138,7 +138,7 @@ class EmergencyContactManager: ObservableObject {
     /// Update notification preferences for a contact
     func updateNotificationPreferences(
         for contactId: String,
-        preferences: NotificationPreferences
+        preferences: EmergencyNotificationPreferences
     ) {
         if let index = contacts.firstIndex(where: { $0.id == contactId }) {
             contacts[index].notificationPreferences = preferences
@@ -195,7 +195,7 @@ struct EmergencyContact: Identifiable, Codable {
     var email: String?
     var relationship: ContactRelationship
     let addedAt: Date
-    var notificationPreferences: NotificationPreferences
+    var notificationPreferences: EmergencyNotificationPreferences
 
     var formattedPhoneNumber: String {
         // Format phone number for display
@@ -260,7 +260,7 @@ enum ContactRelationship: String, Codable, CaseIterable {
 
 // MARK: - Notification Preferences
 
-struct NotificationPreferences: Codable {
+struct EmergencyNotificationPreferences: Codable {
     var receiveScheduledDateAlerts: Bool = true
     var receiveCheckInAlerts: Bool = true
     var receiveEmergencyAlerts: Bool = true

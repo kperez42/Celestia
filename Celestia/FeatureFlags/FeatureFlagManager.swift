@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import SwiftUI
 import FirebaseRemoteConfig
 import Combine
 
@@ -42,7 +43,7 @@ class FeatureFlagManager: ObservableObject {
 
         // Set default values for all feature flags
         self.defaults = FeatureFlag.allFlags.reduce(into: [:]) { result, flag in
-            result[flag.key] = flag.defaultValue as NSObject
+            result[flag.key] = flag.defaultValue as? NSObject ?? NSNumber(value: 0)
         }
 
         configureRemoteConfig()
@@ -122,8 +123,11 @@ class FeatureFlagManager: ObservableObject {
             return override
         }
 
-        guard let data = remoteConfig.configValue(forKey: flag.key).dataValue,
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        guard let data = remoteConfig.configValue(forKey: flag.key).dataValue else {
+            return nil
+        }
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return nil
         }
 
@@ -482,7 +486,7 @@ struct FeatureFlagDebugView: View {
         }
     }
 
-    private func loadFlags() {
+    func loadFlags() {
         flags = manager.getAllFlags()
     }
 }

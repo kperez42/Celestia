@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import SwiftUI
 import Combine
 import Network
 
@@ -409,15 +410,6 @@ class SyncEngine {
     private func executeBlockUser(_ operation: OfflineOperation) async throws {
         Logger.shared.debug("Executing block user from queue", category: .networking)
         try await Task.sleep(nanoseconds: 500_000_000)
-    }
-}
-
-// MARK: - String Extension for Cache Keys
-
-extension String {
-    func sha256() -> String {
-        // Simple hash for cache key (in production, use CryptoKit)
-        return "\(self.hashValue)"
     }
 }
 

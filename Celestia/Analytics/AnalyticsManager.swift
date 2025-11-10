@@ -13,7 +13,7 @@ import FirebaseCrashlytics
 // MARK: - Analytics Manager
 
 @MainActor
-class AnalyticsManager: ObservableObject {
+class AnalyticsManager: ObservableObject, AnalyticsManagerProtocol {
 
     // MARK: - Singleton
 
@@ -24,7 +24,7 @@ class AnalyticsManager: ObservableObject {
     private var sessionStartTime: Date?
     private var currentScreen: String?
     private var userProperties: [String: Any] = [:]
-    private var eventQueue: [AnalyticsEvent] = []
+    private var eventQueue: [AnalyticsEventData] = []
 
     // MARK: - Configuration
 
@@ -217,7 +217,7 @@ class AnalyticsManager: ObservableObject {
     }
 
     /// Track swipe action
-    func trackSwipe(action: SwipeAction, userId: String) {
+    func trackSwipe(action: AnalyticsSwipeAction, userId: String) {
         logEvent(.swipe, parameters: [
             "action": action.rawValue,
             "user_id": userId
@@ -348,6 +348,11 @@ enum AnalyticsEvent {
     case premiumPurchaseFailed
     case purchase
     case refund
+    case subscriptionStarted
+    case subscriptionExpired
+    case subscriptionManaged
+    case consumablePurchased
+    case consumableUsed
 
     // Social
     case profileShared
@@ -411,6 +416,11 @@ enum AnalyticsEvent {
         case .premiumPurchaseFailed: return "purchase_failed"
         case .purchase: return "purchase"
         case .refund: return "refund"
+        case .subscriptionStarted: return "subscription_started"
+        case .subscriptionExpired: return "subscription_expired"
+        case .subscriptionManaged: return "subscription_managed"
+        case .consumablePurchased: return "consumable_purchased"
+        case .consumableUsed: return "consumable_used"
         case .profileShared: return "share"
         case .referralSent: return "referral_sent"
         case .referralCompleted: return "referral_completed"
@@ -448,9 +458,9 @@ enum AnalyticsFunnel: String {
     case referral = "referral"
 }
 
-// MARK: - Swipe Action
+// MARK: - Analytics Swipe Action
 
-enum SwipeAction: String {
+enum AnalyticsSwipeAction: String {
     case like = "like"
     case dislike = "dislike"
     case superLike = "super_like"
@@ -497,5 +507,30 @@ extension AnalyticsManager {
     /// Track user tier
     func trackUserTier(isPremium: Bool) {
         setUserProperty(isPremium ? "premium" : "free", forName: UserProperty.isPremium.rawValue)
+    }
+}
+
+// MARK: - AnalyticsManagerProtocol Conformance
+
+extension AnalyticsManager {
+    /// Log event with string name (protocol method)
+    func log(event: String, parameters: [String: Any]) {
+        Analytics.logEvent(event, parameters: parameters)
+        Logger.shared.info("Event: \(event) \(parameters)", category: .analytics)
+    }
+
+    /// Set user ID (protocol method)
+    func setUserId(_ userId: String) {
+        setUserId(userId as String?)
+    }
+
+    /// Set user property (protocol method)
+    func setUserProperty(_ value: String, forName name: String) {
+        setUserProperty(value as String?, forName: name)
+    }
+
+    /// Log screen view (protocol method)
+    func logScreen(name: String, screenClass: String) {
+        logScreenView(name, screenClass: screenClass)
     }
 }

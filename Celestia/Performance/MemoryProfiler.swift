@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import SwiftUI
 import os.signpost
 
 // MARK: - Memory Profiler

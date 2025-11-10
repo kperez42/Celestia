@@ -7,11 +7,12 @@
 //
 
 import Foundation
+import Combine
 
 // MARK: - Notification Service
 
 @MainActor
-class NotificationService {
+class NotificationService: ObservableObject, NotificationServiceProtocol, NotificationSending {
 
     // MARK: - Singleton
 
@@ -252,6 +253,60 @@ class NotificationService {
                 )
             }
         }
+    }
+}
+
+// MARK: - Protocol Conformance Methods
+
+extension NotificationService {
+    /// Request notification permission (protocol method)
+    func requestPermission() async -> Bool {
+        return await manager.requestPermission()
+    }
+
+    /// Save FCM token (protocol method)
+    func saveFCMToken(userId: String, token: String) async {
+        // Implementation for saving FCM token to backend
+        Logger.shared.info("Saving FCM token for user: \(userId)", category: .general)
+        // In production, save to Firestore or your backend
+    }
+
+    /// Send new match notification (protocol method)
+    func sendNewMatchNotification(match: Match, otherUser: User) async {
+        await sendNewMatchNotification(
+            matchId: match.id,
+            matchName: otherUser.name,
+            matchImageURL: otherUser.profileImages.first.flatMap { URL(string: $0) }
+        )
+    }
+
+    /// Send message notification (protocol method)
+    func sendMessageNotification(message: Message, senderName: String, matchId: String) async {
+        await sendNewMessageNotification(
+            matchId: matchId,
+            senderName: senderName,
+            message: message.text,
+            senderImageURL: nil
+        )
+    }
+
+    /// Send like notification (protocol method)
+    func sendLikeNotification(likerName: String?, userId: String, isSuperLike: Bool) async {
+        if isSuperLike {
+            await sendSuperLikeNotification(
+                likerId: userId,
+                likerName: likerName ?? "Someone",
+                likerImageURL: nil
+            )
+        }
+        // Regular likes don't send notifications in this implementation
+    }
+
+    /// Send referral success notification (protocol method)
+    func sendReferralSuccessNotification(userId: String, referredName: String) async {
+        // Implementation for referral notifications
+        Logger.shared.info("Sending referral success notification to \(userId)", category: .general)
+        // In production, implement the notification logic
     }
 }
 
