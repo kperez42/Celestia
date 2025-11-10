@@ -1,0 +1,26 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "TEAM_ID.com.celestia.app",
+        "paths": [
+          "/join/*",
+          "/profile/*",
+          "/match/*",
+          "/message/*",
+          "/verify-email",
+          "/reset-password",
+          "/upgrade",
+          "/settings",
+          "/notifications"
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": [
+      "TEAM_ID.com.celestia.app"
+    ]
+  }
+}
