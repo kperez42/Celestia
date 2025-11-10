@@ -39,7 +39,7 @@ class InterestService: ObservableObject {
         // Check rate limiting
         guard RateLimiter.shared.canSendLike() else {
             if let timeRemaining = RateLimiter.shared.timeUntilReset(for: .like) {
-                throw CelestiaError.rateLimitExceeded(timeRemaining: timeRemaining)
+                throw CelestiaError.rateLimitExceededWithTime(timeRemaining)
             }
             throw CelestiaError.rateLimitExceeded
         }
@@ -54,7 +54,7 @@ class InterestService: ObservableObject {
         if let msg = message, !msg.isEmpty {
             guard ContentModerator.shared.isAppropriate(msg) else {
                 let violations = ContentModerator.shared.getViolations(msg)
-                throw CelestiaError.inappropriateContent(reasons: violations)
+                throw CelestiaError.inappropriateContentWithReasons(violations)
             }
         }
 

@@ -89,7 +89,7 @@ class MessageService: ObservableObject {
         // Check rate limiting
         guard RateLimiter.shared.canSendMessage() else {
             if let timeRemaining = RateLimiter.shared.timeUntilReset(for: .message) {
-                throw CelestiaError.rateLimitExceeded(timeRemaining: timeRemaining)
+                throw CelestiaError.rateLimitExceededWithTime(timeRemaining)
             }
             throw CelestiaError.rateLimitExceeded
         }
@@ -108,7 +108,7 @@ class MessageService: ObservableObject {
         // Content moderation
         guard ContentModerator.shared.isAppropriate(sanitizedText) else {
             let violations = ContentModerator.shared.getViolations(sanitizedText)
-            throw CelestiaError.inappropriateContent(reasons: violations)
+            throw CelestiaError.inappropriateContentWithReasons(violations)
         }
 
         let message = Message(

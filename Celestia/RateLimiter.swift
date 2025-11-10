@@ -158,23 +158,3 @@ enum RateLimitAction {
     case report
     case search
 }
-
-// MARK: - Rate Limit Error
-
-extension CelestiaError {
-    static let rateLimitExceeded = CelestiaError.custom(
-        message: "You're doing that too often. Please wait a moment and try again.",
-        icon: "clock.fill"
-    )
-
-    static func rateLimitExceeded(timeRemaining: TimeInterval) -> CelestiaError {
-        let minutes = Int(timeRemaining / 60)
-        let seconds = Int(timeRemaining.truncatingRemainder(dividingBy: 60))
-
-        let timeString = minutes > 0 ? "\(minutes)m \(seconds)s" : "\(seconds)s"
-        return .custom(
-            message: "Rate limit exceeded. Try again in \(timeString).",
-            icon: "clock.fill"
-        )
-    }
-}

@@ -235,17 +235,3 @@ class ContentModerator: ContentModerating {
         return violations
     }
 }
-
-// MARK: - Content Moderation Error
-
-extension CelestiaError {
-    static let inappropriateContent = CelestiaError.custom(
-        message: "This content violates our community guidelines.",
-        icon: "exclamationmark.triangle.fill"
-    )
-
-    static func inappropriateContent(reasons: [String]) -> CelestiaError {
-        let message = "Content violation:\n" + reasons.joined(separator: "\n• ")
-        return .custom(message: message, icon: "exclamationmark.triangle.fill")
-    }
-}
