@@ -41,6 +41,6 @@ protocol UserFetching {
 // MARK: - Default Implementations
 
 extension MatchService: MatchCreating {}
-extension NotificationService: NotificationSending {}
+// NotificationService conformance declared in NotificationService.swift
 extension MessageService: MessageSending {}
 extension UserService: UserFetching {}

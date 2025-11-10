@@ -197,8 +197,8 @@ extension MessageService: MessageServiceProtocol {}
 extension SwipeService: SwipeServiceProtocol {}
 extension ReferralManager: ReferralManagerProtocol {}
 extension StoreManager: StoreManagerProtocol {}
-extension NotificationService: NotificationServiceProtocol {}
+// NotificationService conformance declared in NotificationService.swift
 extension ImageUploadService: ImageUploadServiceProtocol {}
 extension ContentModerator: ContentModeratorProtocol {}
-extension AnalyticsManager: AnalyticsManagerProtocol {}
+// AnalyticsManager conformance declared in AnalyticsManager.swift
 extension BlockReportService: BlockReportServiceProtocol {}

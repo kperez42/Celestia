@@ -43,15 +43,15 @@ class BlockReportService: ObservableObject {
         await removeMatch(userId: userId, currentUserId: currentUserId)
     }
 
-    func unblockUser(userId: String, currentUserId: String) async throws {
+    func unblockUser(blockerId: String, blockedId: String) async throws {
         isLoading = true
         defer { isLoading = false }
 
         try await db.collection("blockedUsers")
-            .document("\(currentUserId)_\(userId)")
+            .document("\(blockerId)_\(blockedId)")
             .delete()
 
-        blockedUserIds.remove(userId)
+        blockedUserIds.remove(blockedId)
     }
 
     func isUserBlocked(_ userId: String) -> Bool {
