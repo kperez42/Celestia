@@ -20,7 +20,32 @@ class UserService: ObservableObject {
     private var lastDocument: DocumentSnapshot?
     
     private init() {}
-    
+
+    // MARK: - Input Sanitization
+
+    /// Sanitize user input to prevent injection attacks and malformed data
+    private func sanitizeInput(_ text: String) -> String {
+        var sanitized = text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Remove potentially dangerous HTML/script tags
+        let dangerousPatterns = [
+            "<script>", "</script>",
+            "<iframe>", "</iframe>",
+            "javascript:",
+            "onerror=", "onclick=", "onload="
+        ]
+
+        for pattern in dangerousPatterns {
+            sanitized = sanitized.replacingOccurrences(of: pattern, with: "", options: .caseInsensitive)
+        }
+
+        // Remove null bytes and control characters
+        sanitized = sanitized.components(separatedBy: .controlCharacters).joined()
+        sanitized = sanitized.replacingOccurrences(of: "\0", with: "")
+
+        return sanitized
+    }
+
     /// Fetch users with filters and pagination support
     func fetchUsers(
         excludingUserId: String,
@@ -147,16 +172,24 @@ class UserService: ObservableObject {
         }
     }
     
-    /// Search users by name or location
-    func searchUsers(query: String, currentUserId: String) async throws -> [User] {
-        guard !query.isEmpty else { return [] }
-        
-        let snapshot = try await db.collection("users")
+    /// Search users by name or location with pagination support
+    func searchUsers(query: String, currentUserId: String, limit: Int = 20, offset: DocumentSnapshot? = nil) async throws -> [User] {
+        // Sanitize search query
+        let sanitizedQuery = sanitizeInput(query)
+        guard !sanitizedQuery.isEmpty else { return [] }
+
+        var firestoreQuery = db.collection("users")
             .whereField("showMeInSearch", isEqualTo: true)
-            .limit(to: 50)
-            .getDocuments()
-        
-        let searchQuery = query.lowercased()
+            .limit(to: limit)
+
+        // Add pagination cursor if provided
+        if let offset = offset {
+            firestoreQuery = firestoreQuery.start(afterDocument: offset)
+        }
+
+        let snapshot = try await firestoreQuery.getDocuments()
+
+        let searchQuery = sanitizedQuery.lowercased()
         return snapshot.documents
             .compactMap { try? $0.data(as: User.self) }
             .filter { user in

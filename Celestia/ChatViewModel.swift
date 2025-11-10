@@ -8,6 +8,7 @@
 import Foundation
 import FirebaseFirestore
 
+@MainActor
 class ChatViewModel: ObservableObject {
     @Published var messages: [Message] = []
     @Published var matches: [Match] = []
@@ -28,36 +29,26 @@ class ChatViewModel: ObservableObject {
         self.currentUserId = userId
     }
     
-    func loadMatches(for userID: String) {
-        firestore.collection("matches")
-            .whereField("user1Id", isEqualTo: userID)
-            .getDocuments { [weak self] snapshot1, error1 in
-                guard let self = self else { return }
-                
-                self.firestore.collection("matches")
-                    .whereField("user2Id", isEqualTo: userID)
-                    .getDocuments { snapshot2, error2 in
-                        var allMatches: [Match] = []
-                        
-                        if let docs1 = snapshot1?.documents {
-                            let matches1 = docs1.compactMap { doc -> Match? in
-                                try? doc.data(as: Match.self)
-                            }
-                            allMatches.append(contentsOf: matches1)
-                        }
-                        
-                        if let docs2 = snapshot2?.documents {
-                            let matches2 = docs2.compactMap { doc -> Match? in
-                                try? doc.data(as: Match.self)
-                            }
-                            allMatches.append(contentsOf: matches2)
-                        }
-                        
-                        self.matches = allMatches.sorted {
-                            ($0.lastMessageTimestamp ?? $0.timestamp) > ($1.lastMessageTimestamp ?? $1.timestamp)
-                        }
-                    }
-            }
+    func loadMatches(for userID: String) async {
+        isLoading = true
+        defer { isLoading = false }
+
+        do {
+            // Use OR filter for optimized single query
+            let snapshot = try await firestore.collection("matches")
+                .whereFilter(Filter.orFilter([
+                    Filter.whereField("user1Id", isEqualTo: userID),
+                    Filter.whereField("user2Id", isEqualTo: userID)
+                ]))
+                .whereField("isActive", isEqualTo: true)
+                .getDocuments()
+
+            matches = snapshot.documents
+                .compactMap { try? $0.data(as: Match.self) }
+                .sorted { ($0.lastMessageTimestamp ?? $0.timestamp) > ($1.lastMessageTimestamp ?? $1.timestamp) }
+        } catch {
+            print("Error loading matches: \(error)")
+        }
     }
     
     func loadMessages() {

@@ -8,6 +8,7 @@
 
 import SwiftUI
 import UIKit
+import CryptoKit
 
 @MainActor
 class ImageCache {
@@ -186,9 +187,10 @@ class ImageCache {
 
 extension String {
     func sha256() -> String {
-        // Simple hash for filename - in production, use CryptoKit
-        let hash = self.hash
-        return "\(abs(hash))"
+        // Use CryptoKit for proper cryptographic hashing
+        let data = Data(self.utf8)
+        let hash = SHA256.hash(data: data)
+        return hash.compactMap { String(format: "%02x", $0) }.joined()
     }
 }
 

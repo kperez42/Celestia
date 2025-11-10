@@ -20,7 +20,32 @@ class MessageService: ObservableObject {
     private var listener: ListenerRegistration?
     
     private init() {}
-    
+
+    // MARK: - Input Sanitization
+
+    /// Sanitize user input to prevent injection attacks and malformed data
+    private func sanitizeInput(_ text: String) -> String {
+        var sanitized = text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Remove potentially dangerous HTML/script tags
+        let dangerousPatterns = [
+            "<script>", "</script>",
+            "<iframe>", "</iframe>",
+            "javascript:",
+            "onerror=", "onclick=", "onload="
+        ]
+
+        for pattern in dangerousPatterns {
+            sanitized = sanitized.replacingOccurrences(of: pattern, with: "", options: .caseInsensitive)
+        }
+
+        // Remove null bytes and control characters
+        sanitized = sanitized.components(separatedBy: .controlCharacters).joined()
+        sanitized = sanitized.replacingOccurrences(of: "\0", with: "")
+
+        return sanitized
+    }
+
     /// Listen to messages in real-time for a specific match
     func listenToMessages(matchId: String) {
         listener?.remove()
@@ -61,19 +86,22 @@ class MessageService: ObservableObject {
         receiverId: String,
         text: String
     ) async throws {
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw NSError(domain: "MessageService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Message text cannot be empty"])
+        // Sanitize and validate input
+        let sanitizedText = sanitizeInput(text)
+
+        guard !sanitizedText.isEmpty else {
+            throw CelestiaError.messageNotSent
         }
 
-        guard text.count <= 1000 else {
-            throw NSError(domain: "MessageService", code: -2, userInfo: [NSLocalizedDescriptionKey: "Message is too long"])
+        guard sanitizedText.count <= AppConstants.Limits.maxMessageLength else {
+            throw CelestiaError.messageTooLong
         }
 
         let message = Message(
             matchId: matchId,
             senderId: senderId,
             receiverId: receiverId,
-            text: text.trimmingCharacters(in: .whitespacesAndNewlines)
+            text: sanitizedText
         )
 
         do {
@@ -82,7 +110,7 @@ class MessageService: ObservableObject {
 
             // Update match with last message info
             try await db.collection("matches").document(matchId).updateData([
-                "lastMessage": text.trimmingCharacters(in: .whitespacesAndNewlines),
+                "lastMessage": sanitizedText,
                 "lastMessageTimestamp": FieldValue.serverTimestamp(),
                 "unreadCount.\(receiverId)": FieldValue.increment(Int64(1))
             ])
