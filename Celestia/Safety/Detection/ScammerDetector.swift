@@ -390,7 +390,7 @@ class ScammerDetector {
 
 // MARK: - Chat Message Model
 
-struct ChatMessage {
+struct ChatMessage: Codable {
     let text: String
     let senderId: String
     let timestamp: Date
@@ -398,7 +398,7 @@ struct ChatMessage {
 
 // MARK: - Scam Analysis
 
-struct ScamAnalysis {
+struct ScamAnalysis: Codable {
     let isScam: Bool
     let scamScore: Float // 0.0 to 1.0
     let indicators: [ScamIndicator]
@@ -406,7 +406,7 @@ struct ScamAnalysis {
     let recommendation: ScamRecommendation
 }
 
-struct ConversationScamAnalysis {
+struct ConversationScamAnalysis: Codable {
     let isScam: Bool
     let scamScore: Float
     let indicators: [ScamIndicator]
@@ -458,7 +458,7 @@ enum ScamType: String {
 
 // MARK: - Scam Indicators
 
-enum ScamIndicator: Equatable {
+enum ScamIndicator: Equatable, Codable {
     case financialRequest
     case romanceScamLanguage
     case urgencyTactics
@@ -501,7 +501,7 @@ enum ScamIndicator: Equatable {
 
 // MARK: - Recommendations
 
-enum ScamRecommendation {
+enum ScamRecommendation: Codable {
     case noAction
     case monitor
     case warnUser

@@ -468,8 +468,5 @@ enum ReportError: LocalizedError {
     }
 }
 
-// MARK: - ChatMessage Extension
-
-extension ChatMessage: Codable {}
-extension ConversationScamAnalysis: Codable {}
-extension ScamAnalysis: Codable {}
+// MARK: - Codable Conformance
+// ChatMessage, ScamAnalysis, and ConversationScamAnalysis are Codable (defined in ScammerDetector.swift)
