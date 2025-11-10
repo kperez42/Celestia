@@ -236,10 +236,14 @@ class AuthService: ObservableObject {
             )
             
             print("🔵 Attempting to save user to Firestore...")
-            
+
             // Step 3: Save to Firestore
+            guard let userId = user.id else {
+                throw CelestiaError.invalidData
+            }
+
             let encodedUser = try Firestore.Encoder().encode(user)
-            try await Firestore.firestore().collection("users").document(user.id!).setData(encodedUser)
+            try await Firestore.firestore().collection("users").document(userId).setData(encodedUser)
             
             print("✅ User saved to Firestore successfully")
             

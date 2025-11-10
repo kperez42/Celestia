@@ -111,8 +111,14 @@ class AuthViewModel: ObservableObject {
     }
     
     private func saveUserToFirestore(user: User, referralCode: String = "") {
+        guard let userId = user.id else {
+            errorMessage = "User ID is missing"
+            isLoading = false
+            return
+        }
+
         do {
-            try firestore.collection("users").document(user.id!).setData(from: user) { [weak self] error in
+            try firestore.collection("users").document(userId).setData(from: user) { [weak self] error in
                 guard let self = self else { return }
 
                 if let error = error {
