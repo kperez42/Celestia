@@ -405,8 +405,10 @@ struct DiscoverView: View {
 
     private func applyFilters() {
         let currentLocation: (lat: Double, lon: Double)? = {
-            if let user = authService.currentUser {
-                return (user.latitude, user.longitude)
+            if let user = authService.currentUser,
+               let lat = user.latitude,
+               let lon = user.longitude {
+                return (lat, lon)
             }
             return nil
         }()
