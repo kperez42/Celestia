@@ -52,7 +52,7 @@ class SubscriptionManager: ObservableObject {
     // MARK: - Subscription Status
 
     /// Update subscription from transaction
-    func updateSubscription(tier: SubscriptionTier, transaction: Transaction) async {
+    func updateSubscription(tier: SubscriptionTier, transaction: StoreKit.Transaction) async {
         Logger.shared.info("Updating subscription: \(tier.displayName)", category: .general)
 
         // Determine billing period from product ID
@@ -247,7 +247,7 @@ class SubscriptionManager: ObservableObject {
 
     // MARK: - Purchase History
 
-    private func addToPurchaseHistory(transaction: Transaction, productName: String) {
+    private func addToPurchaseHistory(transaction: StoreKit.Transaction, productName: String) {
         let entry = PurchaseHistoryEntry(
             id: UUID().uuidString,
             productId: transaction.productID,
@@ -352,7 +352,7 @@ class SubscriptionManager: ObservableObject {
     // MARK: - Firebase Integration
 
     /// Sync subscription to Firestore
-    private func syncSubscriptionToFirestore(transaction: Transaction) async {
+    private func syncSubscriptionToFirestore(transaction: StoreKit.Transaction) async {
         guard let userId = Auth.auth().currentUser?.uid else {
             Logger.shared.warning("No user logged in for Firestore sync", category: .general)
             return

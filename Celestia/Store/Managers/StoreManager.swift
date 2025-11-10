@@ -178,7 +178,7 @@ class StoreManager: ObservableObject {
 
     // MARK: - Transaction Verification
 
-    private func checkVerified<T>(_ result: VerificationResult<T>) throws -> T {
+    private func checkVerified<T>(_ result: StoreKit.VerificationResult<T>) throws -> T {
         switch result {
         case .unverified:
             Logger.shared.error("Transaction verification failed", category: .general)
@@ -190,7 +190,7 @@ class StoreManager: ObservableObject {
 
     // MARK: - Deliver Content
 
-    private func deliverContent(for transaction: Transaction) async {
+    private func deliverContent(for transaction: StoreKit.Transaction) async {
         Logger.shared.info("Delivering content for transaction: \(transaction.id)", category: .general)
 
         guard let productType = getProductType(for: transaction.productID) else {
