@@ -1,0 +1,220 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidString(text, minLength, maxLength) {
+      return text is string && text.size() >= minLength && text.size() <= maxLength;
+    }
+
+    function isValidAge(age) {
+      return age is int && age >= 18 && age <= 100;
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      // Anyone can read public user profiles (for discovery)
+      allow read: if isAuthenticated() && isEmailVerified();
+
+      // Users can only create their own profile
+      allow create: if isOwner(userId)
+        && isValidString(request.resource.data.fullName, 1, 50)
+        && isValidAge(request.resource.data.age)
+        && isValidString(request.resource.data.email, 5, 100)
+        && request.resource.data.email == request.auth.token.email;
+
+      // Users can only update their own profile
+      allow update: if isOwner(userId)
+        && isEmailVerified()
+        // Prevent changing critical fields
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.email == resource.data.email;
+
+      // Users can delete their own profile
+      allow delete: if isOwner(userId);
+    }
+
+    // Matches Collection
+    match /matches/{matchId} {
+      // Users can read matches they're part of
+      allow read: if isAuthenticated()
+        && isEmailVerified()
+        && (resource.data.user1Id == request.auth.uid || resource.data.user2Id == request.auth.uid);
+
+      // System creates matches (handled by Cloud Functions ideally)
+      // For now, allow if user is one of the participants
+      allow create: if isAuthenticated()
+        && isEmailVerified()
+        && (request.resource.data.user1Id == request.auth.uid || request.resource.data.user2Id == request.auth.uid)
+        && request.resource.data.user1Id != request.resource.data.user2Id;
+
+      // Users can update matches they're part of (for unmatch, etc.)
+      allow update: if isAuthenticated()
+        && isEmailVerified()
+        && (resource.data.user1Id == request.auth.uid || resource.data.user2Id == request.auth.uid);
+
+      // Don't allow deleting matches (soft delete via isActive field instead)
+      allow delete: if false;
+    }
+
+    // Messages Collection
+    match /messages/{messageId} {
+      // Users can read messages in their matches
+      allow read: if isAuthenticated()
+        && isEmailVerified()
+        && (resource.data.senderId == request.auth.uid || resource.data.receiverId == request.auth.uid);
+
+      // Users can send messages they authored
+      allow create: if isAuthenticated()
+        && isEmailVerified()
+        && request.resource.data.senderId == request.auth.uid
+        && isValidString(request.resource.data.text, 1, 1000)
+        && request.resource.data.timestamp == request.time;
+
+      // Users can update their own messages (for editing)
+      allow update: if isAuthenticated()
+        && isEmailVerified()
+        && resource.data.senderId == request.auth.uid;
+
+      // Users can delete their own messages
+      allow delete: if isAuthenticated()
+        && isEmailVerified()
+        && resource.data.senderId == request.auth.uid;
+    }
+
+    // Interests (Likes) Collection
+    match /interests/{interestId} {
+      // Users can read interests sent to them
+      allow read: if isAuthenticated()
+        && isEmailVerified()
+        && (resource.data.toUserId == request.auth.uid || resource.data.fromUserId == request.auth.uid);
+
+      // Users can send interests
+      allow create: if isAuthenticated()
+        && isEmailVerified()
+        && request.resource.data.fromUserId == request.auth.uid
+        && request.resource.data.fromUserId != request.resource.data.toUserId;
+
+      // Users can update interests they sent or received
+      allow update: if isAuthenticated()
+        && isEmailVerified()
+        && (resource.data.toUserId == request.auth.uid || resource.data.fromUserId == request.auth.uid);
+
+      // Users can delete interests they sent
+      allow delete: if isAuthenticated()
+        && isEmailVerified()
+        && resource.data.fromUserId == request.auth.uid;
+    }
+
+    // Blocks Collection
+    match /blocks/{blockId} {
+      // Users can read blocks they created
+      allow read: if isAuthenticated()
+        && isEmailVerified()
+        && resource.data.blockerId == request.auth.uid;
+
+      // Users can create blocks
+      allow create: if isAuthenticated()
+        && isEmailVerified()
+        && request.resource.data.blockerId == request.auth.uid
+        && request.resource.data.blockerId != request.resource.data.blockedId;
+
+      // Users can unblock (delete)
+      allow delete: if isAuthenticated()
+        && isEmailVerified()
+        && resource.data.blockerId == request.auth.uid;
+
+      // Don't allow updating blocks
+      allow update: if false;
+    }
+
+    // Reports Collection
+    match /reports/{reportId} {
+      // Only the reporter can read their reports
+      allow read: if isAuthenticated()
+        && isEmailVerified()
+        && resource.data.reporterId == request.auth.uid;
+
+      // Users can create reports
+      allow create: if isAuthenticated()
+        && isEmailVerified()
+        && request.resource.data.reporterId == request.auth.uid
+        && isValidString(request.resource.data.reason, 5, 500);
+
+      // Don't allow updating or deleting reports
+      allow update, delete: if false;
+    }
+
+    // Notifications Collection
+    match /notifications/{notificationId} {
+      // Users can read their own notifications
+      allow read: if isAuthenticated()
+        && isEmailVerified()
+        && resource.data.userId == request.auth.uid;
+
+      // System creates notifications (ideally via Cloud Functions)
+      // For now, allow creating if notification is for the authenticated user
+      allow create: if isAuthenticated()
+        && isEmailVerified()
+        && request.resource.data.userId == request.auth.uid;
+
+      // Users can update their own notifications (mark as read)
+      allow update: if isAuthenticated()
+        && isEmailVerified()
+        && resource.data.userId == request.auth.uid;
+
+      // Users can delete their own notifications
+      allow delete: if isAuthenticated()
+        && isEmailVerified()
+        && resource.data.userId == request.auth.uid;
+    }
+
+    // Analytics Collection (for tracking)
+    match /analytics/{analyticsId} {
+      // No read access to analytics
+      allow read: if false;
+
+      // Allow creating analytics events for authenticated users
+      allow create: if isAuthenticated() && isEmailVerified();
+
+      // No update or delete
+      allow update, delete: if false;
+    }
+
+    // Referrals Collection
+    match /referrals/{referralId} {
+      // Users can read referrals they created or were referred by
+      allow read: if isAuthenticated()
+        && isEmailVerified()
+        && (resource.data.referrerId == request.auth.uid || resource.data.referredUserId == request.auth.uid);
+
+      // System creates referrals
+      allow create: if isAuthenticated() && isEmailVerified();
+
+      // System updates referral status
+      allow update: if isAuthenticated()
+        && isEmailVerified()
+        && (resource.data.referrerId == request.auth.uid || resource.data.referredUserId == request.auth.uid);
+
+      // Don't allow deleting referrals
+      allow delete: if false;
+    }
+
+    // Default: Deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

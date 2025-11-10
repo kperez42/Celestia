@@ -15,13 +15,16 @@ class AuthService: ObservableObject {
     @Published var currentUser: User?
     @Published var isLoading = false
     @Published var errorMessage: String?
-    
+    @Published var isEmailVerified = false
+
     static let shared = AuthService()
     
     private init() {
         self.userSession = Auth.auth().currentUser
+        self.isEmailVerified = Auth.auth().currentUser?.isEmailVerified ?? false
         print("🔵 AuthService initialized")
         print("🔵 Current user session: \(Auth.auth().currentUser?.uid ?? "none")")
+        print("🔵 Email verified: \(isEmailVerified)")
         Task {
             await fetchUser()
         }
@@ -87,8 +90,10 @@ class AuthService: ObservableObject {
         do {
             let result = try await Auth.auth().signIn(withEmail: sanitizedEmail, password: sanitizedPassword)
             self.userSession = result.user
+            self.isEmailVerified = result.user.isEmailVerified
             print("✅ Sign in successful: \(result.user.uid)")
-            
+            print("✅ Email verified: \(isEmailVerified)")
+
             await fetchUser()
             
             if currentUser != nil {
@@ -167,7 +172,7 @@ class AuthService: ObservableObject {
     }
 
     @MainActor
-    func createUser(withEmail email: String, password: String, fullName: String, age: Int, gender: String, lookingFor: String, location: String, country: String) async throws {
+    func createUser(withEmail email: String, password: String, fullName: String, age: Int, gender: String, lookingFor: String, location: String, country: String, referralCode: String = "") async throws {
         isLoading = true
         errorMessage = nil
 
@@ -213,7 +218,7 @@ class AuthService: ObservableObject {
             print("✅ Firebase Auth user created: \(result.user.uid)")
             
             // Step 2: Create User object with all required fields
-            let user = User(
+            var user = User(
                 id: result.user.uid,
                 email: sanitizedEmail,
                 fullName: sanitizedFullName,
@@ -234,7 +239,13 @@ class AuthService: ObservableObject {
                 ageRangeMax: 99,
                 maxDistance: 100
             )
-            
+
+            // Set referral code if provided
+            let sanitizedReferralCode = sanitizeInput(referralCode)
+            if !sanitizedReferralCode.isEmpty {
+                user.referredByCode = sanitizedReferralCode.uppercased()
+            }
+
             print("🔵 Attempting to save user to Firestore...")
 
             // Step 3: Save to Firestore
@@ -244,14 +255,50 @@ class AuthService: ObservableObject {
 
             let encodedUser = try Firestore.Encoder().encode(user)
             try await Firestore.firestore().collection("users").document(userId).setData(encodedUser)
-            
+
             print("✅ User saved to Firestore successfully")
-            
-            // Step 4: Fetch user data
+
+            // Step 4: Send email verification with action code settings
+            let actionCodeSettings = ActionCodeSettings()
+            actionCodeSettings.handleCodeInApp = false
+            // Set the URL to redirect to after email verification
+            actionCodeSettings.url = URL(string: "https://celestia-40ce6.firebaseapp.com")
+
+            do {
+                try await result.user.sendEmailVerification(with: actionCodeSettings)
+                print("✅ Verification email sent to \(sanitizedEmail)")
+            } catch let emailError as NSError {
+                print("⚠️ Email verification send failed:")
+                print("  - Domain: \(emailError.domain)")
+                print("  - Code: \(emailError.code)")
+                print("  - Description: \(emailError.localizedDescription)")
+                // Don't fail account creation if email fails to send
+            }
+
+            // Step 5: Initialize referral code and process referral
+            do {
+                // Generate unique referral code for new user
+                try await ReferralManager.shared.initializeReferralCode(for: &user)
+                print("✅ Referral code initialized for user")
+
+                // Process referral if code was provided
+                if !sanitizedReferralCode.isEmpty {
+                    try await ReferralManager.shared.processReferralSignup(
+                        newUser: user,
+                        referralCode: sanitizedReferralCode.uppercased()
+                    )
+                    print("✅ Referral processed successfully")
+                }
+            } catch {
+                print("⚠️ Error handling referral: \(error.localizedDescription)")
+                // Don't fail account creation if referral processing fails
+            }
+
+            // Step 6: Fetch user data
             await fetchUser()
             isLoading = false
-            
-            print("✅ Account creation completed")
+
+            print("✅ Account creation completed - Please verify your email")
         } catch let error as NSError {
             isLoading = false
             
@@ -290,6 +337,7 @@ class AuthService: ObservableObject {
             try Auth.auth().signOut()
             self.userSession = nil
             self.currentUser = nil
+            self.isEmailVerified = false
             print("✅ User signed out")
         } catch {
             print("❌ Error signing out: \(error.localizedDescription)")
@@ -406,7 +454,72 @@ class AuthService: ObservableObject {
         
         self.userSession = nil
         self.currentUser = nil
-        
+
         print("✅ Account deleted successfully")
+    }
+
+    // MARK: - Email Verification
+
+    /// Send email verification to current user
+    @MainActor
+    func sendEmailVerification() async throws {
+        guard let user = Auth.auth().currentUser else {
+            throw CelestiaError.notAuthenticated
+        }
+
+        guard !user.isEmailVerified else {
+            print("✅ Email already verified")
+            return
+        }
+
+        // Configure action code settings for email verification
+        let actionCodeSettings = ActionCodeSettings()
+        actionCodeSettings.handleCodeInApp = false
+        // Set the URL to redirect to after email verification
+        actionCodeSettings.url = URL(string: "https://celestia-40ce6.firebaseapp.com")
+
+        do {
+            try await user.sendEmailVerification(with: actionCodeSettings)
+            print("✅ Verification email sent to \(user.email ?? "")")
+        } catch let error as NSError {
+            print("⚠️ Email verification send failed:")
+            print("  - Domain: \(error.domain)")
+            print("  - Code: \(error.code)")
+            print("  - Description: \(error.localizedDescription)")
+            throw error
+        }
+    }
+
+    /// Reload user to check verification status
+    @MainActor
+    func reloadUser() async throws {
+        guard let user = Auth.auth().currentUser else {
+            throw CelestiaError.notAuthenticated
+        }
+
+        try await user.reload()
+
+        // Update published property to trigger view updates
+        self.isEmailVerified = user.isEmailVerified
+        print("✅ User reloaded - Email verified: \(user.isEmailVerified)")
+
+        // Update local state
+        if user.isEmailVerified {
+            await fetchUser()
+        }
+    }
+
+    /// Check if email verification is required before allowing access
+    @MainActor
+    func requireEmailVerification() async throws {
+        guard let user = Auth.auth().currentUser else {
+            throw CelestiaError.notAuthenticated
+        }
+
+        try await user.reload()
+
+        guard user.isEmailVerified else {
+            throw CelestiaError.emailNotVerified
+        }
     }
 }

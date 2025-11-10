@@ -8,9 +8,9 @@
 import SwiftUI
 
 struct SignUpView: View {
-    @StateObject private var authViewModel = AuthViewModel()
+    @EnvironmentObject var authService: AuthService
     @Environment(\.dismiss) var dismiss
-    
+
     @State private var currentStep = 1
     
     // Step 1: Basic info
@@ -84,8 +84,8 @@ struct SignUpView: View {
                         .padding(.horizontal, 30)
                         
                         // Error message
-                        if !authViewModel.errorMessage.isEmpty {
-                            Text(authViewModel.errorMessage)
+                        if let errorMessage = authService.errorMessage, !errorMessage.isEmpty {
+                            Text(errorMessage)
                                 .font(.caption)
                                 .foregroundColor(.red)
                                 .padding(.horizontal)
@@ -112,7 +112,7 @@ struct SignUpView: View {
                             Button {
                                 handleNext()
                             } label: {
-                                if authViewModel.isLoading {
+                                if authService.isLoading {
                                     ProgressView()
                                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                 } else {
@@ -131,7 +131,7 @@ struct SignUpView: View {
                                 )
                             )
                             .cornerRadius(15)
-                            .disabled(!canProceed || authViewModel.isLoading)
+                            .disabled(!canProceed || authService.isLoading)
                         }
                         .padding(.horizontal, 30)
                         .padding(.bottom, 30)
@@ -150,8 +150,8 @@ struct SignUpView: View {
                 }
             }
         }
-        .onChange(of: authViewModel.isAuthenticated) { isAuth in
-            if isAuth {
+        .onChange(of: authService.userSession) { session in
+            if session != nil {
                 dismiss()
             }
         }
@@ -364,21 +364,29 @@ struct SignUpView: View {
         } else {
             // Final step - create account
             guard let ageInt = Int(age) else { return }
-            authViewModel.signUp(
-                email: email,
-                password: password,
-                name: name,
-                age: ageInt,
-                gender: gender,
-                lookingFor: lookingFor,
-                location: location,
-                country: country,
-                referralCode: referralCode.trimmingCharacters(in: .whitespaces)
-            )
+            Task {
+                do {
+                    try await authService.createUser(
+                        withEmail: email,
+                        password: password,
+                        fullName: name,
+                        age: ageInt,
+                        gender: gender,
+                        lookingFor: lookingFor,
+                        location: location,
+                        country: country,
+                        referralCode: referralCode.trimmingCharacters(in: .whitespaces)
+                    )
+                } catch {
+                    print("Error creating account: \(error)")
+                    // Error is handled by AuthService setting errorMessage
+                }
+            }
         }
     }
 }
 
 #Preview {
     SignUpView()
+        .environmentObject(AuthService.shared)
 }
