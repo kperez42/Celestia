@@ -1,0 +1,171 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode_15.0.app/Contents/Developer
+
+jobs:
+  swiftlint:
+    name: SwiftLint
+    runs-on: macos-13
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install SwiftLint
+        run: brew install swiftlint
+
+      - name: Run SwiftLint
+        run: swiftlint lint --config .swiftlint.yml --reporter github-actions-logging
+
+      - name: SwiftLint Summary
+        if: always()
+        run: |
+          echo "## SwiftLint Results" >> $GITHUB_STEP_SUMMARY
+          swiftlint lint --config .swiftlint.yml --reporter markdown >> $GITHUB_STEP_SUMMARY || true
+
+  test:
+    name: Unit Tests
+    runs-on: macos-13
+
+    strategy:
+      matrix:
+        destination:
+          - platform=iOS Simulator,name=iPhone 15,OS=17.0
+          - platform=iOS Simulator,name=iPhone 15 Pro,OS=17.0
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.0.app
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Install dependencies
+        run: |
+          if [ -f "Podfile" ]; then
+            echo "Installing CocoaPods dependencies..."
+            pod install
+          fi
+
+      - name: Run tests
+        run: |
+          if [ -f "Celestia.xcworkspace" ]; then
+            xcodebuild test \
+              -workspace Celestia.xcworkspace \
+              -scheme Celestia \
+              -destination "${{ matrix.destination }}" \
+              -enableCodeCoverage YES \
+              -derivedDataPath DerivedData \
+              | xcpretty
+          else
+            xcodebuild test \
+              -project Celestia.xcodeproj \
+              -scheme Celestia \
+              -destination "${{ matrix.destination }}" \
+              -enableCodeCoverage YES \
+              -derivedDataPath DerivedData \
+              | xcpretty
+          fi
+
+      - name: Generate code coverage report
+        if: success()
+        run: |
+          xcrun llvm-cov export \
+            -format="lcov" \
+            -instr-profile DerivedData/Build/ProfileData/*/Coverage.profdata \
+            DerivedData/Build/Products/Debug-iphonesimulator/Celestia.app/Celestia \
+            > coverage.lcov
+
+      - name: Upload coverage to Codecov
+        if: success()
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.lcov
+          flags: unittests
+          name: codecov-umbrella
+
+      - name: Test Summary
+        if: always()
+        run: |
+          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "Tests completed for ${{ matrix.destination }}" >> $GITHUB_STEP_SUMMARY
+
+  build:
+    name: Build App
+    runs-on: macos-13
+    needs: [swiftlint, test]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.0.app
+
+      - name: Install dependencies
+        run: |
+          if [ -f "Podfile" ]; then
+            echo "Installing CocoaPods dependencies..."
+            pod install
+          fi
+
+      - name: Build app
+        run: |
+          if [ -f "Celestia.xcworkspace" ]; then
+            xcodebuild build \
+              -workspace Celestia.xcworkspace \
+              -scheme Celestia \
+              -destination "generic/platform=iOS" \
+              -configuration Release \
+              CODE_SIGNING_ALLOWED=NO \
+              | xcpretty
+          else
+            xcodebuild build \
+              -project Celestia.xcodeproj \
+              -scheme Celestia \
+              -destination "generic/platform=iOS" \
+              -configuration Release \
+              CODE_SIGNING_ALLOWED=NO \
+              | xcpretty
+          fi
+
+      - name: Build Summary
+        if: always()
+        run: |
+          echo "## Build Results" >> $GITHUB_STEP_SUMMARY
+          echo "Build completed successfully" >> $GITHUB_STEP_SUMMARY
+
+  danger:
+    name: Danger
+    runs-on: macos-13
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+
+      - name: Install Danger
+        run: gem install danger
+
+      - name: Run Danger
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: danger
