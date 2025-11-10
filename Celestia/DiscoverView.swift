@@ -385,12 +385,14 @@ struct DiscoverView: View {
     
     private func loadUsers() async {
         #if DEBUG
-        // Use test data in preview/debug mode
+        // Use test data in debug builds for easier testing
         allUsers = TestData.discoverUsers
         applyFilters()
         currentIndex = 0
         isLoading = false
-        #else
+        return
+        #endif
+
         guard let currentUserId = authService.currentUser?.id else { return }
 
         isLoading = true
@@ -408,20 +410,16 @@ struct DiscoverView: View {
         } catch {
             print("Error loading users: \(error)")
         }
-        #endif
     }
 
     private func applyFilters() {
         let currentLocation: (lat: Double, lon: Double)? = {
-            #if DEBUG
-            // Use San Francisco as default for testing
-            return (37.7749, -122.4194)
-            #else
-            if let user = authService.currentUser {
-                return (user.latitude, user.longitude)
+            if let user = authService.currentUser,
+               let lat = user.latitude,
+               let lon = user.longitude {
+                return (lat, lon)
             }
             return nil
-            #endif
         }()
 
         users = allUsers.filter { user in
@@ -503,21 +501,7 @@ struct DiscoverView: View {
                 print("❌ Error tracking swipe: \(error)")
             }
 
-            #if DEBUG
-            // In debug mode with test data, just show match animation for demonstration
-            print("💕 DEBUG: Simulating like from \(currentUserId) to \(userId)")
-            // Simulate match on every 3rd like for testing
-            if currentIndex % 3 == 0 {
-                await MainActor.run {
-                    matchedUser = user
-                    showingMatchAnimation = true
-                    HapticManager.shared.match()
-                }
-                // Track match
-                try? await AnalyticsManager.shared.trackMatch(user1Id: currentUserId, user2Id: userId)
-            }
-            #else
-            // Production: Create like and check for mutual match
+            // Create like and check for mutual match
             do {
                 let isMatch = try await swipeService.likeUser(
                     fromUserId: currentUserId,
@@ -538,7 +522,6 @@ struct DiscoverView: View {
             } catch {
                 print("❌ Error creating like: \(error)")
             }
-            #endif
 
             await MainActor.run {
                 withAnimation {
@@ -579,16 +562,12 @@ struct DiscoverView: View {
                 print("❌ Error tracking swipe: \(error)")
             }
 
-            #if DEBUG
-            print("👋 DEBUG: Simulating pass from \(currentUserId) to \(userId)")
-            #else
-            // Production: Record the pass
+            // Record the pass
             do {
                 try await swipeService.passUser(fromUserId: currentUserId, toUserId: userId)
             } catch {
                 print("❌ Error recording pass: \(error)")
             }
-            #endif
 
             await MainActor.run {
                 withAnimation {

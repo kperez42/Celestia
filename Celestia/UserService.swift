@@ -18,9 +18,35 @@ class UserService: ObservableObject {
     static let shared = UserService()
     private let db = Firestore.firestore()
     private var lastDocument: DocumentSnapshot?
-    
+    private var searchTask: Task<Void, Never>?
+
     private init() {}
-    
+
+    // MARK: - Input Sanitization
+
+    /// Sanitize user input to prevent injection attacks and malformed data
+    private func sanitizeInput(_ text: String) -> String {
+        var sanitized = text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Remove potentially dangerous HTML/script tags
+        let dangerousPatterns = [
+            "<script>", "</script>",
+            "<iframe>", "</iframe>",
+            "javascript:",
+            "onerror=", "onclick=", "onload="
+        ]
+
+        for pattern in dangerousPatterns {
+            sanitized = sanitized.replacingOccurrences(of: pattern, with: "", options: .caseInsensitive)
+        }
+
+        // Remove null bytes and control characters
+        sanitized = sanitized.components(separatedBy: .controlCharacters).joined()
+        sanitized = sanitized.replacingOccurrences(of: "\0", with: "")
+
+        return sanitized
+    }
+
     /// Fetch users with filters and pagination support
     func fetchUsers(
         excludingUserId: String,
@@ -147,16 +173,24 @@ class UserService: ObservableObject {
         }
     }
     
-    /// Search users by name or location
-    func searchUsers(query: String, currentUserId: String) async throws -> [User] {
-        guard !query.isEmpty else { return [] }
-        
-        let snapshot = try await db.collection("users")
+    /// Search users by name or location with pagination support
+    func searchUsers(query: String, currentUserId: String, limit: Int = 20, offset: DocumentSnapshot? = nil) async throws -> [User] {
+        // Sanitize search query
+        let sanitizedQuery = sanitizeInput(query)
+        guard !sanitizedQuery.isEmpty else { return [] }
+
+        var firestoreQuery = db.collection("users")
             .whereField("showMeInSearch", isEqualTo: true)
-            .limit(to: 50)
-            .getDocuments()
-        
-        let searchQuery = query.lowercased()
+            .limit(to: limit)
+
+        // Add pagination cursor if provided
+        if let offset = offset {
+            firestoreQuery = firestoreQuery.start(afterDocument: offset)
+        }
+
+        let snapshot = try await firestoreQuery.getDocuments()
+
+        let searchQuery = sanitizedQuery.lowercased()
         return snapshot.documents
             .compactMap { try? $0.data(as: User.self) }
             .filter { user in
@@ -165,6 +199,42 @@ class UserService: ObservableObject {
                        user.location.lowercased().contains(searchQuery) ||
                        user.country.lowercased().contains(searchQuery)
             }
+    }
+
+    /// Debounced search to prevent excessive API calls while typing
+    /// - Parameters:
+    ///   - query: Search query string
+    ///   - currentUserId: Current user's ID to exclude from results
+    ///   - debounceInterval: Time to wait before executing search (default: 0.3 seconds)
+    ///   - limit: Maximum number of results
+    ///   - completion: Callback with search results or error
+    func debouncedSearch(
+        query: String,
+        currentUserId: String,
+        debounceInterval: TimeInterval = 0.3,
+        limit: Int = 20,
+        completion: @escaping ([User]?, Error?) -> Void
+    ) {
+        // Cancel previous search task
+        searchTask?.cancel()
+
+        // Create new debounced search task
+        searchTask = Task {
+            // Wait for debounce interval
+            try? await Task.sleep(nanoseconds: UInt64(debounceInterval * 1_000_000_000))
+
+            // Check if task was cancelled
+            guard !Task.isCancelled else { return }
+
+            do {
+                let results = try await searchUsers(query: query, currentUserId: currentUserId, limit: limit)
+                guard !Task.isCancelled else { return }
+                completion(results, nil)
+            } catch {
+                guard !Task.isCancelled else { return }
+                completion(nil, error)
+            }
+        }
     }
     
     /// Load more users (pagination)
@@ -190,7 +260,7 @@ class UserService: ObservableObject {
     func profileCompletionPercentage(_ user: User) -> Int {
         var completedSteps = 0
         let totalSteps = 7
-        
+
         if !user.fullName.isEmpty { completedSteps += 1 }
         if !user.bio.isEmpty { completedSteps += 1 }
         if !user.profileImageURL.isEmpty { completedSteps += 1 }
@@ -198,7 +268,17 @@ class UserService: ObservableObject {
         if user.languages.count >= 1 { completedSteps += 1 }
         if user.photos.count >= 2 { completedSteps += 1 }
         if user.age >= 18 { completedSteps += 1 }
-        
+
         return (completedSteps * 100) / totalSteps
+    }
+
+    /// Cancel ongoing search task (useful for cleanup or manual cancellation)
+    func cancelSearch() {
+        searchTask?.cancel()
+        searchTask = nil
+    }
+
+    deinit {
+        searchTask?.cancel()
     }
 }

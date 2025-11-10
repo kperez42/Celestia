@@ -15,12 +15,19 @@ class InterestService: ObservableObject {
     @Published var receivedInterests: [Interest] = []
     @Published var isLoading = false
     @Published var error: Error?
-    
+
     static let shared = InterestService()
     private let db = Firestore.firestore()
     private var listener: ListenerRegistration?
-    
-    private init() {}
+    private var lastReceivedDocument: DocumentSnapshot?
+    private var lastSentDocument: DocumentSnapshot?
+
+    // Dependency injection for better testability and reduced coupling
+    private let matchCreator: MatchCreating
+
+    private init(matchCreator: MatchCreating = MatchService.shared) {
+        self.matchCreator = matchCreator
+    }
     
     // MARK: - Send Interest
     
@@ -29,38 +36,48 @@ class InterestService: ObservableObject {
         toUserId: String,
         message: String? = nil
     ) async throws {
+        // Check rate limiting
+        guard RateLimiter.shared.canSendLike() else {
+            if let timeRemaining = RateLimiter.shared.timeUntilReset(for: .like) {
+                throw CelestiaError.rateLimitExceededWithTime(timeRemaining)
+            }
+            throw CelestiaError.rateLimitExceeded
+        }
+
         // Check if interest already exists
         if let existingInterest = try? await fetchInterest(fromUserId: fromUserId, toUserId: toUserId) {
             print("Interest already sent to this user: \(existingInterest.id ?? "unknown")")
             return
         }
-        
+
+        // Validate message if provided
+        if let msg = message, !msg.isEmpty {
+            guard ContentModerator.shared.isAppropriate(msg) else {
+                let violations = ContentModerator.shared.getViolations(msg)
+                throw CelestiaError.inappropriateContentWithReasons(violations)
+            }
+        }
+
         let interest = Interest(
             fromUserId: fromUserId,
             toUserId: toUserId,
             message: message
         )
         
-        do {
-            let docRef = try db.collection("interests").addDocument(from: interest)
-            print("✅ Interest sent: \(docRef.documentID)")
-            
-            // Check for mutual match
-            if let mutualInterest = try? await fetchInterest(fromUserId: toUserId, toUserId: fromUserId),
-               mutualInterest.status == "pending" {
-                // Both users liked each other - create match!
-                await MatchService.shared.createMatch(user1Id: fromUserId, user2Id: toUserId)
-                
-                // Update both interests to accepted
-                try await acceptInterest(interestId: docRef.documentID, fromUserId: fromUserId, toUserId: toUserId)
-                if let mutualId = mutualInterest.id {
-                    try await acceptInterest(interestId: mutualId, fromUserId: toUserId, toUserId: fromUserId)
-                }
+        let docRef = try db.collection("interests").addDocument(from: interest)
+        print("✅ Interest sent: \(docRef.documentID)")
+
+        // Check for mutual match
+        if let mutualInterest = try? await fetchInterest(fromUserId: toUserId, toUserId: fromUserId),
+           mutualInterest.status == "pending" {
+            // Both users liked each other - create match!
+            await matchCreator.createMatch(user1Id: fromUserId, user2Id: toUserId)
+
+            // Update both interests to accepted
+            try await acceptInterest(interestId: docRef.documentID, fromUserId: fromUserId, toUserId: toUserId)
+            if let mutualId = mutualInterest.id {
+                try await acceptInterest(interestId: mutualId, fromUserId: toUserId, toUserId: fromUserId)
             }
-        } catch {
-            print("❌ Error sending interest: \(error)")
-            self.error = error
-            throw error
         }
     }
     
@@ -77,42 +94,58 @@ class InterestService: ObservableObject {
     }
     
     // MARK: - Fetch Received Interests
-    
-    func fetchReceivedInterests(userId: String) async throws {
+
+    func fetchReceivedInterests(userId: String, limit: Int = 20, reset: Bool = true) async throws {
         isLoading = true
         defer { isLoading = false }
-        
-        do {
-            let snapshot = try await db.collection("interests")
-                .whereField("toUserId", isEqualTo: userId)
-                .whereField("status", isEqualTo: "pending")
-                .order(by: "timestamp", descending: true)
-                .getDocuments()
-            
-            receivedInterests = snapshot.documents.compactMap { try? $0.data(as: Interest.self) }
-        } catch {
-            self.error = error
-            throw error
+
+        if reset {
+            lastReceivedDocument = nil
+            receivedInterests = []
         }
+
+        var query = db.collection("interests")
+            .whereField("toUserId", isEqualTo: userId)
+            .whereField("status", isEqualTo: "pending")
+            .order(by: "timestamp", descending: true)
+            .limit(to: limit)
+
+        if let lastDoc = lastReceivedDocument {
+            query = query.start(afterDocument: lastDoc)
+        }
+
+        let snapshot = try await query.getDocuments()
+        lastReceivedDocument = snapshot.documents.last
+
+        let newInterests = snapshot.documents.compactMap { try? $0.data(as: Interest.self) }
+        receivedInterests.append(contentsOf: newInterests)
     }
     
     // MARK: - Fetch Sent Interests
-    
-    func fetchSentInterests(userId: String) async throws {
+
+    func fetchSentInterests(userId: String, limit: Int = 20, reset: Bool = true) async throws {
         isLoading = true
         defer { isLoading = false }
-        
-        do {
-            let snapshot = try await db.collection("interests")
-                .whereField("fromUserId", isEqualTo: userId)
-                .order(by: "timestamp", descending: true)
-                .getDocuments()
-            
-            sentInterests = snapshot.documents.compactMap { try? $0.data(as: Interest.self) }
-        } catch {
-            self.error = error
-            throw error
+
+        if reset {
+            lastSentDocument = nil
+            sentInterests = []
         }
+
+        var query = db.collection("interests")
+            .whereField("fromUserId", isEqualTo: userId)
+            .order(by: "timestamp", descending: true)
+            .limit(to: limit)
+
+        if let lastDoc = lastSentDocument {
+            query = query.start(afterDocument: lastDoc)
+        }
+
+        let snapshot = try await query.getDocuments()
+        lastSentDocument = snapshot.documents.last
+
+        let newInterests = snapshot.documents.compactMap { try? $0.data(as: Interest.self) }
+        sentInterests.append(contentsOf: newInterests)
     }
     
     // MARK: - Listen to Interests
@@ -151,39 +184,27 @@ class InterestService: ObservableObject {
     // MARK: - Accept/Reject
     
     func acceptInterest(interestId: String, fromUserId: String, toUserId: String) async throws {
-        do {
-            try await db.collection("interests").document(interestId).updateData([
-                "status": "accepted",
-                "acceptedAt": FieldValue.serverTimestamp()
-            ])
-            
-            // Check if match already exists to avoid duplicates
-            let matchExists = try? await MatchService.shared.hasMatched(user1Id: fromUserId, user2Id: toUserId)
-            if matchExists != true {
-                await MatchService.shared.createMatch(user1Id: fromUserId, user2Id: toUserId)
-            }
-            
-            print("✅ Interest accepted")
-        } catch {
-            print("❌ Error accepting interest: \(error)")
-            self.error = error
-            throw error
+        try await db.collection("interests").document(interestId).updateData([
+            "status": "accepted",
+            "acceptedAt": FieldValue.serverTimestamp()
+        ])
+
+        // Check if match already exists to avoid duplicates
+        let matchExists = try? await matchCreator.hasMatched(user1Id: fromUserId, user2Id: toUserId)
+        if matchExists != true {
+            await matchCreator.createMatch(user1Id: fromUserId, user2Id: toUserId)
         }
+
+        print("✅ Interest accepted")
     }
     
     func rejectInterest(interestId: String) async throws {
-        do {
-            try await db.collection("interests").document(interestId).updateData([
-                "status": "rejected",
-                "rejectedAt": FieldValue.serverTimestamp()
-            ])
-            
-            print("✅ Interest rejected")
-        } catch {
-            print("❌ Error rejecting interest: \(error)")
-            self.error = error
-            throw error
-        }
+        try await db.collection("interests").document(interestId).updateData([
+            "status": "rejected",
+            "rejectedAt": FieldValue.serverTimestamp()
+        ])
+
+        print("✅ Interest rejected")
     }
     
     // MARK: - Check if Liked

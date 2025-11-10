@@ -25,26 +25,20 @@ class MatchService: ObservableObject {
     func fetchMatches(userId: String) async throws {
         isLoading = true
         defer { isLoading = false }
-        
+
         do {
-            // Query where user is user1
-            let snapshot1 = try await db.collection("matches")
-                .whereField("user1Id", isEqualTo: userId)
+            // Use OR filter for optimized single query
+            let snapshot = try await db.collection("matches")
+                .whereFilter(Filter.orFilter([
+                    Filter.whereField("user1Id", isEqualTo: userId),
+                    Filter.whereField("user2Id", isEqualTo: userId)
+                ]))
                 .whereField("isActive", isEqualTo: true)
                 .getDocuments()
-            
-            // Query where user is user2
-            let snapshot2 = try await db.collection("matches")
-                .whereField("user2Id", isEqualTo: userId)
-                .whereField("isActive", isEqualTo: true)
-                .getDocuments()
-            
-            let matches1 = snapshot1.documents.compactMap { try? $0.data(as: Match.self) }
-            let matches2 = snapshot2.documents.compactMap { try? $0.data(as: Match.self) }
-            
-            matches = (matches1 + matches2).sorted {
-                ($0.lastMessageTimestamp ?? $0.timestamp) > ($1.lastMessageTimestamp ?? $1.timestamp)
-            }
+
+            matches = snapshot.documents
+                .compactMap { try? $0.data(as: Match.self) }
+                .sorted { ($0.lastMessageTimestamp ?? $0.timestamp) > ($1.lastMessageTimestamp ?? $1.timestamp) }
         } catch {
             self.error = error
             throw error
@@ -54,38 +48,27 @@ class MatchService: ObservableObject {
     /// Listen to matches in real-time
     func listenToMatches(userId: String) {
         listener?.remove()
-        
-        // Create compound listener for both queries
-        let dispatchGroup = DispatchGroup()
-        var allMatches: [Match] = []
-        
-        dispatchGroup.enter()
+
+        // Use OR filter for optimized single listener (fixes race condition)
         listener = db.collection("matches")
-            .whereField("user1Id", isEqualTo: userId)
+            .whereFilter(Filter.orFilter([
+                Filter.whereField("user1Id", isEqualTo: userId),
+                Filter.whereField("user2Id", isEqualTo: userId)
+            ]))
             .whereField("isActive", isEqualTo: true)
             .addSnapshotListener { [weak self] snapshot, error in
-                if let documents = snapshot?.documents {
-                    let matches1 = documents.compactMap { try? $0.data(as: Match.self) }
-                    allMatches.append(contentsOf: matches1)
+                guard let self = self else { return }
+
+                if let error = error {
+                    print("❌ Error listening to matches: \(error)")
+                    return
                 }
-                dispatchGroup.leave()
-            }
-        
-        dispatchGroup.enter()
-        db.collection("matches")
-            .whereField("user2Id", isEqualTo: userId)
-            .whereField("isActive", isEqualTo: true)
-            .addSnapshotListener { [weak self] snapshot, error in
-                if let documents = snapshot?.documents {
-                    let matches2 = documents.compactMap { try? $0.data(as: Match.self) }
-                    allMatches.append(contentsOf: matches2)
-                }
-                dispatchGroup.leave()
-                
-                dispatchGroup.notify(queue: .main) {
-                    self?.matches = allMatches.sorted {
-                        ($0.lastMessageTimestamp ?? $0.timestamp) > ($1.lastMessageTimestamp ?? $1.timestamp)
-                    }
+
+                guard let documents = snapshot?.documents else { return }
+
+                let allMatches = documents.compactMap { try? $0.data(as: Match.self) }
+                self.matches = allMatches.sorted {
+                    ($0.lastMessageTimestamp ?? $0.timestamp) > ($1.lastMessageTimestamp ?? $1.timestamp)
                 }
             }
     }
@@ -144,27 +127,23 @@ class MatchService: ObservableObject {
     
     /// Fetch a specific match between two users
     func fetchMatch(user1Id: String, user2Id: String) async throws -> Match? {
-        // Try user1Id -> user2Id
-        let snapshot1 = try await db.collection("matches")
-            .whereField("user1Id", isEqualTo: user1Id)
-            .whereField("user2Id", isEqualTo: user2Id)
+        // Use OR filter for optimized single query
+        let snapshot = try await db.collection("matches")
+            .whereFilter(Filter.orFilter([
+                Filter.andFilter([
+                    Filter.whereField("user1Id", isEqualTo: user1Id),
+                    Filter.whereField("user2Id", isEqualTo: user2Id)
+                ]),
+                Filter.andFilter([
+                    Filter.whereField("user1Id", isEqualTo: user2Id),
+                    Filter.whereField("user2Id", isEqualTo: user1Id)
+                ])
+            ]))
             .whereField("isActive", isEqualTo: true)
             .limit(to: 1)
             .getDocuments()
-        
-        if let match = snapshot1.documents.first.flatMap({ try? $0.data(as: Match.self) }) {
-            return match
-        }
-        
-        // Try user2Id -> user1Id
-        let snapshot2 = try await db.collection("matches")
-            .whereField("user1Id", isEqualTo: user2Id)
-            .whereField("user2Id", isEqualTo: user1Id)
-            .whereField("isActive", isEqualTo: true)
-            .limit(to: 1)
-            .getDocuments()
-        
-        return snapshot2.documents.first.flatMap { try? $0.data(as: Match.self) }
+
+        return snapshot.documents.first.flatMap { try? $0.data(as: Match.self) }
     }
     
     /// Update match with last message info
@@ -189,14 +168,30 @@ class MatchService: ObservableObject {
         ])
     }
     
+    /// Unmatch - Deactivate match and clean up related data
+    func unmatch(matchId: String, userId: String) async throws {
+        // Deactivate the match
+        try await db.collection("matches").document(matchId).updateData([
+            "isActive": false,
+            "unmatchedBy": userId,
+            "unmatchedAt": FieldValue.serverTimestamp()
+        ])
+
+        // Optionally delete all messages (for privacy)
+        // Uncomment if you want to delete messages on unmatch
+        // try await MessageService.shared.deleteAllMessages(matchId: matchId)
+
+        print("✅ Unmatched successfully")
+    }
+
     /// Deactivate a match (soft delete)
     func deactivateMatch(matchId: String) async throws {
         try await db.collection("matches").document(matchId).updateData([
             "isActive": false
         ])
     }
-    
-    /// Delete a match permanently
+
+    /// Delete a match permanently (use with caution)
     func deleteMatch(matchId: String) async throws {
         try await db.collection("matches").document(matchId).delete()
     }

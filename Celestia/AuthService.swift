@@ -26,16 +26,66 @@ class AuthService: ObservableObject {
             await fetchUser()
         }
     }
-    
+
+    // MARK: - Validation
+
+    /// Validate email format
+    private func isValidEmail(_ email: String) -> Bool {
+        let emailRegex = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
+        let emailPredicate = NSPredicate(format: "SELF MATCHES %@", emailRegex)
+        return emailPredicate.evaluate(with: email)
+    }
+
+    /// Validate password strength
+    private func isValidPassword(_ password: String) -> Bool {
+        // At least 8 characters
+        guard password.count >= AppConstants.Limits.minPasswordLength else { return false }
+
+        // Contains at least one letter
+        let letterRegex = ".*[A-Za-z]+.*"
+        let letterPredicate = NSPredicate(format: "SELF MATCHES %@", letterRegex)
+        guard letterPredicate.evaluate(with: password) else { return false }
+
+        // Contains at least one number
+        let numberRegex = ".*[0-9]+.*"
+        let numberPredicate = NSPredicate(format: "SELF MATCHES %@", numberRegex)
+        guard numberPredicate.evaluate(with: password) else { return false }
+
+        return true
+    }
+
+    /// Sanitize user input
+    private func sanitizeInput(_ text: String) -> String {
+        text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     @MainActor
     func signIn(withEmail email: String, password: String) async throws {
         isLoading = true
         errorMessage = nil
-        
-        print("🔵 Attempting sign in with email: \(email)")
-        
+
+        // Sanitize inputs
+        let sanitizedEmail = sanitizeInput(email)
+        let sanitizedPassword = sanitizeInput(password)
+
+        // Validate email format
+        guard isValidEmail(sanitizedEmail) else {
+            isLoading = false
+            errorMessage = AppConstants.ErrorMessages.invalidEmail
+            throw CelestiaError.invalidCredentials
+        }
+
+        // Validate password is not empty
+        guard !sanitizedPassword.isEmpty else {
+            isLoading = false
+            errorMessage = "Password cannot be empty."
+            throw CelestiaError.invalidCredentials
+        }
+
+        print("🔵 Attempting sign in with email: \(sanitizedEmail)")
+
         do {
-            let result = try await Auth.auth().signIn(withEmail: email, password: password)
+            let result = try await Auth.auth().signIn(withEmail: sanitizedEmail, password: sanitizedPassword)
             self.userSession = result.user
             print("✅ Sign in successful: \(result.user.uid)")
             
@@ -77,25 +127,96 @@ class AuthService: ObservableObject {
             throw error
         }
     }
-    
+
+    @MainActor
+    func resetPassword(email: String) async throws {
+        // Sanitize email input
+        let sanitizedEmail = sanitizeInput(email)
+
+        // Validate email format
+        guard isValidEmail(sanitizedEmail) else {
+            errorMessage = AppConstants.ErrorMessages.invalidEmail
+            throw CelestiaError.invalidCredentials
+        }
+
+        do {
+            try await Auth.auth().sendPasswordReset(withEmail: sanitizedEmail)
+            print("✅ Password reset email sent to: \(sanitizedEmail)")
+        } catch let error as NSError {
+            print("❌ Password reset error:")
+            print("  - Domain: \(error.domain)")
+            print("  - Code: \(error.code)")
+            print("  - Description: \(error.localizedDescription)")
+
+            // User-friendly error messages
+            if error.domain == "FIRAuthErrorDomain" {
+                switch error.code {
+                case 17008: // Invalid email
+                    errorMessage = "Please enter a valid email address."
+                case 17011: // User not found
+                    errorMessage = "No account found with this email."
+                default:
+                    errorMessage = "Failed to send password reset email: \(error.localizedDescription)"
+                }
+            } else {
+                errorMessage = error.localizedDescription
+            }
+
+            throw error
+        }
+    }
+
     @MainActor
     func createUser(withEmail email: String, password: String, fullName: String, age: Int, gender: String, lookingFor: String, location: String, country: String) async throws {
         isLoading = true
         errorMessage = nil
-        
-        print("🔵 Creating user with email: \(email)")
-        
+
+        // Sanitize inputs
+        let sanitizedEmail = sanitizeInput(email)
+        let sanitizedPassword = sanitizeInput(password)
+        let sanitizedFullName = sanitizeInput(fullName)
+
+        // Validate email format
+        guard isValidEmail(sanitizedEmail) else {
+            isLoading = false
+            errorMessage = AppConstants.ErrorMessages.invalidEmail
+            throw CelestiaError.invalidCredentials
+        }
+
+        // Validate password strength
+        guard isValidPassword(sanitizedPassword) else {
+            isLoading = false
+            errorMessage = AppConstants.ErrorMessages.weakPassword
+            throw CelestiaError.weakPassword
+        }
+
+        // Validate name is not empty
+        guard !sanitizedFullName.isEmpty else {
+            isLoading = false
+            errorMessage = "Name cannot be empty."
+            throw CelestiaError.invalidProfileData
+        }
+
+        // Validate age restriction
+        guard age >= AppConstants.Limits.minAge else {
+            isLoading = false
+            errorMessage = AppConstants.ErrorMessages.invalidAge
+            throw CelestiaError.ageRestriction
+        }
+
+        print("🔵 Creating user with email: \(sanitizedEmail)")
+
         do {
             // Step 1: Create Firebase Auth user
-            let result = try await Auth.auth().createUser(withEmail: email, password: password)
+            let result = try await Auth.auth().createUser(withEmail: sanitizedEmail, password: sanitizedPassword)
             self.userSession = result.user
             print("✅ Firebase Auth user created: \(result.user.uid)")
             
             // Step 2: Create User object with all required fields
             let user = User(
                 id: result.user.uid,
-                email: email,
-                fullName: fullName,
+                email: sanitizedEmail,
+                fullName: sanitizedFullName,
                 age: age,
                 gender: gender,
                 lookingFor: lookingFor,

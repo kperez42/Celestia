@@ -236,7 +236,8 @@ struct FeedDiscoverView: View {
 
                 Button("Send Message") {
                     showMatchAnimation = false
-                    // TODO: Navigate to messages
+                    // NOTE: Navigation to messages should be implemented using NavigationPath or coordinator
+                    // For now, user can access messages from Messages tab
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.purple)
@@ -255,12 +256,14 @@ struct FeedDiscoverView: View {
 
     private func loadUsers() async {
         #if DEBUG
-        // Use test data in preview/debug mode
+        // Use test data in debug builds for easier testing
         await MainActor.run {
             users = TestData.discoverUsers
             loadMoreUsers()
         }
-        #else
+        return
+        #endif
+
         guard let currentUserId = authService.currentUser?.id else { return }
 
         isLoading = true
@@ -269,20 +272,39 @@ struct FeedDiscoverView: View {
         do {
             // Fetch from Firestore with filters
             let currentLocation: (lat: Double, lon: Double)? = {
-                if let user = authService.currentUser {
-                    return (user.latitude, user.longitude)
+                if let user = authService.currentUser,
+                   let lat = user.latitude,
+                   let lon = user.longitude {
+                    return (lat, lon)
                 }
                 return nil
             }()
 
-            // TODO: Implement actual Firestore query
-            // For now, use test data
+            // Get age range with proper optional handling
+            let ageRange: ClosedRange<Int>? = {
+                if let minAge = authService.currentUser?.ageRangeMin,
+                   let maxAge = authService.currentUser?.ageRangeMax {
+                    return minAge...maxAge
+                }
+                return nil
+            }()
+
+            // Fetch users from Firestore using UserService
+            try await UserService.shared.fetchUsers(
+                excludingUserId: currentUserId,
+                lookingFor: authService.currentUser?.lookingFor,
+                ageRange: ageRange ?? 18...99,
+                limit: 50,
+                reset: true
+            )
+
             await MainActor.run {
-                users = TestData.discoverUsers
+                users = UserService.shared.users
                 loadMoreUsers()
             }
+        } catch {
+            print("❌ Error loading users: \(error)")
         }
-        #endif
     }
 
     private func loadMoreUsers() {
@@ -361,7 +383,8 @@ struct FeedDiscoverView: View {
 
     private func handleMessage(user: User) {
         selectedUser = user
-        // TODO: Navigate to messaging
+        // NOTE: Navigation to messaging should be implemented using NavigationPath or coordinator
+        // For now, user should match first before messaging
         print("Message user: \(user.fullName)")
     }
 }

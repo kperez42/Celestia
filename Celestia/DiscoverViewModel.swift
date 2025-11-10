@@ -12,9 +12,10 @@ class DiscoverViewModel: ObservableObject {
     @Published var users: [User] = []
     @Published var isLoading = false
     @Published var errorMessage = ""
-    
+
     private let firestore = Firestore.firestore()
     private var lastDocument: DocumentSnapshot?
+    private var interestTask: Task<Void, Never>?
     
     func loadUsers(currentUser: User, limit: Int = 20) {
         isLoading = true
@@ -70,21 +71,39 @@ class DiscoverViewModel: ObservableObject {
     }
     
     func sendInterest(from currentUserID: String, to targetUserID: String, completion: @escaping (Bool) -> Void) {
-        Task {
+        // Cancel previous interest task if any
+        interestTask?.cancel()
+
+        interestTask = Task {
+            guard !Task.isCancelled else { return }
             do {
                 try await InterestService.shared.sendInterest(
                     fromUserId: currentUserID,
                     toUserId: targetUserID
                 )
+                guard !Task.isCancelled else { return }
                 await MainActor.run {
                     completion(true)
                 }
             } catch {
                 print("Error sending interest: \(error)")
+                guard !Task.isCancelled else { return }
                 await MainActor.run {
                     completion(false)
                 }
             }
         }
+    }
+
+    /// Cleanup method to cancel ongoing tasks
+    func cleanup() {
+        interestTask?.cancel()
+        interestTask = nil
+        users = []
+        lastDocument = nil
+    }
+
+    deinit {
+        interestTask?.cancel()
     }
 }

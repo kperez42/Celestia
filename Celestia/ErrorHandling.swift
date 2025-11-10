@@ -44,6 +44,11 @@ enum CelestiaError: LocalizedError, Identifiable {
     case messageNotSent
     case messageTooLong
     case inappropriateContent
+    case inappropriateContentWithReasons([String])
+
+    // Rate Limiting
+    case rateLimitExceeded
+    case rateLimitExceededWithTime(TimeInterval)
 
     // Media Errors
     case imageUploadFailed
@@ -115,6 +120,17 @@ enum CelestiaError: LocalizedError, Identifiable {
             return "Message is too long. Please shorten your message."
         case .inappropriateContent:
             return "Message contains inappropriate content."
+        case .inappropriateContentWithReasons(let reasons):
+            return "Content violation: " + reasons.joined(separator: ", ")
+
+        // Rate Limiting
+        case .rateLimitExceeded:
+            return "You're doing that too often. Please wait a moment and try again."
+        case .rateLimitExceededWithTime(let timeRemaining):
+            let minutes = Int(timeRemaining / 60)
+            let seconds = Int(timeRemaining.truncatingRemainder(dividingBy: 60))
+            let timeString = minutes > 0 ? "\(minutes)m \(seconds)s" : "\(seconds)s"
+            return "Rate limit exceeded. Try again in \(timeString)."
 
         // Media
         case .imageUploadFailed:
@@ -189,6 +205,10 @@ enum CelestiaError: LocalizedError, Identifiable {
             return "message.badge.exclamationmark"
         case .userBlocked:
             return "hand.raised"
+        case .inappropriateContent, .inappropriateContentWithReasons:
+            return "exclamationmark.triangle.fill"
+        case .rateLimitExceeded, .rateLimitExceededWithTime:
+            return "clock.fill"
         default:
             return "exclamationmark.triangle"
         }
