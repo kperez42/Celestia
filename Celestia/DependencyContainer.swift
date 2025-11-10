@@ -20,10 +20,10 @@ class DependencyContainer {
 
     // MARK: - Services
 
-    private(set) var authService: AuthServiceProtocol
-    private(set) var userService: UserServiceProtocol
-    private(set) var matchService: MatchServiceProtocol
-    private(set) var messageService: MessageServiceProtocol
+    private(set) var authService: any AuthServiceProtocol
+    private(set) var userService: any UserServiceProtocol
+    private(set) var matchService: any MatchServiceProtocol
+    private(set) var messageService: any MessageServiceProtocol
     private(set) var swipeService: SwipeServiceProtocol
     private(set) var referralManager: ReferralManagerProtocol
     private(set) var storeManager: StoreManagerProtocol
@@ -67,10 +67,10 @@ class DependencyContainer {
 
     /// Create a new instance with custom services (for testing)
     static func createForTesting(
-        authService: AuthServiceProtocol? = nil,
-        userService: UserServiceProtocol? = nil,
-        matchService: MatchServiceProtocol? = nil,
-        messageService: MessageServiceProtocol? = nil,
+        authService: (any AuthServiceProtocol)? = nil,
+        userService: (any UserServiceProtocol)? = nil,
+        matchService: (any MatchServiceProtocol)? = nil,
+        messageService: (any MessageServiceProtocol)? = nil,
         swipeService: SwipeServiceProtocol? = nil,
         networkManager: NetworkManagerProtocol? = nil
     ) -> DependencyContainer {
@@ -100,19 +100,19 @@ class DependencyContainer {
 
     // MARK: - Service Replacement (for testing)
 
-    func replaceAuthService(_ service: AuthServiceProtocol) {
+    func replaceAuthService(_ service: any AuthServiceProtocol) {
         self.authService = service
     }
 
-    func replaceUserService(_ service: UserServiceProtocol) {
+    func replaceUserService(_ service: any UserServiceProtocol) {
         self.userService = service
     }
 
-    func replaceMatchService(_ service: MatchServiceProtocol) {
+    func replaceMatchService(_ service: any MatchServiceProtocol) {
         self.matchService = service
     }
 
-    func replaceMessageService(_ service: MessageServiceProtocol) {
+    func replaceMessageService(_ service: any MessageServiceProtocol) {
         self.messageService = service
     }
 
