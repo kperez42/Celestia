@@ -253,9 +253,22 @@ class AuthService: ObservableObject {
 
             print("✅ User saved to Firestore successfully")
 
-            // Step 4: Send email verification
-            try await result.user.sendEmailVerification()
-            print("✅ Verification email sent to \(sanitizedEmail)")
+            // Step 4: Send email verification with action code settings
+            let actionCodeSettings = ActionCodeSettings()
+            actionCodeSettings.handleCodeInApp = false
+            // Set the URL to redirect to after email verification
+            actionCodeSettings.url = URL(string: "https://celestia-40ce6.firebaseapp.com")
+
+            do {
+                try await result.user.sendEmailVerification(with: actionCodeSettings)
+                print("✅ Verification email sent to \(sanitizedEmail)")
+            } catch let emailError as NSError {
+                print("⚠️ Email verification send failed:")
+                print("  - Domain: \(emailError.domain)")
+                print("  - Code: \(emailError.code)")
+                print("  - Description: \(emailError.localizedDescription)")
+                // Don't fail account creation if email fails to send
+            }
 
             // Step 5: Initialize referral code and process referral
             do {
@@ -458,8 +471,22 @@ class AuthService: ObservableObject {
             return
         }
 
-        try await user.sendEmailVerification()
-        print("✅ Verification email sent to \(user.email ?? "")")
+        // Configure action code settings for email verification
+        let actionCodeSettings = ActionCodeSettings()
+        actionCodeSettings.handleCodeInApp = false
+        // Set the URL to redirect to after email verification
+        actionCodeSettings.url = URL(string: "https://celestia-40ce6.firebaseapp.com")
+
+        do {
+            try await user.sendEmailVerification(with: actionCodeSettings)
+            print("✅ Verification email sent to \(user.email ?? "")")
+        } catch let error as NSError {
+            print("⚠️ Email verification send failed:")
+            print("  - Domain: \(error.domain)")
+            print("  - Code: \(error.code)")
+            print("  - Description: \(error.localizedDescription)")
+            throw error
+        }
     }
 
     /// Reload user to check verification status
