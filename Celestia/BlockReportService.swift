@@ -182,48 +182,7 @@ class BlockReportService: ObservableObject {
     }
 }
 
-// MARK: - Report Reason
-
-enum ReportReason: String, CaseIterable {
-    case inappropriatePhotos = "Inappropriate Photos"
-    case harassment = "Harassment or Bullying"
-    case spam = "Spam or Scam"
-    case underage = "User Appears Underage"
-    case offensive = "Offensive Profile Content"
-    case fake = "Fake Profile or Catfish"
-    case other = "Other"
-
-    var icon: String {
-        switch self {
-        case .inappropriatePhotos: return "photo.fill.on.rectangle.fill"
-        case .harassment: return "exclamationmark.bubble.fill"
-        case .spam: return "envelope.badge.fill"
-        case .underage: return "person.fill.xmark"
-        case .offensive: return "text.bubble.fill"
-        case .fake: return "person.crop.circle.badge.questionmark"
-        case .other: return "ellipsis.circle.fill"
-        }
-    }
-
-    var description: String {
-        switch self {
-        case .inappropriatePhotos:
-            return "Profile contains nudity or sexually explicit content"
-        case .harassment:
-            return "User is harassing, threatening, or bullying"
-        case .spam:
-            return "Profile is spam, advertising, or scam"
-        case .underage:
-            return "User appears to be under 18 years old"
-        case .offensive:
-            return "Profile contains hate speech or offensive content"
-        case .fake:
-            return "Profile uses fake photos or misleading information"
-        case .other:
-            return "Report for another reason"
-        }
-    }
-}
+// ReportReason is defined in Safety/Reporting/ReportingManager.swift
 
 // MARK: - Unmatch Reason
 

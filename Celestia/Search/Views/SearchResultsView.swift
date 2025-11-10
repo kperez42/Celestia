@@ -226,19 +226,19 @@ struct ProfileCard: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 if let height = profile.heightFormatted {
-                    TagView(text: height, icon: "ruler")
+                    SearchSearchTagView(text: height, icon: "ruler")
                 }
 
                 if let education = profile.education {
-                    TagView(text: education.displayName, icon: education.icon)
+                    SearchTagView(text: education.displayName, icon: education.icon)
                 }
 
                 if let occupation = profile.occupation {
-                    TagView(text: occupation, icon: "briefcase")
+                    SearchTagView(text: occupation, icon: "briefcase")
                 }
 
                 if let goal = profile.relationshipGoal {
-                    TagView(text: goal.displayName, icon: goal.icon)
+                    SearchTagView(text: goal.displayName, icon: goal.icon)
                 }
             }
         }
@@ -247,7 +247,7 @@ struct ProfileCard: View {
 
 // MARK: - Tag View
 
-struct TagView: View {
+struct SearchTagView: View {
     let text: String
     let icon: String
 
@@ -266,27 +266,7 @@ struct TagView: View {
     }
 }
 
-// MARK: - Corner Radius Extension
-
-extension View {
-    func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
-        clipShape(RoundedCorner(radius: radius, corners: corners))
-    }
-}
-
-struct RoundedCorner: Shape {
-    var radius: CGFloat = .infinity
-    var corners: UIRectCorner = .allCorners
-
-    func path(in rect: CGRect) -> Path {
-        let path = UIBezierPath(
-            roundedRect: rect,
-            byRoundingCorners: corners,
-            cornerRadii: CGSize(width: radius, height: radius)
-        )
-        return Path(path.cgPath)
-    }
-}
+// Corner radius extension is defined in Extensions.swift
 
 // MARK: - Preview
 

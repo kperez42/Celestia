@@ -263,26 +263,7 @@ extension Notification.Name {
 }
 
 // MARK: - URL Schemes
-
-enum DeepLink {
-    case profile(userId: String)
-    case chat(matchId: String)
-    case premium
-    case settings
-
-    var url: URL? {
-        switch self {
-        case .profile(let userId):
-            return URL(string: "celestia://profile/\(userId)")
-        case .chat(let matchId):
-            return URL(string: "celestia://chat/\(matchId)")
-        case .premium:
-            return URL(string: "celestia://premium")
-        case .settings:
-            return URL(string: "celestia://settings")
-        }
-    }
-}
+// DeepLink is defined in DeepLinkRouter.swift
 
 // MARK: - Preview Helpers
 

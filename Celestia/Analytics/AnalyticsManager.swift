@@ -381,6 +381,13 @@ enum AnalyticsEvent {
     // Experiments
     case experimentExposure
 
+    // Safety & Check-ins
+    case dateCheckInCreated
+    case dateCheckInStarted
+    case dateCheckInMid
+    case dateCheckInCompleted
+    case emergencyAlertTriggered
+
     var name: String {
         switch self {
         case .sessionStart: return "session_start"
@@ -436,6 +443,11 @@ enum AnalyticsEvent {
         case .funnelCompleted: return "funnel_completed"
         case .funnelAbandoned: return "funnel_abandoned"
         case .experimentExposure: return "experiment_exposure"
+        case .dateCheckInCreated: return "date_check_in_created"
+        case .dateCheckInStarted: return "date_check_in_started"
+        case .dateCheckInMid: return "date_check_in_mid"
+        case .dateCheckInCompleted: return "date_check_in_completed"
+        case .emergencyAlertTriggered: return "emergency_alert_triggered"
         }
     }
 

@@ -40,7 +40,7 @@ class PhotoVerification: ObservableObject {
 
         guard hasFace else {
             verificationError = "No face detected in photo"
-            throw VerificationError.noFaceDetected
+            throw PhotoVerificationError.noFaceDetected
         }
 
         // Step 2: Check image quality (40%)
@@ -50,7 +50,7 @@ class PhotoVerification: ObservableObject {
         let isGoodQuality = checkImageQuality(image)
         guard isGoodQuality else {
             verificationError = "Image quality too low"
-            throw VerificationError.poorQuality
+            throw PhotoVerificationError.poorQuality
         }
 
         // Step 3: Simulate face matching (70%)
@@ -63,7 +63,7 @@ class PhotoVerification: ObservableObject {
 
         guard matchScore >= 0.75 else {
             verificationError = "Face doesn't match profile photos"
-            throw VerificationError.noMatch
+            throw PhotoVerificationError.noMatch
         }
 
         // Step 4: Update user verification status (90%)
@@ -84,7 +84,7 @@ class PhotoVerification: ObservableObject {
 
     private func detectFace(in image: UIImage) async throws -> Bool {
         guard let cgImage = image.cgImage else {
-            throw VerificationError.invalidImage
+            throw PhotoVerificationError.invalidImage
         }
 
         return try await withCheckedThrowingContinuation { continuation in
@@ -163,7 +163,7 @@ struct VerificationResult {
     let timestamp: Date
 }
 
-enum VerificationError: LocalizedError {
+enum PhotoVerificationError: LocalizedError {
     case noFaceDetected
     case poorQuality
     case noMatch
