@@ -33,6 +33,10 @@ struct ContentView: View {
             print("🔍 ContentView: userSession changed to: \(newValue ?? "nil")")
             updateAuthenticationState()
         }
+        .onChange(of: authService.isEmailVerified) { newValue in
+            print("🔍 ContentView: isEmailVerified changed to: \(newValue)")
+            updateAuthenticationState()
+        }
         .onAppear {
             print("🔍 ContentView: onAppear - userSession: \(authService.userSession?.uid ?? "nil")")
             updateAuthenticationState()

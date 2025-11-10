@@ -15,13 +15,16 @@ class AuthService: ObservableObject {
     @Published var currentUser: User?
     @Published var isLoading = false
     @Published var errorMessage: String?
-    
+    @Published var isEmailVerified = false
+
     static let shared = AuthService()
     
     private init() {
         self.userSession = Auth.auth().currentUser
+        self.isEmailVerified = Auth.auth().currentUser?.isEmailVerified ?? false
         print("🔵 AuthService initialized")
         print("🔵 Current user session: \(Auth.auth().currentUser?.uid ?? "none")")
+        print("🔵 Email verified: \(isEmailVerified)")
         Task {
             await fetchUser()
         }
@@ -87,8 +90,10 @@ class AuthService: ObservableObject {
         do {
             let result = try await Auth.auth().signIn(withEmail: sanitizedEmail, password: sanitizedPassword)
             self.userSession = result.user
+            self.isEmailVerified = result.user.isEmailVerified
             print("✅ Sign in successful: \(result.user.uid)")
-            
+            print("✅ Email verified: \(isEmailVerified)")
+
             await fetchUser()
             
             if currentUser != nil {
@@ -332,6 +337,7 @@ class AuthService: ObservableObject {
             try Auth.auth().signOut()
             self.userSession = nil
             self.currentUser = nil
+            self.isEmailVerified = false
             print("✅ User signed out")
         } catch {
             print("❌ Error signing out: \(error.localizedDescription)")
@@ -454,11 +460,6 @@ class AuthService: ObservableObject {
 
     // MARK: - Email Verification
 
-    /// Check if current user's email is verified
-    var isEmailVerified: Bool {
-        return Auth.auth().currentUser?.isEmailVerified ?? false
-    }
-
     /// Send email verification to current user
     @MainActor
     func sendEmailVerification() async throws {
@@ -497,6 +498,9 @@ class AuthService: ObservableObject {
         }
 
         try await user.reload()
+
+        // Update published property to trigger view updates
+        self.isEmailVerified = user.isEmailVerified
         print("✅ User reloaded - Email verified: \(user.isEmailVerified)")
 
         // Update local state
