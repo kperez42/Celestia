@@ -7,6 +7,8 @@
 
 import Foundation
 import StoreKit
+import FirebaseFirestore
+import FirebaseAuth
 
 // MARK: - Subscription Manager
 
@@ -26,6 +28,7 @@ class SubscriptionManager: ObservableObject {
     // MARK: - Private Properties
 
     private let defaults = UserDefaults.standard
+    private let db = Firestore.firestore()
 
     private enum Keys {
         static let subscriptionStatus = "subscription_status"
@@ -71,6 +74,9 @@ class SubscriptionManager: ObservableObject {
 
         saveSubscriptionStatus()
 
+        // Sync with Firestore
+        await syncSubscriptionToFirestore(transaction: transaction)
+
         // Add to purchase history
         addToPurchaseHistory(transaction: transaction, productName: tier.displayName)
 
@@ -93,6 +99,9 @@ class SubscriptionManager: ObservableObject {
                 // Subscription expired
                 subscriptionStatus.isActive = false
                 saveSubscriptionStatus()
+
+                // Sync expiration to Firestore
+                await syncSubscriptionExpirationToFirestore()
 
                 // Track analytics
                 AnalyticsManager.shared.logEvent(.subscriptionExpired, parameters: [
@@ -338,5 +347,87 @@ class SubscriptionManager: ObservableObject {
         #else
         Logger.shared.warning("Subscription management not available on simulator", category: .general)
         #endif
+    }
+
+    // MARK: - Firebase Integration
+
+    /// Sync subscription to Firestore
+    private func syncSubscriptionToFirestore(transaction: Transaction) async {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            Logger.shared.warning("No user logged in for Firestore sync", category: .general)
+            return
+        }
+
+        Logger.shared.info("Syncing subscription to Firestore for user: \(userId)", category: .general)
+
+        do {
+            let userRef = db.collection("users").document(userId)
+
+            // Get tier from product ID
+            let tier = subscriptionStatus.tier
+            let expirationDate = subscriptionStatus.expirationDate ?? Date()
+
+            try await userRef.updateData([
+                "isPremium": true,
+                "premiumTier": tier.rawValue,
+                "subscriptionTier": tier.displayName,
+                "subscriptionPeriod": subscriptionStatus.period.rawValue,
+                "subscriptionExpiryDate": Timestamp(date: expirationDate),
+                "lastPurchaseDate": Timestamp(date: transaction.purchaseDate),
+                "originalTransactionId": transaction.originalID,
+                "transactionId": String(transaction.id),
+                "autoRenewEnabled": subscriptionStatus.autoRenewEnabled,
+                "lastSyncDate": Timestamp(date: Date())
+            ])
+
+            Logger.shared.info("Firestore updated successfully", category: .general)
+
+        } catch {
+            Logger.shared.error("Failed to update Firestore: \(error.localizedDescription)", category: .general)
+        }
+    }
+
+    /// Update Firestore when subscription expires
+    func syncSubscriptionExpirationToFirestore() async {
+        guard let userId = Auth.auth().currentUser?.uid else { return }
+
+        do {
+            let userRef = db.collection("users").document(userId)
+            try await userRef.updateData([
+                "isPremium": false,
+                "subscriptionStatus": "expired",
+                "lastSyncDate": Timestamp(date: Date())
+            ])
+
+            Logger.shared.info("Subscription expiration synced to Firestore", category: .general)
+
+        } catch {
+            Logger.shared.error("Failed to sync expiration to Firestore: \(error.localizedDescription)", category: .general)
+        }
+    }
+
+    /// Restore subscription from Firestore (useful for cross-device sync)
+    func restoreFromFirestore() async {
+        guard let userId = Auth.auth().currentUser?.uid else { return }
+
+        Logger.shared.info("Restoring subscription from Firestore", category: .general)
+
+        do {
+            let userRef = db.collection("users").document(userId)
+            let snapshot = try await userRef.getDocument()
+
+            guard let data = snapshot.data(),
+                  let isPremium = data["isPremium"] as? Bool,
+                  isPremium else {
+                Logger.shared.info("No premium status in Firestore", category: .general)
+                return
+            }
+
+            // This is informational only - actual subscription status comes from StoreKit
+            Logger.shared.info("Premium status in Firestore: true", category: .general)
+
+        } catch {
+            Logger.shared.error("Failed to restore from Firestore: \(error.localizedDescription)", category: .general)
+        }
     }
 }
