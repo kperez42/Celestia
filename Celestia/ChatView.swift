@@ -44,8 +44,16 @@ struct ChatView: View {
         .confirmationDialog("Unmatch with \(otherUser.fullName)?", isPresented: $showingUnmatchConfirmation, titleVisibility: .visible) {
             Button("Unmatch", role: .destructive) {
                 HapticManager.shared.notification(.warning)
-                // TODO: Implement unmatch functionality
-                dismiss()
+                Task {
+                    do {
+                        if let matchId = match?.id {
+                            try await MatchService.shared.unmatch(matchId: matchId, userId: currentUserId)
+                            dismiss()
+                        }
+                    } catch {
+                        print("Error unmatching: \(error)")
+                    }
+                }
             }
             Button("Cancel", role: .cancel) {
                 HapticManager.shared.impact(.light)

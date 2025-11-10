@@ -230,7 +230,8 @@ struct UserDetailView: View {
         }
         .alert("It's a Match! 🎉", isPresented: $showingMatched) {
             Button("Send Message") {
-                // TODO: Navigate to chat
+                // NOTE: Navigation to chat should be implemented using NavigationPath or coordinator
+                // For now, user can access chat from Messages tab
                 dismiss()
             }
             Button("Keep Browsing") { dismiss() }
