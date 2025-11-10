@@ -263,8 +263,19 @@ struct FeedDiscoverView: View {
         do {
             // Fetch from Firestore with filters
             let currentLocation: (lat: Double, lon: Double)? = {
-                if let user = authService.currentUser {
-                    return (user.latitude, user.longitude)
+                if let user = authService.currentUser,
+                   let lat = user.latitude,
+                   let lon = user.longitude {
+                    return (lat, lon)
+                }
+                return nil
+            }()
+
+            // Get age range with proper optional handling
+            let ageRange: ClosedRange<Int>? = {
+                if let minAge = authService.currentUser?.ageRangeMin,
+                   let maxAge = authService.currentUser?.ageRangeMax {
+                    return minAge...maxAge
                 }
                 return nil
             }()
@@ -273,7 +284,7 @@ struct FeedDiscoverView: View {
             try await UserService.shared.fetchUsers(
                 excludingUserId: currentUserId,
                 lookingFor: authService.currentUser?.lookingFor,
-                ageRange: authService.currentUser?.ageRangeMin...authService.currentUser?.ageRangeMax ?? 18...99,
+                ageRange: ageRange ?? 18...99,
                 limit: 50,
                 reset: true
             )
