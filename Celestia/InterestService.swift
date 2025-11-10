@@ -16,7 +16,7 @@ class InterestService: ObservableObject {
     @Published var isLoading = false
     @Published var error: Error?
 
-    nonisolated(unsafe) static let shared = InterestService()
+    static let shared = InterestService()
     private let db = Firestore.firestore()
     private var listener: ListenerRegistration?
     private var lastReceivedDocument: DocumentSnapshot?
@@ -241,9 +241,6 @@ class InterestService: ObservableObject {
     }
     
     deinit {
-        // Use Task to call MainActor-isolated method
-        Task { @MainActor in
-            self.stopListening()
-        }
+        listener?.remove()
     }
 }

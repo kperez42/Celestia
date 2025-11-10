@@ -8,6 +8,7 @@
 
 import Foundation
 import SwiftUI
+import UIKit
 import FirebaseAuth
 import StoreKit
 
@@ -141,8 +142,8 @@ protocol NotificationServiceProtocol: ObservableObject {
 // MARK: - Image Upload Service Protocol
 
 protocol ImageUploadServiceProtocol {
-    func uploadProfileImage(image: Data, userId: String) async throws -> String
-    func uploadChatImage(image: Data, matchId: String) async throws -> String
+    func uploadProfileImage(_ image: UIImage, userId: String) async throws -> String
+    func uploadChatImage(_ image: UIImage, matchId: String) async throws -> String
     func deleteImage(url: String) async throws
 }
 
