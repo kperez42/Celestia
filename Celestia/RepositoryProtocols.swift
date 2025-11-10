@@ -1,0 +1,76 @@
+//
+//  RepositoryProtocols.swift
+//  Celestia
+//
+//  Repository pattern interfaces for data access layer
+//  Separates business logic from data access concerns
+//
+
+import Foundation
+import FirebaseFirestore
+
+// MARK: - User Repository Protocol
+
+protocol UserRepository {
+    func fetchUser(id: String) async throws -> User?
+    func updateUser(_ user: User) async throws
+    func updateUserFields(userId: String, fields: [String: Any]) async throws
+    func searchUsers(query: String, currentUserId: String, limit: Int, offset: DocumentSnapshot?) async throws -> [User]
+    func incrementProfileViews(userId: String) async
+    func updateLastActive(userId: String) async
+}
+
+// MARK: - Match Repository Protocol
+
+protocol MatchRepository {
+    func fetchMatches(userId: String) async throws -> [Match]
+    func fetchMatch(user1Id: String, user2Id: String) async throws -> Match?
+    func createMatch(match: Match) async throws -> String
+    func updateMatchLastMessage(matchId: String, message: String, timestamp: Date) async throws
+    func deactivateMatch(matchId: String) async throws
+}
+
+// MARK: - Message Repository Protocol
+
+protocol MessageRepository {
+    func fetchMessages(matchId: String, limit: Int, before: Date?) async throws -> [Message]
+    func sendMessage(_ message: Message) async throws
+    func markMessagesAsRead(matchId: String, userId: String) async throws
+    func deleteMessage(messageId: String) async throws
+}
+
+// MARK: - Interest Repository Protocol
+
+protocol InterestRepository {
+    func fetchInterest(fromUserId: String, toUserId: String) async throws -> Interest?
+    func sendInterest(_ interest: Interest) async throws
+    func acceptInterest(interestId: String) async throws
+    func rejectInterest(interestId: String) async throws
+}
+
+// MARK: - Firestore Implementations (Optional - for future refactoring)
+
+/*
+ Example implementation:
+
+ class FirestoreUserRepository: UserRepository {
+     private let db = Firestore.firestore()
+
+     func fetchUser(id: String) async throws -> User? {
+         let doc = try await db.collection("users").document(id).getDocument()
+         return try? doc.data(as: User.self)
+     }
+
+     // ... other methods
+ }
+
+ Usage in services:
+
+ class UserService: ObservableObject {
+     private let repository: UserRepository
+
+     init(repository: UserRepository = FirestoreUserRepository()) {
+         self.repository = repository
+     }
+ }
+*/

@@ -104,33 +104,27 @@ class MessageService: ObservableObject {
             text: sanitizedText
         )
 
-        do {
-            // Add message to Firestore
-            _ = try db.collection("messages").addDocument(from: message)
+        // Add message to Firestore
+        _ = try db.collection("messages").addDocument(from: message)
 
-            // Update match with last message info
-            try await db.collection("matches").document(matchId).updateData([
-                "lastMessage": sanitizedText,
-                "lastMessageTimestamp": FieldValue.serverTimestamp(),
-                "unreadCount.\(receiverId)": FieldValue.increment(Int64(1))
-            ])
+        // Update match with last message info
+        try await db.collection("matches").document(matchId).updateData([
+            "lastMessage": sanitizedText,
+            "lastMessageTimestamp": FieldValue.serverTimestamp(),
+            "unreadCount.\(receiverId)": FieldValue.increment(Int64(1))
+        ])
 
-            // Send notification to receiver
-            let senderSnapshot = try? await db.collection("users").document(senderId).getDocument()
-            if let senderName = senderSnapshot?.data()?["fullName"] as? String {
-                await NotificationService.shared.sendMessageNotification(
-                    message: message,
-                    senderName: senderName,
-                    matchId: matchId
-                )
-            }
-
-            print("✅ Message sent successfully")
-        } catch {
-            print("❌ Error sending message: \(error)")
-            self.error = error
-            throw error
+        // Send notification to receiver
+        let senderSnapshot = try? await db.collection("users").document(senderId).getDocument()
+        if let senderName = senderSnapshot?.data()?["fullName"] as? String {
+            await NotificationService.shared.sendMessageNotification(
+                message: message,
+                senderName: senderName,
+                matchId: matchId
+            )
         }
+
+        print("✅ Message sent successfully")
     }
     
     /// Send an image message
@@ -147,19 +141,14 @@ class MessageService: ObservableObject {
             text: "📷 Photo",
             imageURL: imageURL
         )
-        
-        do {
-            _ = try db.collection("messages").addDocument(from: message)
-            
-            try await db.collection("matches").document(matchId).updateData([
-                "lastMessage": "📷 Photo",
-                "lastMessageTimestamp": FieldValue.serverTimestamp(),
-                "unreadCount.\(receiverId)": FieldValue.increment(Int64(1))
-            ])
-        } catch {
-            self.error = error
-            throw error
-        }
+
+        _ = try db.collection("messages").addDocument(from: message)
+
+        try await db.collection("matches").document(matchId).updateData([
+            "lastMessage": "📷 Photo",
+            "lastMessageTimestamp": FieldValue.serverTimestamp(),
+            "unreadCount.\(receiverId)": FieldValue.increment(Int64(1))
+        ])
     }
     
     /// Mark messages as read

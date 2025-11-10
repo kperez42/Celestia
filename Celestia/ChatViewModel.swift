@@ -90,13 +90,13 @@ class ChatViewModel: ObservableObject {
     func sendMessage(text: String) {
         guard !currentUserId.isEmpty && !otherUserId.isEmpty else { return }
         guard !text.isEmpty else { return }
-        
+
         Task {
             do {
                 // Find or create match
                 if let match = try? await MatchService.shared.fetchMatch(user1Id: currentUserId, user2Id: otherUserId),
                    let matchId = match.id {
-                    
+
                     try await MessageService.shared.sendMessage(
                         matchId: matchId,
                         senderId: currentUserId,
@@ -109,44 +109,9 @@ class ChatViewModel: ObservableObject {
             }
         }
     }
-    
-    func sendMessage(matchID: String, senderID: String, receiverID: String, content: String) {
-        let message = Message(
-            matchId: matchID,
-            senderId: senderID,
-            receiverId: receiverID,
-            text: content
-        )
-        
-        do {
-            try firestore.collection("messages").addDocument(from: message) { [weak self] error in
-                if let error = error {
-                    print("Error sending message: \(error)")
-                    return
-                }
-                
-                // Update match's lastMessageTimestamp
-                self?.firestore.collection("matches").document(matchID).updateData([
-                    "lastMessageTimestamp": Date()
-                ])
-            }
-        } catch {
-            print("Error encoding message: \(error)")
-        }
-    }
-    
-    func markMessagesAsRead(matchID: String, currentUserID: String) {
-        firestore.collection("messages")
-            .whereField("matchId", isEqualTo: matchID)
-            .whereField("receiverId", isEqualTo: currentUserID)
-            .whereField("isRead", isEqualTo: false)
-            .getDocuments { snapshot, error in
-                guard let documents = snapshot?.documents else { return }
-                
-                for doc in documents {
-                    doc.reference.updateData(["isRead": true])
-                }
-            }
+
+    func markMessagesAsRead(matchID: String, currentUserID: String) async {
+        await MessageService.shared.markMessagesAsRead(matchId: matchID, userId: currentUserID)
     }
     
     deinit {
