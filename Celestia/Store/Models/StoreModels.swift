@@ -537,3 +537,59 @@ enum StoreError: LocalizedError {
         }
     }
 }
+
+// MARK: - Premium Plan (Legacy)
+
+enum PremiumPlan: String, CaseIterable {
+    case monthly = "monthly"
+    case sixMonth = "6month"
+    case annual = "annual"
+
+    var name: String {
+        switch self {
+        case .monthly: return "Monthly"
+        case .sixMonth: return "6 Months"
+        case .annual: return "Annual"
+        }
+    }
+
+    var price: String {
+        switch self {
+        case .monthly: return "$19.99"
+        case .sixMonth: return "$14.99"
+        case .annual: return "$9.99"
+        }
+    }
+
+    var period: String {
+        switch self {
+        case .monthly: return "month"
+        case .sixMonth: return "month"
+        case .annual: return "month"
+        }
+    }
+
+    var totalPrice: String {
+        switch self {
+        case .monthly: return "$19.99/month"
+        case .sixMonth: return "$89.94 total"
+        case .annual: return "$119.88 total"
+        }
+    }
+
+    var savings: Int {
+        switch self {
+        case .monthly: return 0
+        case .sixMonth: return 25
+        case .annual: return 50
+        }
+    }
+
+    var productID: String {
+        switch self {
+        case .monthly: return "com.celestia.premium.monthly"
+        case .sixMonth: return "com.celestia.premium.sixmonth"
+        case .annual: return "com.celestia.premium.annual"
+        }
+    }
+}
