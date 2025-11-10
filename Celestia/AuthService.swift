@@ -244,14 +244,18 @@ class AuthService: ObservableObject {
 
             let encodedUser = try Firestore.Encoder().encode(user)
             try await Firestore.firestore().collection("users").document(userId).setData(encodedUser)
-            
+
             print("✅ User saved to Firestore successfully")
-            
-            // Step 4: Fetch user data
+
+            // Step 4: Send email verification
+            try await result.user.sendEmailVerification()
+            print("✅ Verification email sent to \(sanitizedEmail)")
+
+            // Step 5: Fetch user data
             await fetchUser()
             isLoading = false
-            
-            print("✅ Account creation completed")
+
+            print("✅ Account creation completed - Please verify your email")
         } catch let error as NSError {
             isLoading = false
             
@@ -406,7 +410,60 @@ class AuthService: ObservableObject {
         
         self.userSession = nil
         self.currentUser = nil
-        
+
         print("✅ Account deleted successfully")
+    }
+
+    // MARK: - Email Verification
+
+    /// Check if current user's email is verified
+    var isEmailVerified: Bool {
+        return Auth.auth().currentUser?.isEmailVerified ?? false
+    }
+
+    /// Send email verification to current user
+    @MainActor
+    func sendEmailVerification() async throws {
+        guard let user = Auth.auth().currentUser else {
+            throw CelestiaError.notAuthenticated
+        }
+
+        guard !user.isEmailVerified else {
+            print("✅ Email already verified")
+            return
+        }
+
+        try await user.sendEmailVerification()
+        print("✅ Verification email sent to \(user.email ?? "")")
+    }
+
+    /// Reload user to check verification status
+    @MainActor
+    func reloadUser() async throws {
+        guard let user = Auth.auth().currentUser else {
+            throw CelestiaError.notAuthenticated
+        }
+
+        try await user.reload()
+        print("✅ User reloaded - Email verified: \(user.isEmailVerified)")
+
+        // Update local state
+        if user.isEmailVerified {
+            await fetchUser()
+        }
+    }
+
+    /// Check if email verification is required before allowing access
+    @MainActor
+    func requireEmailVerification() async throws {
+        guard let user = Auth.auth().currentUser else {
+            throw CelestiaError.notAuthenticated
+        }
+
+        try await user.reload()
+
+        guard user.isEmailVerified else {
+            throw CelestiaError.emailNotVerified
+        }
     }
 }
