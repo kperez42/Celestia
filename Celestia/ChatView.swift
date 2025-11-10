@@ -46,7 +46,8 @@ struct ChatView: View {
                 HapticManager.shared.notification(.warning)
                 Task {
                     do {
-                        if let matchId = match?.id {
+                        if let matchId = match.id,
+                           let currentUserId = authService.currentUser?.id {
                             try await MatchService.shared.unmatch(matchId: matchId, userId: currentUserId)
                             dismiss()
                         }
