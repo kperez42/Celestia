@@ -167,7 +167,7 @@ class AuthService: ObservableObject {
     }
 
     @MainActor
-    func createUser(withEmail email: String, password: String, fullName: String, age: Int, gender: String, lookingFor: String, location: String, country: String) async throws {
+    func createUser(withEmail email: String, password: String, fullName: String, age: Int, gender: String, lookingFor: String, location: String, country: String, referralCode: String = "") async throws {
         isLoading = true
         errorMessage = nil
 
@@ -213,7 +213,7 @@ class AuthService: ObservableObject {
             print("✅ Firebase Auth user created: \(result.user.uid)")
             
             // Step 2: Create User object with all required fields
-            let user = User(
+            var user = User(
                 id: result.user.uid,
                 email: sanitizedEmail,
                 fullName: sanitizedFullName,
@@ -234,7 +234,13 @@ class AuthService: ObservableObject {
                 ageRangeMax: 99,
                 maxDistance: 100
             )
-            
+
+            // Set referral code if provided
+            let sanitizedReferralCode = sanitizeInput(referralCode)
+            if !sanitizedReferralCode.isEmpty {
+                user.referredByCode = sanitizedReferralCode.uppercased()
+            }
+
             print("🔵 Attempting to save user to Firestore...")
 
             // Step 3: Save to Firestore
@@ -251,7 +257,26 @@ class AuthService: ObservableObject {
             try await result.user.sendEmailVerification()
             print("✅ Verification email sent to \(sanitizedEmail)")
 
-            // Step 5: Fetch user data
+            // Step 5: Initialize referral code and process referral
+            do {
+                // Generate unique referral code for new user
+                try await ReferralManager.shared.initializeReferralCode(for: &user)
+                print("✅ Referral code initialized for user")
+
+                // Process referral if code was provided
+                if !sanitizedReferralCode.isEmpty {
+                    try await ReferralManager.shared.processReferralSignup(
+                        newUser: user,
+                        referralCode: sanitizedReferralCode.uppercased()
+                    )
+                    print("✅ Referral processed successfully")
+                }
+            } catch {
+                print("⚠️ Error handling referral: \(error.localizedDescription)")
+                // Don't fail account creation if referral processing fails
+            }
+
+            // Step 6: Fetch user data
             await fetchUser()
             isLoading = false
 

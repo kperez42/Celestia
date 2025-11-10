@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct SignInView: View {
-    @StateObject private var authViewModel = AuthViewModel()
+    @EnvironmentObject var authService: AuthService
     @Environment(\.dismiss) var dismiss
 
     @State private var email = ""
@@ -83,8 +83,8 @@ struct SignInView: View {
                             }
                             
                             // Error message
-                            if !authViewModel.errorMessage.isEmpty {
-                                Text(authViewModel.errorMessage)
+                            if let errorMessage = authService.errorMessage, !errorMessage.isEmpty {
+                                Text(errorMessage)
                                     .font(.caption)
                                     .foregroundColor(.red)
                                     .padding(.horizontal)
@@ -92,9 +92,16 @@ struct SignInView: View {
                             
                             // Sign In Button
                             Button {
-                                authViewModel.signIn(email: email, password: password)
+                                Task {
+                                    do {
+                                        try await authService.signIn(withEmail: email, password: password)
+                                    } catch {
+                                        print("Error signing in: \(error)")
+                                        // Error is handled by AuthService setting errorMessage
+                                    }
+                                }
                             } label: {
-                                if authViewModel.isLoading {
+                                if authService.isLoading {
                                     ProgressView()
                                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                         .frame(maxWidth: .infinity)
@@ -115,7 +122,7 @@ struct SignInView: View {
                                 )
                             )
                             .cornerRadius(15)
-                            .disabled(email.isEmpty || password.isEmpty || authViewModel.isLoading)
+                            .disabled(email.isEmpty || password.isEmpty || authService.isLoading)
                             
                             // Forgot Password
                             Button {
@@ -144,8 +151,8 @@ struct SignInView: View {
                 }
             }
         }
-        .onChange(of: authViewModel.isAuthenticated) { isAuth in
-            if isAuth {
+        .onChange(of: authService.userSession) { session in
+            if session != nil {
                 dismiss()
             }
         }
@@ -183,4 +190,5 @@ struct SignInView: View {
 
 #Preview {
     SignInView()
+        .environmentObject(AuthService.shared)
 }
