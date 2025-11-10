@@ -164,8 +164,9 @@ struct EditProfileView: View {
                         Image(uiImage: profileImage)
                             .resizable()
                             .scaledToFill()
-                    } else if let imageURL = URL(string: authService.currentUser?.profileImageURL ?? ""),
-                              !authService.currentUser!.profileImageURL.isEmpty {
+                    } else if let currentUser = authService.currentUser,
+                              let imageURL = URL(string: currentUser.profileImageURL),
+                              !currentUser.profileImageURL.isEmpty {
                         AsyncImage(url: imageURL) { phase in
                             switch phase {
                             case .success(let image):

@@ -242,9 +242,10 @@ struct UserDetailView: View {
     }
     
     func sendInterest() {
-        guard let currentUserID = authViewModel.currentUser?.id else { return }
-        
-        viewModel.sendInterest(from: currentUserID, to: user.id!) { success in
+        guard let currentUserID = authViewModel.currentUser?.id,
+              let targetUserID = user.id else { return }
+
+        viewModel.sendInterest(from: currentUserID, to: targetUserID) { success in
             if success {
                 // Check if it was a match or just interest sent
                 // For now, just show interest sent
