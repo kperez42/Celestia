@@ -59,16 +59,18 @@ class MatchService: ObservableObject {
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self else { return }
 
-                if let error = error {
-                    print("❌ Error listening to matches: \(error)")
-                    return
-                }
+                Task { @MainActor in
+                    if let error = error {
+                        print("❌ Error listening to matches: \(error)")
+                        return
+                    }
 
-                guard let documents = snapshot?.documents else { return }
+                    guard let documents = snapshot?.documents else { return }
 
-                let allMatches = documents.compactMap { try? $0.data(as: Match.self) }
-                self.matches = allMatches.sorted {
-                    ($0.lastMessageTimestamp ?? $0.timestamp) > ($1.lastMessageTimestamp ?? $1.timestamp)
+                    let allMatches = documents.compactMap { try? $0.data(as: Match.self) }
+                    self.matches = allMatches.sorted {
+                        ($0.lastMessageTimestamp ?? $0.timestamp) > ($1.lastMessageTimestamp ?? $1.timestamp)
+                    }
                 }
             }
     }

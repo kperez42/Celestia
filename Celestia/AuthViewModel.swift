@@ -9,12 +9,13 @@ import Foundation
 import FirebaseAuth
 import FirebaseFirestore
 
+@MainActor
 class AuthViewModel: ObservableObject {
     @Published var isAuthenticated = false
     @Published var currentUser: User?
     @Published var errorMessage = ""
     @Published var isLoading = false
-    
+
     private let auth = Auth.auth()
     private let firestore = Firestore.firestore()
     
@@ -36,36 +37,38 @@ class AuthViewModel: ObservableObject {
         auth.createUser(withEmail: email, password: password) { [weak self] result, error in
             guard let self = self else { return }
 
-            if let error = error {
-                self.errorMessage = error.localizedDescription
-                self.isLoading = false
-                return
+            Task { @MainActor in
+                if let error = error {
+                    self.errorMessage = error.localizedDescription
+                    self.isLoading = false
+                    return
+                }
+
+                guard let firebaseUser = result?.user else {
+                    self.errorMessage = "Failed to create user"
+                    self.isLoading = false
+                    return
+                }
+
+                // Create user document in Firestore
+                var user = User(
+                    id: firebaseUser.uid,
+                    email: email,
+                    fullName: name,
+                    age: age,
+                    gender: gender,
+                    lookingFor: lookingFor,
+                    location: location,
+                    country: country
+                )
+
+                // Store referral code if provided
+                if !referralCode.isEmpty {
+                    user.referredByCode = referralCode.uppercased().trimmingCharacters(in: .whitespaces)
+                }
+
+                self.saveUserToFirestore(user: user, referralCode: referralCode)
             }
-
-            guard let firebaseUser = result?.user else {
-                self.errorMessage = "Failed to create user"
-                self.isLoading = false
-                return
-            }
-
-            // Create user document in Firestore
-            var user = User(
-                id: firebaseUser.uid,
-                email: email,
-                fullName: name,
-                age: age,
-                gender: gender,
-                lookingFor: lookingFor,
-                location: location,
-                country: country
-            )
-
-            // Store referral code if provided
-            if !referralCode.isEmpty {
-                user.referredByCode = referralCode.uppercased().trimmingCharacters(in: .whitespaces)
-            }
-
-            self.saveUserToFirestore(user: user, referralCode: referralCode)
         }
     }
     
@@ -75,20 +78,22 @@ class AuthViewModel: ObservableObject {
         
         auth.signIn(withEmail: email, password: password) { [weak self] result, error in
             guard let self = self else { return }
-            
-            if let error = error {
-                self.errorMessage = error.localizedDescription
-                self.isLoading = false
-                return
+
+            Task { @MainActor in
+                if let error = error {
+                    self.errorMessage = error.localizedDescription
+                    self.isLoading = false
+                    return
+                }
+
+                guard let firebaseUser = result?.user else {
+                    self.errorMessage = "Failed to sign in"
+                    self.isLoading = false
+                    return
+                }
+
+                self.loadUserData(uid: firebaseUser.uid)
             }
-            
-            guard let firebaseUser = result?.user else {
-                self.errorMessage = "Failed to sign in"
-                self.isLoading = false
-                return
-            }
-            
-            self.loadUserData(uid: firebaseUser.uid)
         }
     }
     
@@ -156,22 +161,24 @@ class AuthViewModel: ObservableObject {
     private func loadUserData(uid: String) {
         firestore.collection("users").document(uid).getDocument { [weak self] snapshot, error in
             guard let self = self else { return }
-            
-            if let error = error {
-                self.errorMessage = error.localizedDescription
+
+            Task { @MainActor in
+                if let error = error {
+                    self.errorMessage = error.localizedDescription
+                    self.isLoading = false
+                    return
+                }
+
+                guard let data = snapshot?.data() else {
+                    self.errorMessage = "User data not found"
+                    self.isLoading = false
+                    return
+                }
+
+                self.currentUser = User(dictionary: data)
+                self.isAuthenticated = true
                 self.isLoading = false
-                return
             }
-            
-            guard let data = snapshot?.data() else {
-                self.errorMessage = "User data not found"
-                self.isLoading = false
-                return
-            }
-            
-            self.currentUser = User(dictionary: data)
-            self.isAuthenticated = true
-            self.isLoading = false
         }
     }
 }

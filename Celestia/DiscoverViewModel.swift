@@ -8,6 +8,7 @@
 import Foundation
 import FirebaseFirestore
 
+@MainActor
 class DiscoverViewModel: ObservableObject {
     @Published var users: [User] = []
     @Published var isLoading = false
@@ -38,35 +39,37 @@ class DiscoverViewModel: ObservableObject {
         
         query.getDocuments { [weak self] snapshot, error in
             guard let self = self else { return }
-            
-            if let error = error {
-                self.errorMessage = error.localizedDescription
-                self.isLoading = false
-                return
-            }
-            
-            guard let documents = snapshot?.documents else {
-                self.isLoading = false
-                return
-            }
-            
-            self.lastDocument = documents.last
-            
-            let fetchedUsers = documents.compactMap { doc -> User? in
-                let data = doc.data()
-                var user = User(dictionary: data)
-                user.id = doc.documentID
-                
-                // Don't show current user
-                if user.id == currentUser.id {
-                    return nil
+
+            Task { @MainActor in
+                if let error = error {
+                    self.errorMessage = error.localizedDescription
+                    self.isLoading = false
+                    return
                 }
-                
-                return user
+
+                guard let documents = snapshot?.documents else {
+                    self.isLoading = false
+                    return
+                }
+
+                self.lastDocument = documents.last
+
+                let fetchedUsers = documents.compactMap { doc -> User? in
+                    let data = doc.data()
+                    var user = User(dictionary: data)
+                    user.id = doc.documentID
+
+                    // Don't show current user
+                    if user.id == currentUser.id {
+                        return nil
+                    }
+
+                    return user
+                }
+
+                self.users.append(contentsOf: fetchedUsers)
+                self.isLoading = false
             }
-            
-            self.users.append(contentsOf: fetchedUsers)
-            self.isLoading = false
         }
     }
     
