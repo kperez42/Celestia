@@ -387,6 +387,8 @@ enum AnalyticsEvent {
     case dateCheckInMid
     case dateCheckInCompleted
     case emergencyAlertTriggered
+    case reportSubmitted
+    case userBlocked
 
     var name: String {
         switch self {
@@ -448,6 +450,8 @@ enum AnalyticsEvent {
         case .dateCheckInMid: return "date_check_in_mid"
         case .dateCheckInCompleted: return "date_check_in_completed"
         case .emergencyAlertTriggered: return "emergency_alert_triggered"
+        case .reportSubmitted: return "report_submitted"
+        case .userBlocked: return "user_blocked"
         }
     }
 

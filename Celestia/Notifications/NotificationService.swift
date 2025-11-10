@@ -261,7 +261,7 @@ class NotificationService: ObservableObject, NotificationServiceProtocol, Notifi
 extension NotificationService {
     /// Request notification permission (protocol method)
     func requestPermission() async -> Bool {
-        return await manager.requestPermission()
+        return await manager.requestAuthorization()
     }
 
     /// Save FCM token (protocol method)
@@ -274,9 +274,9 @@ extension NotificationService {
     /// Send new match notification (protocol method)
     func sendNewMatchNotification(match: Match, otherUser: User) async {
         await sendNewMatchNotification(
-            matchId: match.id,
+            matchId: match.id ?? "",
             matchName: otherUser.name,
-            matchImageURL: otherUser.profileImages.first.flatMap { URL(string: $0) }
+            matchImageURL: otherUser.photos.first.flatMap { URL(string: $0) }
         )
     }
 

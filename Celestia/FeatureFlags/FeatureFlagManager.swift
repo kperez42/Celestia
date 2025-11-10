@@ -123,11 +123,10 @@ class FeatureFlagManager: ObservableObject {
             return override
         }
 
-        guard let data = remoteConfig.configValue(forKey: flag.key).dataValue else {
-            return nil
-        }
+        let data = remoteConfig.configValue(forKey: flag.key).dataValue
 
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        guard !data.isEmpty,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return nil
         }
 
@@ -412,6 +411,7 @@ extension View {
 struct FeatureFlagged {
     let flag: FeatureFlag
 
+    @MainActor
     var wrappedValue: Bool {
         return FeatureFlagManager.shared.isEnabled(flag)
     }
