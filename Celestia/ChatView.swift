@@ -302,10 +302,6 @@ struct ChatView: View {
     private func setupChat() {
         guard let matchId = match.id else { return }
 
-        #if DEBUG
-        // Use test messages in preview/debug mode
-        messageService.messages = TestData.messagesForMatch(matchId)
-        #else
         messageService.listenToMessages(matchId: matchId)
 
         // Mark messages as read
@@ -314,7 +310,6 @@ struct ChatView: View {
                 await messageService.markMessagesAsRead(matchId: matchId, userId: userId)
             }
         }
-        #endif
     }
     
     private func sendMessage() {
@@ -334,38 +329,6 @@ struct ChatView: View {
         // Clear input immediately for better UX
         messageText = ""
 
-        #if DEBUG
-        // Add message locally for demo
-        let newMessage = Message(
-            matchId: matchId,
-            senderId: authService.currentUser?.id ?? "current_user",
-            receiverId: otherUser.id ?? "",
-            text: text,
-            timestamp: Date(),
-            isRead: false,
-            isDelivered: true
-        )
-        messageService.messages.append(newMessage)
-
-        // Simulate response after delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            isOtherUserTyping = true
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-            isOtherUserTyping = false
-            let response = Message(
-                matchId: matchId,
-                senderId: otherUser.id ?? "",
-                receiverId: authService.currentUser?.id ?? "",
-                text: "Thanks for the message! 😊",
-                timestamp: Date(),
-                isRead: false,
-                isDelivered: true
-            )
-            messageService.messages.append(response)
-            HapticManager.shared.notification(.success)
-        }
-        #else
         guard let currentUserId = authService.currentUser?.id else { return }
         guard let receiverId = otherUser.id else { return }
 
@@ -384,7 +347,6 @@ struct ChatView: View {
                 // Could show error alert here
             }
         }
-        #endif
     }
 }
 

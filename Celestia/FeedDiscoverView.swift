@@ -255,13 +255,6 @@ struct FeedDiscoverView: View {
     // MARK: - Data Loading
 
     private func loadUsers() async {
-        #if DEBUG
-        // Use test data in preview/debug mode
-        await MainActor.run {
-            users = TestData.discoverUsers
-            loadMoreUsers()
-        }
-        #else
         guard let currentUserId = authService.currentUser?.id else { return }
 
         isLoading = true
@@ -289,8 +282,9 @@ struct FeedDiscoverView: View {
                 users = UserService.shared.users
                 loadMoreUsers()
             }
+        } catch {
+            print("❌ Error loading users: \(error)")
         }
-        #endif
     }
 
     private func loadMoreUsers() {

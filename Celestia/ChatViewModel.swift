@@ -16,7 +16,8 @@ class ChatViewModel: ObservableObject {
     
     private let firestore = Firestore.firestore()
     private var messagesListener: ListenerRegistration?
-    
+    private var loadTask: Task<Void, Never>?
+
     var currentUserId: String
     var otherUserId: String
     
@@ -53,11 +54,16 @@ class ChatViewModel: ObservableObject {
     
     func loadMessages() {
         guard !currentUserId.isEmpty && !otherUserId.isEmpty else { return }
-        
+
+        // Cancel previous task if any
+        loadTask?.cancel()
+
         // Find match between current user and other user
-        Task {
+        loadTask = Task {
+            guard !Task.isCancelled else { return }
             if let match = try? await MatchService.shared.fetchMatch(user1Id: currentUserId, user2Id: otherUserId),
                let matchId = match.id {
+                guard !Task.isCancelled else { return }
                 await loadMessages(for: matchId)
             }
         }
@@ -114,7 +120,17 @@ class ChatViewModel: ObservableObject {
         await MessageService.shared.markMessagesAsRead(matchId: matchID, userId: currentUserID)
     }
     
+    /// Cleanup method to cancel ongoing tasks and remove listeners
+    func cleanup() {
+        loadTask?.cancel()
+        loadTask = nil
+        messagesListener?.remove()
+        messagesListener = nil
+        messages = []
+    }
+
     deinit {
+        loadTask?.cancel()
         messagesListener?.remove()
     }
 }

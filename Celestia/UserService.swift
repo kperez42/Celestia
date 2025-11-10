@@ -18,7 +18,8 @@ class UserService: ObservableObject {
     static let shared = UserService()
     private let db = Firestore.firestore()
     private var lastDocument: DocumentSnapshot?
-    
+    private var searchTask: Task<Void, Never>?
+
     private init() {}
 
     // MARK: - Input Sanitization
@@ -199,6 +200,42 @@ class UserService: ObservableObject {
                        user.country.lowercased().contains(searchQuery)
             }
     }
+
+    /// Debounced search to prevent excessive API calls while typing
+    /// - Parameters:
+    ///   - query: Search query string
+    ///   - currentUserId: Current user's ID to exclude from results
+    ///   - debounceInterval: Time to wait before executing search (default: 0.3 seconds)
+    ///   - limit: Maximum number of results
+    ///   - completion: Callback with search results or error
+    func debouncedSearch(
+        query: String,
+        currentUserId: String,
+        debounceInterval: TimeInterval = 0.3,
+        limit: Int = 20,
+        completion: @escaping ([User]?, Error?) -> Void
+    ) {
+        // Cancel previous search task
+        searchTask?.cancel()
+
+        // Create new debounced search task
+        searchTask = Task {
+            // Wait for debounce interval
+            try? await Task.sleep(nanoseconds: UInt64(debounceInterval * 1_000_000_000))
+
+            // Check if task was cancelled
+            guard !Task.isCancelled else { return }
+
+            do {
+                let results = try await searchUsers(query: query, currentUserId: currentUserId, limit: limit)
+                guard !Task.isCancelled else { return }
+                completion(results, nil)
+            } catch {
+                guard !Task.isCancelled else { return }
+                completion(nil, error)
+            }
+        }
+    }
     
     /// Load more users (pagination)
     func loadMoreUsers(excludingUserId: String, lookingFor: String? = nil, ageRange: ClosedRange<Int>? = nil) async throws {
@@ -223,7 +260,7 @@ class UserService: ObservableObject {
     func profileCompletionPercentage(_ user: User) -> Int {
         var completedSteps = 0
         let totalSteps = 7
-        
+
         if !user.fullName.isEmpty { completedSteps += 1 }
         if !user.bio.isEmpty { completedSteps += 1 }
         if !user.profileImageURL.isEmpty { completedSteps += 1 }
@@ -231,7 +268,17 @@ class UserService: ObservableObject {
         if user.languages.count >= 1 { completedSteps += 1 }
         if user.photos.count >= 2 { completedSteps += 1 }
         if user.age >= 18 { completedSteps += 1 }
-        
+
         return (completedSteps * 100) / totalSteps
+    }
+
+    /// Cancel ongoing search task (useful for cleanup or manual cancellation)
+    func cancelSearch() {
+        searchTask?.cancel()
+        searchTask = nil
+    }
+
+    deinit {
+        searchTask?.cancel()
     }
 }

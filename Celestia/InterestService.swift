@@ -19,6 +19,8 @@ class InterestService: ObservableObject {
     static let shared = InterestService()
     private let db = Firestore.firestore()
     private var listener: ListenerRegistration?
+    private var lastReceivedDocument: DocumentSnapshot?
+    private var lastSentDocument: DocumentSnapshot?
 
     // Dependency injection for better testability and reduced coupling
     private let matchCreator: MatchCreating
@@ -92,32 +94,58 @@ class InterestService: ObservableObject {
     }
     
     // MARK: - Fetch Received Interests
-    
-    func fetchReceivedInterests(userId: String) async throws {
+
+    func fetchReceivedInterests(userId: String, limit: Int = 20, reset: Bool = true) async throws {
         isLoading = true
         defer { isLoading = false }
 
-        let snapshot = try await db.collection("interests")
+        if reset {
+            lastReceivedDocument = nil
+            receivedInterests = []
+        }
+
+        var query = db.collection("interests")
             .whereField("toUserId", isEqualTo: userId)
             .whereField("status", isEqualTo: "pending")
             .order(by: "timestamp", descending: true)
-            .getDocuments()
+            .limit(to: limit)
 
-        receivedInterests = snapshot.documents.compactMap { try? $0.data(as: Interest.self) }
+        if let lastDoc = lastReceivedDocument {
+            query = query.start(afterDocument: lastDoc)
+        }
+
+        let snapshot = try await query.getDocuments()
+        lastReceivedDocument = snapshot.documents.last
+
+        let newInterests = snapshot.documents.compactMap { try? $0.data(as: Interest.self) }
+        receivedInterests.append(contentsOf: newInterests)
     }
     
     // MARK: - Fetch Sent Interests
-    
-    func fetchSentInterests(userId: String) async throws {
+
+    func fetchSentInterests(userId: String, limit: Int = 20, reset: Bool = true) async throws {
         isLoading = true
         defer { isLoading = false }
 
-        let snapshot = try await db.collection("interests")
+        if reset {
+            lastSentDocument = nil
+            sentInterests = []
+        }
+
+        var query = db.collection("interests")
             .whereField("fromUserId", isEqualTo: userId)
             .order(by: "timestamp", descending: true)
-            .getDocuments()
+            .limit(to: limit)
 
-        sentInterests = snapshot.documents.compactMap { try? $0.data(as: Interest.self) }
+        if let lastDoc = lastSentDocument {
+            query = query.start(afterDocument: lastDoc)
+        }
+
+        let snapshot = try await query.getDocuments()
+        lastSentDocument = snapshot.documents.last
+
+        let newInterests = snapshot.documents.compactMap { try? $0.data(as: Interest.self) }
+        sentInterests.append(contentsOf: newInterests)
     }
     
     // MARK: - Listen to Interests
