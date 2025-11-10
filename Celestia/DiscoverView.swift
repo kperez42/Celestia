@@ -384,6 +384,15 @@ struct DiscoverView: View {
     // MARK: - Helper Functions
     
     private func loadUsers() async {
+        #if DEBUG
+        // Use test data in debug builds for easier testing
+        allUsers = TestData.discoverUsers
+        applyFilters()
+        currentIndex = 0
+        isLoading = false
+        return
+        #endif
+
         guard let currentUserId = authService.currentUser?.id else { return }
 
         isLoading = true
