@@ -115,7 +115,7 @@ class PhotoVerificationManager {
 
     // MARK: - Face Detection
 
-    private func detectFaces(in image: UIImage) async throws -> [VNFaceObservation] {
+    func detectFaces(in image: UIImage) async throws -> [VNFaceObservation] {
         guard let cgImage = image.cgImage else {
             throw VerificationError.verificationFailed
         }

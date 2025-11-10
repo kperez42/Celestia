@@ -16,7 +16,7 @@ class InterestService: ObservableObject {
     @Published var isLoading = false
     @Published var error: Error?
 
-    static let shared = InterestService()
+    nonisolated(unsafe) static let shared = InterestService()
     private let db = Firestore.firestore()
     private var listener: ListenerRegistration?
     private var lastReceivedDocument: DocumentSnapshot?

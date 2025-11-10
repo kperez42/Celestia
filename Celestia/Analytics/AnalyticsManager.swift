@@ -530,23 +530,28 @@ extension AnalyticsManager {
 
 extension AnalyticsManager {
     /// Log event with string name (protocol method)
-    func log(event: String, parameters: [String: Any]) {
+    nonisolated func log(event: String, parameters: [String: Any]) {
         Analytics.logEvent(event, parameters: parameters)
         Logger.shared.info("Event: \(event) \(parameters)", category: .analytics)
     }
 
     /// Set user ID (protocol method)
-    func setUserId(_ userId: String) {
-        setUserId(userId as String?)
+    nonisolated func setUserId(_ userId: String) {
+        Analytics.setUserID(userId)
+        Crashlytics.crashlytics().setUserID(userId)
     }
 
     /// Set user property (protocol method)
-    func setUserProperty(_ value: String, forName name: String) {
-        setUserProperty(value as String?, forName: name)
+    nonisolated func setUserProperty(_ value: String, forName name: String) {
+        Analytics.setUserProperty(value, forName: name)
+        Crashlytics.crashlytics().setCustomValue(value, forKey: name)
     }
 
     /// Log screen view (protocol method)
-    func logScreen(name: String, screenClass: String) {
-        logScreenView(name, screenClass: screenClass)
+    nonisolated func logScreen(name: String, screenClass: String) {
+        Analytics.logEvent(AnalyticsEventScreenView, parameters: [
+            AnalyticsParameterScreenName: name,
+            AnalyticsParameterScreenClass: screenClass
+        ])
     }
 }

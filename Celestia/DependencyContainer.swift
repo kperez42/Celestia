@@ -24,15 +24,15 @@ class DependencyContainer {
     private(set) var userService: any UserServiceProtocol
     private(set) var matchService: any MatchServiceProtocol
     private(set) var messageService: any MessageServiceProtocol
-    private(set) var swipeService: SwipeServiceProtocol
-    private(set) var referralManager: ReferralManagerProtocol
-    private(set) var storeManager: StoreManagerProtocol
-    private(set) var notificationService: NotificationServiceProtocol
-    private(set) var imageUploadService: ImageUploadServiceProtocol
-    private(set) var contentModerator: ContentModeratorProtocol
-    private(set) var analyticsManager: AnalyticsManagerProtocol
-    private(set) var blockReportService: BlockReportServiceProtocol
-    private(set) var networkManager: NetworkManagerProtocol
+    private(set) var swipeService: any SwipeServiceProtocol
+    private(set) var referralManager: any ReferralManagerProtocol
+    private(set) var storeManager: any StoreManagerProtocol
+    private(set) var notificationService: any NotificationServiceProtocol
+    private(set) var imageUploadService: any ImageUploadServiceProtocol
+    private(set) var contentModerator: any ContentModeratorProtocol
+    private(set) var analyticsManager: any AnalyticsManagerProtocol
+    private(set) var blockReportService: any BlockReportServiceProtocol
+    private(set) var networkManager: any NetworkManagerProtocol
 
     // MARK: - Initialization
 
@@ -71,8 +71,8 @@ class DependencyContainer {
         userService: (any UserServiceProtocol)? = nil,
         matchService: (any MatchServiceProtocol)? = nil,
         messageService: (any MessageServiceProtocol)? = nil,
-        swipeService: SwipeServiceProtocol? = nil,
-        networkManager: NetworkManagerProtocol? = nil
+        swipeService: (any SwipeServiceProtocol)? = nil,
+        networkManager: (any NetworkManagerProtocol)? = nil
     ) -> DependencyContainer {
         let container = DependencyContainer()
 
@@ -116,11 +116,11 @@ class DependencyContainer {
         self.messageService = service
     }
 
-    func replaceSwipeService(_ service: SwipeServiceProtocol) {
+    func replaceSwipeService(_ service: any SwipeServiceProtocol) {
         self.swipeService = service
     }
 
-    func replaceNetworkManager(_ manager: NetworkManagerProtocol) {
+    func replaceNetworkManager(_ manager: any NetworkManagerProtocol) {
         self.networkManager = manager
     }
 
@@ -188,42 +188,42 @@ struct Injected<T> {
 
 @propertyWrapper
 struct InjectedAuthService {
-    var wrappedValue: AuthServiceProtocol {
+    var wrappedValue: any AuthServiceProtocol {
         DependencyContainer.shared.authService
     }
 }
 
 @propertyWrapper
 struct InjectedUserService {
-    var wrappedValue: UserServiceProtocol {
+    var wrappedValue: any UserServiceProtocol {
         DependencyContainer.shared.userService
     }
 }
 
 @propertyWrapper
 struct InjectedMatchService {
-    var wrappedValue: MatchServiceProtocol {
+    var wrappedValue: any MatchServiceProtocol {
         DependencyContainer.shared.matchService
     }
 }
 
 @propertyWrapper
 struct InjectedMessageService {
-    var wrappedValue: MessageServiceProtocol {
+    var wrappedValue: any MessageServiceProtocol {
         DependencyContainer.shared.messageService
     }
 }
 
 @propertyWrapper
 struct InjectedSwipeService {
-    var wrappedValue: SwipeServiceProtocol {
+    var wrappedValue: any SwipeServiceProtocol {
         DependencyContainer.shared.swipeService
     }
 }
 
 @propertyWrapper
 struct InjectedNetworkManager {
-    var wrappedValue: NetworkManagerProtocol {
+    var wrappedValue: any NetworkManagerProtocol {
         DependencyContainer.shared.networkManager
     }
 }

@@ -305,36 +305,4 @@ struct IDVerificationResult {
     let failureReason: String?
 }
 
-// MARK: - Extension for PhotoVerificationManager
-
-extension PhotoVerificationManager {
-    func detectFaces(in image: UIImage) async throws -> [VNFaceObservation] {
-        guard let cgImage = image.cgImage else {
-            throw VerificationError.verificationFailed
-        }
-
-        return try await withCheckedThrowingContinuation { continuation in
-            let request = VNDetectFaceLandmarksRequest { request, error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-
-                guard let observations = request.results as? [VNFaceObservation] else {
-                    continuation.resume(returning: [])
-                    return
-                }
-
-                continuation.resume(returning: observations)
-            }
-
-            let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-
-            do {
-                try handler.perform([request])
-            } catch {
-                continuation.resume(throwing: error)
-            }
-        }
-    }
-}
+// MARK: - Extension removed - detectFaces is already defined in PhotoVerificationManager

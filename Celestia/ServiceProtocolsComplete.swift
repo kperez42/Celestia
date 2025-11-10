@@ -9,6 +9,7 @@
 import Foundation
 import SwiftUI
 import FirebaseAuth
+import StoreKit
 
 // MARK: - Auth Service Protocol
 
@@ -42,9 +43,7 @@ protocol UserServiceProtocol: ObservableObject {
 
     func fetchUser(userId: String) async throws -> User?
     func fetchUsers(excludingUserId: String, lookingFor: String?, ageRange: ClosedRange<Int>?, country: String?, limit: Int, reset: Bool) async throws
-    func updateUserLocation(userId: String, location: String, latitude: Double, longitude: Double) async throws
-    func updateUserActivity(userId: String) async throws
-    func incrementProfileViews(userId: String) async throws
+    func incrementProfileViews(userId: String) async
 }
 
 // MARK: - Match Service Protocol
@@ -76,12 +75,12 @@ protocol MessageServiceProtocol: ObservableObject {
     var isLoading: Bool { get }
     var error: Error? { get }
 
-    func fetchMessages(matchId: String) async throws
+    func fetchMessages(matchId: String, limit: Int, before: Date?) async throws -> [Message]
     func listenToMessages(matchId: String)
     func stopListening()
     func sendMessage(matchId: String, senderId: String, receiverId: String, text: String) async throws
     func sendImageMessage(matchId: String, senderId: String, receiverId: String, imageURL: String) async throws
-    func deleteMessage(messageId: String, matchId: String) async throws
+    func deleteMessage(messageId: String) async throws
 }
 
 // MARK: - Swipe Service Protocol
@@ -118,12 +117,13 @@ protocol ReferralManagerProtocol: ObservableObject {
 
 @MainActor
 protocol StoreManagerProtocol: ObservableObject {
-    var hasActiveSubscription: Bool { get }
+    var products: [Product] { get }
+    var subscriptionProducts: [Product] { get }
+    var purchasedProductIDs: Set<String> { get }
 
     func loadProducts() async
-    func purchase(_ product: Any) async throws -> Bool
+    func purchase(_ product: Product) async throws -> PurchaseResult
     func restorePurchases() async throws
-    func getProduct(for plan: PremiumPlan) -> Any?
 }
 
 // MARK: - Notification Service Protocol
@@ -171,11 +171,11 @@ protocol AnalyticsManagerProtocol {
 
 @MainActor
 protocol BlockReportServiceProtocol {
-    func blockUser(blockerId: String, blockedId: String, reason: String) async throws
+    func blockUser(userId: String, currentUserId: String) async throws
     func unblockUser(blockerId: String, blockedId: String) async throws
-    func isUserBlocked(blockerId: String, blockedId: String) async throws -> Bool
-    func getBlockedUsers(userId: String) async throws -> [String]
-    func reportUser(reporterId: String, reportedId: String, reason: String, details: String) async throws
+    func isUserBlocked(_ userId: String) -> Bool
+    func getBlockedUsers() async throws -> [User]
+    func reportUser(userId: String, currentUserId: String, reason: ReportReason, additionalDetails: String?) async throws
 }
 
 // MARK: - Network Manager Protocol

@@ -418,7 +418,7 @@ struct ConversationScamAnalysis: Codable {
 
 // MARK: - Scam Types
 
-enum ScamType: String {
+enum ScamType: String, Codable {
     case financialScam = "financial_scam"
     case romanceScam = "romance_scam"
     case phishing = "phishing"
