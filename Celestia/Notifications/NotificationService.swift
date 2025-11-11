@@ -332,4 +332,18 @@ extension NotificationService {
             senderImageURL: URL(string: "https://example.com/sarah.jpg")
         )
     }
+
+    // MARK: - Listener Management
+
+    /// Listen to notifications for a user
+    func listenToNotifications(userId: String) {
+        // TODO: Implement real-time notification listening
+        Logger.shared.debug("Listening to notifications for user: \(userId)", category: .general)
+    }
+
+    /// Stop listening to notifications
+    nonisolated func stopListening() {
+        // TODO: Implement stopping notification listener
+        Logger.shared.debug("Stopped listening to notifications", category: .general)
+    }
 }

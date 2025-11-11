@@ -331,7 +331,7 @@ struct BlockedUsersView: View {
 
         Task {
             do {
-                try await reportService.unblockUser(userId: userId, currentUserId: currentUserId)
+                try await reportService.unblockUser(blockerId: currentUserId, blockedId: userId)
                 await MainActor.run {
                     blockedUsers.removeAll { $0.id == userId }
                     HapticManager.shared.success()

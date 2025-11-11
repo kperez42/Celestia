@@ -76,9 +76,11 @@ class MatchService: ObservableObject {
     }
     
     /// Stop listening to matches
-    func stopListening() {
-        listener?.remove()
-        listener = nil
+    nonisolated func stopListening() {
+        Task { @MainActor in
+            listener?.remove()
+            listener = nil
+        }
     }
     
     /// Create a new match between two users

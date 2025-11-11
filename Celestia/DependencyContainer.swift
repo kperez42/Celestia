@@ -136,7 +136,7 @@ class DependencyContainer {
         }
 
         // Clear caches
-        ImageCache.shared.clearCache()
+        ImageCache.shared.clearAll()
 
         Logger.shared.info("Services reset complete", category: .general)
     }

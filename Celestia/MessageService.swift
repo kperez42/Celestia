@@ -73,10 +73,12 @@ class MessageService: ObservableObject {
     }
     
     /// Stop listening to messages
-    func stopListening() {
-        listener?.remove()
-        listener = nil
-        messages = []
+    nonisolated func stopListening() {
+        Task { @MainActor in
+            listener?.remove()
+            listener = nil
+            messages = []
+        }
     }
     
     /// Send a text message
