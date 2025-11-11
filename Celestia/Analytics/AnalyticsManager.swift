@@ -207,6 +207,14 @@ class AnalyticsManager: ObservableObject, AnalyticsManagerProtocol {
         ])
     }
 
+    /// Track match between two users
+    func trackMatch(user1Id: String, user2Id: String) async throws {
+        logEvent(.match, parameters: [
+            "user1_id": user1Id,
+            "user2_id": user2Id
+        ])
+    }
+
     /// Track message sent
     func trackMessageSent(matchId: String, messageLength: Int, hasMedia: Bool) {
         logEvent(.messageSent, parameters: [
@@ -221,6 +229,26 @@ class AnalyticsManager: ObservableObject, AnalyticsManagerProtocol {
         logEvent(.swipe, parameters: [
             "action": action.rawValue,
             "user_id": userId
+        ])
+    }
+
+    /// Track swipe with direction
+    func trackSwipe(swipedUserId: String, swiperUserId: String, direction: AnalyticsSwipeDirection) async throws {
+        let action: AnalyticsSwipeAction
+        switch direction {
+        case .right:
+            action = .like
+        case .left:
+            action = .dislike
+        case .up:
+            action = .superLike
+        }
+
+        logEvent(.swipe, parameters: [
+            "action": action.rawValue,
+            "swiped_user_id": swipedUserId,
+            "swiper_user_id": swiperUserId,
+            "direction": direction.rawValue
         ])
     }
 
@@ -498,6 +526,14 @@ enum AnalyticsSwipeAction: String {
     case like = "like"
     case dislike = "dislike"
     case superLike = "super_like"
+}
+
+// MARK: - Analytics Swipe Direction
+
+enum AnalyticsSwipeDirection: String {
+    case left = "left"
+    case right = "right"
+    case up = "up"
 }
 
 // MARK: - Supporting Types
