@@ -196,7 +196,7 @@ extension String {
 
 // MARK: - Cached Async Image
 
-struct CachedAsyncImage<Content: View, Placeholder: View>: View {
+struct SimpleCachedAsyncImage<Content: View, Placeholder: View>: View {
     let url: URL?
     let content: (Image) -> Content
     let placeholder: () -> Placeholder

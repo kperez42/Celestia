@@ -134,16 +134,16 @@ class ImageUploadService {
     
     // MARK: - Delete Image
 
-    func deleteImage(urlString: String) async throws {
-        guard !urlString.isEmpty, let url = URL(string: urlString) else {
+    func deleteImage(url: String) async throws {
+        guard !url.isEmpty, let urlObj = URL(string: url) else {
             throw CelestiaError.invalidData
         }
 
         // Use retry logic for deletion
         try await RetryManager.shared.retryDatabaseOperation {
-            let ref = Storage.storage().reference(forURL: urlString)
+            let ref = Storage.storage().reference(forURL: url)
             try await ref.delete()
-            print("✅ Image deleted successfully: \(urlString)")
+            print("✅ Image deleted successfully: \(url)")
         }
     }
 

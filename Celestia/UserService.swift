@@ -14,6 +14,7 @@ class UserService: ObservableObject {
     @Published var users: [User] = []
     @Published var isLoading = false
     @Published var error: Error?
+    @Published var hasMoreUsers = true
     
     static let shared = UserService()
     private let db = Firestore.firestore()
@@ -92,11 +93,12 @@ class UserService: ObservableObject {
         do {
             let snapshot = try await query.getDocuments()
             lastDocument = snapshot.documents.last
-            
+
             let newUsers = snapshot.documents.compactMap { try? $0.data(as: User.self) }
                 .filter { $0.id != excludingUserId }
-            
+
             users.append(contentsOf: newUsers)
+            hasMoreUsers = newUsers.count >= limit
         } catch {
             self.error = error
             throw error

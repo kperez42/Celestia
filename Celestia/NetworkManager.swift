@@ -1,0 +1,485 @@
+//
+//  NetworkManager.swift
+//  Celestia
+//
+//  Centralized networking layer with retry logic, interceptors, and monitoring
+//  Provides robust network communication with automatic error handling
+//
+
+import Foundation
+import Network
+import Combine
+
+// MARK: - Network Error
+
+enum NetworkError: LocalizedError {
+    case invalidURL
+    case noData
+    case decodingError
+    case encodingError
+    case serverError(Int)
+    case noInternetConnection
+    case timeout
+    case cancelled
+    case unknown(Error)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidURL:
+            return "Invalid URL"
+        case .noData:
+            return "No data received from server"
+        case .decodingError:
+            return "Failed to decode response"
+        case .encodingError:
+            return "Failed to encode request"
+        case .serverError(let code):
+            return "Server error: \(code)"
+        case .noInternetConnection:
+            return "No internet connection"
+        case .timeout:
+            return "Request timed out"
+        case .cancelled:
+            return "Request was cancelled"
+        case .unknown(let error):
+            return error.localizedDescription
+        }
+    }
+}
+
+// MARK: - Network Request
+
+struct NetworkRequest {
+    let url: URL
+    let method: HTTPMethod
+    let headers: [String: String]?
+    let body: Data?
+    let timeout: TimeInterval
+
+    enum HTTPMethod: String {
+        case get = "GET"
+        case post = "POST"
+        case put = "PUT"
+        case delete = "DELETE"
+        case patch = "PATCH"
+    }
+
+    init(
+        url: URL,
+        method: HTTPMethod = .get,
+        headers: [String: String]? = nil,
+        body: Data? = nil,
+        timeout: TimeInterval = 30
+    ) {
+        self.url = url
+        self.method = method
+        self.headers = headers
+        self.body = body
+        self.timeout = timeout
+    }
+}
+
+// MARK: - Network Response
+
+struct NetworkResponse {
+    let data: Data
+    let response: HTTPURLResponse
+    let metrics: URLSessionTaskMetrics?
+}
+
+// MARK: - Request Interceptor Protocol
+
+protocol RequestInterceptor {
+    func adapt(_ request: URLRequest) async throws -> URLRequest
+    func retry(_ request: URLRequest, for session: URLSession, dueTo error: Error) async throws -> Bool
+}
+
+// MARK: - Response Interceptor Protocol
+
+protocol ResponseInterceptor {
+    func intercept(_ response: NetworkResponse) async throws -> NetworkResponse
+}
+
+// MARK: - Network Manager
+
+class NetworkManager: NetworkManagerProtocol {
+
+    // MARK: - Singleton
+
+    static let shared = NetworkManager()
+
+    // MARK: - Properties
+
+    private let session: URLSession
+    private let monitor: NWPathMonitor
+    private let monitorQueue = DispatchQueue(label: "com.celestia.network.monitor")
+
+    @Published private(set) var isNetworkAvailable = true
+    @Published private(set) var connectionType: NWInterface.InterfaceType?
+
+    private var requestInterceptors: [RequestInterceptor] = []
+    private var responseInterceptors: [ResponseInterceptor] = []
+
+    private let maxRetryAttempts = 3
+    private let baseRetryDelay: TimeInterval = 1.0
+
+    // MARK: - Initialization
+
+    init() {
+        // Configure URL session
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 30
+        config.timeoutIntervalForResource = 60
+        config.waitsForConnectivity = true
+        config.requestCachePolicy = .returnCacheDataElseLoad
+
+        self.session = URLSession(configuration: config)
+        self.monitor = NWPathMonitor()
+
+        setupNetworkMonitoring()
+    }
+
+    // MARK: - Network Monitoring
+
+    func startMonitoring() {
+        monitor.start(queue: monitorQueue)
+        Logger.shared.network("Network monitoring started", level: .info)
+    }
+
+    func stopMonitoring() {
+        monitor.cancel()
+        Logger.shared.network("Network monitoring stopped", level: .info)
+    }
+
+    private func setupNetworkMonitoring() {
+        monitor.pathUpdateHandler = { [weak self] path in
+            guard let self = self else { return }
+
+            DispatchQueue.main.async {
+                self.isNetworkAvailable = path.status == .satisfied
+                self.connectionType = path.availableInterfaces.first?.type
+
+                let status = path.status == .satisfied ? "Connected" : "Disconnected"
+                let type = self.connectionType.map { "\($0)" } ?? "Unknown"
+                Logger.shared.network("Network status: \(status) (\(type))", level: .info)
+
+                if !self.isNetworkAvailable {
+                    CrashlyticsManager.shared.logEvent("network_disconnected")
+                }
+            }
+        }
+    }
+
+    func isConnected() -> Bool {
+        return isNetworkAvailable
+    }
+
+    // MARK: - Interceptor Management
+
+    func addRequestInterceptor(_ interceptor: RequestInterceptor) {
+        requestInterceptors.append(interceptor)
+    }
+
+    func addResponseInterceptor(_ interceptor: ResponseInterceptor) {
+        responseInterceptors.append(interceptor)
+    }
+
+    // MARK: - Request Execution
+
+    func performRequest<T: Decodable>(_ networkRequest: NetworkRequest, retryCount: Int = 0) async throws -> T {
+        // Check network connectivity
+        guard isNetworkAvailable else {
+            Logger.shared.network("Request failed: No internet connection", level: .error)
+            throw NetworkError.noInternetConnection
+        }
+
+        // Create URL request
+        var urlRequest = URLRequest(url: networkRequest.url, timeoutInterval: networkRequest.timeout)
+        urlRequest.httpMethod = networkRequest.method.rawValue
+        urlRequest.httpBody = networkRequest.body
+
+        // Set headers
+        if let headers = networkRequest.headers {
+            for (key, value) in headers {
+                urlRequest.setValue(value, forHTTPHeaderField: key)
+            }
+        }
+
+        // Apply request interceptors
+        for interceptor in requestInterceptors {
+            urlRequest = try await interceptor.adapt(urlRequest)
+        }
+
+        do {
+            // Perform request
+            let startTime = Date()
+            let (data, response) = try await session.data(for: urlRequest)
+            let endTime = Date()
+            let duration = endTime.timeIntervalSince(startTime)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw NetworkError.invalidURL
+            }
+
+            Logger.shared.network(
+                "Request completed: \(networkRequest.method.rawValue) \(networkRequest.url.path) - \(httpResponse.statusCode) (\(String(format: "%.2f", duration))s)",
+                level: .debug
+            )
+
+            // Track in Crashlytics
+            CrashlyticsManager.shared.trackNetworkRequest(
+                url: networkRequest.url,
+                httpMethod: networkRequest.method.rawValue,
+                startTime: startTime,
+                endTime: endTime,
+                responseCode: httpResponse.statusCode,
+                requestSize: Int64(networkRequest.body?.count ?? 0),
+                responseSize: Int64(data.count)
+            )
+
+            // Check status code
+            guard (200...299).contains(httpResponse.statusCode) else {
+                Logger.shared.network(
+                    "Server error: \(httpResponse.statusCode)",
+                    level: .error
+                )
+                throw NetworkError.serverError(httpResponse.statusCode)
+            }
+
+            // Apply response interceptors
+            var networkResponse = NetworkResponse(data: data, response: httpResponse, metrics: nil)
+            for interceptor in responseInterceptors {
+                networkResponse = try await interceptor.intercept(networkResponse)
+            }
+
+            // Decode response
+            do {
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+                return try decoder.decode(T.self, from: networkResponse.data)
+            } catch {
+                Logger.shared.network(
+                    "Decoding error: \(error.localizedDescription)",
+                    level: .error
+                )
+                throw NetworkError.decodingError
+            }
+
+        } catch {
+            // Handle errors with retry logic
+            return try await handleError(
+                error,
+                for: networkRequest,
+                urlRequest: urlRequest,
+                retryCount: retryCount
+            )
+        }
+    }
+
+    // MARK: - Error Handling & Retry Logic
+
+    private func handleError<T: Decodable>(
+        _ error: Error,
+        for networkRequest: NetworkRequest,
+        urlRequest: URLRequest,
+        retryCount: Int
+    ) async throws -> T {
+        // Convert to NetworkError
+        let networkError: NetworkError
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .notConnectedToInternet:
+                networkError = .noInternetConnection
+            case .timedOut:
+                networkError = .timeout
+            case .cancelled:
+                networkError = .cancelled
+            default:
+                networkError = .unknown(error)
+            }
+        } else if let netError = error as? NetworkError {
+            networkError = netError
+        } else {
+            networkError = .unknown(error)
+        }
+
+        Logger.shared.network(
+            "Request error: \(networkError.errorDescription ?? "Unknown error")",
+            level: .error,
+            error: error
+        )
+
+        // Check if we should retry
+        if shouldRetry(error: networkError, retryCount: retryCount) {
+            let delay = calculateRetryDelay(attempt: retryCount)
+            Logger.shared.network(
+                "Retrying request in \(delay)s (attempt \(retryCount + 1)/\(maxRetryAttempts))",
+                level: .warning
+            )
+
+            try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            return try await performRequest(networkRequest, retryCount: retryCount + 1)
+        }
+
+        // Record error
+        CrashlyticsManager.shared.recordError(
+            domain: "com.celestia.network",
+            code: 1000,
+            message: "Network request failed",
+            userInfo: [
+                "url": networkRequest.url.absoluteString,
+                "method": networkRequest.method.rawValue,
+                "error": networkError.errorDescription ?? "Unknown"
+            ]
+        )
+
+        throw networkError
+    }
+
+    private func shouldRetry(error: NetworkError, retryCount: Int) -> Bool {
+        // Don't retry if max attempts reached
+        guard retryCount < maxRetryAttempts else { return false }
+
+        // Retry logic based on error type
+        switch error {
+        case .timeout, .noInternetConnection:
+            return true
+        case .serverError(let code):
+            // Retry on server errors (500+)
+            return code >= 500
+        case .cancelled:
+            return false
+        default:
+            return false
+        }
+    }
+
+    private func calculateRetryDelay(attempt: Int) -> TimeInterval {
+        // Exponential backoff: 1s, 2s, 4s, 8s...
+        return baseRetryDelay * pow(2.0, Double(attempt))
+    }
+
+    // MARK: - Convenience Methods
+
+    /// Perform GET request
+    func get<T: Decodable>(
+        url: URL,
+        headers: [String: String]? = nil
+    ) async throws -> T {
+        let request = NetworkRequest(url: url, method: .get, headers: headers)
+        return try await performRequest(request)
+    }
+
+    /// Perform POST request
+    func post<T: Decodable, Body: Encodable>(
+        url: URL,
+        body: Body,
+        headers: [String: String]? = nil
+    ) async throws -> T {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let bodyData = try encoder.encode(body)
+
+        var allHeaders = headers ?? [:]
+        allHeaders["Content-Type"] = "application/json"
+
+        let request = NetworkRequest(url: url, method: .post, headers: allHeaders, body: bodyData)
+        return try await performRequest(request)
+    }
+
+    /// Perform PUT request
+    func put<T: Decodable, Body: Encodable>(
+        url: URL,
+        body: Body,
+        headers: [String: String]? = nil
+    ) async throws -> T {
+        let encoder = JSONEncoder()
+        let bodyData = try encoder.encode(body)
+
+        var allHeaders = headers ?? [:]
+        allHeaders["Content-Type"] = "application/json"
+
+        let request = NetworkRequest(url: url, method: .put, headers: allHeaders, body: bodyData)
+        return try await performRequest(request)
+    }
+
+    /// Perform DELETE request
+    func delete<T: Decodable>(
+        url: URL,
+        headers: [String: String]? = nil
+    ) async throws -> T {
+        let request = NetworkRequest(url: url, method: .delete, headers: headers)
+        return try await performRequest(request)
+    }
+
+    /// Upload data with progress tracking
+    func upload(
+        url: URL,
+        data: Data,
+        headers: [String: String]? = nil,
+        progressHandler: ((Double) -> Void)? = nil
+    ) async throws -> Data {
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "POST"
+        urlRequest.httpBody = data
+
+        if let headers = headers {
+            for (key, value) in headers {
+                urlRequest.setValue(value, forHTTPHeaderField: key)
+            }
+        }
+
+        let (responseData, response) = try await session.data(for: urlRequest)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidURL
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw NetworkError.serverError(httpResponse.statusCode)
+        }
+
+        return responseData
+    }
+
+    // MARK: - Cache Management
+
+    func clearCache() {
+        session.configuration.urlCache?.removeAllCachedResponses()
+        Logger.shared.network("URL cache cleared", level: .info)
+    }
+}
+
+// MARK: - Default Interceptors
+
+// Auth Token Interceptor
+class AuthTokenInterceptor: RequestInterceptor {
+    func adapt(_ request: URLRequest) async throws -> URLRequest {
+        var modifiedRequest = request
+
+        // Add authentication token if available
+        // Example: Get token from Keychain or AuthService
+        // if let token = getAuthToken() {
+        //     modifiedRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        // }
+
+        return modifiedRequest
+    }
+
+    func retry(_ request: URLRequest, for session: URLSession, dueTo error: Error) async throws -> Bool {
+        // Implement retry logic for auth errors
+        // Example: Refresh token if 401 error
+        return false
+    }
+}
+
+// Logging Interceptor
+class LoggingInterceptor: ResponseInterceptor {
+    func intercept(_ response: NetworkResponse) async throws -> NetworkResponse {
+        Logger.shared.network(
+            "Response: \(response.response.statusCode) - \(response.data.count) bytes",
+            level: .debug
+        )
+        return response
+    }
+}

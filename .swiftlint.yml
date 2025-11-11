@@ -1,0 +1,410 @@
+# SwiftLint Configuration for Celestia
+# https://github.com/realm/SwiftLint
+
+# Paths to include/exclude
+included:
+  - Celestia
+  - CelestiaTests
+
+excluded:
+  - Pods
+  - Carthage
+  - .build
+  - DerivedData
+  - fastlane
+
+# Disable rules
+disabled_rules:
+  - trailing_whitespace # Handled by editor
+  - todo # We use TODOs for tracking work
+  - line_length # Can be too restrictive for descriptive code
+
+# Opt-in rules (not enabled by default)
+opt_in_rules:
+  - array_init
+  - attributes
+  - closure_end_indentation
+  - closure_spacing
+  - collection_alignment
+  - contains_over_filter_count
+  - contains_over_filter_is_empty
+  - contains_over_first_not_nil
+  - contains_over_range_nil_comparison
+  - empty_collection_literal
+  - empty_count
+  - empty_string
+  - enum_case_associated_values_count
+  - explicit_init
+  - extension_access_modifier
+  - fallthrough
+  - fatal_error_message
+  - first_where
+  - flatmap_over_map_reduce
+  - identical_operands
+  - implicit_return
+  - joined_default_parameter
+  - last_where
+  - legacy_multiple
+  - legacy_random
+  - literal_expression_end_indentation
+  - lower_acl_than_parent
+  - modifier_order
+  - multiline_arguments
+  - multiline_function_chains
+  - multiline_literal_brackets
+  - multiline_parameters
+  - nimble_operator
+  - nslocalizedstring_key
+  - number_separator
+  - object_literal
+  - operator_usage_whitespace
+  - overridden_super_call
+  - override_in_extension
+  - pattern_matching_keywords
+  - prefer_self_type_over_type_of_self
+  - prefer_zero_over_explicit_init
+  - private_action
+  - private_outlet
+  - prohibited_interface_builder
+  - prohibited_super_call
+  - quick_discouraged_call
+  - quick_discouraged_focused_test
+  - quick_discouraged_pending_test
+  - reduce_into
+  - redundant_nil_coalescing
+  - redundant_type_annotation
+  - single_test_class
+  - sorted_first_last
+  - sorted_imports
+  - static_operator
+  - strong_iboutlet
+  - toggle_bool
+  - trailing_closure
+  - unavailable_function
+  - unneeded_parentheses_in_closure_argument
+  - untyped_error_in_catch
+  - vertical_parameter_alignment_on_call
+  - vertical_whitespace_closing_braces
+  - vertical_whitespace_opening_braces
+  - yoda_condition
+
+# Configurable rules
+line_length:
+  warning: 120
+  error: 150
+  ignores_comments: true
+  ignores_urls: true
+  ignores_function_declarations: true
+  ignores_interpolated_strings: true
+
+file_length:
+  warning: 500
+  error: 1000
+  ignore_comment_only_lines: true
+
+function_body_length:
+  warning: 50
+  error: 100
+
+function_parameter_count:
+  warning: 6
+  error: 8
+
+type_body_length:
+  warning: 300
+  error: 500
+
+type_name:
+  min_length: 3
+  max_length: 50
+  excluded:
+    - ID
+    - URL
+    - T
+    - U
+    - V
+
+identifier_name:
+  min_length: 2
+  max_length: 50
+  excluded:
+    - id
+    - url
+    - db
+    - to
+    - by
+    - at
+    - on
+    - in
+    - x
+    - y
+    - z
+
+large_tuple:
+  warning: 3
+  error: 4
+
+nesting:
+  type_level:
+    warning: 3
+  statement_level:
+    warning: 5
+
+cyclomatic_complexity:
+  warning: 15
+  error: 25
+  ignores_case_statements: true
+
+# Custom rules
+custom_rules:
+  no_print_statements:
+    name: "No Print Statements"
+    regex: '(?<!\/\/\s)(?<!\/\/)print\('
+    message: "Use Logger instead of print()"
+    severity: warning
+
+  no_force_unwrap:
+    name: "No Force Unwrap"
+    regex: '\!\s*(?!\=)'
+    message: "Avoid using force unwrap (!). Use optional binding or guard instead."
+    severity: warning
+
+  no_force_try:
+    name: "No Force Try"
+    regex: 'try!'
+    message: "Avoid using try!. Use proper error handling."
+    severity: error
+
+  proper_logging:
+    name: "Proper Logging"
+    regex: 'Logger\.shared\.(debug|info|warning|error|critical)\([^,]*\)'
+    message: "Consider adding a category to your log statement"
+    severity: warning
+
+  firebase_error_handling:
+    name: "Firebase Error Handling"
+    regex: 'try await.*Firebase.*\n(?!.*catch)'
+    message: "Firebase calls should have proper error handling"
+    severity: warning
+
+# Analyzer rules (require full build)
+analyzer_rules:
+  - explicit_self
+  - unused_import
+  - unused_declaration
+
+# Reporter type (xcode, json, csv, checkstyle, junit, html, emoji, sonarqube, markdown)
+reporter: "xcode"
+
+# Paths to ignore for specific rules
+force_cast:
+  severity: error
+
+force_try:
+  severity: error
+
+implicit_getter:
+  severity: warning
+
+# Number of spaces for indentation
+indentation: 4
+
+# Severity overrides
+severity_overrides:
+  legacy_hashing: error
+  legacy_constructor: error
+  legacy_constant: error
+  legacy_nsgeometry_functions: error
+
+# Exclusions for test files
+file_name:
+  excluded:
+    - Tests.swift
+    - Mock.swift
+    - Stub.swift
+
+# Allow longer lines in test files
+line_length:
+  excluded:
+    - "*Tests.swift"
+    - "*Spec.swift"
+
+# Collection element alignment
+collection_alignment:
+  align_colons: true
+
+# Closure spacing
+closure_spacing:
+  severity: warning
+
+# Modifier order
+modifier_order:
+  preferred_modifier_order:
+    - override
+    - acl
+    - setterACL
+    - dynamic
+    - mutators
+    - lazy
+    - final
+    - required
+    - convenience
+    - typeMethods
+    - owned
+
+# Vertical whitespace
+vertical_whitespace:
+  max_empty_lines: 2
+
+# Trailing comma
+trailing_comma:
+  mandatory_comma: true
+
+# Empty parameters
+empty_parameters:
+  severity: warning
+
+# Multiple closures with trailing closure
+multiple_closures_with_trailing_closure:
+  severity: warning
+
+# Private over fileprivate
+private_over_fileprivate:
+  validate_extensions: true
+
+# Redundant discardable let
+redundant_discardable_let:
+  severity: warning
+
+# Shorthand operator
+shorthand_operator:
+  severity: warning
+
+# Syntactic sugar
+syntactic_sugar:
+  severity: warning
+
+# Unused closure parameter
+unused_closure_parameter:
+  severity: warning
+
+# Unused enumerated
+unused_enumerated:
+  severity: warning
+
+# Unused optional binding
+unused_optional_binding:
+  severity: error
+  ignore_optional_try: true
+
+# Vertical parameter alignment
+vertical_parameter_alignment:
+  severity: warning
+
+# Void return
+void_return:
+  severity: warning
+
+# Weak delegate
+weak_delegate:
+  severity: warning
+
+# XCTFail message
+xctfail_message:
+  severity: warning
+
+# Attributes
+attributes:
+  always_on_same_line:
+    - "@IBAction"
+    - "@NSManaged"
+    - "@objc"
+  always_on_line_above:
+    - "@discardableResult"
+    - "@available"
+    - "@MainActor"
+
+# Deployment target
+deployment_target:
+  iOS_deployment_target: 16.0
+
+# Empty xctest method
+empty_xctest_method:
+  severity: warning
+
+# Explicit enum raw value
+explicit_enum_raw_value:
+  severity: warning
+
+# File header
+file_header:
+  required_pattern: |
+                    \/\/
+                    \/\/  .*?\.swift
+                    \/\/  Celestia
+                    \/\/
+                    \/\/  Created by .* on \d+\/\d+\/\d+\.
+                    \/\/
+
+# Multiline arguments
+multiline_arguments:
+  first_argument_location: next_line
+  only_enforce_after_first_closure_on_first_line: true
+
+# Multiline parameters
+multiline_parameters:
+  allows_single_line: true
+
+# Number separator
+number_separator:
+  minimum_length: 5
+  minimum_fraction_length: 5
+
+# Operator usage whitespace
+operator_usage_whitespace:
+  lines_to_skip_before_violations: 1
+  skip_aligned_constants: true
+
+# Pattern matching keywords
+pattern_matching_keywords:
+  severity: warning
+
+# Prefer self type over type of self
+prefer_self_type_over_type_of_self:
+  severity: warning
+
+# Private action
+private_action:
+  severity: warning
+
+# Private outlet
+private_outlet:
+  allow_private_set: true
+
+# Sorted imports
+sorted_imports:
+  severity: warning
+
+# Strong IBOutlet
+strong_iboutlet:
+  severity: warning
+
+# Trailing closure
+trailing_closure:
+  only_single_muted_parameter: true
+
+# Untyped error in catch
+untyped_error_in_catch:
+  severity: error
+
+# Vertical whitespace closing braces
+vertical_whitespace_closing_braces:
+  severity: warning
+
+# Vertical whitespace opening braces
+vertical_whitespace_opening_braces:
+  severity: warning
+
+# Yoda condition
+yoda_condition:
+  severity: warning

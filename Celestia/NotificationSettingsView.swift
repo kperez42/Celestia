@@ -361,6 +361,35 @@ struct NotificationHistoryRow: View {
     }
 }
 
+// MARK: - Supporting Types
+
+enum NotificationType: String, Codable {
+    case newMatch
+    case newMessage
+    case secretAdmirer
+    case profileView
+    case weeklyDigest
+    case activityReminder
+    case likeReceived
+    case superLikeReceived
+}
+
+struct NotificationData: Identifiable, Codable {
+    let id: String
+    let type: NotificationType
+    let title: String
+    let body: String
+    let timestamp: Date
+
+    init(id: String = UUID().uuidString, type: NotificationType, title: String, body: String, timestamp: Date = Date()) {
+        self.id = id
+        self.type = type
+        self.title = title
+        self.body = body
+        self.timestamp = timestamp
+    }
+}
+
 #Preview {
     NavigationStack {
         NotificationSettingsView()

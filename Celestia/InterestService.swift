@@ -241,9 +241,6 @@ class InterestService: ObservableObject {
     }
     
     deinit {
-        // Use Task to call MainActor-isolated method
-        Task { @MainActor in
-            self.stopListening()
-        }
+        listener?.remove()
     }
 }

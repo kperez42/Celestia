@@ -22,9 +22,9 @@ class AuthService: ObservableObject {
     private init() {
         self.userSession = Auth.auth().currentUser
         self.isEmailVerified = Auth.auth().currentUser?.isEmailVerified ?? false
-        print("🔵 AuthService initialized")
-        print("🔵 Current user session: \(Auth.auth().currentUser?.uid ?? "none")")
-        print("🔵 Email verified: \(isEmailVerified)")
+        Logger.shared.auth("AuthService initialized", level: .info)
+        Logger.shared.auth("Current user session: \(Auth.auth().currentUser?.uid ?? "none")", level: .debug)
+        Logger.shared.auth("Email verified: \(isEmailVerified)", level: .info)
         Task {
             await fetchUser()
         }
@@ -85,31 +85,28 @@ class AuthService: ObservableObject {
             throw CelestiaError.invalidCredentials
         }
 
-        print("🔵 Attempting sign in with email: \(sanitizedEmail)")
+        Logger.shared.auth("Attempting sign in with email: \(sanitizedEmail)", level: .info)
 
         do {
             let result = try await Auth.auth().signIn(withEmail: sanitizedEmail, password: sanitizedPassword)
             self.userSession = result.user
             self.isEmailVerified = result.user.isEmailVerified
-            print("✅ Sign in successful: \(result.user.uid)")
-            print("✅ Email verified: \(isEmailVerified)")
+            Logger.shared.auth("Sign in successful: \(result.user.uid)", level: .info)
+            Logger.shared.auth("Email verified: \(isEmailVerified)", level: .info)
 
             await fetchUser()
-            
+
             if currentUser != nil {
-                print("✅ User data fetched successfully")
+                Logger.shared.auth("User data fetched successfully", level: .info)
             } else {
-                print("⚠️ User session exists but no user data in Firestore")
+                Logger.shared.auth("User session exists but no user data in Firestore", level: .warning)
             }
             
             isLoading = false
         } catch let error as NSError {
             isLoading = false
-            
-            print("❌ Sign in error:")
-            print("  - Domain: \(error.domain)")
-            print("  - Code: \(error.code)")
-            print("  - Description: \(error.localizedDescription)")
+
+            Logger.shared.auth("Sign in error - Domain: \(error.domain), Code: \(error.code)", level: .error, error: error)
             
             // User-friendly error messages
             if error.domain == "FIRAuthErrorDomain" {
