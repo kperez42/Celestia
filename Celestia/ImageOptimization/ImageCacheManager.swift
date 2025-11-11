@@ -36,7 +36,11 @@ class ImageCacheManager {
     // MARK: - Initialization
 
     private init() {
-        diskCache = DiskCache(directory: cacheDirectory)
+        // Compute cache directory before using self
+        let urls = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)
+        let cacheDirURL = urls[0].appendingPathComponent("ImageCache", isDirectory: true)
+
+        diskCache = DiskCache(directory: cacheDirURL)
         configureMemoryCache()
         setupCacheDirectory()
         Logger.shared.info("ImageCacheManager initialized", category: .general)
