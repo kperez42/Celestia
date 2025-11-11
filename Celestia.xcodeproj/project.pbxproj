@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		BA58E5AE2EC3C2BA005DE376 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = BA58E5AD2EC3C2BA005DE376 /* FirebaseAnalytics */; };
+		BA58E5B02EC3C2BA005DE376 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = BA58E5AF2EC3C2BA005DE376 /* FirebaseCrashlytics */; };
+		BA58E5B22EC3C2BA005DE376 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = BA58E5B12EC3C2BA005DE376 /* FirebaseMessaging */; };
+		BA58E5B42EC3C2BA005DE376 /* FirebasePerformance in Frameworks */ = {isa = PBXBuildFile; productRef = BA58E5B32EC3C2BA005DE376 /* FirebasePerformance */; };
+		BA58E5B62EC3C2BA005DE376 /* FirebaseRemoteConfig in Frameworks */ = {isa = PBXBuildFile; productRef = BA58E5B52EC3C2BA005DE376 /* FirebaseRemoteConfig */; };
 		BA6731D62EB33154005E3235 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = BA6731D52EB33154005E3235 /* FirebaseAuth */; };
 		BA6731D82EB33154005E3235 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = BA6731D72EB33154005E3235 /* FirebaseFirestore */; };
 		BA6731DA2EB33154005E3235 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = BA6731D92EB33154005E3235 /* FirebaseStorage */; };
@@ -58,9 +63,14 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BA58E5B42EC3C2BA005DE376 /* FirebasePerformance in Frameworks */,
+				BA58E5B22EC3C2BA005DE376 /* FirebaseMessaging in Frameworks */,
 				BA6731D62EB33154005E3235 /* FirebaseAuth in Frameworks */,
 				BA6731D82EB33154005E3235 /* FirebaseFirestore in Frameworks */,
+				BA58E5B02EC3C2BA005DE376 /* FirebaseCrashlytics in Frameworks */,
+				BA58E5AE2EC3C2BA005DE376 /* FirebaseAnalytics in Frameworks */,
 				BA6731DA2EB33154005E3235 /* FirebaseStorage in Frameworks */,
+				BA58E5B62EC3C2BA005DE376 /* FirebaseRemoteConfig in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -124,6 +134,11 @@
 				BA6731D52EB33154005E3235 /* FirebaseAuth */,
 				BA6731D72EB33154005E3235 /* FirebaseFirestore */,
 				BA6731D92EB33154005E3235 /* FirebaseStorage */,
+				BA58E5AD2EC3C2BA005DE376 /* FirebaseAnalytics */,
+				BA58E5AF2EC3C2BA005DE376 /* FirebaseCrashlytics */,
+				BA58E5B12EC3C2BA005DE376 /* FirebaseMessaging */,
+				BA58E5B32EC3C2BA005DE376 /* FirebasePerformance */,
+				BA58E5B52EC3C2BA005DE376 /* FirebaseRemoteConfig */,
 			);
 			productName = Celestia;
 			productReference = BA6731632EB320C4005E3235 /* Celestia.app */;
@@ -204,6 +219,7 @@
 			knownRegions = (
 				en,
 				Base,
+				es,
 			);
 			mainGroup = BA67315A2EB320C4005E3235;
 			minimizedProjectReferenceProxies = 1;
@@ -588,6 +604,31 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		BA58E5AD2EC3C2BA005DE376 /* FirebaseAnalytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BA6731D42EB33154005E3235 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalytics;
+		};
+		BA58E5AF2EC3C2BA005DE376 /* FirebaseCrashlytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BA6731D42EB33154005E3235 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCrashlytics;
+		};
+		BA58E5B12EC3C2BA005DE376 /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BA6731D42EB33154005E3235 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
+		};
+		BA58E5B32EC3C2BA005DE376 /* FirebasePerformance */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BA6731D42EB33154005E3235 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebasePerformance;
+		};
+		BA58E5B52EC3C2BA005DE376 /* FirebaseRemoteConfig */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BA6731D42EB33154005E3235 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseRemoteConfig;
+		};
 		BA6731D52EB33154005E3235 /* FirebaseAuth */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = BA6731D42EB33154005E3235 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
