@@ -67,7 +67,7 @@ class BackgroundCheckManager {
         Logger.shared.info("Background check completed", category: .general)
 
         // Track analytics
-        AnalyticsManager.shared.logEvent(.backgroundCheckCompleted, parameters: [
+        await AnalyticsManager.shared.logEvent(.backgroundCheckCompleted, parameters: [
             "is_clean": result.isClean,
             "status": result.status.rawValue
         ])
