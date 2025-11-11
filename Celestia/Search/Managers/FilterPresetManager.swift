@@ -126,19 +126,19 @@ class FilterPresetManager: ObservableObject {
         var nearbyVerified = SearchFilter()
         nearbyVerified.distanceRadius = 10
         nearbyVerified.verifiedOnly = true
-        try? savePreset(name: "Nearby & Verified", filter: nearbyVerified)
+        _ = try? savePreset(name: "Nearby & Verified", filter: nearbyVerified)
 
         // Preset 2: Active This Week
         var activeThisWeek = SearchFilter()
         activeThisWeek.activeInLastDays = 7
         activeThisWeek.withPhotosOnly = true
-        try? savePreset(name: "Active This Week", filter: activeThisWeek)
+        _ = try? savePreset(name: "Active This Week", filter: activeThisWeek)
 
         // Preset 3: Long-term Relationship
         var longTerm = SearchFilter()
         longTerm.relationshipGoals = [.longTerm, .marriage]
         longTerm.verifiedOnly = true
-        try? savePreset(name: "Looking for Love", filter: longTerm)
+        _ = try? savePreset(name: "Looking for Love", filter: longTerm)
 
         Logger.shared.info("Default presets created", category: .general)
     }

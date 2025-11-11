@@ -112,8 +112,8 @@ struct AgeRange: Codable, Equatable {
     var max: Int // 18-99
 
     init(min: Int = 18, max: Int = 99) {
-        self.min = max(18, min(99, min))
-        self.max = max(18, min(99, max))
+        self.min = Swift.max(18, Swift.min(99, min))
+        self.max = Swift.max(18, Swift.min(99, max))
     }
 
     func contains(_ age: Int) -> Bool {
@@ -128,8 +128,8 @@ struct HeightRange: Codable, Equatable {
     var maxInches: Int
 
     init(minInches: Int = 48, maxInches: Int = 96) {
-        self.minInches = max(48, min(96, minInches))
-        self.maxInches = max(48, min(96, maxInches))
+        self.minInches = Swift.max(48, Swift.min(96, minInches))
+        self.maxInches = Swift.max(48, Swift.min(96, maxInches))
     }
 
     func contains(_ heightInches: Int) -> Bool {

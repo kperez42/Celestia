@@ -389,6 +389,16 @@ enum AnalyticsEvent {
     case emergencyAlertTriggered
     case reportSubmitted
     case userBlocked
+    case emergencyContactAdded
+    case emergencyContactRemoved
+    case backgroundCheckCompleted
+    case verificationCompleted
+    case safetyAlertCreated
+
+    // Search & Filters
+    case filterPresetSaved
+    case filterPresetUsed
+    case searchPerformed
 
     var name: String {
         switch self {
@@ -452,6 +462,14 @@ enum AnalyticsEvent {
         case .emergencyAlertTriggered: return "emergency_alert_triggered"
         case .reportSubmitted: return "report_submitted"
         case .userBlocked: return "user_blocked"
+        case .emergencyContactAdded: return "emergency_contact_added"
+        case .emergencyContactRemoved: return "emergency_contact_removed"
+        case .backgroundCheckCompleted: return "background_check_completed"
+        case .verificationCompleted: return "verification_completed"
+        case .safetyAlertCreated: return "safety_alert_created"
+        case .filterPresetSaved: return "filter_preset_saved"
+        case .filterPresetUsed: return "filter_preset_used"
+        case .searchPerformed: return "search_performed"
         }
     }
 

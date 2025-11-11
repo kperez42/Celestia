@@ -199,10 +199,10 @@ struct ChatView: View {
                 .padding()
             }
             .background(Color(.systemGroupedBackground))
-            .onChange(of: messageService.messages.count) { _ in
+            .onChange(of: messageService.messages.count) {
                 scrollToBottom(proxy: proxy)
             }
-            .onChange(of: isOtherUserTyping) { _ in
+            .onChange(of: isOtherUserTyping) {
                 if isOtherUserTyping {
                     withAnimation {
                         proxy.scrollTo("typing", anchor: .bottom)
@@ -260,7 +260,7 @@ struct ChatView: View {
                     .background(Color(.systemGray6))
                     .cornerRadius(20)
                     .lineLimit(1...5)
-                    .onChange(of: messageText) { _ in
+                    .onChange(of: messageText) {
                         // Simulate typing indicator (in production, send to Firestore)
                         #if DEBUG
                         // Toggle typing indicator for demo

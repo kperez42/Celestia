@@ -392,10 +392,10 @@ class SearchManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             "Music lover and concert goer"
         ]
 
-        for i in 0..<count {
+        for _ in 0..<count {
             let age = Int.random(in: 22...45)
             let name = names.randomElement()!
-            let distance = Double.random(in: 1...50)
+            _ = Double.random(in: 1...50) // Distance placeholder for future use
 
             // Random location within radius
             let baseLat = currentLocation?.latitude ?? 37.7749

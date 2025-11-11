@@ -194,7 +194,7 @@ class ScammerDetector {
             scamTypes: Array(scamTypes),
             escalationDetected: escalationPattern,
             messageCount: messages.count,
-            recommendation: determineRecommendation(conversationScore, scamTypes: scamTypes)
+            recommendation: determineRecommendation(conversationScore, scamTypes: Array(scamTypes))
         )
     }
 
