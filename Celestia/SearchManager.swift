@@ -113,6 +113,8 @@ class SearchManager: ObservableObject {
             query = query.whereField("gender", isEqualTo: "Male")
         case .women:
             query = query.whereField("gender", isEqualTo: "Female")
+        case .nonBinary:
+            query = query.whereField("gender", isEqualTo: "Non-Binary")
         case .everyone:
             break // No filter
         }

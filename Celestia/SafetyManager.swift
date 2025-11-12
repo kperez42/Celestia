@@ -308,8 +308,10 @@ class SafetyManager: ObservableObject {
     func triggerEmergency() async throws {
         Logger.shared.error("EMERGENCY TRIGGERED", category: .general)
 
-        // Trigger check-in emergency
-        try await checkInManager.triggerEmergency()
+        // Trigger check-in emergency if there's an active check-in
+        if let activeCheckIn = checkInManager.activeCheckIns.first {
+            try await checkInManager.triggerEmergency(checkInId: activeCheckIn.id)
+        }
 
         // Create critical alert
         createSafetyAlert(
