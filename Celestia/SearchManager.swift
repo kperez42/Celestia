@@ -249,57 +249,6 @@ struct UserProfile: Identifiable, Codable {
     }
 }
 
-// MARK: - Filter Preset Manager
-
-@MainActor
-class FilterPresetManager: ObservableObject {
-    static let shared = FilterPresetManager()
-
-    @Published var presets: [FilterPreset] = []
-    @Published var searchHistory: [SearchHistoryEntry] = []
-
-    private init() {}
-
-    func savePreset(name: String, filter: SearchFilter) throws -> FilterPreset {
-        let preset = FilterPreset(id: UUID().uuidString, name: name, filter: filter, createdAt: Date())
-        presets.append(preset)
-        return preset
-    }
-
-    func addToHistory(filter: SearchFilter, resultsCount: Int) {
-        let item = SearchHistoryEntry(filter: filter, resultsCount: resultsCount, searchedAt: Date())
-        searchHistory.insert(item, at: 0)
-
-        // Keep only last 20 searches
-        if searchHistory.count > 20 {
-            searchHistory.removeLast()
-        }
-    }
-}
-
-struct SearchHistoryEntry: Identifiable, Codable, Equatable {
-    let id: String
-    let filter: SearchFilter
-    let resultsCount: Int
-    let searchedAt: Date
-
-    init(filter: SearchFilter, resultsCount: Int, searchedAt: Date) {
-        self.id = UUID().uuidString
-        self.filter = filter
-        self.resultsCount = resultsCount
-        self.searchedAt = searchedAt
-    }
-
-    static func == (lhs: SearchHistoryEntry, rhs: SearchHistoryEntry) -> Bool {
-        return lhs.id == rhs.id
-    }
-}
-
-// Filter Presets View (stub for compilation)
-struct FilterPresetsView: View {
-    let onSelect: (FilterPreset) -> Void
-
-    var body: some View {
-        Text("Filter Presets")
-    }
-}
+// Note: FilterPresetManager is defined in FilterPresetManager.swift
+// Note: SearchHistoryEntry is defined in FilterModels.swift
+// Note: FilterPresetsView is defined in FilterPresetsView.swift
