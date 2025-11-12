@@ -249,7 +249,7 @@ class PushNotificationManager: NSObject, ObservableObject {
     /// Check if should deliver notification (respects quiet hours, preferences)
     func shouldDeliverNotification(category: NotificationCategory) -> Bool {
         // Check if category is enabled
-        guard preferences.isEnabled(category) else {
+        guard preferences.isEnabled(for: category) else {
             Logger.shared.debug("Notification disabled for category: \(category.identifier)", category: .general)
             return false
         }
