@@ -59,8 +59,8 @@ struct SeeWhoLikesYouView: View {
                 await viewModel.loadUsersWhoLiked()
             }
             .sheet(isPresented: $showUpgradeSheet) {
-                // TODO: Show premium upgrade sheet
-                Text("Upgrade to Premium")
+                PremiumUpgradeView()
+                    .environmentObject(authService)
             }
         }
     }
@@ -299,9 +299,9 @@ class SeeWhoLikesYouViewModel: ObservableObject {
             }
 
             usersWhoLiked = users
-            print("✅ Loaded \(users.count) users who liked you")
+            Logger.shared.info("Loaded \(users.count) users who liked you", category: .matching)
         } catch {
-            print("❌ Error loading likes: \(error.localizedDescription)")
+            Logger.shared.error("Error loading likes", category: .matching, error: error)
         }
     }
 }

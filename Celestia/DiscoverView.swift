@@ -76,6 +76,10 @@ struct DiscoverView: View {
             .sheet(isPresented: $viewModel.showingFilters) {
                 DiscoverFiltersView()
             }
+            .sheet(isPresented: $viewModel.showingUpgradeSheet) {
+                PremiumUpgradeView()
+                    .environmentObject(authService)
+            }
             .onChange(of: viewModel.hasActiveFilters) { _ in
                 viewModel.applyFilters()
             }

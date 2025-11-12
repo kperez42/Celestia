@@ -23,6 +23,7 @@ class DiscoverViewModel: ObservableObject {
     @Published var showingFilters = false
     @Published var dragOffset: CGSize = .zero
     @Published var isProcessingAction = false
+    @Published var showingUpgradeSheet = false
 
     var remainingCount: Int {
         return max(0, users.count - currentIndex)
@@ -150,7 +151,7 @@ class DiscoverViewModel: ObservableObject {
             let canLike = await checkDailyLikeLimit()
             if !canLike {
                 isProcessingAction = false
-                // Show upgrade prompt (TODO: implement upgrade sheet)
+                showingUpgradeSheet = true
                 Logger.shared.warning("Daily like limit reached. User needs to upgrade to Premium", category: .matching)
                 return
             }
@@ -292,7 +293,7 @@ class DiscoverViewModel: ObservableObject {
         // Check if user has super likes remaining
         if currentUser.superLikesRemaining <= 0 {
             isProcessingAction = false
-            // Show purchase prompt (TODO: implement purchase sheet)
+            showingUpgradeSheet = true
             Logger.shared.warning("No Super Likes remaining. User needs to purchase more", category: .payment)
             return
         }
