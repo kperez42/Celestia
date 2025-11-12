@@ -93,7 +93,7 @@ class DateCheckInManager: ObservableObject {
     /// Start an active check-in
     func startCheckIn(checkInId: String) async throws {
         guard let index = scheduledCheckIns.firstIndex(where: { $0.id == checkInId }) else {
-            throw CelestiaError.notFound
+            throw CelestiaError.checkInNotFound
         }
 
         var checkIn = scheduledCheckIns.remove(at: index)
@@ -121,7 +121,7 @@ class DateCheckInManager: ObservableObject {
     /// Complete a check-in (user is safe)
     func completeCheckIn(checkInId: String) async throws {
         guard let index = activeCheckIns.firstIndex(where: { $0.id == checkInId }) else {
-            throw CelestiaError.notFound
+            throw CelestiaError.checkInNotFound
         }
 
         var checkIn = activeCheckIns.remove(at: index)
@@ -176,13 +176,13 @@ class DateCheckInManager: ObservableObject {
             return
         }
 
-        throw CelestiaError.notFound
+        throw CelestiaError.checkInNotFound
     }
 
     /// Trigger emergency alert
     func triggerEmergency(checkInId: String) async throws {
         guard let index = activeCheckIns.firstIndex(where: { $0.id == checkInId }) else {
-            throw CelestiaError.notFound
+            throw CelestiaError.checkInNotFound
         }
 
         var checkIn = activeCheckIns[index]

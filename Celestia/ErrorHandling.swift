@@ -40,6 +40,9 @@ enum CelestiaError: LocalizedError, Identifiable {
     case cannotMatchWithSelf
     case userBlocked
 
+    // Check-in Errors
+    case checkInNotFound
+
     // Message Errors
     case messageNotSent
     case messageTooLong
@@ -112,6 +115,10 @@ enum CelestiaError: LocalizedError, Identifiable {
             return "You cannot match with yourself."
         case .userBlocked:
             return "This user has blocked you or you've blocked them."
+
+        // Check-in
+        case .checkInNotFound:
+            return "Check-in not found."
 
         // Message
         case .messageNotSent:
