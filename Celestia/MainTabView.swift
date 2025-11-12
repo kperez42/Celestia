@@ -31,7 +31,7 @@ struct MainTabView: View {
                     .tag(1)
                 
                 // Messages
-                MessagesView()
+                MessagesView(selectedTab: $selectedTab)
                     .tag(2)
                 
                 // Profile
@@ -106,8 +106,8 @@ struct MainTabView: View {
             }
         }
         .padding(.horizontal, 8)
-        .padding(.top, 2)
-        .padding(.bottom, -15)
+        .padding(.top, 8)
+        .padding(.bottom, 8)
         .background(
             ZStack {
                 // Blur effect
@@ -124,7 +124,7 @@ struct MainTabView: View {
                 )
             }
         )
-        
+
     }
     
     // MARK: - Helper Functions

@@ -21,6 +21,7 @@ struct ProfileView: View {
     @State private var animateStats = false
     @State private var profileCompletion = 0
     @State private var showingLogoutConfirmation = false
+    @State private var showingShareSheet = false
     
     var body: some View {
         NavigationStack {
@@ -277,10 +278,7 @@ struct ProfileView: View {
             // Top bar buttons
             VStack {
                 HStack {
-                    Button {
-                        // Share profile
-                        HapticManager.shared.impact(.light)
-                    } label: {
+                    ShareLink(item: URL(string: "https://celestia.app/profile/\(user.id ?? "")")!, subject: Text("Check out \(user.fullName)'s profile"), message: Text("See \(user.fullName) on Celestia!")) {
                         Image(systemName: "square.and.arrow.up")
                             .font(.title3)
                             .foregroundColor(.white)
@@ -288,6 +286,9 @@ struct ProfileView: View {
                             .background(Color.white.opacity(0.2))
                             .clipShape(Circle())
                     }
+                    .simultaneousGesture(TapGesture().onEnded {
+                        HapticManager.shared.impact(.light)
+                    })
 
                     Spacer()
 

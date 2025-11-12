@@ -111,16 +111,19 @@ struct DiscoverView: View {
             // Shuffle button
             Button {
                 viewModel.shuffleUsers()
+                HapticManager.shared.impact(.light)
             } label: {
                 Image(systemName: "shuffle")
                     .font(.title3)
                     .foregroundColor(.purple)
+                    .frame(width: 44, height: 44)
             }
             .padding(.trailing, 8)
 
             // Filter button
             Button {
                 viewModel.showFilters()
+                HapticManager.shared.impact(.light)
             } label: {
                 ZStack(alignment: .topTrailing) {
                     Image(systemName: viewModel.hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
@@ -134,6 +137,7 @@ struct DiscoverView: View {
                             .offset(x: 2, y: -2)
                     }
                 }
+                .frame(width: 44, height: 44)
             }
         }
         .padding()

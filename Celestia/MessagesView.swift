@@ -12,7 +12,9 @@ struct MessagesView: View {
     @StateObject private var matchService = MatchService.shared
     @StateObject private var userService = UserService.shared
     @StateObject private var messageService = MessageService.shared
-    
+
+    @Binding var selectedTab: Int
+
     @State private var matchedUsers: [String: User] = [:]
     @State private var searchText = ""
     @State private var showSearch = false
@@ -328,7 +330,8 @@ struct MessagesView: View {
             
             // CTA Button
             Button {
-                // Navigate to discover
+                selectedTab = 0
+                HapticManager.shared.impact(.medium)
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "heart.fill")
@@ -658,7 +661,7 @@ struct IdentifiableMatchUser: Identifiable {
 
 #Preview {
     NavigationStack {
-        MessagesView()
+        MessagesView(selectedTab: .constant(2))
             .environmentObject(AuthService.shared)
     }
 }

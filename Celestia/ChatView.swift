@@ -18,6 +18,7 @@ struct ChatView: View {
     @FocusState private var isInputFocused: Bool
     @State private var isOtherUserTyping = false
     @State private var showingUnmatchConfirmation = false
+    @State private var showingUserProfile = false
     @Environment(\.dismiss) var dismiss
 
     var body: some View {
@@ -69,6 +70,9 @@ struct ChatView: View {
             ),
             userName: otherUser.fullName
         )
+        .sheet(isPresented: $showingUserProfile) {
+            UserDetailView(user: otherUser)
+        }
     }
 
     // MARK: - Custom Header
@@ -78,10 +82,12 @@ struct ChatView: View {
             // Back button
             Button {
                 dismiss()
+                HapticManager.shared.impact(.light)
             } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(.purple)
+                    .frame(width: 44, height: 44)
             }
 
             // Profile image
@@ -145,7 +151,8 @@ struct ChatView: View {
             // More options menu
             Menu {
                 Button {
-                    // View profile
+                    showingUserProfile = true
+                    HapticManager.shared.impact(.light)
                 } label: {
                     Label("View Profile", systemImage: "person.circle")
                 }
@@ -159,6 +166,7 @@ struct ChatView: View {
                 Image(systemName: "ellipsis.circle")
                     .font(.system(size: 20))
                     .foregroundColor(.gray)
+                    .frame(width: 44, height: 44)
             }
         }
         .padding(.horizontal, 16)
