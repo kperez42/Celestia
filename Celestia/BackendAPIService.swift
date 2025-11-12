@@ -32,7 +32,7 @@ class ResponseCache {
             cache.removeValue(forKey: key)
             return nil
         }
-        Logger.shared.debug("📦 Cache hit: \(key)", category: .networkinging)
+        Logger.shared.debug("📦 Cache hit: \(key)", category: .networking)
         return cached.data
     }
 
