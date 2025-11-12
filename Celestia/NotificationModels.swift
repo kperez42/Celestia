@@ -3,6 +3,7 @@
 //  Celestia
 //
 //  Models and types for notification system
+//  NotificationData is defined in NotificationSettingsView.swift
 //
 
 import Foundation
@@ -452,42 +453,6 @@ struct NotificationPreferenceItem: Identifiable {
             icon: "envelope.fill"
         )
     ]
-}
-
-// MARK: - Notification Data
-
-struct NotificationData: Codable, Identifiable {
-    let id: String
-    let type: NotificationCategory
-    let title: String
-    let body: String
-    let timestamp: Date
-    let userId: String?
-    let matchId: String?
-    let imageURL: String?
-    var isRead: Bool
-
-    init(
-        id: String = UUID().uuidString,
-        type: NotificationCategory,
-        title: String,
-        body: String,
-        timestamp: Date,
-        userId: String? = nil,
-        matchId: String? = nil,
-        imageURL: String? = nil,
-        isRead: Bool = false
-    ) {
-        self.id = id
-        self.type = type
-        self.title = title
-        self.body = body
-        self.timestamp = timestamp
-        self.userId = userId
-        self.matchId = matchId
-        self.imageURL = imageURL
-        self.isRead = isRead
-    }
 }
 
 // MARK: - UserDefaults Extension

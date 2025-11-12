@@ -3,11 +3,13 @@
 //  Celestia
 //
 //  Manages user search and filtering functionality
+//  Filter types are defined in FilterModels.swift
 //
 
 import Foundation
 import Combine
 import FirebaseFirestore
+import SwiftUI
 
 // MARK: - Search Manager
 
@@ -85,7 +87,7 @@ class SearchManager: ObservableObject {
 
     /// Reset filter to defaults
     func resetFilter() {
-        currentFilter.reset()
+        currentFilter = SearchFilter()
     }
 
     /// Clear search results
@@ -247,175 +249,6 @@ struct UserProfile: Identifiable, Codable {
     }
 }
 
-// MARK: - Search Filter
-
-struct SearchFilter: Codable {
-    var ageRange: AgeRange = AgeRange(min: 18, max: 99)
-    var distanceRadius: Int = 50 // miles
-    var useCurrentLocation: Bool = true
-    var heightRange: HeightRange?
-    var showMe: ShowMeFilter = .everyone
-    var educationLevels: [EducationLevel] = []
-    var ethnicities: [Ethnicity] = []
-    var religions: [Religion] = []
-    var smoking: LifestyleFilter = .any
-    var drinking: LifestyleFilter = .any
-    var pets: PetPreference = .any
-    var hasChildren: LifestyleFilter = .any
-    var wantsChildren: LifestyleFilter = .any
-    var exercise: ExerciseFrequency?
-    var diet: DietPreference?
-    var relationshipGoals: [RelationshipGoal] = []
-    var verifiedOnly: Bool = false
-    var withPhotosOnly: Bool = true
-    var activeInLastDays: Int?
-    var newUsers: Bool = false
-    var zodiacSigns: [ZodiacSign] = []
-    var politicalViews: [PoliticalView] = []
-
-    var activeFilterCount: Int {
-        var count = 0
-
-        if ageRange.min != 18 || ageRange.max != 99 { count += 1 }
-        if distanceRadius != 50 { count += 1 }
-        if heightRange != nil { count += 1 }
-        if showMe != .everyone { count += 1 }
-        if !educationLevels.isEmpty { count += 1 }
-        if !ethnicities.isEmpty { count += 1 }
-        if !religions.isEmpty { count += 1 }
-        if smoking != .any { count += 1 }
-        if drinking != .any { count += 1 }
-        if pets != .any { count += 1 }
-        if hasChildren != .any { count += 1 }
-        if wantsChildren != .any { count += 1 }
-        if exercise != nil { count += 1 }
-        if diet != nil { count += 1 }
-        if !relationshipGoals.isEmpty { count += 1 }
-        if verifiedOnly { count += 1 }
-        if !withPhotosOnly { count += 1 }
-        if activeInLastDays != nil { count += 1 }
-        if newUsers { count += 1 }
-        if !zodiacSigns.isEmpty { count += 1 }
-        if !politicalViews.isEmpty { count += 1 }
-
-        return count
-    }
-
-    mutating func reset() {
-        self = SearchFilter()
-    }
-}
-
-// MARK: - Supporting Types
-
-struct AgeRange: Codable {
-    var min: Int
-    var max: Int
-}
-
-struct HeightRange: Codable {
-    var minInches: Int = 48 // 4'0"
-    var maxInches: Int = 96 // 8'0"
-
-    static func formatHeight(_ inches: Int) -> String {
-        let feet = inches / 12
-        let remainingInches = inches % 12
-        return "\(feet)'\(remainingInches)\""
-    }
-}
-
-enum ShowMeFilter: String, Codable, CaseIterable {
-    case men = "men"
-    case women = "women"
-    case everyone = "everyone"
-
-    var displayName: String {
-        switch self {
-        case .men: return "Men"
-        case .women: return "Women"
-        case .everyone: return "Everyone"
-        }
-    }
-}
-
-enum LifestyleFilter: String, Codable, CaseIterable {
-    case any = "any"
-    case yes = "yes"
-    case no = "no"
-    case sometimes = "sometimes"
-
-    var displayName: String {
-        switch self {
-        case .any: return "Any"
-        case .yes: return "Yes"
-        case .no: return "No"
-        case .sometimes: return "Sometimes"
-        }
-    }
-}
-
-enum PetPreference: String, Codable, CaseIterable {
-    case any = "any"
-    case dog = "dog"
-    case cat = "cat"
-    case both = "both"
-    case none = "none"
-
-    var displayName: String {
-        switch self {
-        case .any: return "Any"
-        case .dog: return "Dog"
-        case .cat: return "Cat"
-        case .both: return "Both"
-        case .none: return "None"
-        }
-    }
-}
-
-enum ExerciseFrequency: String, Codable, CaseIterable {
-    case any = "any"
-    case never = "never"
-    case rarely = "rarely"
-    case sometimes = "sometimes"
-    case often = "often"
-    case everyday = "everyday"
-
-    var displayName: String {
-        switch self {
-        case .any: return "Any"
-        case .never: return "Never"
-        case .rarely: return "Rarely"
-        case .sometimes: return "Sometimes"
-        case .often: return "Often"
-        case .everyday: return "Every day"
-        }
-    }
-}
-
-enum DietPreference: String, Codable, CaseIterable {
-    case any = "any"
-    case vegan = "vegan"
-    case vegetarian = "vegetarian"
-    case pescatarian = "pescatarian"
-    case kosher = "kosher"
-    case halal = "halal"
-    case carnivore = "carnivore"
-    case other = "other"
-
-    var displayName: String {
-        switch self {
-        case .any: return "Any"
-        case .vegan: return "Vegan"
-        case .vegetarian: return "Vegetarian"
-        case .pescatarian: return "Pescatarian"
-        case .kosher: return "Kosher"
-        case .halal: return "Halal"
-        case .carnivore: return "Carnivore"
-        case .other: return "Other"
-        }
-    }
-}
-
 // MARK: - Filter Preset Manager
 
 @MainActor
@@ -423,7 +256,7 @@ class FilterPresetManager: ObservableObject {
     static let shared = FilterPresetManager()
 
     @Published var presets: [FilterPreset] = []
-    @Published var searchHistory: [SearchHistoryItem] = []
+    @Published var searchHistory: [SearchHistoryEntry] = []
 
     private init() {}
 
@@ -434,7 +267,7 @@ class FilterPresetManager: ObservableObject {
     }
 
     func addToHistory(filter: SearchFilter, resultsCount: Int) {
-        let item = SearchHistoryItem(filter: filter, resultsCount: resultsCount, searchedAt: Date())
+        let item = SearchHistoryEntry(filter: filter, resultsCount: resultsCount, searchedAt: Date())
         searchHistory.insert(item, at: 0)
 
         // Keep only last 20 searches
@@ -444,18 +277,22 @@ class FilterPresetManager: ObservableObject {
     }
 }
 
-struct FilterPreset: Identifiable, Codable {
+struct SearchHistoryEntry: Identifiable, Codable, Equatable {
     let id: String
-    let name: String
-    let filter: SearchFilter
-    let createdAt: Date
-}
-
-struct SearchHistoryItem: Identifiable {
-    let id = UUID()
     let filter: SearchFilter
     let resultsCount: Int
     let searchedAt: Date
+
+    init(filter: SearchFilter, resultsCount: Int, searchedAt: Date) {
+        self.id = UUID().uuidString
+        self.filter = filter
+        self.resultsCount = resultsCount
+        self.searchedAt = searchedAt
+    }
+
+    static func == (lhs: SearchHistoryEntry, rhs: SearchHistoryEntry) -> Bool {
+        return lhs.id == rhs.id
+    }
 }
 
 // Filter Presets View (stub for compilation)
@@ -466,5 +303,3 @@ struct FilterPresetsView: View {
         Text("Filter Presets")
     }
 }
-
-import SwiftUI

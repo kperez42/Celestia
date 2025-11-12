@@ -77,7 +77,7 @@ class DiscoverViewModel: ObservableObject {
         // Cancel previous interest task if any
         interestTask?.cancel()
 
-        interestTask = Task {
+        interestTask = Task { @MainActor in
             guard !Task.isCancelled else { return }
             do {
                 try await InterestService.shared.sendInterest(
@@ -85,15 +85,11 @@ class DiscoverViewModel: ObservableObject {
                     toUserId: targetUserID
                 )
                 guard !Task.isCancelled else { return }
-                await MainActor.run {
-                    completion(true)
-                }
+                completion(true)
             } catch {
                 print("Error sending interest: \(error)")
                 guard !Task.isCancelled else { return }
-                await MainActor.run {
-                    completion(false)
-                }
+                completion(false)
             }
         }
     }

@@ -77,7 +77,7 @@ class NetworkMonitor: ObservableObject {
 
     // MARK: - Singleton
 
-    nonisolated(unsafe) static let shared = NetworkMonitor()
+    static let shared = NetworkMonitor()
 
     // MARK: - Published Properties
 
