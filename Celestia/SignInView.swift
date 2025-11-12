@@ -17,7 +17,9 @@ struct SignInView: View {
     @State private var showForgotPassword = false
     @State private var resetEmail = ""
     @State private var showResetSuccess = false
-    
+    @FocusState private var emailFieldFocused: Bool
+    @FocusState private var passwordFieldFocused: Bool
+
     var body: some View {
         NavigationView {
             ZStack {
@@ -52,9 +54,14 @@ struct SignInView: View {
                                 TextField("Enter your email", text: $email)
                                     .textInputAutocapitalization(.never)
                                     .keyboardType(.emailAddress)
+                                    .focused($emailFieldFocused)
                                     .padding()
                                     .background(Color(.systemBackground))
                                     .cornerRadius(10)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .stroke(emailFieldFocused ? LinearGradient(colors: [.purple, .pink], startPoint: .leading, endPoint: .trailing) : LinearGradient(colors: [.clear], startPoint: .leading, endPoint: .trailing), lineWidth: 2)
+                                    )
                             }
                             
                             // Password
@@ -66,10 +73,12 @@ struct SignInView: View {
                                 HStack {
                                     if showPassword {
                                         TextField("Enter your password", text: $password)
+                                            .focused($passwordFieldFocused)
                                     } else {
                                         SecureField("Enter your password", text: $password)
+                                            .focused($passwordFieldFocused)
                                     }
-                                    
+
                                     Button {
                                         showPassword.toggle()
                                     } label: {
@@ -80,6 +89,10 @@ struct SignInView: View {
                                 .padding()
                                 .background(Color(.systemBackground))
                                 .cornerRadius(10)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .stroke(passwordFieldFocused ? LinearGradient(colors: [.purple, .pink], startPoint: .leading, endPoint: .trailing) : LinearGradient(colors: [.clear], startPoint: .leading, endPoint: .trailing), lineWidth: 2)
+                                )
                             }
                             
                             // Error message
@@ -123,6 +136,7 @@ struct SignInView: View {
                             )
                             .cornerRadius(15)
                             .disabled(email.isEmpty || password.isEmpty || authService.isLoading)
+                            .scaleButton()
                             
                             // Forgot Password
                             Button {
@@ -132,6 +146,7 @@ struct SignInView: View {
                                     .font(.subheadline)
                                     .foregroundColor(.purple)
                             }
+                            .scaleButton(scale: 0.97)
                         }
                         .padding(.horizontal, 30)
                         

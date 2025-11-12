@@ -730,9 +730,10 @@ struct EditProfileView: View {
         }
         .disabled(isLoading || !isFormValid)
         .opacity(isFormValid ? 1.0 : 0.6)
+        .scaleButton()
         .padding(.bottom, 30)
     }
-    
+
     // MARK: - Helper Functions
     
     private var isFormValid: Bool {

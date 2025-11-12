@@ -638,9 +638,10 @@ struct ProfileView: View {
             .cornerRadius(16)
             .shadow(color: .purple.opacity(0.4), radius: 15, y: 8)
         }
+        .scaleButton()
         .padding(.horizontal, 20)
     }
-    
+
     // MARK: - Verification Card
 
     private var verificationCard: some View {

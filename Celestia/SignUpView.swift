@@ -118,8 +118,9 @@ struct SignUpView: View {
                                         .background(Color.white)
                                         .cornerRadius(15)
                                 }
+                                .scaleButton()
                             }
-                            
+
                             Button {
                                 handleNext()
                             } label: {
@@ -143,6 +144,7 @@ struct SignUpView: View {
                             )
                             .cornerRadius(15)
                             .disabled(!canProceed || authService.isLoading)
+                            .scaleButton()
                         }
                         .padding(.horizontal, 30)
                         .padding(.bottom, 30)

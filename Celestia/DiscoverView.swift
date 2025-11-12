@@ -209,6 +209,7 @@ struct DiscoverView: View {
                     }
                     .disabled(viewModel.isProcessingAction)
                     .opacity(viewModel.isProcessingAction ? 0.6 : 1.0)
+                    .actionButton()
 
                     // Super Like button
                     Button {
@@ -237,6 +238,7 @@ struct DiscoverView: View {
                     }
                     .disabled(viewModel.isProcessingAction)
                     .opacity(viewModel.isProcessingAction ? 0.6 : 1.0)
+                    .actionButton()
 
                     // Like button
                     Button {
@@ -266,6 +268,7 @@ struct DiscoverView: View {
                     }
                     .disabled(viewModel.isProcessingAction)
                     .opacity(viewModel.isProcessingAction ? 0.6 : 1.0)
+                    .actionButton()
                 }
                 .frame(maxWidth: .infinity) // Center the buttons
                 .padding(.bottom, 100) // Stay above tab bar and safe area
