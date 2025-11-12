@@ -14,7 +14,8 @@ struct SettingsView: View {
     @State private var showDeleteConfirmation = false
     @State private var showReferralDashboard = false
     @State private var showPremiumUpgrade = false
-    
+    @State private var showSeeWhoLikesYou = false
+
     var body: some View {
         NavigationStack {
             List {
@@ -94,6 +95,33 @@ struct SettingsView: View {
                                     .background(Color.purple)
                                     .cornerRadius(10)
                             }
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                    }
+
+                    Button {
+                        showSeeWhoLikesYou = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "heart.fill")
+                                .foregroundColor(.pink)
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: 6) {
+                                    Text("See Who Likes You")
+                                        .foregroundColor(.primary)
+                                    if !(authService.currentUser?.isPremium ?? false) {
+                                        Image(systemName: "crown.fill")
+                                            .font(.caption2)
+                                            .foregroundColor(.orange)
+                                    }
+                                }
+                                Text("Premium feature")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
                             Image(systemName: "chevron.right")
                                 .font(.caption)
                                 .foregroundColor(.gray)
@@ -217,6 +245,10 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showPremiumUpgrade) {
                 PremiumUpgradeView()
+                    .environmentObject(authService)
+            }
+            .sheet(isPresented: $showSeeWhoLikesYou) {
+                SeeWhoLikesYouView()
                     .environmentObject(authService)
             }
         }
