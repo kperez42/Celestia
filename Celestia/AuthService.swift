@@ -106,8 +106,8 @@ class AuthService: ObservableObject {
         } catch let error as NSError {
             isLoading = false
 
-            Logger.shared.auth("Sign in error - Domain: \(error.domain), Code: \(error.code)", level: .error, error: error)
-            
+            Logger.shared.auth("Sign in error - Domain: \(error.domain), Code: \(error.code)", level: .error)
+
             // User-friendly error messages
             if error.domain == "FIRAuthErrorDomain" {
                 switch error.code {
