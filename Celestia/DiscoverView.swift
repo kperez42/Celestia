@@ -13,23 +13,7 @@ struct SwipeAction {
 
 struct DiscoverView: View {
     @EnvironmentObject var authService: AuthService
-    @StateObject private var userService = UserService.shared
-    @StateObject private var matchService = MatchService.shared
-    @StateObject private var swipeService = SwipeService.shared
-    @StateObject private var filters = DiscoveryFilters.shared
-
-    @State private var currentIndex = 0
-    @State private var users: [User] = []
-    @State private var allUsers: [User] = [] // Unfiltered list
-    @State private var isLoading = false
-    @State private var dragOffset: CGSize = .zero
-    @State private var showingMatchAnimation = false
-    @State private var matchedUser: User?
-    @State private var swipeHistory: [SwipeAction] = []
-    @State private var showUndoButton = false
-    @State private var selectedUser: User?
-    @State private var showingUserDetail = false
-    @State private var showingFilters = false
+    @StateObject private var viewModel = DiscoverViewModel()
     
     var body: some View {
         NavigationStack {
@@ -47,7 +31,7 @@ struct DiscoverView: View {
                     headerView
                     
                     // Main content
-                    if isLoading {
+                    if viewModel.isLoading {
                         // Skeleton loading state
                         ZStack {
                             ForEach(0..<3, id: \.self) { index in
@@ -62,7 +46,7 @@ struct DiscoverView: View {
                             }
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else if users.isEmpty || currentIndex >= users.count {
+                    } else if viewModel.users.isEmpty || viewModel.currentIndex >= viewModel.users.count {
                         emptyStateView
                     } else {
                         cardStackView
@@ -70,30 +54,30 @@ struct DiscoverView: View {
                 }
                 
                 // Match animation
-                if showingMatchAnimation {
+                if viewModel.showingMatchAnimation {
                     matchCelebrationView
                 }
             }
             .navigationTitle("")
             .navigationBarHidden(true)
             .task {
-                await loadUsers()
+                await viewModel.loadUsers()
             }
             .refreshable {
                 HapticManager.shared.impact(.light)
-                await loadUsers()
+                await viewModel.loadUsers()
                 HapticManager.shared.notification(.success)
             }
-            .sheet(isPresented: $showingUserDetail) {
-                if let user = selectedUser {
+            .sheet(isPresented: $viewModel.showingUserDetail) {
+                if let user = viewModel.selectedUser {
                     UserDetailView(user: user)
                 }
             }
-            .sheet(isPresented: $showingFilters) {
+            .sheet(isPresented: $viewModel.showingFilters) {
                 DiscoverFiltersView()
             }
-            .onChange(of: filters.hasActiveFilters) { _ in
-                applyFilters()
+            .onChange(of: viewModel.hasActiveFilters) { _ in
+                viewModel.applyFilters()
             }
         }
     }
@@ -107,13 +91,13 @@ struct DiscoverView: View {
                     .font(.largeTitle)
                     .fontWeight(.bold)
 
-                if !users.isEmpty {
+                if !viewModel.users.isEmpty {
                     HStack(spacing: 4) {
-                        Text("\(users.count - currentIndex) people")
+                        Text("\(viewModel.remainingCount) people")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
 
-                        if filters.hasActiveFilters {
+                        if viewModel.hasActiveFilters {
                             Image(systemName: "line.3.horizontal.decrease.circle.fill")
                                 .font(.caption)
                                 .foregroundColor(.purple)
@@ -126,7 +110,7 @@ struct DiscoverView: View {
 
             // Shuffle button
             Button {
-                shuffleUsers()
+                viewModel.shuffleUsers()
             } label: {
                 Image(systemName: "shuffle")
                     .font(.title3)
@@ -136,14 +120,14 @@ struct DiscoverView: View {
 
             // Filter button
             Button {
-                showingFilters = true
+                viewModel.showFilters()
             } label: {
                 ZStack(alignment: .topTrailing) {
-                    Image(systemName: filters.hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                    Image(systemName: viewModel.hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
                         .font(.title2)
                         .foregroundColor(.purple)
 
-                    if filters.hasActiveFilters {
+                    if viewModel.hasActiveFilters {
                         Circle()
                             .fill(Color.red)
                             .frame(width: 8, height: 8)
@@ -160,8 +144,8 @@ struct DiscoverView: View {
 
     private var cardStackView: some View {
         ZStack {
-            ForEach(Array(users.enumerated().filter { $0.offset >= currentIndex && $0.offset < currentIndex + 3 }), id: \.offset) { index, user in
-                let cardIndex = index - currentIndex
+            ForEach(Array(viewModel.users.enumerated().filter { $0.offset >= viewModel.currentIndex && $0.offset < viewModel.currentIndex + 3 }), id: \.offset) { index, user in
+                let cardIndex = index - viewModel.currentIndex
 
                 UserCardView(user: user)
                     .padding(.horizontal, 16)
@@ -171,22 +155,20 @@ struct DiscoverView: View {
                     .scaleEffect(1.0 - CGFloat(cardIndex) * 0.05)
                     .opacity(1.0 - Double(cardIndex) * 0.2)
                     .zIndex(Double(3 - cardIndex))
-                    .offset(cardIndex == 0 ? dragOffset : .zero)
-                    .rotationEffect(.degrees(cardIndex == 0 ? Double(dragOffset.width / 20) : 0))
+                    .offset(cardIndex == 0 ? viewModel.dragOffset : .zero)
+                    .rotationEffect(.degrees(cardIndex == 0 ? Double(viewModel.dragOffset.width / 20) : 0))
                     .onTapGesture {
                         if cardIndex == 0 {
-                            selectedUser = user
-                            showingUserDetail = true
-                            HapticManager.shared.impact(.medium)
+                            viewModel.showUserDetail(user)
                         }
                     }
                     .gesture(
                         cardIndex == 0 ? DragGesture()
                             .onChanged { value in
-                                dragOffset = value.translation
+                                viewModel.dragOffset = value.translation
                             }
                             .onEnded { value in
-                                handleSwipeEnd(value: value, user: user)
+                                viewModel.handleSwipeEnd(value: value)
                             } : nil
                     )
             }
@@ -198,7 +180,7 @@ struct DiscoverView: View {
                 HStack(spacing: 20) {
                     // Pass button
                     Button {
-                        handlePass()
+                        Task { await viewModel.handlePass() }
                     } label: {
                         Image(systemName: "xmark")
                             .font(.title)
@@ -218,7 +200,7 @@ struct DiscoverView: View {
 
                     // Super Like button
                     Button {
-                        handleSuperLike()
+                        Task { await viewModel.handleSuperLike() }
                     } label: {
                         Image(systemName: "star.fill")
                             .font(.title2)
@@ -237,7 +219,7 @@ struct DiscoverView: View {
 
                     // Like button
                     Button {
-                        handleLike()
+                        Task { await viewModel.handleLike() }
                     } label: {
                         Image(systemName: "heart.fill")
                             .font(.title)
@@ -267,7 +249,7 @@ struct DiscoverView: View {
         VStack(spacing: 24) {
             Spacer()
 
-            Image(systemName: filters.hasActiveFilters ? "line.3.horizontal.decrease.circle" : "person.2.slash")
+            Image(systemName: viewModel.hasActiveFilters ? "line.3.horizontal.decrease.circle" : "person.2.slash")
                 .font(.system(size: 80))
                 .foregroundStyle(
                     LinearGradient(
@@ -278,11 +260,11 @@ struct DiscoverView: View {
                 )
 
             VStack(spacing: 12) {
-                Text(filters.hasActiveFilters ? "No Matches Found" : "No More Profiles")
+                Text(viewModel.hasActiveFilters ? "No Matches Found" : "No More Profiles")
                     .font(.title2)
                     .fontWeight(.bold)
 
-                Text(filters.hasActiveFilters ?
+                Text(viewModel.hasActiveFilters ?
                      "Try adjusting your filters to see more people" :
                      "Check back later for new people nearby")
                     .font(.subheadline)
@@ -292,11 +274,9 @@ struct DiscoverView: View {
             }
 
             VStack(spacing: 12) {
-                if filters.hasActiveFilters {
+                if viewModel.hasActiveFilters {
                     Button {
-                        HapticManager.shared.impact(.medium)
-                        filters.resetFilters()
-                        applyFilters()
+                        viewModel.resetFilters()
                     } label: {
                         HStack {
                             Image(systemName: "arrow.counterclockwise")
@@ -320,7 +300,7 @@ struct DiscoverView: View {
                 Button {
                     HapticManager.shared.impact(.light)
                     Task {
-                        await loadUsers()
+                        await viewModel.loadUsers()
                     }
                 } label: {
                     HStack {
@@ -347,33 +327,33 @@ struct DiscoverView: View {
         ZStack {
             Color.black.opacity(0.8)
                 .ignoresSafeArea()
-            
+
             VStack(spacing: 30) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 80))
                     .foregroundColor(.yellow)
-                
+
                 Text("It's a Match! 🎉")
                     .font(.largeTitle)
                     .fontWeight(.bold)
                     .foregroundColor(.white)
-                
-                if let user = matchedUser {
+
+                if let user = viewModel.matchedUser {
                     Text("You and \(user.fullName) liked each other!")
                         .font(.title3)
                         .foregroundColor(.white)
                         .multilineTextAlignment(.center)
                 }
-                
+
                 Button("Send Message") {
-                    showingMatchAnimation = false
+                    viewModel.dismissMatchAnimation()
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.purple)
                 .controlSize(.large)
-                
+
                 Button("Keep Swiping") {
-                    showingMatchAnimation = false
+                    viewModel.dismissMatchAnimation()
                 }
                 .foregroundColor(.white)
             }
@@ -381,233 +361,6 @@ struct DiscoverView: View {
         }
     }
     
-    // MARK: - Helper Functions
-    
-    private func loadUsers() async {
-        #if DEBUG
-        // Use test data in debug builds for easier testing
-        allUsers = TestData.discoverUsers
-        applyFilters()
-        currentIndex = 0
-        isLoading = false
-        return
-        #endif
-
-        guard let currentUserId = authService.currentUser?.id else { return }
-
-        isLoading = true
-        defer { isLoading = false }
-
-        do {
-            try await userService.fetchUsers(
-                excludingUserId: currentUserId,
-                limit: 50,
-                reset: true
-            )
-            allUsers = userService.users
-            applyFilters()
-            currentIndex = 0
-        } catch {
-            print("Error loading users: \(error)")
-        }
-    }
-
-    private func applyFilters() {
-        let currentLocation: (lat: Double, lon: Double)? = {
-            if let user = authService.currentUser,
-               let lat = user.latitude,
-               let lon = user.longitude {
-                return (lat, lon)
-            }
-            return nil
-        }()
-
-        users = allUsers.filter { user in
-            filters.matchesFilters(user: user, currentUserLocation: currentLocation)
-        }
-
-        // Reset index if needed
-        if currentIndex >= users.count {
-            currentIndex = 0
-        }
-    }
-
-    private func shuffleUsers() {
-        HapticManager.shared.impact(.medium)
-        withAnimation {
-            users.shuffle()
-            currentIndex = 0
-        }
-    }
-    
-    private func handleSwipeEnd(value: DragGesture.Value, user: User) {
-        let threshold: CGFloat = 100
-        
-        withAnimation {
-            if value.translation.width > threshold {
-                // Like
-                dragOffset = CGSize(width: 500, height: 0)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    handleLike()
-                    dragOffset = .zero
-                }
-            } else if value.translation.width < -threshold {
-                // Pass
-                dragOffset = CGSize(width: -500, height: 0)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    handlePass()
-                    dragOffset = .zero
-                }
-            } else {
-                dragOffset = .zero
-            }
-        }
-    }
-    
-    private func handleLike(isSuperLike: Bool = false) {
-        guard currentIndex < users.count else { return }
-        let user = users[currentIndex]
-
-        // Save to history for undo
-        swipeHistory.append(SwipeAction(user: user, index: currentIndex, wasLike: true))
-        showUndoButton = true
-
-        // Haptic feedback
-        if isSuperLike {
-            HapticManager.shared.superLike()
-        } else {
-            HapticManager.shared.swipeRight()
-        }
-
-        Task {
-            guard let currentUserId = authService.currentUser?.id,
-                  let userId = user.id else {
-                await MainActor.run {
-                    withAnimation {
-                        currentIndex += 1
-                    }
-                }
-                return
-            }
-
-            // Track swipe analytics
-            do {
-                try await AnalyticsManager.shared.trackSwipe(
-                    swipedUserId: userId,
-                    swiperUserId: currentUserId,
-                    direction: AnalyticsSwipeDirection.right
-                )
-            } catch {
-                print("❌ Error tracking swipe: \(error)")
-            }
-
-            // Create like and check for mutual match
-            do {
-                let isMatch = try await swipeService.likeUser(
-                    fromUserId: currentUserId,
-                    toUserId: userId,
-                    isSuperLike: isSuperLike
-                )
-
-                if isMatch {
-                    await MainActor.run {
-                        matchedUser = user
-                        showingMatchAnimation = true
-                        HapticManager.shared.match()
-                    }
-                    print("🎉 It's a match with \(user.fullName)!")
-                    // Track match
-                    try await AnalyticsManager.shared.trackMatch(user1Id: currentUserId, user2Id: userId)
-                }
-            } catch {
-                print("❌ Error creating like: \(error)")
-            }
-
-            await MainActor.run {
-                withAnimation {
-                    currentIndex += 1
-                }
-            }
-        }
-    }
-
-    private func handlePass() {
-        guard currentIndex < users.count else { return }
-        let user = users[currentIndex]
-
-        // Save to history for undo
-        swipeHistory.append(SwipeAction(user: user, index: currentIndex, wasLike: false))
-        showUndoButton = true
-
-        // Haptic feedback
-        HapticManager.shared.swipeLeft()
-
-        Task {
-            guard let currentUserId = authService.currentUser?.id,
-                  let userId = user.id else {
-                withAnimation {
-                    currentIndex += 1
-                }
-                return
-            }
-
-            // Track swipe analytics
-            do {
-                try await AnalyticsManager.shared.trackSwipe(
-                    swipedUserId: userId,
-                    swiperUserId: currentUserId,
-                    direction: AnalyticsSwipeDirection.left
-                )
-            } catch {
-                print("❌ Error tracking swipe: \(error)")
-            }
-
-            // Record the pass
-            do {
-                try await swipeService.passUser(fromUserId: currentUserId, toUserId: userId)
-            } catch {
-                print("❌ Error recording pass: \(error)")
-            }
-
-            await MainActor.run {
-                withAnimation {
-                    currentIndex += 1
-                }
-            }
-        }
-    }
-
-    private func handleSuperLike() {
-        guard currentIndex < users.count else { return }
-
-        // Check if user is premium
-        if authService.currentUser?.isPremium == true {
-            handleLike(isSuperLike: true)
-        } else {
-            // Show premium upgrade prompt
-            // For now, just treat as regular like
-            handleLike(isSuperLike: false)
-        }
-    }
-
-    private func handleUndo() {
-        guard !swipeHistory.isEmpty else { return }
-
-        // Check if user has premium for unlimited undo, otherwise allow 1 free undo
-        let isPremium = authService.currentUser?.isPremium ?? false
-        let freeUndoCount = 1
-
-        if isPremium || swipeHistory.count <= freeUndoCount {
-            let lastAction = swipeHistory.removeLast()
-
-            withAnimation(.spring(response: 0.3)) {
-                currentIndex = lastAction.index
-                showUndoButton = !swipeHistory.isEmpty
-            }
-
-            HapticManager.shared.impact(.medium)
-        }
-    }
 }
 
 // MARK: - User Card View
