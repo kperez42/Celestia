@@ -21,31 +21,6 @@ class MessageService: ObservableObject {
     
     private init() {}
 
-    // MARK: - Input Sanitization
-
-    /// Sanitize user input to prevent injection attacks and malformed data
-    private func sanitizeInput(_ text: String) -> String {
-        var sanitized = text.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        // Remove potentially dangerous HTML/script tags
-        let dangerousPatterns = [
-            "<script>", "</script>",
-            "<iframe>", "</iframe>",
-            "javascript:",
-            "onerror=", "onclick=", "onload="
-        ]
-
-        for pattern in dangerousPatterns {
-            sanitized = sanitized.replacingOccurrences(of: pattern, with: "", options: .caseInsensitive)
-        }
-
-        // Remove null bytes and control characters
-        sanitized = sanitized.components(separatedBy: .controlCharacters).joined()
-        sanitized = sanitized.replacingOccurrences(of: "\0", with: "")
-
-        return sanitized
-    }
-
     /// Listen to messages in real-time for a specific match
     func listenToMessages(matchId: String) {
         listener?.remove()
@@ -94,8 +69,8 @@ class MessageService: ObservableObject {
             throw CelestiaError.rateLimitExceeded
         }
 
-        // Sanitize and validate input
-        let sanitizedText = sanitizeInput(text)
+        // Sanitize and validate input using centralized utility
+        let sanitizedText = InputSanitizer.standard(text)
 
         guard !sanitizedText.isEmpty else {
             throw CelestiaError.messageNotSent

@@ -57,19 +57,14 @@ class AuthService: ObservableObject {
         return true
     }
 
-    /// Sanitize user input
-    private func sanitizeInput(_ text: String) -> String {
-        text.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
     @MainActor
     func signIn(withEmail email: String, password: String) async throws {
         isLoading = true
         errorMessage = nil
 
-        // Sanitize inputs
-        let sanitizedEmail = sanitizeInput(email)
-        let sanitizedPassword = sanitizeInput(password)
+        // Sanitize inputs using centralized utility
+        let sanitizedEmail = InputSanitizer.email(email)
+        let sanitizedPassword = InputSanitizer.basic(password)
 
         // Validate email format
         guard isValidEmail(sanitizedEmail) else {
@@ -132,8 +127,8 @@ class AuthService: ObservableObject {
 
     @MainActor
     func resetPassword(email: String) async throws {
-        // Sanitize email input
-        let sanitizedEmail = sanitizeInput(email)
+        // Sanitize email input using centralized utility
+        let sanitizedEmail = InputSanitizer.email(email)
 
         // Validate email format
         guard isValidEmail(sanitizedEmail) else {
@@ -173,10 +168,10 @@ class AuthService: ObservableObject {
         isLoading = true
         errorMessage = nil
 
-        // Sanitize inputs
-        let sanitizedEmail = sanitizeInput(email)
-        let sanitizedPassword = sanitizeInput(password)
-        let sanitizedFullName = sanitizeInput(fullName)
+        // Sanitize inputs using centralized utility
+        let sanitizedEmail = InputSanitizer.email(email)
+        let sanitizedPassword = InputSanitizer.basic(password)
+        let sanitizedFullName = InputSanitizer.strict(fullName)
 
         // Validate email format
         guard isValidEmail(sanitizedEmail) else {
@@ -238,9 +233,9 @@ class AuthService: ObservableObject {
             )
 
             // Set referral code if provided
-            let sanitizedReferralCode = sanitizeInput(referralCode)
+            let sanitizedReferralCode = InputSanitizer.referralCode(referralCode)
             if !sanitizedReferralCode.isEmpty {
-                user.referredByCode = sanitizedReferralCode.uppercased()
+                user.referredByCode = sanitizedReferralCode
             }
 
             print("🔵 Attempting to save user to Firestore...")
@@ -282,7 +277,7 @@ class AuthService: ObservableObject {
                 if !sanitizedReferralCode.isEmpty {
                     try await ReferralManager.shared.processReferralSignup(
                         newUser: user,
-                        referralCode: sanitizedReferralCode.uppercased()
+                        referralCode: sanitizedReferralCode
                     )
                     print("✅ Referral processed successfully")
                 }

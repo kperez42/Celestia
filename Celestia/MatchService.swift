@@ -98,12 +98,20 @@ class MatchService: ObservableObject {
             // Update match counts for both users
             try await updateMatchCounts(user1Id: user1Id, user2Id: user2Id)
 
-            // Fetch user data for notifications
-            let user1Snapshot = try? await db.collection("users").document(user1Id).getDocument()
-            let user2Snapshot = try? await db.collection("users").document(user2Id).getDocument()
+            // PERFORMANCE FIX: Batch fetch both users in a single query (prevents N+1 problem)
+            let usersSnapshot = try? await db.collection("users")
+                .whereField(FieldPath.documentID(), in: [user1Id, user2Id])
+                .getDocuments()
 
-            if let user1Data = user1Snapshot?.data(),
-               let user2Data = user2Snapshot?.data(),
+            // Create a dictionary for quick lookup
+            var userDataMap: [String: [String: Any]] = [:]
+            usersSnapshot?.documents.forEach { doc in
+                userDataMap[doc.documentID] = doc.data()
+            }
+
+            // Get user data from the map
+            if let user1Data = userDataMap[user1Id],
+               let user2Data = userDataMap[user2Id],
                let user1Name = user1Data["fullName"] as? String,
                let user2Name = user2Data["fullName"] as? String {
 
