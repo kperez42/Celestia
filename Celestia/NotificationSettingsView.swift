@@ -67,35 +67,35 @@ struct NotificationSettingsView: View {
                     icon: "heart.circle.fill",
                     title: "New Matches",
                     description: "When you match with someone",
-                    isOn: $preferences.newMatches
+                    isOn: $preferences.newMatchesEnabled
                 )
 
                 NotificationToggle(
                     icon: "message.circle.fill",
                     title: "Messages",
                     description: "When you receive a new message",
-                    isOn: $preferences.messages
+                    isOn: $preferences.newMessagesEnabled
                 )
 
                 NotificationToggle(
                     icon: "eye.circle.fill",
                     title: "Profile Views",
                     description: "When someone views your profile",
-                    isOn: $preferences.profileViews
+                    isOn: $preferences.profileViewsEnabled
                 )
 
                 NotificationToggle(
                     icon: "star.circle.fill",
-                    title: "Likes",
-                    description: "When someone likes your profile",
-                    isOn: $preferences.likes
+                    title: "Super Likes",
+                    description: "When someone super likes you",
+                    isOn: $preferences.superLikesEnabled
                 )
 
                 NotificationToggle(
                     icon: "sparkles",
-                    title: "Secret Admirer",
-                    description: "Mystery likes and special alerts",
-                    isOn: $preferences.secretAdmirer
+                    title: "Premium Offers",
+                    description: "Special offers and promotions",
+                    isOn: $preferences.premiumOffersEnabled
                 )
             }
 
@@ -103,22 +103,22 @@ struct NotificationSettingsView: View {
             Section("Engagement") {
                 NotificationToggle(
                     icon: "calendar.circle.fill",
-                    title: "Weekly Digest",
-                    description: "Your week in review (Sundays at 6 PM)",
-                    isOn: $preferences.weeklyDigest
+                    title: "Match Reminders",
+                    description: "Reminders about your matches",
+                    isOn: $preferences.matchRemindersEnabled
                 )
 
                 NotificationToggle(
                     icon: "bell.circle.fill",
-                    title: "Activity Reminders",
-                    description: "Gentle nudges to stay active",
-                    isOn: $preferences.activityReminders
+                    title: "Message Reminders",
+                    description: "Reminders to reply to messages",
+                    isOn: $preferences.messageRemindersEnabled
                 )
             }
 
             // Sound & Badge
             Section("Preferences") {
-                Toggle(isOn: $preferences.sound) {
+                Toggle(isOn: $preferences.soundEnabled) {
                     HStack {
                         Image(systemName: "speaker.wave.2.fill")
                             .foregroundStyle(
@@ -138,7 +138,7 @@ struct NotificationSettingsView: View {
                     }
                 }
 
-                Toggle(isOn: $preferences.badge) {
+                Toggle(isOn: $preferences.vibrationEnabled) {
                     HStack {
                         Image(systemName: "app.badge.fill")
                             .foregroundStyle(
@@ -149,9 +149,9 @@ struct NotificationSettingsView: View {
                                 )
                             )
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Badge")
+                            Text("Vibration")
                                 .fontWeight(.medium)
-                            Text("Show notification count on app icon")
+                            Text("Vibrate with notifications")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }

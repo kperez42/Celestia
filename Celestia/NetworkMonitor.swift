@@ -97,7 +97,7 @@ class NetworkMonitor: ObservableObject {
 
     private init() {
         setupMonitor()
-        Logger.shared.info("NetworkMonitor initialized", category: .network)
+        Logger.shared.info("NetworkMonitor initialized", category: .networking)
     }
 
     // MARK: - Setup
@@ -142,7 +142,7 @@ class NetworkMonitor: ObservableObject {
             lastConnectivityChange = Date()
 
             if isConnected {
-                Logger.shared.info("Network connected via \(connectionType.description)", category: .network)
+                Logger.shared.info("Network connected via \(connectionType.description)", category: .networking)
 
                 // Track in analytics
                 AnalyticsManager.shared.logEvent(.networkConnected, parameters: [
@@ -151,7 +151,7 @@ class NetworkMonitor: ObservableObject {
                     "offline_duration": timeSinceLastChange
                 ])
             } else {
-                Logger.shared.warning("Network disconnected", category: .network)
+                Logger.shared.warning("Network disconnected", category: .networking)
 
                 // Track in analytics
                 AnalyticsManager.shared.logEvent(.networkDisconnected, parameters: [
@@ -204,11 +204,11 @@ class NetworkMonitor: ObservableObject {
             let latency = Date().timeIntervalSince(startTime)
             updateQuality(basedOnLatency: latency)
 
-            Logger.shared.debug("Network latency: \(Int(latency * 1000))ms", category: .network)
+            Logger.shared.debug("Network latency: \(Int(latency * 1000))ms", category: .networking)
 
             return latency
         } catch {
-            Logger.shared.error("Failed to test network latency", category: .network, error: error)
+            Logger.shared.error("Failed to test network latency", category: .networking, error: error)
             return nil
         }
     }
