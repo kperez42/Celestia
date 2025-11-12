@@ -200,6 +200,11 @@ class DiscoverViewModel: ObservableObject {
         }
     }
 
+    /// Show filters sheet
+    func showFilters() {
+        showingFilters = true
+    }
+
     /// Load users (no parameters version for view)
     func loadUsers() async {
         // TODO: Get current user from AuthService and call loadUsers(currentUser:)
