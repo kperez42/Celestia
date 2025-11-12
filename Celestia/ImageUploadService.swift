@@ -2,7 +2,7 @@
 //  ImageUploadService.swift
 //  Celestia
 //
-//  Enhanced with comprehensive error handling and retry logic
+//  Enhanced with comprehensive error handling, retry logic, and background processing
 //
 
 import Foundation
@@ -10,7 +10,6 @@ import UIKit
 import Firebase
 import FirebaseStorage
 
-@MainActor
 class ImageUploadService {
     static let shared = ImageUploadService()
 
@@ -24,28 +23,44 @@ class ImageUploadService {
     // MARK: - Upload with Validation and Retry
 
     func uploadImage(_ image: UIImage, path: String) async throws -> String {
-        // Validate image
+        // Validate image on current thread (fast check)
         try validateImage(image)
 
-        // Optimize image
-        guard let optimizedImage = optimizeImage(image) else {
-            throw CelestiaError.invalidImageFormat
-        }
-
-        // Convert to data
-        guard let imageData = optimizedImage.jpegData(compressionQuality: compressionQuality) else {
-            throw CelestiaError.invalidImageFormat
-        }
+        // Optimize image on background thread (CPU-intensive)
+        let imageData = try await optimizeImageAsync(image)
 
         // Validate size
         if imageData.count > maxImageSize {
             throw CelestiaError.imageTooBig
         }
 
-        // Upload with retry logic
+        // Upload with retry logic (network operation)
         return try await RetryManager.shared.retryUploadOperation {
             try await self.performUpload(imageData: imageData, path: path)
         }
+    }
+
+    // MARK: - Background Image Processing
+
+    private func optimizeImageAsync(_ image: UIImage) async throws -> Data {
+        // Perform image processing on background thread to avoid blocking UI
+        return try await Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self = self else {
+                throw CelestiaError.invalidImageFormat
+            }
+
+            // Optimize image using modern UIGraphicsImageRenderer
+            guard let optimizedImage = self.optimizeImageOnBackgroundThread(image) else {
+                throw CelestiaError.invalidImageFormat
+            }
+
+            // Convert to data
+            guard let imageData = optimizedImage.jpegData(compressionQuality: self.compressionQuality) else {
+                throw CelestiaError.invalidImageFormat
+            }
+
+            return imageData
+        }.value
     }
 
     // MARK: - Private Upload Method
@@ -67,7 +82,7 @@ class ImageUploadService {
 
             // Get download URL
             let url = try await ref.downloadURL()
-            print("✅ Image uploaded successfully: \(url.absoluteString)")
+            Logger.shared.info("Image uploaded successfully: \(url.absoluteString)", category: .general)
             return url.absoluteString
         } catch let error as NSError {
             // Convert to CelestiaError
@@ -108,9 +123,9 @@ class ImageUploadService {
         }
     }
 
-    // MARK: - Image Optimization
+    // MARK: - Image Optimization (Background Thread)
 
-    private func optimizeImage(_ image: UIImage) -> UIImage? {
+    private func optimizeImageOnBackgroundThread(_ image: UIImage) -> UIImage? {
         let size = image.size
 
         // Calculate new size if needed
@@ -120,18 +135,18 @@ class ImageUploadService {
             newSize = CGSize(width: size.width * scale, height: size.height * scale)
         }
 
-        // Resize if needed
+        // Resize if needed using modern UIGraphicsImageRenderer
         if newSize != size {
-            UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
-            image.draw(in: CGRect(origin: .zero, size: newSize))
-            let resizedImage = UIGraphicsGetImageFromCurrentImageContext()
-            UIGraphicsEndImageContext()
+            let renderer = UIGraphicsImageRenderer(size: newSize)
+            let resizedImage = renderer.image { context in
+                image.draw(in: CGRect(origin: .zero, size: newSize))
+            }
             return resizedImage
         }
 
         return image
     }
-    
+
     // MARK: - Delete Image
 
     func deleteImage(url: String) async throws {
@@ -143,7 +158,7 @@ class ImageUploadService {
         try await RetryManager.shared.retryDatabaseOperation {
             let ref = Storage.storage().reference(forURL: url)
             try await ref.delete()
-            print("✅ Image deleted successfully: \(url)")
+            Logger.shared.info("Image deleted successfully: \(url)", category: .general)
         }
     }
 
@@ -188,4 +203,3 @@ class ImageUploadService {
         return uploadedURLs
     }
 }
-

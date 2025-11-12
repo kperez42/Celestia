@@ -61,7 +61,7 @@ class MatchService: ObservableObject {
 
                 Task { @MainActor in
                     if let error = error {
-                        print("❌ Error listening to matches: \(error)")
+                        Logger.shared.error("Error listening to matches: \(error)", category: .general)
                         return
                     }
 
@@ -85,7 +85,7 @@ class MatchService: ObservableObject {
     func createMatch(user1Id: String, user2Id: String) async {
         // Check if match already exists
         if let existingMatch = try? await fetchMatch(user1Id: user1Id, user2Id: user2Id) {
-            print("Match already exists: \(existingMatch.id ?? "unknown")")
+            Logger.shared.info("Match already exists: \(existingMatch.id ?? "unknown")", category: .general)
             return
         }
 
@@ -93,7 +93,7 @@ class MatchService: ObservableObject {
 
         do {
             let docRef = try db.collection("matches").addDocument(from: match)
-            print("✅ Match created: \(docRef.documentID)")
+            Logger.shared.info("Match created: \(docRef.documentID)", category: .general)
 
             // Update match counts for both users
             try await updateMatchCounts(user1Id: user1Id, user2Id: user2Id)
@@ -130,7 +130,7 @@ class MatchService: ObservableObject {
                 await notificationService.sendNewMatchNotification(match: matchWithId, otherUser: user1)
             }
         } catch {
-            print("❌ Error creating match: \(error)")
+            Logger.shared.error("Error creating match: \(error)", category: .general)
             self.error = error
         }
     }
@@ -191,7 +191,7 @@ class MatchService: ObservableObject {
         // Uncomment if you want to delete messages on unmatch
         // try await MessageService.shared.deleteAllMessages(matchId: matchId)
 
-        print("✅ Unmatched successfully")
+        Logger.shared.info("Unmatched successfully", category: .general)
     }
 
     /// Deactivate a match (soft delete)
