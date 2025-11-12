@@ -11,6 +11,8 @@ import Combine
 
 // MARK: - Notification Category
 
+import UserNotifications
+
 enum NotificationCategory: String, CaseIterable, Codable {
     case newMatch = "NEW_MATCH"
     case newMessage = "NEW_MESSAGE"
@@ -44,6 +46,29 @@ enum NotificationCategory: String, CaseIterable, Codable {
         case .messageReminder:
             return "Message Reminder"
         }
+    }
+
+    var actions: [UNNotificationAction] {
+        switch self {
+        case .newMatch:
+            return [
+                UNNotificationAction(identifier: "VIEW_MATCH", title: "View Match", options: .foreground),
+                UNNotificationAction(identifier: "OPEN_APP", title: "Open App", options: .foreground)
+            ]
+        case .newMessage:
+            return [
+                UNTextInputNotificationAction(identifier: "REPLY", title: "Reply", options: .foreground),
+                UNNotificationAction(identifier: "VIEW_PROFILE", title: "View Profile", options: .foreground)
+            ]
+        default:
+            return [
+                UNNotificationAction(identifier: "OPEN_APP", title: "Open App", options: .foreground)
+            ]
+        }
+    }
+
+    var options: UNNotificationCategoryOptions {
+        return [.customDismissAction]
     }
 }
 

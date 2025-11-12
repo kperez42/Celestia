@@ -195,6 +195,13 @@ class AnalyticsManager: ObservableObject, AnalyticsManagerProtocol {
         ])
     }
 
+    /// Fetch profile insights for a user
+    func fetchProfileInsights(for userId: String) async throws -> ProfileInsights {
+        // In production, this would fetch real analytics from backend
+        // For now, return empty insights that will be populated by the view
+        return ProfileInsights()
+    }
+
     /// Enable/disable analytics
     func setEnabled(_ enabled: Bool) {
         isEnabled = enabled
