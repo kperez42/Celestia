@@ -126,7 +126,7 @@ struct MessagesView: View {
                     // Title section
                     HStack(spacing: 12) {
                         Image(systemName: "message.circle.fill")
-                            .font(.system(size: 34))
+                            .font(.system(size: 36))
                             .foregroundStyle(
                                 LinearGradient(
                                     colors: [.white, .yellow.opacity(0.9)],
@@ -135,10 +135,10 @@ struct MessagesView: View {
                                 )
                             )
                             .shadow(color: .white.opacity(0.4), radius: 10)
-                        
+
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Messages")
-                                .font(.system(size: 34, weight: .bold))
+                                .font(.system(size: 36, weight: .bold))
                                 .foregroundColor(.white)
                             
                             if !conversations.isEmpty {
@@ -242,7 +242,7 @@ struct MessagesView: View {
         .padding(14)
         .background(Color.white)
         .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+        .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
     }

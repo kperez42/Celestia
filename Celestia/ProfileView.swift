@@ -446,11 +446,11 @@ struct ProfileView: View {
         }
         .padding(20)
         .background(Color.white)
-        .cornerRadius(20)
+        .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
         .padding(.horizontal, 20)
     }
-    
+
     private func missingItem(icon: String, text: String) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
@@ -497,7 +497,7 @@ struct ProfileView: View {
         }
         .padding(.vertical, 20)
         .background(Color.white)
-        .cornerRadius(20)
+        .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
         .padding(.horizontal, 20)
         .scaleEffect(animateStats ? 1 : 0.8)
@@ -595,9 +595,9 @@ struct ProfileView: View {
                     endPoint: .bottomTrailing
                 )
             )
-            .cornerRadius(20)
+            .cornerRadius(16)
             .overlay(
-                RoundedRectangle(cornerRadius: 20)
+                RoundedRectangle(cornerRadius: 16)
                     .stroke(
                         LinearGradient(
                             colors: [Color.purple.opacity(0.3), Color.pink.opacity(0.2)],
@@ -702,9 +702,9 @@ struct ProfileView: View {
                     endPoint: .bottomTrailing
                 )
             )
-            .cornerRadius(20)
+            .cornerRadius(16)
             .overlay(
-                RoundedRectangle(cornerRadius: 20)
+                RoundedRectangle(cornerRadius: 16)
                     .stroke(
                         LinearGradient(
                             colors: [Color.blue.opacity(0.3), Color.cyan.opacity(0.2)],
@@ -759,9 +759,9 @@ struct ProfileView: View {
                 endPoint: .bottomTrailing
             )
         )
-        .cornerRadius(20)
+        .cornerRadius(16)
         .overlay(
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: 16)
                 .stroke(
                     LinearGradient(
                         colors: [Color.yellow.opacity(0.5), Color.orange.opacity(0.3)],
@@ -835,9 +835,9 @@ struct ProfileView: View {
                     endPoint: .bottomTrailing
                 )
             )
-            .cornerRadius(20)
+            .cornerRadius(16)
             .overlay(
-                RoundedRectangle(cornerRadius: 20)
+                RoundedRectangle(cornerRadius: 16)
                     .stroke(
                         LinearGradient(
                             colors: [Color.yellow.opacity(0.3), Color.orange.opacity(0.2)],
@@ -871,11 +871,11 @@ struct ProfileView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
         .background(Color.white)
-        .cornerRadius(20)
+        .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
         .padding(.horizontal, 20)
     }
-    
+
     // MARK: - Prompts Section
 
     private func promptsSection(prompts: [ProfilePrompt]) -> some View {
@@ -931,11 +931,11 @@ struct ProfileView: View {
         }
         .padding(20)
         .background(Color.white)
-        .cornerRadius(20)
+        .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
         .padding(.horizontal, 20)
     }
-    
+
     private func detailRow(icon: String, label: String, value: String) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
@@ -1034,11 +1034,11 @@ struct ProfileView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
         .background(Color.white)
-        .cornerRadius(20)
+        .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
         .padding(.horizontal, 20)
     }
-    
+
     // MARK: - Interests Card
     
     private func interestsCard(interests: [String]) -> some View {
@@ -1066,11 +1066,11 @@ struct ProfileView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
         .background(Color.white)
-        .cornerRadius(20)
+        .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
         .padding(.horizontal, 20)
     }
-    
+
     // MARK: - Preferences Card
     
     private func preferencesCard(user: User) -> some View {
@@ -1108,11 +1108,11 @@ struct ProfileView: View {
         }
         .padding(20)
         .background(Color.white)
-        .cornerRadius(20)
+        .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
         .padding(.horizontal, 20)
     }
-    
+
     // MARK: - Achievements Card
     
     private func achievementsCard(user: User) -> some View {
@@ -1153,11 +1153,11 @@ struct ProfileView: View {
         }
         .padding(20)
         .background(Color.white)
-        .cornerRadius(20)
+        .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
         .padding(.horizontal, 20)
     }
-    
+
     private func achievementBadge(icon: String, title: String, subtitle: String, color: Color) -> some View {
         VStack(spacing: 8) {
             ZStack {

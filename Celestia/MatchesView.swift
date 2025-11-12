@@ -673,7 +673,7 @@ struct MatchProfileCard: View {
         }
         .background(Color.white)
         .cornerRadius(16)
-        .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
+        .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
         .overlay(
             RoundedRectangle(cornerRadius: 16)
                 .stroke(

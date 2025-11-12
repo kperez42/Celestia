@@ -88,8 +88,7 @@ struct DiscoverView: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Discover")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
+                    .font(.system(size: 36, weight: .bold))
 
                 if !viewModel.users.isEmpty {
                     HStack(spacing: 4) {
