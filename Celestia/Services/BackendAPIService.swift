@@ -9,6 +9,121 @@
 import Foundation
 import StoreKit
 
+// MARK: - Request/Response Interceptors
+
+protocol RequestInterceptor {
+    func intercept(request: inout URLRequest) async throws
+}
+
+protocol ResponseInterceptor {
+    func intercept(data: Data, response: URLResponse) async throws -> Data
+}
+
+// MARK: - Default Interceptors
+
+struct LoggingInterceptor: RequestInterceptor, ResponseInterceptor {
+    func intercept(request: inout URLRequest) async throws {
+        Logger.shared.debug("🌐 Request: \(request.httpMethod ?? "GET") \(request.url?.absoluteString ?? "unknown")", category: .network)
+
+        if let headers = request.allHTTPHeaderFields {
+            Logger.shared.debug("📋 Headers: \(headers)", category: .network)
+        }
+    }
+
+    func intercept(data: Data, response: URLResponse) async throws -> Data {
+        if let httpResponse = response as? HTTPURLResponse {
+            let statusEmoji = httpResponse.statusCode < 400 ? "✅" : "❌"
+            Logger.shared.debug("\(statusEmoji) Response: \(httpResponse.statusCode) (\(data.count) bytes)", category: .network)
+        }
+        return data
+    }
+}
+
+struct AnalyticsInterceptor: RequestInterceptor, ResponseInterceptor {
+    func intercept(request: inout URLRequest) async throws {
+        // Track API call
+        if let url = request.url {
+            AnalyticsManager.shared.logEvent(.featureUsed, parameters: [
+                "feature": "api_call",
+                "endpoint": url.path,
+                "method": request.httpMethod ?? "GET"
+            ])
+        }
+    }
+
+    func intercept(data: Data, response: URLResponse) async throws -> Data {
+        // Track API response
+        if let httpResponse = response as? HTTPURLResponse {
+            AnalyticsManager.shared.logEvent(.performance, parameters: [
+                "operation": "api_response",
+                "status_code": httpResponse.statusCode,
+                "response_size": data.count
+            ])
+        }
+        return data
+    }
+}
+
+// MARK: - Response Cache
+
+@MainActor
+class ResponseCache {
+    private var cache: [String: CachedResponse] = [:]
+    private let maxCacheSize = 50
+    private let defaultCacheDuration: TimeInterval = 300 // 5 minutes
+
+    struct CachedResponse {
+        let data: Data
+        let timestamp: Date
+        let duration: TimeInterval
+
+        var isExpired: Bool {
+            Date().timeIntervalSince(timestamp) > duration
+        }
+    }
+
+    func get(for key: String) -> Data? {
+        guard let cached = cache[key], !cached.isExpired else {
+            cache.removeValue(forKey: key)
+            return nil
+        }
+        Logger.shared.debug("📦 Cache hit: \(key)", category: .network)
+        return cached.data
+    }
+
+    func set(_ data: Data, for key: String, duration: TimeInterval? = nil) {
+        // Limit cache size
+        if cache.count >= maxCacheSize {
+            // Remove oldest entry
+            if let oldestKey = cache.min(by: { $0.value.timestamp < $1.value.timestamp })?.key {
+                cache.removeValue(forKey: oldestKey)
+            }
+        }
+
+        cache[key] = CachedResponse(
+            data: data,
+            timestamp: Date(),
+            duration: duration ?? defaultCacheDuration
+        )
+
+        Logger.shared.debug("💾 Cached response: \(key)", category: .network)
+    }
+
+    func clear() {
+        cache.removeAll()
+        Logger.shared.info("🗑️ Response cache cleared", category: .network)
+    }
+
+    func clearExpired() {
+        let expiredKeys = cache.filter { $0.value.isExpired }.map { $0.key }
+        expiredKeys.forEach { cache.removeValue(forKey: $0) }
+
+        if !expiredKeys.isEmpty {
+            Logger.shared.debug("🗑️ Cleared \(expiredKeys.count) expired cache entries", category: .network)
+        }
+    }
+}
+
 // MARK: - Backend API Service Protocol
 
 protocol BackendAPIServiceProtocol {
@@ -27,6 +142,9 @@ class BackendAPIService: BackendAPIServiceProtocol {
 
     private let baseURL: String
     private let session: URLSession
+    private var requestInterceptors: [RequestInterceptor] = []
+    private var responseInterceptors: [ResponseInterceptor] = []
+    private let responseCache: ResponseCache = ResponseCache()
 
     // MARK: - Configuration
 
@@ -48,7 +166,21 @@ class BackendAPIService: BackendAPIServiceProtocol {
 
         self.session = URLSession(configuration: config)
 
+        // Register default interceptors
+        #if DEBUG
+        registerInterceptor(LoggingInterceptor())
+        #endif
+        registerInterceptor(AnalyticsInterceptor())
+
         Logger.shared.info("BackendAPIService initialized with URL: \(baseURL)", category: .network)
+    }
+
+    // MARK: - Interceptor Management
+
+    func registerInterceptor<T: RequestInterceptor & ResponseInterceptor>(_ interceptor: T) {
+        requestInterceptors.append(interceptor)
+        responseInterceptors.append(interceptor)
+        Logger.shared.debug("Registered interceptor: \(type(of: interceptor))", category: .network)
     }
 
     // MARK: - Receipt Validation
@@ -208,21 +340,49 @@ class BackendAPIService: BackendAPIServiceProtocol {
         return try await performRequestWithRetry(request: request)
     }
 
-    private func performRequestWithRetry<T: Decodable>(request: URLRequest, attempt: Int = 1) async throws -> T {
+    private func performRequestWithRetry<T: Decodable>(request: URLRequest, attempt: Int = 1, useCache: Bool = false) async throws -> T {
+        var mutableRequest = request
+
+        // Generate cache key from request
+        let cacheKey = generateCacheKey(from: request)
+
+        // Check cache if enabled
+        if useCache, let cachedData = responseCache.get(for: cacheKey) {
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            return try decoder.decode(T.self, from: cachedData)
+        }
+
+        // Apply request interceptors
+        for interceptor in requestInterceptors {
+            try await interceptor.intercept(request: &mutableRequest)
+        }
+
         do {
-            let (data, response) = try await session.data(for: request)
+            let (responseData, response) = try await session.data(for: mutableRequest)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw BackendAPIError.invalidResponse
             }
 
+            // Apply response interceptors
+            var processedData = responseData
+            for interceptor in responseInterceptors {
+                processedData = try await interceptor.intercept(data: processedData, response: response)
+            }
+
             // Check status code
             switch httpResponse.statusCode {
             case 200...299:
+                // Cache successful responses if caching is enabled
+                if useCache {
+                    responseCache.set(processedData, for: cacheKey)
+                }
+
                 // Success - decode response
                 let decoder = JSONDecoder()
                 decoder.keyDecodingStrategy = .convertFromSnakeCase
-                return try decoder.decode(T.self, from: data)
+                return try decoder.decode(T.self, from: processedData)
 
             case 401:
                 throw BackendAPIError.unauthorized
@@ -235,7 +395,7 @@ class BackendAPIService: BackendAPIServiceProtocol {
                 if attempt < AppConstants.API.retryAttempts {
                     Logger.shared.warning("Server error (attempt \(attempt)/\(AppConstants.API.retryAttempts)), retrying...", category: .network)
                     try await Task.sleep(nanoseconds: UInt64(pow(2.0, Double(attempt)) * 1_000_000_000)) // Exponential backoff
-                    return try await performRequestWithRetry(request: request, attempt: attempt + 1)
+                    return try await performRequestWithRetry(request: request, attempt: attempt + 1, useCache: useCache)
                 }
                 throw BackendAPIError.serverError(httpResponse.statusCode)
 
@@ -250,10 +410,22 @@ class BackendAPIService: BackendAPIServiceProtocol {
             if attempt < AppConstants.API.retryAttempts {
                 Logger.shared.warning("Network error (attempt \(attempt)/\(AppConstants.API.retryAttempts)), retrying...", category: .network)
                 try await Task.sleep(nanoseconds: UInt64(pow(2.0, Double(attempt)) * 1_000_000_000))
-                return try await performRequestWithRetry(request: request, attempt: attempt + 1)
+                return try await performRequestWithRetry(request: request, attempt: attempt + 1, useCache: useCache)
             }
             throw BackendAPIError.networkError(error)
         }
+    }
+
+    private func generateCacheKey(from request: URLRequest) -> String {
+        var key = request.url?.absoluteString ?? ""
+        key += "-\(request.httpMethod ?? "GET")"
+
+        if let bodyData = request.httpBody,
+           let bodyString = String(data: bodyData, encoding: .utf8) {
+            key += "-\(bodyString.hashValue)"
+        }
+
+        return key
     }
 
     // MARK: - Authentication

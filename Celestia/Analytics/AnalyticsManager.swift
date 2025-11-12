@@ -289,6 +289,129 @@ class AnalyticsManager: ObservableObject, AnalyticsManagerProtocol {
         }
     }
 
+    /// Track app launch time
+    func trackAppLaunch(duration: TimeInterval, isWarmStart: Bool) {
+        logEvent(.appLaunchTime, parameters: [
+            "duration": duration,
+            "is_warm_start": isWarmStart,
+            "duration_ms": Int(duration * 1000)
+        ])
+
+        let launchType = isWarmStart ? "warm" : "cold"
+        Logger.shared.info("App \(launchType) launch: \(Int(duration * 1000))ms", category: .analytics)
+    }
+
+    /// Track view load time
+    func trackViewLoad(viewName: String, duration: TimeInterval) {
+        logEvent(.performance, parameters: [
+            "operation": "view_load",
+            "view_name": viewName,
+            "duration": duration,
+            "duration_ms": Int(duration * 1000)
+        ])
+
+        if duration > 0.5 {
+            Logger.shared.warning("Slow view load: \(viewName) (\(Int(duration * 1000))ms)", category: .analytics)
+        }
+    }
+
+    // MARK: - Screen View Tracking
+
+    /// Track screen view (automatically called by view modifier)
+    func trackScreenView(_ screenName: String, previousScreen: String? = nil) {
+        let previousScreenName = currentScreen
+        currentScreen = screenName
+
+        Analytics.logEvent(AnalyticsEventName.screenView, parameters: [
+            AnalyticsParameterScreenName: screenName,
+            AnalyticsParameterScreenClass: screenName,
+            "previous_screen": previousScreenName ?? "none",
+            "timestamp": ISO8601DateFormatter().string(from: Date())
+        ])
+
+        Logger.shared.debug("Screen view: \(screenName)", category: .analytics)
+    }
+
+    /// Get current screen name
+    func getCurrentScreen() -> String? {
+        return currentScreen
+    }
+
+    // MARK: - User Journey Tracking
+
+    /// Track user journey step
+    func trackJourneyStep(journey: String, step: String, metadata: [String: Any] = [:]) {
+        var parameters: [String: Any] = [
+            "journey": journey,
+            "step": step
+        ]
+
+        parameters.merge(metadata) { (_, new) in new }
+
+        logEvent(.funnelStep, parameters: parameters)
+
+        Logger.shared.debug("Journey step: \(journey) -> \(step)", category: .analytics)
+    }
+
+    /// Track journey completion
+    func trackJourneyCompleted(journey: String, duration: TimeInterval? = nil) {
+        var parameters: [String: Any] = [
+            "journey": journey
+        ]
+
+        if let duration = duration {
+            parameters["duration"] = duration
+            parameters["duration_seconds"] = Int(duration)
+        }
+
+        logEvent(.funnelCompleted, parameters: parameters)
+
+        Logger.shared.info("Journey completed: \(journey)", category: .analytics)
+    }
+
+    /// Track journey abandonment
+    func trackJourneyAbandoned(journey: String, lastStep: String, reason: String? = nil) {
+        var parameters: [String: Any] = [
+            "journey": journey,
+            "last_step": lastStep
+        ]
+
+        if let reason = reason {
+            parameters["reason"] = reason
+        }
+
+        logEvent(.funnelAbandoned, parameters: parameters)
+
+        Logger.shared.warning("Journey abandoned: \(journey) at \(lastStep)", category: .analytics)
+    }
+
+    // MARK: - Feature Adoption Tracking
+
+    /// Track feature usage
+    func trackFeatureUsage(feature: String, action: String, metadata: [String: Any] = [:]) {
+        var parameters: [String: Any] = [
+            "feature": feature,
+            "action": action
+        ]
+
+        parameters.merge(metadata) { (_, new) in new }
+
+        logEvent(.featureUsed, parameters: parameters)
+
+        Logger.shared.debug("Feature used: \(feature) - \(action)", category: .analytics)
+    }
+
+    /// Track feature discovery (first time use)
+    func trackFeatureDiscovery(feature: String) {
+        logEvent(.featureUsed, parameters: [
+            "feature": feature,
+            "action": "discovered",
+            "first_use": true
+        ])
+
+        Logger.shared.info("Feature discovered: \(feature)", category: .analytics)
+    }
+
     // MARK: - A/B Testing
 
     /// Track experiment exposure
@@ -551,6 +674,13 @@ enum AnalyticsEvent {
     // Performance
     case performance
     case error
+    case screenView
+    case appLaunchTime
+
+    // Network
+    case networkConnected
+    case networkDisconnected
+    case networkQualityChanged
 
     // Engagement
     case engagement
@@ -638,6 +768,11 @@ enum AnalyticsEvent {
         case .privacySettingsChanged: return "privacy_settings_changed"
         case .performance: return "performance"
         case .error: return "error"
+        case .screenView: return "screen_view"
+        case .appLaunchTime: return "app_launch_time"
+        case .networkConnected: return "network_connected"
+        case .networkDisconnected: return "network_disconnected"
+        case .networkQualityChanged: return "network_quality_changed"
         case .engagement: return "engagement"
         case .featureUsed: return "feature_used"
         case .funnelStep: return "funnel_step"
