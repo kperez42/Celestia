@@ -116,7 +116,7 @@ class SubscriptionManager: ObservableObject {
         let status = subscription.status
 
         // Update status
-        for await result in status {
+        for result in status {
             guard case .verified(let renewalInfo) = result.renewalInfo,
                   case .verified(let transaction) = result.transaction else {
                 continue
@@ -336,7 +336,12 @@ class SubscriptionManager: ObservableObject {
     func manageSubscription() async {
         #if !targetEnvironment(simulator)
         do {
-            try await AppStore.showManageSubscriptions(in: UIApplication.shared.connectedScenes.first as? UIWindowScene)
+            guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene else {
+                Logger.shared.error("No window scene available", category: .general)
+                return
+            }
+
+            try await AppStore.showManageSubscriptions(in: windowScene)
 
             // Track analytics
             AnalyticsManager.shared.logEvent(.subscriptionManaged, parameters: [:])
@@ -371,7 +376,7 @@ class SubscriptionManager: ObservableObject {
                 "isPremium": true,
                 "premiumTier": tier.rawValue,
                 "subscriptionTier": tier.displayName,
-                "subscriptionPeriod": subscriptionStatus.period.rawValue,
+                "subscriptionPeriod": subscriptionStatus.period?.rawValue ?? "unknown",
                 "subscriptionExpiryDate": Timestamp(date: expirationDate),
                 "lastPurchaseDate": Timestamp(date: transaction.purchaseDate),
                 "originalTransactionId": transaction.originalID,

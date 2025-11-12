@@ -343,14 +343,12 @@ class StoreManager: ObservableObject {
     /// Present promo code redemption sheet
     func presentPromoCodeRedemption() async {
         #if !targetEnvironment(simulator)
-        do {
-            try await AppStore.presentCodeRedemptionSheet()
+        // Use StoreKit 1 API for code redemption
+        await MainActor.run {
+            SKPaymentQueue.default().presentCodeRedemptionSheet()
 
             // Track analytics
             AnalyticsManager.shared.logEvent(.promoCodeRedeemed, parameters: [:])
-
-        } catch {
-            Logger.shared.error("Failed to present promo code sheet: \(error.localizedDescription)", category: .general)
         }
         #else
         Logger.shared.warning("Promo code redemption not available on simulator", category: .general)

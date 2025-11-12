@@ -255,7 +255,7 @@ struct SearchHistoryView: View {
     @StateObject private var presetManager = FilterPresetManager.shared
     @Environment(\.dismiss) private var dismiss
 
-    let onSelect: (SearchFilter) -> Void
+    let onSelect: (FilterPreset) -> Void
 
     var body: some View {
         NavigationView {

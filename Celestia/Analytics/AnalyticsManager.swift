@@ -381,6 +381,12 @@ enum AnalyticsEvent {
     case subscriptionManaged
     case consumablePurchased
     case consumableUsed
+    case purchaseInitiated
+    case purchaseCompleted
+    case purchaseCancelled
+    case purchaseFailed
+    case purchasesRestored
+    case promoCodeRedeemed
 
     // Social
     case profileShared
@@ -468,6 +474,12 @@ enum AnalyticsEvent {
         case .subscriptionManaged: return "subscription_managed"
         case .consumablePurchased: return "consumable_purchased"
         case .consumableUsed: return "consumable_used"
+        case .purchaseInitiated: return "purchase_initiated"
+        case .purchaseCompleted: return "purchase_completed"
+        case .purchaseCancelled: return "purchase_cancelled"
+        case .purchaseFailed: return "purchase_failed"
+        case .purchasesRestored: return "purchases_restored"
+        case .promoCodeRedeemed: return "promo_code_redeemed"
         case .profileShared: return "share"
         case .referralSent: return "referral_sent"
         case .referralCompleted: return "referral_completed"
