@@ -123,10 +123,45 @@ class SubscriptionManager: ObservableObject {
         await updateTier(from: transaction)
     }
 
-    /// Add consumable purchase (not implemented - subscriptions only)
-    func addConsumable(_ type: ConsumableType, amount: Int) {
+    /// Add consumable purchase
+    func addConsumable(_ type: ConsumableType, amount: Int) async {
         Logger.shared.info("Consumable purchase: \(type) x\(amount)", category: .general)
-        // Consumables not currently implemented - would track boost purchases, etc.
+
+        guard let userId = AuthService.shared.currentUser?.id else {
+            Logger.shared.error("Cannot add consumable: No user logged in", category: .general)
+            return
+        }
+
+        let db = Firestore.firestore()
+        let userRef = db.collection("users").document(userId)
+
+        do {
+            switch type {
+            case .superLikes:
+                try await userRef.updateData([
+                    "superLikesRemaining": FieldValue.increment(Int64(amount))
+                ])
+                Logger.shared.info("✅ Added \(amount) Super Likes", category: .general)
+
+            case .boost:
+                try await userRef.updateData([
+                    "boostsRemaining": FieldValue.increment(Int64(amount))
+                ])
+                Logger.shared.info("✅ Added \(amount) Boosts", category: .general)
+
+            case .rewind:
+                try await userRef.updateData([
+                    "rewindsRemaining": FieldValue.increment(Int64(amount))
+                ])
+                Logger.shared.info("✅ Added \(amount) Rewinds", category: .general)
+            }
+
+            // Refresh user data
+            await AuthService.shared.fetchUser()
+
+        } catch {
+            Logger.shared.error("Failed to add consumable: \(error.localizedDescription)", category: .general)
+        }
     }
 
     // MARK: - Transaction Monitoring

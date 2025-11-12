@@ -138,10 +138,22 @@ class DiscoverViewModel: ObservableObject {
         isProcessingAction = true
 
         let likedUser = users[currentIndex]
-        guard let currentUserId = AuthService.shared.currentUser?.id,
+        guard let currentUser = AuthService.shared.currentUser,
+              let currentUserId = currentUser.id,
               let likedUserId = likedUser.id else {
             isProcessingAction = false
             return
+        }
+
+        // Check daily like limit for non-premium users
+        if !currentUser.isPremium {
+            let canLike = await checkDailyLikeLimit()
+            if !canLike {
+                isProcessingAction = false
+                // Show upgrade prompt (TODO: implement upgrade sheet)
+                print("⚠️ Daily like limit reached. Please upgrade to Premium for unlimited likes!")
+                return
+            }
         }
 
         // Move to next card with animation
@@ -157,6 +169,11 @@ class DiscoverViewModel: ObservableObject {
                 toUserId: likedUserId,
                 isSuperLike: false
             )
+
+            // Decrement daily like counter if not premium
+            if !currentUser.isPremium {
+                await decrementDailyLikes()
+            }
 
             if isMatch {
                 // Show match animation
@@ -175,6 +192,55 @@ class DiscoverViewModel: ObservableObject {
         }
 
         isProcessingAction = false
+    }
+
+    /// Check if user has daily likes remaining
+    private func checkDailyLikeLimit() async -> Bool {
+        guard let userId = AuthService.shared.currentUser?.id else { return false }
+
+        let db = Firestore.firestore()
+        let userRef = db.collection("users").document(userId)
+
+        do {
+            let document = try await userRef.getDocument()
+            guard let data = document.data() else { return false }
+
+            let lastResetDate = (data["lastLikeResetDate"] as? Timestamp)?.dateValue() ?? Date()
+            var likesRemaining = data["likesRemainingToday"] as? Int ?? 50
+
+            // Check if we need to reset (new day)
+            if !Calendar.current.isDate(lastResetDate, inSameDayAs: Date()) {
+                // Reset to 50 likes
+                try await userRef.updateData([
+                    "likesRemainingToday": 50,
+                    "lastLikeResetDate": Timestamp(date: Date())
+                ])
+                await AuthService.shared.fetchUser()
+                return true
+            }
+
+            return likesRemaining > 0
+        } catch {
+            print("Error checking daily like limit: \(error)")
+            return true // Allow on error
+        }
+    }
+
+    /// Decrement daily like count
+    private func decrementDailyLikes() async {
+        guard let userId = AuthService.shared.currentUser?.id else { return }
+
+        let db = Firestore.firestore()
+        let userRef = db.collection("users").document(userId)
+
+        do {
+            try await userRef.updateData([
+                "likesRemainingToday": FieldValue.increment(Int64(-1))
+            ])
+            await AuthService.shared.fetchUser()
+        } catch {
+            print("Error decrementing daily likes: \(error)")
+        }
     }
 
     /// Handle pass action
@@ -216,9 +282,18 @@ class DiscoverViewModel: ObservableObject {
         isProcessingAction = true
 
         let superLikedUser = users[currentIndex]
-        guard let currentUserId = AuthService.shared.currentUser?.id,
+        guard let currentUser = AuthService.shared.currentUser,
+              let currentUserId = currentUser.id,
               let superLikedUserId = superLikedUser.id else {
             isProcessingAction = false
+            return
+        }
+
+        // Check if user has super likes remaining
+        if currentUser.superLikesRemaining <= 0 {
+            isProcessingAction = false
+            // Show purchase prompt (TODO: implement purchase sheet)
+            print("⚠️ No Super Likes remaining. Please purchase more!")
             return
         }
 
@@ -236,6 +311,9 @@ class DiscoverViewModel: ObservableObject {
                 isSuperLike: true
             )
 
+            // Deduct super like from balance
+            await decrementSuperLikes()
+
             if isMatch {
                 // Show match animation
                 await MainActor.run {
@@ -247,14 +325,30 @@ class DiscoverViewModel: ObservableObject {
             } else {
                 print("⭐ Super Like sent to \(superLikedUser.fullName)")
             }
-
-            // TODO: Deduct super like from user's balance when consumables are implemented
         } catch {
             print("❌ Error sending super like: \(error.localizedDescription)")
             // Still move forward even if super like fails
         }
 
         isProcessingAction = false
+    }
+
+    /// Decrement super like count
+    private func decrementSuperLikes() async {
+        guard let userId = AuthService.shared.currentUser?.id else { return }
+
+        let db = Firestore.firestore()
+        let userRef = db.collection("users").document(userId)
+
+        do {
+            try await userRef.updateData([
+                "superLikesRemaining": FieldValue.increment(Int64(-1))
+            ])
+            await AuthService.shared.fetchUser()
+            print("✅ Super Like used. Remaining: \(AuthService.shared.currentUser?.superLikesRemaining ?? 0)")
+        } catch {
+            print("Error decrementing super likes: \(error)")
+        }
     }
 
     /// Apply filters

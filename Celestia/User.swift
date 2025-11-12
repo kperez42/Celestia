@@ -53,7 +53,20 @@ struct User: Identifiable, Codable {
     var likesReceived: Int = 0
     var matchCount: Int = 0
     var profileViews: Int = 0
-    
+
+    // Consumables (Premium Features)
+    var superLikesRemaining: Int = 0
+    var boostsRemaining: Int = 0
+    var rewindsRemaining: Int = 0
+
+    // Daily Limits (Free Users)
+    var likesRemainingToday: Int = 50  // Free users get 50 likes/day
+    var lastLikeResetDate: Date = Date()
+
+    // Boost Status
+    var isBoostActive: Bool = false
+    var boostExpiryDate: Date?
+
     // Notifications
     var fcmToken: String?
     var notificationsEnabled: Bool = true
