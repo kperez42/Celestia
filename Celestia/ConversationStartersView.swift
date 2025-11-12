@@ -126,7 +126,7 @@ struct StarterCard: View {
                     )
             )
         }
-        .buttonStyle(ScaleButtonStyle())
+        .scaleButton()
         .offset(y: appeared ? 0 : 50)
         .opacity(appeared ? 1 : 0)
         .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(Double(index) * 0.1), value: appeared)
@@ -258,7 +258,7 @@ struct CompactStarterButton: View {
             .cornerRadius(12)
             .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
         }
-        .buttonStyle(ScaleButtonStyle())
+        .scaleButton()
         .offset(x: appeared ? 0 : -50)
         .opacity(appeared ? 1 : 0)
         .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(Double(index) * 0.08), value: appeared)
