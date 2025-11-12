@@ -7,6 +7,7 @@
 
 import Foundation
 import StoreKit
+import UIKit
 
 // MARK: - Store Manager
 
@@ -386,7 +387,14 @@ class StoreManager: ObservableObject {
             if #available(iOS 16.0, *) {
                 Task {
                     do {
-                        try await AppStore.presentOfferCodeRedeemSheet(in: nil)
+                        // Get the active window scene
+                        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene else {
+                            Logger.shared.error("No window scene available for offer code redemption", category: .general)
+                            return
+                        }
+
+                        try await AppStore.presentOfferCodeRedeemSheet(in: windowScene)
+
                         // Track analytics
                         await AnalyticsManager.shared.logEvent(.promoCodeRedeemed, parameters: [:])
                     } catch {
