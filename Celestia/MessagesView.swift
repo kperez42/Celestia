@@ -12,7 +12,9 @@ struct MessagesView: View {
     @StateObject private var matchService = MatchService.shared
     @StateObject private var userService = UserService.shared
     @StateObject private var messageService = MessageService.shared
-    
+
+    @Binding var selectedTab: Int
+
     @State private var matchedUsers: [String: User] = [:]
     @State private var searchText = ""
     @State private var showSearch = false
@@ -124,7 +126,7 @@ struct MessagesView: View {
                     // Title section
                     HStack(spacing: 12) {
                         Image(systemName: "message.circle.fill")
-                            .font(.system(size: 34))
+                            .font(.system(size: 36))
                             .foregroundStyle(
                                 LinearGradient(
                                     colors: [.white, .yellow.opacity(0.9)],
@@ -133,10 +135,10 @@ struct MessagesView: View {
                                 )
                             )
                             .shadow(color: .white.opacity(0.4), radius: 10)
-                        
+
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Messages")
-                                .font(.system(size: 34, weight: .bold))
+                                .font(.system(size: 36, weight: .bold))
                                 .foregroundColor(.white)
                             
                             if !conversations.isEmpty {
@@ -240,7 +242,7 @@ struct MessagesView: View {
         .padding(14)
         .background(Color.white)
         .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+        .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
     }
@@ -267,10 +269,10 @@ struct MessagesView: View {
                 }
             }
             .padding(20)
-            .padding(.bottom, 80)
+            .padding(.bottom, 100)
         }
     }
-    
+
     // MARK: - Loading View
 
     private var loadingView: some View {
@@ -281,7 +283,7 @@ struct MessagesView: View {
                 }
             }
             .padding(20)
-            .padding(.bottom, 80)
+            .padding(.bottom, 100)
         }
     }
     
@@ -328,7 +330,8 @@ struct MessagesView: View {
             
             // CTA Button
             Button {
-                // Navigate to discover
+                selectedTab = 0
+                HapticManager.shared.impact(.medium)
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "heart.fill")
@@ -463,7 +466,8 @@ struct ConversationRow: View {
                             .fontWeight(.semibold)
                             .foregroundColor(.primary)
                             .lineLimit(1)
-                        
+                            .truncationMode(.tail)
+
                         if user.isVerified {
                             Image(systemName: "checkmark.seal.fill")
                                 .font(.caption)
@@ -657,7 +661,7 @@ struct IdentifiableMatchUser: Identifiable {
 
 #Preview {
     NavigationStack {
-        MessagesView()
+        MessagesView(selectedTab: .constant(2))
             .environmentObject(AuthService.shared)
     }
 }

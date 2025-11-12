@@ -38,7 +38,7 @@ struct DiscoverView: View {
                                 CardSkeleton()
                                     .padding(.horizontal, 16)
                                     .padding(.top, 16)
-                                    .padding(.bottom, 180)
+                                    .padding(.bottom, 200)
                                     .offset(y: CGFloat(index * 8))
                                     .scaleEffect(1.0 - CGFloat(index) * 0.05)
                                     .opacity(1.0 - Double(index) * 0.2)
@@ -88,8 +88,7 @@ struct DiscoverView: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Discover")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
+                    .font(.system(size: 36, weight: .bold))
 
                 if !viewModel.users.isEmpty {
                     HStack(spacing: 4) {
@@ -111,16 +110,19 @@ struct DiscoverView: View {
             // Shuffle button
             Button {
                 viewModel.shuffleUsers()
+                HapticManager.shared.impact(.light)
             } label: {
                 Image(systemName: "shuffle")
                     .font(.title3)
                     .foregroundColor(.purple)
+                    .frame(width: 44, height: 44)
             }
             .padding(.trailing, 8)
 
             // Filter button
             Button {
                 viewModel.showFilters()
+                HapticManager.shared.impact(.light)
             } label: {
                 ZStack(alignment: .topTrailing) {
                     Image(systemName: viewModel.hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
@@ -134,6 +136,7 @@ struct DiscoverView: View {
                             .offset(x: 2, y: -2)
                     }
                 }
+                .frame(width: 44, height: 44)
             }
         }
         .padding()
@@ -149,8 +152,8 @@ struct DiscoverView: View {
 
                 UserCardView(user: user)
                     .padding(.horizontal, 16)
-                    .padding(.top, 16) // Reduce card height from top
-                    .padding(.bottom, 180) // Increased space for buttons and tab bar
+                    .padding(.top, 16)
+                    .padding(.bottom, 200) // Space for buttons and tab bar
                     .offset(y: CGFloat(cardIndex * 8))
                     .scaleEffect(1.0 - CGFloat(cardIndex) * 0.05)
                     .opacity(1.0 - Double(cardIndex) * 0.2)
@@ -182,63 +185,93 @@ struct DiscoverView: View {
                     Button {
                         Task { await viewModel.handlePass() }
                     } label: {
-                        Image(systemName: "xmark")
-                            .font(.title)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                            .frame(width: 64, height: 64)
-                            .background(
-                                LinearGradient(
-                                    colors: [Color.red.opacity(0.9), Color.red],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
+                        ZStack {
+                            if viewModel.isProcessingAction {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            } else {
+                                Image(systemName: "xmark")
+                                    .font(.title)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        .frame(width: 64, height: 64)
+                        .background(
+                            LinearGradient(
+                                colors: [Color.red.opacity(0.9), Color.red],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
                             )
-                            .clipShape(Circle())
-                            .shadow(color: .red.opacity(0.4), radius: 8, y: 4)
+                        )
+                        .clipShape(Circle())
+                        .shadow(color: .red.opacity(0.4), radius: 8, y: 4)
                     }
+                    .disabled(viewModel.isProcessingAction)
+                    .opacity(viewModel.isProcessingAction ? 0.6 : 1.0)
+                    .actionButton()
 
                     // Super Like button
                     Button {
                         Task { await viewModel.handleSuperLike() }
                     } label: {
-                        Image(systemName: "star.fill")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                            .frame(width: 56, height: 56)
-                            .background(
-                                LinearGradient(
-                                    colors: [Color.blue, Color.cyan],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
+                        ZStack {
+                            if viewModel.isProcessingAction {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            } else {
+                                Image(systemName: "star.fill")
+                                    .font(.title2)
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        .frame(width: 56, height: 56)
+                        .background(
+                            LinearGradient(
+                                colors: [Color.blue, Color.cyan],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
                             )
-                            .clipShape(Circle())
-                            .shadow(color: .blue.opacity(0.4), radius: 8, y: 4)
+                        )
+                        .clipShape(Circle())
+                        .shadow(color: .blue.opacity(0.4), radius: 8, y: 4)
                     }
+                    .disabled(viewModel.isProcessingAction)
+                    .opacity(viewModel.isProcessingAction ? 0.6 : 1.0)
+                    .actionButton()
 
                     // Like button
                     Button {
                         Task { await viewModel.handleLike() }
                     } label: {
-                        Image(systemName: "heart.fill")
-                            .font(.title)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                            .frame(width: 64, height: 64)
-                            .background(
-                                LinearGradient(
-                                    colors: [Color.green.opacity(0.9), Color.green],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
+                        ZStack {
+                            if viewModel.isProcessingAction {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            } else {
+                                Image(systemName: "heart.fill")
+                                    .font(.title)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        .frame(width: 64, height: 64)
+                        .background(
+                            LinearGradient(
+                                colors: [Color.green.opacity(0.9), Color.green],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
                             )
-                            .clipShape(Circle())
-                            .shadow(color: .green.opacity(0.4), radius: 8, y: 4)
+                        )
+                        .clipShape(Circle())
+                        .shadow(color: .green.opacity(0.4), radius: 8, y: 4)
                     }
+                    .disabled(viewModel.isProcessingAction)
+                    .opacity(viewModel.isProcessingAction ? 0.6 : 1.0)
+                    .actionButton()
                 }
                 .frame(maxWidth: .infinity) // Center the buttons
-                .padding(.bottom, 100) // Stay above tab bar
+                .padding(.bottom, 100) // Stay above tab bar and safe area
             }
         }
     }

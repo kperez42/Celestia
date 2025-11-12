@@ -33,7 +33,18 @@ struct SignUpView: View {
 
     let genderOptions = ["Male", "Female", "Non-binary", "Other"]
     let lookingForOptions = ["Men", "Women", "Everyone"]
-    
+
+    // Computed properties for validation
+    private var passwordsMatch: Bool {
+        !password.isEmpty && !confirmPassword.isEmpty && password == confirmPassword
+    }
+
+    private var isValidEmail: Bool {
+        let emailRegex = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
+        let emailPredicate = NSPredicate(format:"SELF MATCHES %@", emailRegex)
+        return emailPredicate.evaluate(with: email)
+    }
+
     var body: some View {
         NavigationView {
             ZStack {
@@ -48,6 +59,8 @@ struct SignUpView: View {
                                 Circle()
                                     .fill(currentStep >= step ? Color.purple : Color.gray.opacity(0.3))
                                     .frame(width: 12, height: 12)
+                                    .scaleEffect(currentStep == step ? 1.2 : 1.0)
+                                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: currentStep)
                             }
                         }
                         .padding(.top, 20)
@@ -73,15 +86,28 @@ struct SignUpView: View {
                             switch currentStep {
                             case 1:
                                 step1Content
+                                    .transition(.asymmetric(
+                                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                                        removal: .move(edge: .leading).combined(with: .opacity)
+                                    ))
                             case 2:
                                 step2Content
+                                    .transition(.asymmetric(
+                                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                                        removal: .move(edge: .leading).combined(with: .opacity)
+                                    ))
                             case 3:
                                 step3Content
+                                    .transition(.asymmetric(
+                                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                                        removal: .move(edge: .leading).combined(with: .opacity)
+                                    ))
                             default:
                                 EmptyView()
                             }
                         }
                         .padding(.horizontal, 30)
+                        .animation(.easeInOut(duration: 0.3), value: currentStep)
                         
                         // Error message
                         if let errorMessage = authService.errorMessage, !errorMessage.isEmpty {
@@ -107,8 +133,9 @@ struct SignUpView: View {
                                         .background(Color.white)
                                         .cornerRadius(15)
                                 }
+                                .scaleButton()
                             }
-                            
+
                             Button {
                                 handleNext()
                             } label: {
@@ -132,11 +159,13 @@ struct SignUpView: View {
                             )
                             .cornerRadius(15)
                             .disabled(!canProceed || authService.isLoading)
+                            .scaleButton()
                         }
                         .padding(.horizontal, 30)
                         .padding(.bottom, 30)
                     }
                 }
+                .scrollDismissesKeyboard(.interactively)
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -188,17 +217,47 @@ struct SignUpView: View {
                 Text("Confirm Password")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
-                
+
                 SecureField("Re-enter password", text: $confirmPassword)
                     .padding()
                     .background(Color(.systemBackground))
                     .cornerRadius(10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(passwordsMatch ? Color.green : (!password.isEmpty && !confirmPassword.isEmpty && password != confirmPassword ? Color.red : Color.clear), lineWidth: 2)
+                    )
             }
-            
-            if !password.isEmpty && !confirmPassword.isEmpty && password != confirmPassword {
-                Text("Passwords do not match")
-                    .font(.caption)
-                    .foregroundColor(.red)
+
+            // Password validation feedback
+            if !password.isEmpty && !confirmPassword.isEmpty {
+                if password != confirmPassword {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.red)
+                        Text("Passwords do not match")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
+                } else {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                        Text("Passwords match")
+                            .font(.caption)
+                            .foregroundColor(.green)
+                    }
+                }
+            }
+
+            // Password strength indicator
+            if !password.isEmpty {
+                HStack(spacing: 6) {
+                    Image(systemName: password.count >= 6 ? "checkmark.circle.fill" : "xmark.circle.fill")
+                        .foregroundColor(password.count >= 6 ? .green : .gray)
+                    Text("At least 6 characters")
+                        .font(.caption)
+                        .foregroundColor(password.count >= 6 ? .green : .secondary)
+                }
             }
         }
     }

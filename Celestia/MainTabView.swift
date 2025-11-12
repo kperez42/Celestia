@@ -25,21 +25,38 @@ struct MainTabView: View {
                 // Discover
                 FeedDiscoverView()
                     .tag(0)
-                
+                    .transition(.asymmetric(
+                        insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
+                        removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
+                    ))
+
                 // Matches
                 MatchesView()
                     .tag(1)
-                
+                    .transition(.asymmetric(
+                        insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
+                        removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
+                    ))
+
                 // Messages
-                MessagesView()
+                MessagesView(selectedTab: $selectedTab)
                     .tag(2)
-                
+                    .transition(.asymmetric(
+                        insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
+                        removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
+                    ))
+
                 // Profile
                 ProfileView()
                     .tag(3)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
+                        removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
+                    ))
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .ignoresSafeArea(.keyboard)
+            .animation(.easeInOut(duration: 0.3), value: selectedTab)
             
             // Custom Tab Bar
             customTabBar
@@ -106,8 +123,8 @@ struct MainTabView: View {
             }
         }
         .padding(.horizontal, 8)
-        .padding(.top, 2)
-        .padding(.bottom, -15)
+        .padding(.top, 8)
+        .padding(.bottom, 8)
         .background(
             ZStack {
                 // Blur effect
@@ -124,7 +141,7 @@ struct MainTabView: View {
                 )
             }
         )
-        
+
     }
     
     // MARK: - Helper Functions
@@ -192,7 +209,7 @@ struct TabBarButton: View {
                     // Badge
                     if badgeCount > 0 {
                         Text("\(badgeCount)")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.system(size: 11, weight: .bold))
                             .foregroundColor(.white)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 2)
@@ -210,10 +227,10 @@ struct TabBarButton: View {
                             .scaleEffect(isSelected ? 1.1 : 1.0)
                     }
                 }
-                
+
                 // Title
                 Text(title)
-                    .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
+                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
                     .foregroundColor(isSelected ? .purple : .gray)
             }
             .frame(maxWidth: .infinity)

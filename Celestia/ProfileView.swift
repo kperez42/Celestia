@@ -21,6 +21,7 @@ struct ProfileView: View {
     @State private var animateStats = false
     @State private var profileCompletion = 0
     @State private var showingLogoutConfirmation = false
+    @State private var showingShareSheet = false
     
     var body: some View {
         NavigationStack {
@@ -217,12 +218,12 @@ struct ProfileView: View {
                         .offset(x: geo.size.width - 60, y: 100)
                 }
             }
-            .frame(height: 380)
-            
+            .frame(height: 340)
+
             // Profile content
             VStack(spacing: 16) {
                 Spacer()
-                
+
                 // Profile image with tap to expand
                 Button {
                     selectedPhotoIndex = 0
@@ -231,21 +232,21 @@ struct ProfileView: View {
                 } label: {
                     profileImageView(user: user)
                 }
-                
+
                 // Name and badges
                 VStack(spacing: 10) {
                     HStack(spacing: 8) {
                         Text(user.fullName)
                             .font(.system(size: 32, weight: .bold))
                             .foregroundColor(.white)
-                        
+
                         if user.isVerified {
                             Image(systemName: "checkmark.seal.fill")
                                 .font(.title3)
                                 .foregroundColor(.blue)
                                 .shadow(color: .blue.opacity(0.5), radius: 5)
                         }
-                        
+
                         if user.isPremium {
                             Image(systemName: "crown.fill")
                                 .font(.title3)
@@ -253,7 +254,7 @@ struct ProfileView: View {
                                 .shadow(color: .yellow.opacity(0.7), radius: 8)
                         }
                     }
-                    
+
                     // Location and age
                     HStack(spacing: 8) {
                         HStack(spacing: 4) {
@@ -262,9 +263,9 @@ struct ProfileView: View {
                             Text("\(user.location), \(user.country)")
                                 .font(.subheadline)
                         }
-                        
+
                         Text("•")
-                        
+
                         Text("\(user.age) years old")
                             .font(.subheadline)
                     }
@@ -272,15 +273,12 @@ struct ProfileView: View {
                 }
                 .padding(.bottom, 40)
             }
-            .frame(height: 380)
-            
+            .frame(height: 340)
+
             // Top bar buttons
             VStack {
                 HStack {
-                    Button {
-                        // Share profile
-                        HapticManager.shared.impact(.light)
-                    } label: {
+                    ShareLink(item: URL(string: "https://celestia.app/profile/\(user.id ?? "")")!, subject: Text("Check out \(user.fullName)'s profile"), message: Text("See \(user.fullName) on Celestia!")) {
                         Image(systemName: "square.and.arrow.up")
                             .font(.title3)
                             .foregroundColor(.white)
@@ -288,9 +286,12 @@ struct ProfileView: View {
                             .background(Color.white.opacity(0.2))
                             .clipShape(Circle())
                     }
-                    
+                    .simultaneousGesture(TapGesture().onEnded {
+                        HapticManager.shared.impact(.light)
+                    })
+
                     Spacer()
-                    
+
                     Button {
                         showingSettings = true
                         HapticManager.shared.impact(.light)
@@ -307,7 +308,7 @@ struct ProfileView: View {
                 .padding(.top, 40)
                 Spacer()
             }
-            .frame(height: 380)
+            .frame(height: 340)
         }
     }
     
@@ -445,11 +446,11 @@ struct ProfileView: View {
         }
         .padding(20)
         .background(Color.white)
-        .cornerRadius(20)
+        .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
         .padding(.horizontal, 20)
     }
-    
+
     private func missingItem(icon: String, text: String) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
@@ -496,7 +497,7 @@ struct ProfileView: View {
         }
         .padding(.vertical, 20)
         .background(Color.white)
-        .cornerRadius(20)
+        .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
         .padding(.horizontal, 20)
         .scaleEffect(animateStats ? 1 : 0.8)
@@ -594,9 +595,9 @@ struct ProfileView: View {
                     endPoint: .bottomTrailing
                 )
             )
-            .cornerRadius(20)
+            .cornerRadius(16)
             .overlay(
-                RoundedRectangle(cornerRadius: 20)
+                RoundedRectangle(cornerRadius: 16)
                     .stroke(
                         LinearGradient(
                             colors: [Color.purple.opacity(0.3), Color.pink.opacity(0.2)],
@@ -637,9 +638,10 @@ struct ProfileView: View {
             .cornerRadius(16)
             .shadow(color: .purple.opacity(0.4), radius: 15, y: 8)
         }
+        .scaleButton()
         .padding(.horizontal, 20)
     }
-    
+
     // MARK: - Verification Card
 
     private var verificationCard: some View {
@@ -701,9 +703,9 @@ struct ProfileView: View {
                     endPoint: .bottomTrailing
                 )
             )
-            .cornerRadius(20)
+            .cornerRadius(16)
             .overlay(
-                RoundedRectangle(cornerRadius: 20)
+                RoundedRectangle(cornerRadius: 16)
                     .stroke(
                         LinearGradient(
                             colors: [Color.blue.opacity(0.3), Color.cyan.opacity(0.2)],
@@ -758,9 +760,9 @@ struct ProfileView: View {
                 endPoint: .bottomTrailing
             )
         )
-        .cornerRadius(20)
+        .cornerRadius(16)
         .overlay(
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: 16)
                 .stroke(
                     LinearGradient(
                         colors: [Color.yellow.opacity(0.5), Color.orange.opacity(0.3)],
@@ -834,9 +836,9 @@ struct ProfileView: View {
                     endPoint: .bottomTrailing
                 )
             )
-            .cornerRadius(20)
+            .cornerRadius(16)
             .overlay(
-                RoundedRectangle(cornerRadius: 20)
+                RoundedRectangle(cornerRadius: 16)
                     .stroke(
                         LinearGradient(
                             colors: [Color.yellow.opacity(0.3), Color.orange.opacity(0.2)],
@@ -870,11 +872,11 @@ struct ProfileView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
         .background(Color.white)
-        .cornerRadius(20)
+        .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
         .padding(.horizontal, 20)
     }
-    
+
     // MARK: - Prompts Section
 
     private func promptsSection(prompts: [ProfilePrompt]) -> some View {
@@ -930,11 +932,11 @@ struct ProfileView: View {
         }
         .padding(20)
         .background(Color.white)
-        .cornerRadius(20)
+        .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
         .padding(.horizontal, 20)
     }
-    
+
     private func detailRow(icon: String, label: String, value: String) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
@@ -1033,11 +1035,11 @@ struct ProfileView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
         .background(Color.white)
-        .cornerRadius(20)
+        .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
         .padding(.horizontal, 20)
     }
-    
+
     // MARK: - Interests Card
     
     private func interestsCard(interests: [String]) -> some View {
@@ -1065,11 +1067,11 @@ struct ProfileView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
         .background(Color.white)
-        .cornerRadius(20)
+        .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
         .padding(.horizontal, 20)
     }
-    
+
     // MARK: - Preferences Card
     
     private func preferencesCard(user: User) -> some View {
@@ -1107,11 +1109,11 @@ struct ProfileView: View {
         }
         .padding(20)
         .background(Color.white)
-        .cornerRadius(20)
+        .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
         .padding(.horizontal, 20)
     }
-    
+
     // MARK: - Achievements Card
     
     private func achievementsCard(user: User) -> some View {
@@ -1152,11 +1154,11 @@ struct ProfileView: View {
         }
         .padding(20)
         .background(Color.white)
-        .cornerRadius(20)
+        .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
         .padding(.horizontal, 20)
     }
-    
+
     private func achievementBadge(icon: String, title: String, subtitle: String, color: Color) -> some View {
         VStack(spacing: 8) {
             ZStack {
@@ -1211,7 +1213,7 @@ struct ProfileView: View {
             }
         }
         .padding(.horizontal, 20)
-        .padding(.bottom, 30)
+        .padding(.bottom, 100)
     }
     
     private func actionButton(icon: String, title: String, color: Color, action: @escaping () -> Void) -> some View {

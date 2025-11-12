@@ -22,6 +22,7 @@ class DiscoverViewModel: ObservableObject {
     @Published var showingUserDetail = false
     @Published var showingFilters = false
     @Published var dragOffset: CGSize = .zero
+    @Published var isProcessingAction = false
 
     var remainingCount: Int {
         return max(0, users.count - currentIndex)
@@ -133,7 +134,8 @@ class DiscoverViewModel: ObservableObject {
 
     /// Handle like action
     func handleLike() async {
-        guard currentIndex < users.count else { return }
+        guard currentIndex < users.count, !isProcessingAction else { return }
+        isProcessingAction = true
         let user = users[currentIndex]
 
         // Move to next card
@@ -141,13 +143,18 @@ class DiscoverViewModel: ObservableObject {
             currentIndex += 1
             dragOffset = .zero
         }
+
+        // Simulate network delay
+        try? await Task.sleep(nanoseconds: 300_000_000)
+        isProcessingAction = false
 
         // TODO: Implement like logic (send interest, check for match, etc.)
     }
 
     /// Handle pass action
     func handlePass() async {
-        guard currentIndex < users.count else { return }
+        guard currentIndex < users.count, !isProcessingAction else { return }
+        isProcessingAction = true
 
         // Move to next card
         withAnimation {
@@ -155,12 +162,17 @@ class DiscoverViewModel: ObservableObject {
             dragOffset = .zero
         }
 
+        // Simulate network delay
+        try? await Task.sleep(nanoseconds: 300_000_000)
+        isProcessingAction = false
+
         // TODO: Implement pass logic
     }
 
     /// Handle super like action
     func handleSuperLike() async {
-        guard currentIndex < users.count else { return }
+        guard currentIndex < users.count, !isProcessingAction else { return }
+        isProcessingAction = true
         let user = users[currentIndex]
 
         // Move to next card
@@ -168,6 +180,10 @@ class DiscoverViewModel: ObservableObject {
             currentIndex += 1
             dragOffset = .zero
         }
+
+        // Simulate network delay
+        try? await Task.sleep(nanoseconds: 300_000_000)
+        isProcessingAction = false
 
         // TODO: Implement super like logic (send super like interest, check for match, etc.)
     }

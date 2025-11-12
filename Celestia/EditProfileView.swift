@@ -324,19 +324,62 @@ struct EditProfileView: View {
     }
     
     // MARK: - Basic Info Section
-    
+
     private var basicInfoSection: some View {
         VStack(spacing: 20) {
             SectionHeader(icon: "person.fill", title: "Basic Information", color: .purple)
-            
-            FormField(label: "Full Name", placeholder: "Enter your name", text: $fullName)
-            
-            FormField(
-                label: "Age",
-                placeholder: "18",
-                text: $age,
-                keyboardType: .numberPad
-            )
+
+            // Full Name (Required)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 4) {
+                    Text("Full Name")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+                    Text("*")
+                        .foregroundColor(.red)
+                        .font(.subheadline)
+                }
+                TextField("Enter your name", text: $fullName)
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(fullName.isEmpty ? Color.red.opacity(0.3) : Color.clear, lineWidth: 1)
+                    )
+            }
+
+            // Age (Required)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 4) {
+                    Text("Age")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+                    Text("*")
+                        .foregroundColor(.red)
+                        .font(.subheadline)
+                }
+                TextField("18", text: $age)
+                    .keyboardType(.numberPad)
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke((Int(age) ?? 0) < 18 ? Color.red.opacity(0.3) : Color.clear, lineWidth: 1)
+                    )
+                if !age.isEmpty && (Int(age) ?? 0) < 18 {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.red)
+                        Text("You must be at least 18 years old")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
+                }
+            }
             
             // Gender Picker
             VStack(alignment: .leading, spacing: 8) {
@@ -353,9 +396,47 @@ struct EditProfileView: View {
                 .pickerStyle(.segmented)
             }
             
+            // Location and Country (Required)
             HStack(spacing: 12) {
-                FormField(label: "City", placeholder: "Los Angeles", text: $location)
-                FormField(label: "Country", placeholder: "USA", text: $country)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 4) {
+                        Text("City")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.secondary)
+                        Text("*")
+                            .foregroundColor(.red)
+                            .font(.subheadline)
+                    }
+                    TextField("Los Angeles", text: $location)
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(location.isEmpty ? Color.red.opacity(0.3) : Color.clear, lineWidth: 1)
+                        )
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 4) {
+                        Text("Country")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.secondary)
+                        Text("*")
+                            .foregroundColor(.red)
+                            .font(.subheadline)
+                    }
+                    TextField("USA", text: $country)
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(country.isEmpty ? Color.red.opacity(0.3) : Color.clear, lineWidth: 1)
+                        )
+                }
             }
         }
         .padding(20)
@@ -376,12 +457,19 @@ struct EditProfileView: View {
                         .font(.subheadline)
                         .fontWeight(.semibold)
                         .foregroundColor(.secondary)
-                    
+
                     Spacer()
-                    
+
+                    // Character counter with color coding
                     Text("\(bio.count)/500")
                         .font(.caption)
-                        .foregroundColor(bio.count > 500 ? .red : .gray)
+                        .fontWeight(bio.count >= 400 ? .semibold : .regular)
+                        .foregroundColor(
+                            bio.count >= 500 ? .red :
+                            bio.count >= 450 ? .orange :
+                            bio.count >= 400 ? .yellow :
+                            .gray
+                        )
                 }
                 
                 TextEditor(text: $bio)
@@ -642,9 +730,10 @@ struct EditProfileView: View {
         }
         .disabled(isLoading || !isFormValid)
         .opacity(isFormValid ? 1.0 : 0.6)
+        .scaleButton()
         .padding(.bottom, 30)
     }
-    
+
     // MARK: - Helper Functions
     
     private var isFormValid: Bool {

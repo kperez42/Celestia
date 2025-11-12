@@ -18,6 +18,8 @@ struct ChatView: View {
     @FocusState private var isInputFocused: Bool
     @State private var isOtherUserTyping = false
     @State private var showingUnmatchConfirmation = false
+    @State private var showingUserProfile = false
+    @State private var isSending = false
     @Environment(\.dismiss) var dismiss
 
     var body: some View {
@@ -69,6 +71,9 @@ struct ChatView: View {
             ),
             userName: otherUser.fullName
         )
+        .sheet(isPresented: $showingUserProfile) {
+            UserDetailView(user: otherUser)
+        }
     }
 
     // MARK: - Custom Header
@@ -78,10 +83,12 @@ struct ChatView: View {
             // Back button
             Button {
                 dismiss()
+                HapticManager.shared.impact(.light)
             } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(.purple)
+                    .frame(width: 44, height: 44)
             }
 
             // Profile image
@@ -145,7 +152,8 @@ struct ChatView: View {
             // More options menu
             Menu {
                 Button {
-                    // View profile
+                    showingUserProfile = true
+                    HapticManager.shared.impact(.light)
                 } label: {
                     Label("View Profile", systemImage: "person.circle")
                 }
@@ -159,6 +167,7 @@ struct ChatView: View {
                 Image(systemName: "ellipsis.circle")
                     .font(.system(size: 20))
                     .foregroundColor(.gray)
+                    .frame(width: 44, height: 44)
             }
         }
         .padding(.horizontal, 16)
@@ -198,6 +207,7 @@ struct ChatView: View {
                 }
                 .padding()
             }
+            .scrollDismissesKeyboard(.interactively)
             .background(Color(.systemGroupedBackground))
             .onChange(of: messageService.messages.count) {
                 scrollToBottom(proxy: proxy)
@@ -271,15 +281,23 @@ struct ChatView: View {
                 Button {
                     sendMessage()
                 } label: {
-                    Image(systemName: messageText.isEmpty ? "arrow.up.circle" : "arrow.up.circle.fill")
-                        .font(.system(size: 32))
-                        .foregroundStyle(
-                            messageText.isEmpty ?
-                            LinearGradient(colors: [.gray.opacity(0.5)], startPoint: .leading, endPoint: .trailing) :
-                            LinearGradient(colors: [.purple, .pink], startPoint: .leading, endPoint: .trailing)
-                        )
+                    ZStack {
+                        if isSending {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .purple))
+                        } else {
+                            Image(systemName: messageText.isEmpty ? "arrow.up.circle" : "arrow.up.circle.fill")
+                                .font(.system(size: 32))
+                                .foregroundStyle(
+                                    messageText.isEmpty ?
+                                    LinearGradient(colors: [.gray.opacity(0.5)], startPoint: .leading, endPoint: .trailing) :
+                                    LinearGradient(colors: [.purple, .pink], startPoint: .leading, endPoint: .trailing)
+                                )
+                        }
+                    }
+                    .frame(width: 32, height: 32)
                 }
-                .disabled(messageText.isEmpty)
+                .disabled(messageText.isEmpty || isSending)
             }
 
             // Character count (if over 100 characters)
@@ -314,7 +332,7 @@ struct ChatView: View {
     }
     
     private func sendMessage() {
-        guard !messageText.isEmpty else { return }
+        guard !messageText.isEmpty, !isSending else { return }
 
         let text = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else {
@@ -333,6 +351,8 @@ struct ChatView: View {
         guard let currentUserId = authService.currentUser?.id else { return }
         guard let receiverId = otherUser.id else { return }
 
+        isSending = true
+
         Task {
             do {
                 try await messageService.sendMessage(
@@ -347,6 +367,7 @@ struct ChatView: View {
                 HapticManager.shared.notification(.error)
                 // Could show error alert here
             }
+            isSending = false
         }
     }
 }

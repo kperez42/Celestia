@@ -220,7 +220,7 @@ struct WelcomeView: View {
                 .cornerRadius(28)
                 .shadow(color: .white.opacity(0.5), radius: 15, y: 5)
             }
-            .buttonStyle(ScaleButtonStyle())
+            .scaleButton()
             
             // Sign In - Secondary
             NavigationLink {
@@ -244,7 +244,7 @@ struct WelcomeView: View {
                         .stroke(Color.white.opacity(0.5), lineWidth: 2)
                 )
             }
-            .buttonStyle(ScaleButtonStyle())
+            .scaleButton()
             
             // Terms & Privacy
             HStack(spacing: 8) {
@@ -372,16 +372,6 @@ struct Feature {
     let icon: String
     let title: String
     let description: String
-}
-
-// MARK: - Scale Button Style
-
-struct ScaleButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
-    }
 }
 
 #Preview {
