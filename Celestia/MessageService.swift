@@ -21,31 +21,6 @@ class MessageService: ObservableObject {
     
     private init() {}
 
-    // MARK: - Input Sanitization
-
-    /// Sanitize user input to prevent injection attacks and malformed data
-    private func sanitizeInput(_ text: String) -> String {
-        var sanitized = text.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        // Remove potentially dangerous HTML/script tags
-        let dangerousPatterns = [
-            "<script>", "</script>",
-            "<iframe>", "</iframe>",
-            "javascript:",
-            "onerror=", "onclick=", "onload="
-        ]
-
-        for pattern in dangerousPatterns {
-            sanitized = sanitized.replacingOccurrences(of: pattern, with: "", options: .caseInsensitive)
-        }
-
-        // Remove null bytes and control characters
-        sanitized = sanitized.components(separatedBy: .controlCharacters).joined()
-        sanitized = sanitized.replacingOccurrences(of: "\0", with: "")
-
-        return sanitized
-    }
-
     /// Listen to messages in real-time for a specific match
     func listenToMessages(matchId: String) {
         listener?.remove()
@@ -73,12 +48,10 @@ class MessageService: ObservableObject {
     }
     
     /// Stop listening to messages
-    nonisolated func stopListening() {
-        Task { @MainActor in
-            listener?.remove()
-            listener = nil
-            messages = []
-        }
+    func stopListening() {
+        listener?.remove()
+        listener = nil
+        messages = []
     }
     
     /// Send a text message
@@ -96,8 +69,8 @@ class MessageService: ObservableObject {
             throw CelestiaError.rateLimitExceeded
         }
 
-        // Sanitize and validate input
-        let sanitizedText = sanitizeInput(text)
+        // Sanitize and validate input using centralized utility
+        let sanitizedText = InputSanitizer.standard(text)
 
         guard !sanitizedText.isEmpty else {
             throw CelestiaError.messageNotSent
@@ -107,10 +80,29 @@ class MessageService: ObservableObject {
             throw CelestiaError.messageTooLong
         }
 
-        // Content moderation
-        guard ContentModerator.shared.isAppropriate(sanitizedText) else {
-            let violations = ContentModerator.shared.getViolations(sanitizedText)
-            throw CelestiaError.inappropriateContentWithReasons(violations)
+        // Content moderation - use server-side validation if available
+        do {
+            // Try server-side validation first (more secure)
+            let validationResponse = try await BackendAPIService.shared.validateContent(
+                sanitizedText,
+                type: .message
+            )
+
+            guard validationResponse.isAppropriate else {
+                Logger.shared.warning("Content flagged by server: \(validationResponse.violations.joined(separator: ", "))", category: .moderation)
+                throw CelestiaError.inappropriateContentWithReasons(validationResponse.violations)
+            }
+
+            Logger.shared.debug("Content validated server-side ✅", category: .moderation)
+
+        } catch is BackendAPIError {
+            // Fallback to client-side validation if server unavailable
+            Logger.shared.warning("Server-side validation unavailable, using client-side", category: .moderation)
+
+            guard ContentModerator.shared.isAppropriate(sanitizedText) else {
+                let violations = ContentModerator.shared.getViolations(sanitizedText)
+                throw CelestiaError.inappropriateContentWithReasons(violations)
+            }
         }
 
         let message = Message(

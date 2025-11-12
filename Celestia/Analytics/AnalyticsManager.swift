@@ -289,6 +289,129 @@ class AnalyticsManager: ObservableObject, AnalyticsManagerProtocol {
         }
     }
 
+    /// Track app launch time
+    func trackAppLaunch(duration: TimeInterval, isWarmStart: Bool) {
+        logEvent(.appLaunchTime, parameters: [
+            "duration": duration,
+            "is_warm_start": isWarmStart,
+            "duration_ms": Int(duration * 1000)
+        ])
+
+        let launchType = isWarmStart ? "warm" : "cold"
+        Logger.shared.info("App \(launchType) launch: \(Int(duration * 1000))ms", category: .analytics)
+    }
+
+    /// Track view load time
+    func trackViewLoad(viewName: String, duration: TimeInterval) {
+        logEvent(.performance, parameters: [
+            "operation": "view_load",
+            "view_name": viewName,
+            "duration": duration,
+            "duration_ms": Int(duration * 1000)
+        ])
+
+        if duration > 0.5 {
+            Logger.shared.warning("Slow view load: \(viewName) (\(Int(duration * 1000))ms)", category: .analytics)
+        }
+    }
+
+    // MARK: - Screen View Tracking
+
+    /// Track screen view (automatically called by view modifier)
+    func trackScreenView(_ screenName: String, previousScreen: String? = nil) {
+        let previousScreenName = currentScreen
+        currentScreen = screenName
+
+        Analytics.logEvent(AnalyticsEventName.screenView, parameters: [
+            AnalyticsParameterScreenName: screenName,
+            AnalyticsParameterScreenClass: screenName,
+            "previous_screen": previousScreenName ?? "none",
+            "timestamp": ISO8601DateFormatter().string(from: Date())
+        ])
+
+        Logger.shared.debug("Screen view: \(screenName)", category: .analytics)
+    }
+
+    /// Get current screen name
+    func getCurrentScreen() -> String? {
+        return currentScreen
+    }
+
+    // MARK: - User Journey Tracking
+
+    /// Track user journey step
+    func trackJourneyStep(journey: String, step: String, metadata: [String: Any] = [:]) {
+        var parameters: [String: Any] = [
+            "journey": journey,
+            "step": step
+        ]
+
+        parameters.merge(metadata) { (_, new) in new }
+
+        logEvent(.funnelStep, parameters: parameters)
+
+        Logger.shared.debug("Journey step: \(journey) -> \(step)", category: .analytics)
+    }
+
+    /// Track journey completion
+    func trackJourneyCompleted(journey: String, duration: TimeInterval? = nil) {
+        var parameters: [String: Any] = [
+            "journey": journey
+        ]
+
+        if let duration = duration {
+            parameters["duration"] = duration
+            parameters["duration_seconds"] = Int(duration)
+        }
+
+        logEvent(.funnelCompleted, parameters: parameters)
+
+        Logger.shared.info("Journey completed: \(journey)", category: .analytics)
+    }
+
+    /// Track journey abandonment
+    func trackJourneyAbandoned(journey: String, lastStep: String, reason: String? = nil) {
+        var parameters: [String: Any] = [
+            "journey": journey,
+            "last_step": lastStep
+        ]
+
+        if let reason = reason {
+            parameters["reason"] = reason
+        }
+
+        logEvent(.funnelAbandoned, parameters: parameters)
+
+        Logger.shared.warning("Journey abandoned: \(journey) at \(lastStep)", category: .analytics)
+    }
+
+    // MARK: - Feature Adoption Tracking
+
+    /// Track feature usage
+    func trackFeatureUsage(feature: String, action: String, metadata: [String: Any] = [:]) {
+        var parameters: [String: Any] = [
+            "feature": feature,
+            "action": action
+        ]
+
+        parameters.merge(metadata) { (_, new) in new }
+
+        logEvent(.featureUsed, parameters: parameters)
+
+        Logger.shared.debug("Feature used: \(feature) - \(action)", category: .analytics)
+    }
+
+    /// Track feature discovery (first time use)
+    func trackFeatureDiscovery(feature: String) {
+        logEvent(.featureUsed, parameters: [
+            "feature": feature,
+            "action": "discovered",
+            "first_use": true
+        ])
+
+        Logger.shared.info("Feature discovered: \(feature)", category: .analytics)
+    }
+
     // MARK: - A/B Testing
 
     /// Track experiment exposure
@@ -301,29 +424,140 @@ class AnalyticsManager: ObservableObject, AnalyticsManagerProtocol {
 
     // MARK: - Profile Insights
 
-    /// Fetch profile insights for a user
+    /// Fetch profile insights for a user from Firestore analytics
     func fetchProfileInsights(for userId: String) async throws -> ProfileInsights {
-        // This is a placeholder implementation
-        // In a real app, this would fetch analytics data from Firebase Analytics
-        // or a custom analytics backend
-
         var insights = ProfileInsights()
 
-        // For now, return default/mock data
-        // TODO: Implement actual analytics data fetching from Firebase
-        insights.profileViews = Int.random(in: 50...200)
-        insights.viewsThisWeek = Int.random(in: 10...50)
-        insights.viewsLastWeek = Int.random(in: 10...50)
-        insights.swipesReceived = Int.random(in: 30...150)
-        insights.likesReceived = Int.random(in: 15...100)
-        insights.likeRate = Double(insights.likesReceived) / Double(max(insights.swipesReceived, 1))
-        insights.matchCount = Int.random(in: 5...30)
-        insights.matchRate = Double(insights.matchCount) / Double(max(insights.likesReceived, 1))
-        insights.profileScore = Int.random(in: 60...95)
+        // Calculate date ranges for weekly analysis
+        let calendar = Calendar.current
+        let now = Date()
+        let weekStart = calendar.date(byAdding: .day, value: -7, to: now)!
+        let lastWeekStart = calendar.date(byAdding: .day, value: -14, to: now)!
+
+        do {
+            // Fetch analytics data from Firestore
+            let db = Firestore.firestore()
+
+            // Profile views (all time)
+            let profileViewsSnapshot = try await db.collection("analytics")
+                .whereField("type", isEqualTo: "profile_view")
+                .whereField("targetUserId", isEqualTo: userId)
+                .getDocuments()
+            insights.profileViews = profileViewsSnapshot.documents.count
+
+            // Views this week
+            let viewsThisWeekSnapshot = try await db.collection("analytics")
+                .whereField("type", isEqualTo: "profile_view")
+                .whereField("targetUserId", isEqualTo: userId)
+                .whereField("timestamp", isGreaterThan: Timestamp(date: weekStart))
+                .getDocuments()
+            insights.viewsThisWeek = viewsThisWeekSnapshot.documents.count
+
+            // Views last week
+            let viewsLastWeekSnapshot = try await db.collection("analytics")
+                .whereField("type", isEqualTo: "profile_view")
+                .whereField("targetUserId", isEqualTo: userId)
+                .whereField("timestamp", isGreaterThan: Timestamp(date: lastWeekStart))
+                .whereField("timestamp", isLessThan: Timestamp(date: weekStart))
+                .getDocuments()
+            insights.viewsLastWeek = viewsLastWeekSnapshot.documents.count
+
+            // Swipes received (right swipes on user's profile)
+            let swipesSnapshot = try await db.collection("interests")
+                .whereField("toUserId", isEqualTo: userId)
+                .getDocuments()
+            insights.swipesReceived = swipesSnapshot.documents.count
+
+            // Likes received (filter for likes, not passes)
+            insights.likesReceived = swipesSnapshot.documents.filter { doc in
+                (doc.data()["isLike"] as? Bool) == true
+            }.count
+
+            // Calculate like rate
+            insights.likeRate = Double(insights.likesReceived) / Double(max(insights.swipesReceived, 1))
+
+            // Match count
+            let matchesSnapshot = try await db.collection("matches")
+                .whereFilter(Filter.orFilter([
+                    Filter.whereField("user1Id", isEqualTo: userId),
+                    Filter.whereField("user2Id", isEqualTo: userId)
+                ]))
+                .whereField("isActive", isEqualTo: true)
+                .getDocuments()
+            insights.matchCount = matchesSnapshot.documents.count
+
+            // Calculate match rate (matches / likes)
+            insights.matchRate = Double(insights.matchCount) / Double(max(insights.likesReceived, 1))
+
+            // Calculate profile score (0-100 based on engagement metrics)
+            insights.profileScore = calculateProfileScore(insights: insights)
+
+            // Get last active date from user doc
+            let userDoc = try await db.collection("users").document(userId).getDocument()
+            if let lastActive = userDoc.data()?["lastActive"] as? Timestamp {
+                insights.lastActiveDate = lastActive.dateValue()
+            } else {
+                insights.lastActiveDate = Date()
+            }
+
+            Logger.shared.debug("Fetched real analytics for user \(userId): \(insights.profileViews) views, \(insights.likesReceived) likes, \(insights.matchCount) matches", category: .analytics)
+
+        } catch {
+            Logger.shared.error("Failed to fetch analytics from Firestore, using defaults", category: .analytics, error: error)
+            // Fall back to defaults if Firestore query fails
+            insights = createDefaultInsights()
+        }
+
+        return insights
+    }
+
+    /// Calculate profile score based on engagement metrics
+    private func calculateProfileScore(insights: ProfileInsights) -> Int {
+        var score = 50 // Base score
+
+        // Boost for profile completeness (views indicate profile is interesting)
+        if insights.profileViews > 100 {
+            score += 15
+        } else if insights.profileViews > 50 {
+            score += 10
+        } else if insights.profileViews > 20 {
+            score += 5
+        }
+
+        // Boost for like rate
+        if insights.likeRate > 0.5 {
+            score += 20
+        } else if insights.likeRate > 0.3 {
+            score += 10
+        } else if insights.likeRate > 0.1 {
+            score += 5
+        }
+
+        // Boost for match rate
+        if insights.matchRate > 0.5 {
+            score += 15
+        } else if insights.matchRate > 0.3 {
+            score += 10
+        } else if insights.matchRate > 0.1 {
+            score += 5
+        }
+
+        return min(100, max(0, score))
+    }
+
+    /// Create default insights when data unavailable
+    private func createDefaultInsights() -> ProfileInsights {
+        var insights = ProfileInsights()
+        insights.profileViews = 0
+        insights.viewsThisWeek = 0
+        insights.viewsLastWeek = 0
+        insights.swipesReceived = 0
+        insights.likesReceived = 0
+        insights.likeRate = 0.0
+        insights.matchCount = 0
+        insights.matchRate = 0.0
+        insights.profileScore = 50
         insights.lastActiveDate = Date()
-
-        Logger.shared.debug("Fetched profile insights for user: \(userId)", category: .analytics)
-
         return insights
     }
 
@@ -440,6 +674,13 @@ enum AnalyticsEvent {
     // Performance
     case performance
     case error
+    case screenView
+    case appLaunchTime
+
+    // Network
+    case networkConnected
+    case networkDisconnected
+    case networkQualityChanged
 
     // Engagement
     case engagement
@@ -527,6 +768,11 @@ enum AnalyticsEvent {
         case .privacySettingsChanged: return "privacy_settings_changed"
         case .performance: return "performance"
         case .error: return "error"
+        case .screenView: return "screen_view"
+        case .appLaunchTime: return "app_launch_time"
+        case .networkConnected: return "network_connected"
+        case .networkDisconnected: return "network_disconnected"
+        case .networkQualityChanged: return "network_quality_changed"
         case .engagement: return "engagement"
         case .featureUsed: return "feature_used"
         case .funnelStep: return "funnel_step"

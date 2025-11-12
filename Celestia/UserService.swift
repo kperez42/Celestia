@@ -23,31 +23,6 @@ class UserService: ObservableObject {
 
     private init() {}
 
-    // MARK: - Input Sanitization
-
-    /// Sanitize user input to prevent injection attacks and malformed data
-    private func sanitizeInput(_ text: String) -> String {
-        var sanitized = text.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        // Remove potentially dangerous HTML/script tags
-        let dangerousPatterns = [
-            "<script>", "</script>",
-            "<iframe>", "</iframe>",
-            "javascript:",
-            "onerror=", "onclick=", "onload="
-        ]
-
-        for pattern in dangerousPatterns {
-            sanitized = sanitized.replacingOccurrences(of: pattern, with: "", options: .caseInsensitive)
-        }
-
-        // Remove null bytes and control characters
-        sanitized = sanitized.components(separatedBy: .controlCharacters).joined()
-        sanitized = sanitized.replacingOccurrences(of: "\0", with: "")
-
-        return sanitized
-    }
-
     /// Fetch users with filters and pagination support
     func fetchUsers(
         excludingUserId: String,
@@ -177,8 +152,8 @@ class UserService: ObservableObject {
     
     /// Search users by name or location with pagination support
     func searchUsers(query: String, currentUserId: String, limit: Int = 20, offset: DocumentSnapshot? = nil) async throws -> [User] {
-        // Sanitize search query
-        let sanitizedQuery = sanitizeInput(query)
+        // Sanitize search query using centralized utility
+        let sanitizedQuery = InputSanitizer.standard(query)
         guard !sanitizedQuery.isEmpty else { return [] }
 
         var firestoreQuery = db.collection("users")

@@ -193,6 +193,42 @@ class StoreManager: ObservableObject {
     private func deliverContent(for transaction: StoreKit.Transaction) async {
         Logger.shared.info("Delivering content for transaction: \(transaction.id)", category: .general)
 
+        // CRITICAL: Validate receipt server-side before delivering content
+        // This prevents fraud by ensuring purchases are legitimate
+        guard let userId = AuthService.shared.currentUser?.id else {
+            Logger.shared.error("Cannot deliver content: no user ID", category: .general)
+            return
+        }
+
+        do {
+            // Validate with backend server
+            let validationResponse = try await BackendAPIService.shared.validateReceipt(transaction, userId: userId)
+
+            guard validationResponse.isValid else {
+                Logger.shared.error("Server-side validation failed: \(validationResponse.reason ?? "unknown")", category: .general)
+                // Track fraud attempt
+                AnalyticsManager.shared.logEvent(.fraudDetected, parameters: [
+                    "transaction_id": String(transaction.id),
+                    "product_id": transaction.productID,
+                    "reason": validationResponse.reason ?? "validation_failed"
+                ])
+                return
+            }
+
+            Logger.shared.info("Server-side validation successful ✅", category: .general)
+
+        } catch {
+            Logger.shared.error("Receipt validation error: \(error.localizedDescription)", category: .general)
+            // SECURITY: Don't deliver content if validation fails
+            // Track validation errors for monitoring
+            AnalyticsManager.shared.logEvent(.validationError, parameters: [
+                "transaction_id": String(transaction.id),
+                "error": error.localizedDescription
+            ])
+            return
+        }
+
+        // Validation passed - deliver content
         guard let productType = getProductType(for: transaction.productID) else {
             Logger.shared.error("Unknown product type: \(transaction.productID)", category: .general)
             return

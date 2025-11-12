@@ -10,7 +10,7 @@ import SwiftUI
 struct UserDetailView: View {
     let user: User
     @StateObject private var viewModel = DiscoverViewModel()
-    @StateObject private var authViewModel = AuthViewModel()
+    @EnvironmentObject var authService: AuthService
     @Environment(\.dismiss) var dismiss
     
     @State private var showingInterestSent = false
@@ -209,7 +209,7 @@ struct UserDetailView: View {
         .onAppear {
             // Track profile view
             Task {
-                guard let currentUserId = authViewModel.currentUser?.id,
+                guard let currentUserId = authService.currentUser?.id,
                       let viewedUserId = user.id else { return }
 
                 do {
@@ -242,7 +242,7 @@ struct UserDetailView: View {
     }
     
     func sendInterest() {
-        guard let currentUserID = authViewModel.currentUser?.id,
+        guard let currentUserID = authService.currentUser?.id,
               let targetUserID = user.id else { return }
 
         viewModel.sendInterest(from: currentUserID, to: targetUserID) { success in

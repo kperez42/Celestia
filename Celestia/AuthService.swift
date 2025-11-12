@@ -57,19 +57,14 @@ class AuthService: ObservableObject {
         return true
     }
 
-    /// Sanitize user input
-    private func sanitizeInput(_ text: String) -> String {
-        text.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
     @MainActor
     func signIn(withEmail email: String, password: String) async throws {
         isLoading = true
         errorMessage = nil
 
-        // Sanitize inputs
-        let sanitizedEmail = sanitizeInput(email)
-        let sanitizedPassword = sanitizeInput(password)
+        // Sanitize inputs using centralized utility
+        let sanitizedEmail = InputSanitizer.email(email)
+        let sanitizedPassword = InputSanitizer.basic(password)
 
         // Validate email format
         guard isValidEmail(sanitizedEmail) else {
@@ -132,8 +127,8 @@ class AuthService: ObservableObject {
 
     @MainActor
     func resetPassword(email: String) async throws {
-        // Sanitize email input
-        let sanitizedEmail = sanitizeInput(email)
+        // Sanitize email input using centralized utility
+        let sanitizedEmail = InputSanitizer.email(email)
 
         // Validate email format
         guard isValidEmail(sanitizedEmail) else {
@@ -173,10 +168,10 @@ class AuthService: ObservableObject {
         isLoading = true
         errorMessage = nil
 
-        // Sanitize inputs
-        let sanitizedEmail = sanitizeInput(email)
-        let sanitizedPassword = sanitizeInput(password)
-        let sanitizedFullName = sanitizeInput(fullName)
+        // Sanitize inputs using centralized utility
+        let sanitizedEmail = InputSanitizer.email(email)
+        let sanitizedPassword = InputSanitizer.basic(password)
+        let sanitizedFullName = InputSanitizer.strict(fullName)
 
         // Validate email format
         guard isValidEmail(sanitizedEmail) else {
@@ -238,9 +233,9 @@ class AuthService: ObservableObject {
             )
 
             // Set referral code if provided
-            let sanitizedReferralCode = sanitizeInput(referralCode)
+            let sanitizedReferralCode = InputSanitizer.referralCode(referralCode)
             if !sanitizedReferralCode.isEmpty {
-                user.referredByCode = sanitizedReferralCode.uppercased()
+                user.referredByCode = sanitizedReferralCode
             }
 
             print("🔵 Attempting to save user to Firestore...")
@@ -282,7 +277,7 @@ class AuthService: ObservableObject {
                 if !sanitizedReferralCode.isEmpty {
                     try await ReferralManager.shared.processReferralSignup(
                         newUser: user,
-                        referralCode: sanitizedReferralCode.uppercased()
+                        referralCode: sanitizedReferralCode
                     )
                     print("✅ Referral processed successfully")
                 }
@@ -517,6 +512,43 @@ class AuthService: ObservableObject {
 
         guard user.isEmailVerified else {
             throw CelestiaError.emailNotVerified
+        }
+    }
+
+    /// Apply email verification action code from deep link
+    @MainActor
+    func verifyEmail(withToken token: String) async throws {
+        Logger.shared.auth("Applying email verification action code", level: .info)
+
+        do {
+            // Apply the action code from the email link
+            try await Auth.auth().applyActionCode(token)
+            Logger.shared.auth("Email verification action code applied successfully", level: .info)
+
+            // Reload the current user to update verification status
+            if let user = Auth.auth().currentUser {
+                try await user.reload()
+                self.isEmailVerified = user.isEmailVerified
+                Logger.shared.auth("Email verified successfully: \(user.isEmailVerified)", level: .info)
+
+                // Update local user data
+                await fetchUser()
+            }
+        } catch let error as NSError {
+            Logger.shared.auth("Email verification failed", level: .error, error: error)
+
+            // Handle specific Firebase Auth errors
+            if error.domain == "FIRAuthErrorDomain" {
+                switch error.code {
+                case 17045: // Invalid action code (expired or already used)
+                    throw CelestiaError.invalidData
+                case 17999: // Network error
+                    throw CelestiaError.networkError
+                default:
+                    throw error
+                }
+            }
+            throw error
         }
     }
 }

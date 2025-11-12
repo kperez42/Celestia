@@ -8,6 +8,7 @@
 
 import Foundation
 import Combine
+import FirebaseFirestore
 
 // MARK: - Notification Service
 
@@ -22,6 +23,8 @@ class NotificationService: ObservableObject, NotificationServiceProtocol, Notifi
 
     private let manager = PushNotificationManager.shared
     private let badgeManager = BadgeManager.shared
+    private let messageService = MessageService.shared
+    private var listener: ListenerRegistration?
 
     // MARK: - Published Properties
 
@@ -193,28 +196,64 @@ class NotificationService: ObservableObject, NotificationServiceProtocol, Notifi
         // try await sendRemoteNotification(payload: payload)
     }
 
-    // MARK: - Backend Integration (Placeholder)
+    // MARK: - Backend Integration
 
     private func sendRemoteNotification(payload: NotificationPayload) async throws {
-        // TODO: Send notification via your backend
-        // Your backend should use FCM/APNs to deliver the notification
-
         guard let fcmToken = manager.fcmToken else {
-            Logger.shared.warning("No FCM token available", category: .general)
+            Logger.shared.warning("No FCM token available for remote notification", category: .general)
             return
         }
 
-        Logger.shared.info("Would send remote notification with FCM token: \(fcmToken)", category: .general)
+        do {
+            // Send notification via backend API
+            let request = NotificationRequest(
+                token: fcmToken,
+                title: payload.title,
+                body: payload.body,
+                data: payload.userInfo,
+                imageURL: payload.imageURL?.absoluteString,
+                category: payload.category.identifier
+            )
 
-        // Example API call:
-        // let request = NotificationRequest(
-        //     token: fcmToken,
-        //     title: payload.title,
-        //     body: payload.body,
-        //     data: payload.userInfo,
-        //     imageURL: payload.imageURL
-        // )
-        // try await api.sendNotification(request)
+            try await BackendAPIService.shared.sendPushNotification(request)
+            Logger.shared.info("Remote notification sent successfully", category: .general)
+        } catch {
+            Logger.shared.error("Failed to send remote notification", category: .general, error: error)
+            // Don't throw - we still want local notification to work
+        }
+    }
+
+    // MARK: - Notification Request Model
+
+    private struct NotificationRequest: Encodable {
+        let token: String
+        let title: String
+        let body: String
+        let data: [AnyHashable: Any]
+        let imageURL: String?
+        let category: String
+
+        enum CodingKeys: String, CodingKey {
+            case token, title, body, data, imageURL = "image_url", category
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(token, forKey: .token)
+            try container.encode(title, forKey: .title)
+            try container.encode(body, forKey: .body)
+            try container.encodeIfPresent(imageURL, forKey: .imageURL)
+            try container.encode(category, forKey: .category)
+
+            // Convert data dictionary to JSON-serializable format
+            let jsonData = data.compactMapValues { value -> Any? in
+                if value is String || value is Int || value is Bool || value is Double {
+                    return value
+                }
+                return nil
+            }
+            try container.encode(jsonData as! [String: String], forKey: .data)
+        }
     }
 
     // MARK: - Reminder Scheduling
@@ -225,9 +264,8 @@ class NotificationService: ObservableObject, NotificationServiceProtocol, Notifi
             // Wait 24 hours
             try? await Task.sleep(nanoseconds: 24 * 60 * 60 * 1_000_000_000)
 
-            // Check if user still hasn't messaged
-            // TODO: Check message status from MessageService
-            let hasMessaged = false // Placeholder
+            // Check if user has sent any messages in this match
+            let hasMessaged = await checkIfUserHasMessaged(matchId: matchId)
 
             if !hasMessaged {
                 await sendMatchReminderNotification(
@@ -245,9 +283,8 @@ class NotificationService: ObservableObject, NotificationServiceProtocol, Notifi
             // Wait 24 hours
             try? await Task.sleep(nanoseconds: 24 * 60 * 60 * 1_000_000_000)
 
-            // Check if user still hasn't replied
-            // TODO: Check reply status from MessageService
-            let hasReplied = false // Placeholder
+            // Check if user has replied to messages
+            let hasReplied = await checkIfUserHasMessaged(matchId: matchId)
 
             if !hasReplied {
                 await sendMessageReminderNotification(
@@ -256,6 +293,23 @@ class NotificationService: ObservableObject, NotificationServiceProtocol, Notifi
                     matchImageURL: matchImageURL
                 )
             }
+        }
+    }
+
+    // MARK: - Helper Methods
+
+    /// Check if current user has sent any messages in a match
+    private func checkIfUserHasMessaged(matchId: String) async -> Bool {
+        guard let currentUserId = AuthService.shared.currentUser?.id else {
+            return false
+        }
+
+        do {
+            let messages = try await messageService.fetchMessages(matchId: matchId, limit: 100)
+            return messages.contains { $0.senderId == currentUserId }
+        } catch {
+            Logger.shared.error("Failed to check message status", category: .general, error: error)
+            return false
         }
     }
 }
@@ -339,18 +393,51 @@ extension NotificationService {
 
     // MARK: - Listener Management
 
-    /// Listen to notifications for a user
+    /// Listen to notifications for a user from Firestore
     func listenToNotifications(userId: String) {
-        // TODO: Implement real-time notification listening from Firestore
-        Logger.shared.debug("Listening to notifications for user: \(userId)", category: .general)
+        // Remove existing listener
+        listener?.remove()
 
-        // For now, load some mock data for testing
-        loadMockNotificationHistory()
+        Logger.shared.debug("Starting notification listener for user: \(userId)", category: .general)
+
+        // Listen to user's notifications collection
+        listener = Firestore.firestore()
+            .collection("notifications")
+            .whereField("userId", isEqualTo: userId)
+            .order(by: "timestamp", descending: true)
+            .limit(to: 50)
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self else { return }
+
+                Task { @MainActor in
+                    if let error = error {
+                        Logger.shared.error("Error listening to notifications", category: .general, error: error)
+                        return
+                    }
+
+                    guard let documents = snapshot?.documents else {
+                        Logger.shared.warning("No notification documents found", category: .general)
+                        return
+                    }
+
+                    // Parse notifications
+                    self.notificationHistory = documents.compactMap { doc -> NotificationData? in
+                        guard let data = try? doc.data(as: NotificationData.self) else {
+                            return nil
+                        }
+                        return data
+                    }
+
+                    Logger.shared.debug("Loaded \(self.notificationHistory.count) notifications", category: .general)
+                }
+            }
     }
 
     /// Stop listening to notifications
-    nonisolated func stopListening() {
-        // TODO: Implement stopping notification listener
+    func stopListening() {
+        listener?.remove()
+        listener = nil
+        notificationHistory = []
         Logger.shared.debug("Stopped listening to notifications", category: .general)
     }
 

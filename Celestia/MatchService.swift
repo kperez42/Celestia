@@ -61,7 +61,7 @@ class MatchService: ObservableObject {
 
                 Task { @MainActor in
                     if let error = error {
-                        print("❌ Error listening to matches: \(error)")
+                        Logger.shared.error("Error listening to matches: \(error)", category: .general)
                         return
                     }
 
@@ -76,18 +76,16 @@ class MatchService: ObservableObject {
     }
     
     /// Stop listening to matches
-    nonisolated func stopListening() {
-        Task { @MainActor in
-            listener?.remove()
-            listener = nil
-        }
+    func stopListening() {
+        listener?.remove()
+        listener = nil
     }
     
     /// Create a new match between two users
     func createMatch(user1Id: String, user2Id: String) async {
         // Check if match already exists
         if let existingMatch = try? await fetchMatch(user1Id: user1Id, user2Id: user2Id) {
-            print("Match already exists: \(existingMatch.id ?? "unknown")")
+            Logger.shared.info("Match already exists: \(existingMatch.id ?? "unknown")", category: .general)
             return
         }
 
@@ -95,17 +93,25 @@ class MatchService: ObservableObject {
 
         do {
             let docRef = try db.collection("matches").addDocument(from: match)
-            print("✅ Match created: \(docRef.documentID)")
+            Logger.shared.info("Match created: \(docRef.documentID)", category: .general)
 
             // Update match counts for both users
             try await updateMatchCounts(user1Id: user1Id, user2Id: user2Id)
 
-            // Fetch user data for notifications
-            let user1Snapshot = try? await db.collection("users").document(user1Id).getDocument()
-            let user2Snapshot = try? await db.collection("users").document(user2Id).getDocument()
+            // PERFORMANCE FIX: Batch fetch both users in a single query (prevents N+1 problem)
+            let usersSnapshot = try? await db.collection("users")
+                .whereField(FieldPath.documentID(), in: [user1Id, user2Id])
+                .getDocuments()
 
-            if let user1Data = user1Snapshot?.data(),
-               let user2Data = user2Snapshot?.data(),
+            // Create a dictionary for quick lookup
+            var userDataMap: [String: [String: Any]] = [:]
+            usersSnapshot?.documents.forEach { doc in
+                userDataMap[doc.documentID] = doc.data()
+            }
+
+            // Get user data from the map
+            if let user1Data = userDataMap[user1Id],
+               let user2Data = userDataMap[user2Id],
                let user1Name = user1Data["fullName"] as? String,
                let user2Name = user2Data["fullName"] as? String {
 
@@ -124,7 +130,7 @@ class MatchService: ObservableObject {
                 await notificationService.sendNewMatchNotification(match: matchWithId, otherUser: user1)
             }
         } catch {
-            print("❌ Error creating match: \(error)")
+            Logger.shared.error("Error creating match: \(error)", category: .general)
             self.error = error
         }
     }
@@ -185,7 +191,7 @@ class MatchService: ObservableObject {
         // Uncomment if you want to delete messages on unmatch
         // try await MessageService.shared.deleteAllMessages(matchId: matchId)
 
-        print("✅ Unmatched successfully")
+        Logger.shared.info("Unmatched successfully", category: .general)
     }
 
     /// Deactivate a match (soft delete)
