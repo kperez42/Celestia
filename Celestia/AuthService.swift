@@ -17,6 +17,7 @@ class AuthService: ObservableObject {
     @Published var errorMessage: String?
     @Published var isEmailVerified = false
     @Published var referralBonusMessage: String?
+    @Published var referralErrorMessage: String?
 
     static let shared = AuthService()
     
@@ -276,20 +277,34 @@ class AuthService: ObservableObject {
 
                 // Process referral if code was provided
                 if !sanitizedReferralCode.isEmpty {
-                    try await ReferralManager.shared.processReferralSignup(
-                        newUser: user,
-                        referralCode: sanitizedReferralCode
-                    )
-                    print("✅ Referral processed successfully")
+                    do {
+                        try await ReferralManager.shared.processReferralSignup(
+                            newUser: user,
+                            referralCode: sanitizedReferralCode
+                        )
+                        print("✅ Referral processed successfully")
 
-                    // Set success message for UI
-                    await MainActor.run {
-                        self.referralBonusMessage = "🎉 Referral bonus activated! You've received \(ReferralRewards.newUserBonusDays) days of Premium!"
+                        // Set success message for UI
+                        await MainActor.run {
+                            self.referralBonusMessage = "🎉 Referral bonus activated! You've received \(ReferralRewards.newUserBonusDays) days of Premium!"
+                        }
+                    } catch let referralError as ReferralError {
+                        // Show user-friendly error message
+                        await MainActor.run {
+                            self.referralErrorMessage = referralError.localizedDescription
+                        }
+                        print("⚠️ Referral error: \(referralError.localizedDescription)")
+                    } catch {
+                        // Generic referral error
+                        await MainActor.run {
+                            self.referralErrorMessage = "Unable to process referral code. Your account was created successfully."
+                        }
+                        print("⚠️ Unexpected referral error: \(error.localizedDescription)")
                     }
                 }
             } catch {
-                print("⚠️ Error handling referral: \(error.localizedDescription)")
-                // Don't fail account creation if referral processing fails
+                print("⚠️ Error initializing referral code: \(error.localizedDescription)")
+                // Don't fail account creation if referral code initialization fails
             }
 
             // Step 6: Fetch user data

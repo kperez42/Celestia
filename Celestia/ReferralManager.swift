@@ -24,11 +24,32 @@ class ReferralManager: ObservableObject {
 
     // MARK: - Referral Code Generation
 
-    func generateReferralCode(for userId: String) -> String {
+    func generateReferralCode(for userId: String) async throws -> String {
         // Generate a unique 8-character code
         let characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-        let code = String((0..<8).map { _ in characters.randomElement()! })
-        return "CEL-\(code)"
+
+        // Try up to 5 times to generate a unique code
+        for attempt in 1...5 {
+            let code = String((0..<8).map { _ in characters.randomElement()! })
+            let fullCode = "CEL-\(code)"
+
+            // Check if code already exists
+            let snapshot = try await db.collection("users")
+                .whereField("referralStats.referralCode", isEqualTo: fullCode)
+                .limit(to: 1)
+                .getDocuments()
+
+            if snapshot.documents.isEmpty {
+                // Code is unique
+                return fullCode
+            }
+
+            print("⚠️ Referral code collision detected (attempt \(attempt)/5): \(fullCode)")
+        }
+
+        // If we still can't generate a unique code after 5 attempts, use timestamp
+        let timestamp = Int(Date().timeIntervalSince1970)
+        return "CEL-\(String(timestamp).suffix(8))"
     }
 
     func initializeReferralCode(for user: inout User) async throws {
@@ -37,8 +58,8 @@ class ReferralManager: ObservableObject {
             return
         }
 
-        // Generate new code
-        let code = generateReferralCode(for: user.id ?? "")
+        // Generate new unique code
+        let code = try await generateReferralCode(for: user.id ?? "")
         user.referralStats.referralCode = code
 
         // Update in Firestore
@@ -62,13 +83,37 @@ class ReferralManager: ObservableObject {
 
         guard let referrerDoc = querySnapshot.documents.first else {
             print("Invalid referral code: \(referralCode)")
-            return
+            throw ReferralError.invalidCode
         }
 
         let referrerId = referrerDoc.documentID
         guard let newUserId = newUser.id, referrerId != newUserId else {
             print("Cannot refer yourself")
-            return
+            throw ReferralError.selfReferral
+        }
+
+        // Check if this email has already been referred
+        let existingReferralSnapshot = try await db.collection("referrals")
+            .whereField("referredUserId", isEqualTo: newUserId)
+            .whereField("status", isEqualTo: ReferralStatus.completed.rawValue)
+            .limit(to: 1)
+            .getDocuments()
+
+        if !existingReferralSnapshot.documents.isEmpty {
+            print("User has already been referred")
+            throw ReferralError.alreadyReferred
+        }
+
+        // Check if user's email was already used with a different account
+        let emailCheckSnapshot = try await db.collection("users")
+            .whereField("email", isEqualTo: newUser.email)
+            .whereField("referredByCode", isNotEqualTo: nil)
+            .limit(to: 1)
+            .getDocuments()
+
+        if emailCheckSnapshot.documents.count > 1 {
+            print("Email has already been referred with a different account")
+            throw ReferralError.emailAlreadyReferred
         }
 
         // Create referral record
@@ -267,5 +312,22 @@ class ReferralManager: ObservableObject {
 
     func getReferralURL(code: String) -> URL? {
         return URL(string: "https://celestia.app/join/\(code)")
+    }
+
+    // MARK: - Analytics
+
+    func trackShare(userId: String, code: String, shareMethod: String = "generic") async {
+        do {
+            try await db.collection("referralShares").addDocument(data: [
+                "userId": userId,
+                "referralCode": code,
+                "shareMethod": shareMethod,
+                "timestamp": Timestamp(date: Date()),
+                "platform": "iOS"
+            ])
+            print("✅ Tracked share for code: \(code) via \(shareMethod)")
+        } catch {
+            print("⚠️ Failed to track share: \(error.localizedDescription)")
+        }
     }
 }

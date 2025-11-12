@@ -9,6 +9,7 @@ import SwiftUI
 
 struct SignUpView: View {
     @EnvironmentObject var authService: AuthService
+    @EnvironmentObject var deepLinkManager: DeepLinkManager
     @Environment(\.dismiss) var dismiss
 
     @State private var currentStep = 1
@@ -186,12 +187,28 @@ struct SignUpView: View {
                 dismiss()
             }
         }
+        .onAppear {
+            // Pre-fill referral code from deep link
+            if let deepLinkCode = deepLinkManager.referralCode {
+                referralCode = deepLinkCode
+                validateReferralCode(deepLinkCode)
+                deepLinkManager.clearReferralCode()
+                print("✅ Pre-filled referral code from deep link: \(deepLinkCode)")
+            }
+        }
         .alert("Referral Bonus", isPresented: .constant(authService.referralBonusMessage != nil)) {
             Button("Awesome! 🎉") {
                 authService.referralBonusMessage = nil
             }
         } message: {
             Text(authService.referralBonusMessage ?? "")
+        }
+        .alert("Referral Code Issue", isPresented: .constant(authService.referralErrorMessage != nil)) {
+            Button("OK") {
+                authService.referralErrorMessage = nil
+            }
+        } message: {
+            Text(authService.referralErrorMessage ?? "")
         }
     }
     

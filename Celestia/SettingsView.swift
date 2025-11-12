@@ -29,8 +29,28 @@ struct SettingsView: View {
                     HStack {
                         Text("Account Type")
                         Spacer()
-                        Text(authService.currentUser?.isPremium == true ? "Premium" : "Free")
-                            .foregroundColor(.gray)
+                        HStack(spacing: 4) {
+                            if authService.currentUser?.isPremium == true {
+                                Image(systemName: "crown.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.orange)
+                            }
+                            Text(authService.currentUser?.isPremium == true ? "Premium" : "Free")
+                                .foregroundColor(.gray)
+                        }
+                    }
+
+                    // Show premium expiry date if user is premium
+                    if let user = authService.currentUser,
+                       user.isPremium,
+                       let expiryDate = user.subscriptionExpiryDate {
+                        HStack {
+                            Text("Premium Until")
+                            Spacer()
+                            Text(expiryDate.formatted(date: .abbreviated, time: .omitted))
+                                .foregroundColor(.orange)
+                                .fontWeight(.medium)
+                        }
                     }
                 }
 

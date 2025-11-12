@@ -181,6 +181,17 @@ struct ReferralDashboardView: View {
                 Button {
                     showShareSheet = true
                     HapticManager.shared.impact(.medium)
+
+                    // Track share event
+                    if let user = authService.currentUser {
+                        Task {
+                            await referralManager.trackShare(
+                                userId: user.id ?? "",
+                                code: user.referralStats.referralCode,
+                                shareMethod: "share_button"
+                            )
+                        }
+                    }
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "square.and.arrow.up.fill")
@@ -371,6 +382,17 @@ struct ReferralDashboardView: View {
             Button {
                 showShareSheet = true
                 HapticManager.shared.impact(.medium)
+
+                // Track share event
+                if let user = authService.currentUser {
+                    Task {
+                        await referralManager.trackShare(
+                            userId: user.id ?? "",
+                            code: user.referralStats.referralCode,
+                            shareMethod: "empty_state_share"
+                        )
+                    }
+                }
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "square.and.arrow.up.fill")
