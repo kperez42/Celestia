@@ -198,6 +198,7 @@ struct ChatView: View {
                 }
                 .padding()
             }
+            .scrollDismissesKeyboard(.interactively)
             .background(Color(.systemGroupedBackground))
             .onChange(of: messageService.messages.count) {
                 scrollToBottom(proxy: proxy)

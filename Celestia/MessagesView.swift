@@ -463,7 +463,8 @@ struct ConversationRow: View {
                             .fontWeight(.semibold)
                             .foregroundColor(.primary)
                             .lineLimit(1)
-                        
+                            .truncationMode(.tail)
+
                         if user.isVerified {
                             Image(systemName: "checkmark.seal.fill")
                                 .font(.caption)

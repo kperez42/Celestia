@@ -138,6 +138,7 @@ struct SignInView: View {
                         Spacer()
                     }
                 }
+                .scrollDismissesKeyboard(.interactively)
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -137,6 +137,7 @@ struct SignUpView: View {
                         .padding(.bottom, 30)
                     }
                 }
+                .scrollDismissesKeyboard(.interactively)
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

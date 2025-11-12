@@ -217,12 +217,12 @@ struct ProfileView: View {
                         .offset(x: geo.size.width - 60, y: 100)
                 }
             }
-            .frame(height: 380)
-            
+            .frame(height: 340)
+
             // Profile content
             VStack(spacing: 16) {
                 Spacer()
-                
+
                 // Profile image with tap to expand
                 Button {
                     selectedPhotoIndex = 0
@@ -231,21 +231,21 @@ struct ProfileView: View {
                 } label: {
                     profileImageView(user: user)
                 }
-                
+
                 // Name and badges
                 VStack(spacing: 10) {
                     HStack(spacing: 8) {
                         Text(user.fullName)
                             .font(.system(size: 32, weight: .bold))
                             .foregroundColor(.white)
-                        
+
                         if user.isVerified {
                             Image(systemName: "checkmark.seal.fill")
                                 .font(.title3)
                                 .foregroundColor(.blue)
                                 .shadow(color: .blue.opacity(0.5), radius: 5)
                         }
-                        
+
                         if user.isPremium {
                             Image(systemName: "crown.fill")
                                 .font(.title3)
@@ -253,7 +253,7 @@ struct ProfileView: View {
                                 .shadow(color: .yellow.opacity(0.7), radius: 8)
                         }
                     }
-                    
+
                     // Location and age
                     HStack(spacing: 8) {
                         HStack(spacing: 4) {
@@ -262,9 +262,9 @@ struct ProfileView: View {
                             Text("\(user.location), \(user.country)")
                                 .font(.subheadline)
                         }
-                        
+
                         Text("•")
-                        
+
                         Text("\(user.age) years old")
                             .font(.subheadline)
                     }
@@ -272,8 +272,8 @@ struct ProfileView: View {
                 }
                 .padding(.bottom, 40)
             }
-            .frame(height: 380)
-            
+            .frame(height: 340)
+
             // Top bar buttons
             VStack {
                 HStack {
@@ -288,9 +288,9 @@ struct ProfileView: View {
                             .background(Color.white.opacity(0.2))
                             .clipShape(Circle())
                     }
-                    
+
                     Spacer()
-                    
+
                     Button {
                         showingSettings = true
                         HapticManager.shared.impact(.light)
@@ -307,7 +307,7 @@ struct ProfileView: View {
                 .padding(.top, 40)
                 Spacer()
             }
-            .frame(height: 380)
+            .frame(height: 340)
         }
     }
     
