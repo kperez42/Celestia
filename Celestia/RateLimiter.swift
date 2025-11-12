@@ -102,7 +102,7 @@ class RateLimiter: ObservableObject {
     }
 
     /// Check if user is rate limited for a specific action
-    func isRateLimited(for action: RateLimitAction) -> Bool {
+    func isRateLimited(for action: RateLimitActionType) -> Bool {
         switch action {
         case .message:
             cleanupOldTimestamps(&messageTimes, window: 60)
@@ -120,7 +120,7 @@ class RateLimiter: ObservableObject {
     }
 
     /// Get time until rate limit resets
-    func timeUntilReset(for action: RateLimitAction) -> TimeInterval? {
+    func timeUntilReset(for action: RateLimitActionType) -> TimeInterval? {
         let times: [Date]
         let window: TimeInterval
 
@@ -151,8 +151,10 @@ class RateLimiter: ObservableObject {
 }
 
 // MARK: - Rate Limit Action Types
+// Note: This is different from RateLimitAction in BackendAPIService
+// This is for local client-side rate limiting
 
-enum RateLimitAction {
+enum RateLimitActionType {
     case message
     case like
     case report

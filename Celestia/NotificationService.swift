@@ -179,11 +179,18 @@ class NotificationService: ObservableObject, NotificationServiceProtocol, Notifi
         // Send local notification (for testing/development)
         #if DEBUG
         do {
+            // Convert [AnyHashable: Any] to [String: Any]
+            let stringUserInfo = payload.userInfo.reduce(into: [String: Any]()) { result, pair in
+                if let key = pair.key as? String {
+                    result[key] = pair.value
+                }
+            }
+
             try await manager.scheduleLocalNotification(
                 title: payload.title,
                 body: payload.body,
                 category: payload.category,
-                userInfo: payload.userInfo,
+                userInfo: stringUserInfo,
                 imageURL: payload.imageURL
             )
         } catch {

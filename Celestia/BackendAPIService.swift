@@ -9,61 +9,6 @@
 import Foundation
 import StoreKit
 
-// MARK: - Request/Response Interceptors
-
-protocol RequestInterceptor {
-    func intercept(request: inout URLRequest) async throws
-}
-
-protocol ResponseInterceptor {
-    func intercept(data: Data, response: URLResponse) async throws -> Data
-}
-
-// MARK: - Default Interceptors
-
-struct LoggingInterceptor: RequestInterceptor, ResponseInterceptor {
-    func intercept(request: inout URLRequest) async throws {
-        Logger.shared.debug("🌐 Request: \(request.httpMethod ?? "GET") \(request.url?.absoluteString ?? "unknown")", category: .network)
-
-        if let headers = request.allHTTPHeaderFields {
-            Logger.shared.debug("📋 Headers: \(headers)", category: .network)
-        }
-    }
-
-    func intercept(data: Data, response: URLResponse) async throws -> Data {
-        if let httpResponse = response as? HTTPURLResponse {
-            let statusEmoji = httpResponse.statusCode < 400 ? "✅" : "❌"
-            Logger.shared.debug("\(statusEmoji) Response: \(httpResponse.statusCode) (\(data.count) bytes)", category: .network)
-        }
-        return data
-    }
-}
-
-struct AnalyticsInterceptor: RequestInterceptor, ResponseInterceptor {
-    func intercept(request: inout URLRequest) async throws {
-        // Track API call
-        if let url = request.url {
-            AnalyticsManager.shared.logEvent(.featureUsed, parameters: [
-                "feature": "api_call",
-                "endpoint": url.path,
-                "method": request.httpMethod ?? "GET"
-            ])
-        }
-    }
-
-    func intercept(data: Data, response: URLResponse) async throws -> Data {
-        // Track API response
-        if let httpResponse = response as? HTTPURLResponse {
-            AnalyticsManager.shared.logEvent(.performance, parameters: [
-                "operation": "api_response",
-                "status_code": httpResponse.statusCode,
-                "response_size": data.count
-            ])
-        }
-        return data
-    }
-}
-
 // MARK: - Response Cache
 
 @MainActor
@@ -87,7 +32,7 @@ class ResponseCache {
             cache.removeValue(forKey: key)
             return nil
         }
-        Logger.shared.debug("📦 Cache hit: \(key)", category: .network)
+        Logger.shared.debug("📦 Cache hit: \(key)", category: .networking)
         return cached.data
     }
 
@@ -106,12 +51,12 @@ class ResponseCache {
             duration: duration ?? defaultCacheDuration
         )
 
-        Logger.shared.debug("💾 Cached response: \(key)", category: .network)
+        Logger.shared.debug("💾 Cached response: \(key)", category: .networking)
     }
 
     func clear() {
         cache.removeAll()
-        Logger.shared.info("🗑️ Response cache cleared", category: .network)
+        Logger.shared.info("🗑️ Response cache cleared", category: .networking)
     }
 
     func clearExpired() {
@@ -119,7 +64,7 @@ class ResponseCache {
         expiredKeys.forEach { cache.removeValue(forKey: $0) }
 
         if !expiredKeys.isEmpty {
-            Logger.shared.debug("🗑️ Cleared \(expiredKeys.count) expired cache entries", category: .network)
+            Logger.shared.debug("🗑️ Cleared \(expiredKeys.count) expired cache entries", category: .networking)
         }
     }
 }
@@ -172,7 +117,7 @@ class BackendAPIService: BackendAPIServiceProtocol {
         #endif
         registerInterceptor(AnalyticsInterceptor())
 
-        Logger.shared.info("BackendAPIService initialized with URL: \(baseURL)", category: .network)
+        Logger.shared.info("BackendAPIService initialized with URL: \(baseURL)", category: .networking)
     }
 
     // MARK: - Interceptor Management
@@ -180,7 +125,7 @@ class BackendAPIService: BackendAPIServiceProtocol {
     func registerInterceptor<T: RequestInterceptor & ResponseInterceptor>(_ interceptor: T) {
         requestInterceptors.append(interceptor)
         responseInterceptors.append(interceptor)
-        Logger.shared.debug("Registered interceptor: \(type(of: interceptor))", category: .network)
+        Logger.shared.debug("Registered interceptor: \(type(of: interceptor))", category: .networking)
     }
 
     // MARK: - Receipt Validation
@@ -188,7 +133,7 @@ class BackendAPIService: BackendAPIServiceProtocol {
     /// Validate StoreKit transaction with backend server
     /// CRITICAL: This prevents fraud by verifying purchases server-side
     func validateReceipt(_ transaction: Transaction, userId: String) async throws -> ReceiptValidationResponse {
-        Logger.shared.info("Validating receipt server-side for transaction: \(transaction.id)", category: .purchase)
+        Logger.shared.info("Validating receipt server-side for transaction: \(transaction.id)", category: .payment)
 
         // Prepare request payload
         let payload: [String: Any] = [
@@ -204,10 +149,10 @@ class BackendAPIService: BackendAPIServiceProtocol {
         let endpoint = "/v1/purchases/validate"
         let response: ReceiptValidationResponse = try await post(endpoint: endpoint, body: payload)
 
-        Logger.shared.info("Receipt validation response: \(response.isValid ? "VALID" : "INVALID")", category: .purchase)
+        Logger.shared.info("Receipt validation response: \(response.isValid ? "VALID" : "INVALID")", category: .payment)
 
         if !response.isValid {
-            Logger.shared.error("Receipt validation failed: \(response.reason ?? "unknown")", category: .purchase)
+            Logger.shared.error("Receipt validation failed: \(response.reason ?? "unknown")", category: .payment)
             throw StoreError.receiptValidationFailed
         }
 
@@ -251,7 +196,7 @@ class BackendAPIService: BackendAPIServiceProtocol {
         let response: RateLimitResponse = try await post(endpoint: endpoint, body: payload)
 
         if !response.allowed {
-            Logger.shared.warning("Rate limit exceeded for action: \(action.rawValue)", category: .security)
+            Logger.shared.warning("Rate limit exceeded for action: \(action.rawValue)", category: .moderation)
         }
 
         return response
@@ -272,7 +217,7 @@ class BackendAPIService: BackendAPIServiceProtocol {
         let endpoint = "/v1/reports/create"
         let _: EmptyResponse = try await post(endpoint: endpoint, body: payload)
 
-        Logger.shared.info("Report submitted successfully", category: .security)
+        Logger.shared.info("Report submitted successfully", category: .moderation)
     }
 
     // MARK: - Push Notifications
@@ -393,7 +338,7 @@ class BackendAPIService: BackendAPIServiceProtocol {
             case 500...599:
                 // Server error - retry if we haven't exceeded max attempts
                 if attempt < AppConstants.API.retryAttempts {
-                    Logger.shared.warning("Server error (attempt \(attempt)/\(AppConstants.API.retryAttempts)), retrying...", category: .network)
+                    Logger.shared.warning("Server error (attempt \(attempt)/\(AppConstants.API.retryAttempts)), retrying...", category: .networking)
                     try await Task.sleep(nanoseconds: UInt64(pow(2.0, Double(attempt)) * 1_000_000_000)) // Exponential backoff
                     return try await performRequestWithRetry(request: request, attempt: attempt + 1, useCache: useCache)
                 }
@@ -408,7 +353,7 @@ class BackendAPIService: BackendAPIServiceProtocol {
         } catch {
             // Network error - retry if we haven't exceeded max attempts
             if attempt < AppConstants.API.retryAttempts {
-                Logger.shared.warning("Network error (attempt \(attempt)/\(AppConstants.API.retryAttempts)), retrying...", category: .network)
+                Logger.shared.warning("Network error (attempt \(attempt)/\(AppConstants.API.retryAttempts)), retrying...", category: .networking)
                 try await Task.sleep(nanoseconds: UInt64(pow(2.0, Double(attempt)) * 1_000_000_000))
                 return try await performRequestWithRetry(request: request, attempt: attempt + 1, useCache: useCache)
             }
@@ -437,7 +382,7 @@ class BackendAPIService: BackendAPIServiceProtocol {
             let token = try await user?.getIDToken()
             return token
         } catch {
-            Logger.shared.error("Failed to get auth token: \(error)", category: .auth)
+            Logger.shared.error("Failed to get auth token: \(error)", category: .authentication)
             return nil
         }
     }

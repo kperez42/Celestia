@@ -377,7 +377,7 @@ struct UserCardView: View {
                     .shadow(radius: 10)
 
                 // User image with caching
-                CachedAsyncImage(url: URL(string: user.profileImageURL)) { image in
+                AsyncImage(url: URL(string: user.profileImageURL)) { image in
                     image
                         .resizable()
                         .scaledToFill()

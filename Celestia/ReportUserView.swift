@@ -28,7 +28,7 @@ struct ReportUserView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         HStack(spacing: 16) {
                             if let photoURL = URL(string: user.profileImageURL) {
-                                CachedAsyncImage(url: photoURL) { image in
+                                AsyncImage(url: photoURL) { image in
                                     image
                                         .resizable()
                                         .aspectRatio(contentMode: .fill)
@@ -252,7 +252,7 @@ struct BlockedUsersView: View {
                     ForEach(blockedUsers) { user in
                         HStack(spacing: 16) {
                             if let photoURL = URL(string: user.profileImageURL) {
-                                CachedAsyncImage(url: photoURL) { image in
+                                AsyncImage(url: photoURL) { image in
                                     image
                                         .resizable()
                                         .aspectRatio(contentMode: .fill)

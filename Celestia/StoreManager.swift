@@ -381,12 +381,21 @@ class StoreManager: ObservableObject {
     /// Present promo code redemption sheet
     func presentPromoCodeRedemption() async {
         #if !targetEnvironment(simulator)
-        // Use StoreKit 1 API for code redemption
+        // Use StoreKit 2 API for offer code redemption
         await MainActor.run {
-            SKPaymentQueue.default().presentCodeRedemptionSheet()
-
-            // Track analytics
-            AnalyticsManager.shared.logEvent(.promoCodeRedeemed, parameters: [:])
+            if #available(iOS 16.0, *) {
+                Task {
+                    do {
+                        try await AppStore.presentOfferCodeRedeemSheet(in: nil)
+                        // Track analytics
+                        await AnalyticsManager.shared.logEvent(.promoCodeRedeemed, parameters: [:])
+                    } catch {
+                        Logger.shared.error("Failed to present offer code sheet", category: .general, error: error)
+                    }
+                }
+            } else {
+                Logger.shared.warning("Offer code redemption requires iOS 16+", category: .general)
+            }
         }
         #else
         Logger.shared.warning("Promo code redemption not available on simulator", category: .general)
@@ -401,7 +410,7 @@ class StoreManager: ObservableObject {
 
     /// Check if user has active subscription
     var hasActiveSubscription: Bool {
-        return SubscriptionManager.shared.subscriptionStatus.isActive
+        return SubscriptionManager.shared.subscriptionStatus?.isActive ?? false
     }
 }
 

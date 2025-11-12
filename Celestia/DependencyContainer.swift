@@ -131,8 +131,10 @@ class DependencyContainer {
         Logger.shared.info("Resetting all services", category: .general)
 
         // Stop listeners
-        if let matchService = matchService as? MatchService {
-            matchService.stopListening()
+        Task { @MainActor in
+            if let matchService = matchService as? MatchService {
+                matchService.stopListening()
+            }
         }
 
         // Clear caches

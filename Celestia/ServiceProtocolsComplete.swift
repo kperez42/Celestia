@@ -30,6 +30,7 @@ protocol AuthServiceProtocol: ObservableObject {
     func deleteAccount() async throws
     func resetPassword(email: String) async throws
     func sendEmailVerification() async throws
+    func verifyEmail(withToken token: String) async throws
     func reloadUser() async throws
 }
 

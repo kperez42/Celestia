@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftUI
 import FirebaseFirestore
 
 @MainActor
@@ -13,6 +14,18 @@ class DiscoverViewModel: ObservableObject {
     @Published var users: [User] = []
     @Published var isLoading = false
     @Published var errorMessage = ""
+    @Published var currentIndex = 0
+    @Published var hasActiveFilters = false
+    @Published var matchedUser: User?
+    @Published var showingMatchAnimation = false
+    @Published var selectedUser: User?
+    @Published var showingUserDetail = false
+    @Published var showingFilters = false
+    @Published var dragOffset: CGSize = .zero
+
+    var remainingCount: Int {
+        return max(0, users.count - currentIndex)
+    }
 
     private let firestore = Firestore.firestore()
     private var lastDocument: DocumentSnapshot?
@@ -77,7 +90,7 @@ class DiscoverViewModel: ObservableObject {
         // Cancel previous interest task if any
         interestTask?.cancel()
 
-        interestTask = Task {
+        interestTask = Task { @MainActor in
             guard !Task.isCancelled else { return }
             do {
                 try await InterestService.shared.sendInterest(
@@ -85,17 +98,117 @@ class DiscoverViewModel: ObservableObject {
                     toUserId: targetUserID
                 )
                 guard !Task.isCancelled else { return }
-                await MainActor.run {
-                    completion(true)
-                }
+                completion(true)
             } catch {
                 print("Error sending interest: \(error)")
                 guard !Task.isCancelled else { return }
-                await MainActor.run {
-                    completion(false)
-                }
+                completion(false)
             }
         }
+    }
+
+    /// Show user detail sheet
+    func showUserDetail(_ user: User) {
+        selectedUser = user
+        showingUserDetail = true
+    }
+
+    /// Handle swipe end gesture
+    func handleSwipeEnd(value: DragGesture.Value) {
+        let threshold: CGFloat = 100
+
+        if value.translation.width > threshold {
+            // Swiped right - like
+            Task { await handleLike() }
+        } else if value.translation.width < -threshold {
+            // Swiped left - pass
+            Task { await handlePass() }
+        }
+
+        // Reset drag offset
+        withAnimation {
+            dragOffset = .zero
+        }
+    }
+
+    /// Handle like action
+    func handleLike() async {
+        guard currentIndex < users.count else { return }
+        let user = users[currentIndex]
+
+        // Move to next card
+        withAnimation {
+            currentIndex += 1
+            dragOffset = .zero
+        }
+
+        // TODO: Implement like logic (send interest, check for match, etc.)
+    }
+
+    /// Handle pass action
+    func handlePass() async {
+        guard currentIndex < users.count else { return }
+
+        // Move to next card
+        withAnimation {
+            currentIndex += 1
+            dragOffset = .zero
+        }
+
+        // TODO: Implement pass logic
+    }
+
+    /// Handle super like action
+    func handleSuperLike() async {
+        guard currentIndex < users.count else { return }
+        let user = users[currentIndex]
+
+        // Move to next card
+        withAnimation {
+            currentIndex += 1
+            dragOffset = .zero
+        }
+
+        // TODO: Implement super like logic (send super like interest, check for match, etc.)
+    }
+
+    /// Apply filters
+    func applyFilters() {
+        // TODO: Implement filter logic
+        currentIndex = 0
+        users.removeAll()
+        // Re-load users with filters
+    }
+
+    /// Reset filters to default
+    func resetFilters() {
+        hasActiveFilters = false
+        applyFilters()
+    }
+
+    /// Shuffle users
+    func shuffleUsers() {
+        users.shuffle()
+        currentIndex = 0
+    }
+
+    /// Dismiss match animation
+    func dismissMatchAnimation() {
+        withAnimation {
+            showingMatchAnimation = false
+            matchedUser = nil
+        }
+    }
+
+    /// Show filters sheet
+    func showFilters() {
+        showingFilters = true
+    }
+
+    /// Load users (no parameters version for view)
+    func loadUsers() async {
+        // TODO: Get current user from AuthService and call loadUsers(currentUser:)
+        // For now, just stub
     }
 
     /// Cleanup method to cancel ongoing tasks

@@ -345,7 +345,7 @@ struct FeedDiscoverView: View {
                 try await AnalyticsManager.shared.trackSwipe(
                     swipedUserId: userId,
                     swiperUserId: currentUserId,
-                    direction: .right
+                    direction: "right"
                 )
 
                 // Simulate match (10% chance)

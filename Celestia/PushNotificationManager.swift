@@ -158,7 +158,7 @@ class PushNotificationManager: NSObject, ObservableObject {
     // MARK: - Notification Categories
 
     private func registerNotificationCategories() {
-        let categories = NotificationCategory.allCategories.map { category in
+        let categories = NotificationCategory.allCases.map { category in
             UNNotificationCategory(
                 identifier: category.identifier,
                 actions: category.actions,
@@ -221,7 +221,15 @@ class PushNotificationManager: NSObject, ObservableObject {
     /// Update badge count
     func updateBadgeCount(_ count: Int) {
         badgeCount = max(0, count)
-        UIApplication.shared.applicationIconBadgeNumber = badgeCount
+
+        // Use UNUserNotificationCenter instead of deprecated applicationIconBadgeNumber
+        if #available(iOS 16.0, *) {
+            Task {
+                try? await center.setBadgeCount(badgeCount)
+            }
+        } else {
+            UIApplication.shared.applicationIconBadgeNumber = badgeCount
+        }
 
         Logger.shared.debug("Badge count updated: \(badgeCount)", category: .general)
     }
@@ -241,7 +249,7 @@ class PushNotificationManager: NSObject, ObservableObject {
     /// Check if should deliver notification (respects quiet hours, preferences)
     func shouldDeliverNotification(category: NotificationCategory) -> Bool {
         // Check if category is enabled
-        guard preferences.isEnabled(category) else {
+        guard preferences.isEnabled(for: category) else {
             Logger.shared.debug("Notification disabled for category: \(category.identifier)", category: .general)
             return false
         }
@@ -267,16 +275,16 @@ class PushNotificationManager: NSObject, ObservableObject {
         Logger.shared.info("Handling notification action: \(actionIdentifier)", category: .general)
 
         switch actionIdentifier {
-        case NotificationAction.reply.identifier:
+        case "REPLY":
             await handleReplyAction(userInfo: userInfo)
 
-        case NotificationAction.viewProfile.identifier:
+        case "VIEW_PROFILE":
             await handleViewProfileAction(userInfo: userInfo)
 
-        case NotificationAction.viewMatch.identifier:
+        case "VIEW_MATCH":
             await handleViewMatchAction(userInfo: userInfo)
 
-        case NotificationAction.openApp.identifier:
+        case "OPEN_APP":
             await handleOpenAppAction(userInfo: userInfo)
 
         default:
@@ -284,7 +292,7 @@ class PushNotificationManager: NSObject, ObservableObject {
         }
 
         // Track action in analytics
-        AnalyticsManager.shared.logEvent(.featureUsed, parameters: [
+        await AnalyticsManager.shared.logEvent(.featureUsed, parameters: [
             "feature": "notification_action",
             "action": actionIdentifier
         ])
