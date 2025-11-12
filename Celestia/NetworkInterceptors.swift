@@ -25,17 +25,17 @@ protocol ResponseInterceptor {
 /// Logging interceptor that logs request and response details
 struct LoggingInterceptor: RequestInterceptor, ResponseInterceptor {
     func intercept(request: inout URLRequest) async throws {
-        Logger.shared.debug("🌐 Request: \(request.httpMethod ?? "GET") \(request.url?.absoluteString ?? "unknown")", category: .network)
+        Logger.shared.debug("🌐 Request: \(request.httpMethod ?? "GET") \(request.url?.absoluteString ?? "unknown")", category: .networking)
 
         if let headers = request.allHTTPHeaderFields {
-            Logger.shared.debug("📋 Headers: \(headers)", category: .network)
+            Logger.shared.debug("📋 Headers: \(headers)", category: .networking)
         }
     }
 
     func intercept(data: Data, response: URLResponse) async throws -> Data {
         if let httpResponse = response as? HTTPURLResponse {
             let statusEmoji = httpResponse.statusCode < 400 ? "✅" : "❌"
-            Logger.shared.debug("\(statusEmoji) Response: \(httpResponse.statusCode) (\(data.count) bytes)", category: .network)
+            Logger.shared.debug("\(statusEmoji) Response: \(httpResponse.statusCode) (\(data.count) bytes)", category: .networking)
         }
         return data
     }

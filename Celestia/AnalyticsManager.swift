@@ -8,6 +8,12 @@
 
 import Foundation
 
+// MARK: - Swipe Direction
+
+enum SwipeDirection {
+    case left, right
+}
+
 // MARK: - Analytics Event
 
 enum AnalyticsEvent: String {
@@ -165,20 +171,26 @@ class AnalyticsManager: ObservableObject, AnalyticsManagerProtocol {
     }
 
     /// Track swipe action
-    func trackSwipe(direction: String, profileId: String) async throws {
+    func trackSwipe(swipedUserId: String, swiperUserId: String, direction: SwipeDirection) async throws {
+        let directionString = direction == .right ? "right" : "left"
         logEvent(.featureUsed, parameters: [
             "feature": "swipe",
-            "direction": direction,
-            "profile_id": profileId
+            "direction": directionString,
+            "swiped_user_id": swipedUserId,
+            "swiper_user_id": swiperUserId
         ])
     }
 
     /// Track match
-    func trackMatch(matchId: String, userId: String, otherUserId: String) async throws {
+    func trackMatch(user1Id: String, user2Id: String) async throws {
+        // Generate a match ID from the two user IDs (sorted for consistency)
+        let sortedIds = [user1Id, user2Id].sorted()
+        let matchId = "\(sortedIds[0])_\(sortedIds[1])"
+
         logEvent(.match, parameters: [
             "match_id": matchId,
-            "user_id": userId,
-            "other_user_id": otherUserId
+            "user1_id": user1Id,
+            "user2_id": user2Id
         ])
     }
 
