@@ -142,9 +142,17 @@ class PushNotificationManager: NSObject, ObservableObject {
 
         Logger.shared.info("Sending push tokens to backend for user: \(userId)", category: .general)
 
-        // TODO: Send to your backend API
-        // Example:
-        // try await api.updatePushTokens(userId: userId, apns: apnsToken, fcm: fcmToken)
+        do {
+            try await BackendAPIService.shared.updatePushTokens(
+                userId: userId,
+                apnsToken: apnsToken,
+                fcmToken: fcmToken
+            )
+            Logger.shared.info("Push tokens sent to backend successfully", category: .general)
+        } catch {
+            Logger.shared.error("Failed to send push tokens to backend", category: .general, error: error)
+            // Don't throw - we'll retry on next token refresh
+        }
     }
 
     // MARK: - Notification Categories

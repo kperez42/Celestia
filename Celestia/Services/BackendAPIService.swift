@@ -143,6 +143,48 @@ class BackendAPIService: BackendAPIServiceProtocol {
         Logger.shared.info("Report submitted successfully", category: .security)
     }
 
+    // MARK: - Push Notifications
+
+    /// Send push notification via backend
+    func sendPushNotification<T: Encodable>(_ notification: T) async throws {
+        let payload: [String: Any]
+
+        // Convert Encodable to dictionary
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        let data = try encoder.encode(notification)
+        payload = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+
+        let endpoint = "/v1/notifications/send"
+        let _: EmptyResponse = try await post(endpoint: endpoint, body: payload)
+
+        Logger.shared.debug("Push notification sent via backend", category: .general)
+    }
+
+    /// Update push notification tokens for a user
+    func updatePushTokens(userId: String, apnsToken: String?, fcmToken: String?) async throws {
+        Logger.shared.info("Updating push tokens for user: \(userId)", category: .general)
+
+        var payload: [String: Any] = [
+            "user_id": userId,
+            "updated_at": ISO8601DateFormatter().string(from: Date())
+        ]
+
+        // Add tokens if available
+        if let apnsToken = apnsToken {
+            payload["apns_token"] = apnsToken
+        }
+
+        if let fcmToken = fcmToken {
+            payload["fcm_token"] = fcmToken
+        }
+
+        let endpoint = "/v1/users/push-tokens"
+        let _: EmptyResponse = try await post(endpoint: endpoint, body: payload)
+
+        Logger.shared.debug("Push tokens updated successfully", category: .general)
+    }
+
     // MARK: - Generic HTTP Methods
 
     private func post<T: Decodable>(endpoint: String, body: [String: Any]) async throws -> T {

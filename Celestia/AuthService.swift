@@ -514,4 +514,41 @@ class AuthService: ObservableObject {
             throw CelestiaError.emailNotVerified
         }
     }
+
+    /// Apply email verification action code from deep link
+    @MainActor
+    func verifyEmail(withToken token: String) async throws {
+        Logger.shared.auth("Applying email verification action code", level: .info)
+
+        do {
+            // Apply the action code from the email link
+            try await Auth.auth().applyActionCode(token)
+            Logger.shared.auth("Email verification action code applied successfully", level: .info)
+
+            // Reload the current user to update verification status
+            if let user = Auth.auth().currentUser {
+                try await user.reload()
+                self.isEmailVerified = user.isEmailVerified
+                Logger.shared.auth("Email verified successfully: \(user.isEmailVerified)", level: .info)
+
+                // Update local user data
+                await fetchUser()
+            }
+        } catch let error as NSError {
+            Logger.shared.auth("Email verification failed", level: .error, error: error)
+
+            // Handle specific Firebase Auth errors
+            if error.domain == "FIRAuthErrorDomain" {
+                switch error.code {
+                case 17045: // Invalid action code (expired or already used)
+                    throw CelestiaError.invalidData
+                case 17999: // Network error
+                    throw CelestiaError.networkError
+                default:
+                    throw error
+                }
+            }
+            throw error
+        }
+    }
 }
