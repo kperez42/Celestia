@@ -59,6 +59,8 @@ struct SignUpView: View {
                                 Circle()
                                     .fill(currentStep >= step ? Color.purple : Color.gray.opacity(0.3))
                                     .frame(width: 12, height: 12)
+                                    .scaleEffect(currentStep == step ? 1.2 : 1.0)
+                                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: currentStep)
                             }
                         }
                         .padding(.top, 20)
@@ -84,15 +86,28 @@ struct SignUpView: View {
                             switch currentStep {
                             case 1:
                                 step1Content
+                                    .transition(.asymmetric(
+                                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                                        removal: .move(edge: .leading).combined(with: .opacity)
+                                    ))
                             case 2:
                                 step2Content
+                                    .transition(.asymmetric(
+                                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                                        removal: .move(edge: .leading).combined(with: .opacity)
+                                    ))
                             case 3:
                                 step3Content
+                                    .transition(.asymmetric(
+                                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                                        removal: .move(edge: .leading).combined(with: .opacity)
+                                    ))
                             default:
                                 EmptyView()
                             }
                         }
                         .padding(.horizontal, 30)
+                        .animation(.easeInOut(duration: 0.3), value: currentStep)
                         
                         // Error message
                         if let errorMessage = authService.errorMessage, !errorMessage.isEmpty {

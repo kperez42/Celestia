@@ -58,13 +58,21 @@ struct SearchResultsView: View {
     // MARK: - Loading View
 
     private var loadingView: some View {
-        VStack(spacing: 20) {
-            ProgressView()
-                .scaleEffect(1.5)
+        ScrollView {
+            VStack(spacing: 16) {
+                Text("Searching for matches...")
+                    .font(.headline)
+                    .foregroundColor(.secondary)
+                    .padding()
 
-            Text("Searching for matches...")
-                .font(.headline)
-                .foregroundColor(.secondary)
+                // Show skeleton grid of search results
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                    ForEach(0..<6, id: \.self) { _ in
+                        MatchCardSkeleton()
+                    }
+                }
+                .padding(.horizontal)
+            }
         }
     }
 

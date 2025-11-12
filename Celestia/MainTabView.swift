@@ -25,21 +25,38 @@ struct MainTabView: View {
                 // Discover
                 FeedDiscoverView()
                     .tag(0)
-                
+                    .transition(.asymmetric(
+                        insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
+                        removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
+                    ))
+
                 // Matches
                 MatchesView()
                     .tag(1)
-                
+                    .transition(.asymmetric(
+                        insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
+                        removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
+                    ))
+
                 // Messages
                 MessagesView(selectedTab: $selectedTab)
                     .tag(2)
-                
+                    .transition(.asymmetric(
+                        insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
+                        removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
+                    ))
+
                 // Profile
                 ProfileView()
                     .tag(3)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
+                        removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
+                    ))
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .ignoresSafeArea(.keyboard)
+            .animation(.easeInOut(duration: 0.3), value: selectedTab)
             
             // Custom Tab Bar
             customTabBar

@@ -106,16 +106,24 @@ struct InterestsView: View {
     }
     
     // MARK: - Loading View
-    
+
     private var loadingView: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .scaleEffect(1.5)
-            Text("Loading interests...")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+        ScrollView {
+            VStack(spacing: 16) {
+                Text("Loading interests...")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .padding(.top)
+
+                // Show skeleton grid
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                    ForEach(0..<6, id: \.self) { _ in
+                        MatchCardSkeleton()
+                    }
+                }
+                .padding(.horizontal)
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     // MARK: - Empty State
