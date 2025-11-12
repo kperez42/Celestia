@@ -187,6 +187,14 @@ class AnalyticsManager: ObservableObject, AnalyticsManagerProtocol {
         ])
     }
 
+    /// Track profile view
+    func trackProfileView(viewedUserId: String, viewerUserId: String) async throws {
+        logEvent(.profileViewed, parameters: [
+            "viewed_user_id": viewedUserId,
+            "viewer_user_id": viewerUserId
+        ])
+    }
+
     /// Enable/disable analytics
     func setEnabled(_ enabled: Bool) {
         isEnabled = enabled

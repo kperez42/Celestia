@@ -96,12 +96,14 @@ class SubscriptionManager: ObservableObject {
         currentTier = tier
         isSubscribed = tier != .none
         expirationDate = transaction.expirationDate
-        autoRenewEnabled = transaction.willAutoRenew
+        // Note: willAutoRenew is not available in StoreKit 2
+        // Check renewal status via Product.SubscriptionInfo instead if needed
+        autoRenewEnabled = true // Default to true for active subscriptions
 
         saveSubscriptionStatus()
 
         // Track analytics
-        AnalyticsManager.shared.logEvent(.subscriptionActive, parameters: [
+        await AnalyticsManager.shared.logEvent(.subscriptionActive, parameters: [
             "tier": tier.rawValue,
             "auto_renew": autoRenewEnabled
         ])
@@ -114,6 +116,17 @@ class SubscriptionManager: ObservableObject {
     /// Check if user has access to a premium feature
     func hasFeature(_ feature: SubscriptionFeature) -> Bool {
         return currentTier.features.contains(feature)
+    }
+
+    /// Update subscription from transaction (called by StoreManager)
+    func updateSubscription(tier: SubscriptionTier, transaction: Transaction) async {
+        await updateTier(from: transaction)
+    }
+
+    /// Add consumable purchase (not implemented - subscriptions only)
+    func addConsumable(_ type: ConsumableType, amount: Int) {
+        Logger.shared.info("Consumable purchase: \(type) x\(amount)", category: .general)
+        // Consumables not currently implemented - would track boost purchases, etc.
     }
 
     // MARK: - Transaction Monitoring

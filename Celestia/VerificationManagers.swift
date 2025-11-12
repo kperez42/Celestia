@@ -10,6 +10,13 @@ import UIKit
 
 // MARK: - Verification Results
 
+enum DocumentType: String {
+    case passport = "passport"
+    case driversLicense = "drivers_license"
+    case nationalID = "national_id"
+    case other = "other"
+}
+
 struct PhotoVerificationResult {
     let isVerified: Bool
     let confidence: Double // 0.0 - 1.0
@@ -30,13 +37,15 @@ struct IDVerificationResult {
     let failureReason: String?
     let verifiedAt: Date
     let extractedData: IDExtractedData?
+    let documentType: DocumentType
 
-    init(isVerified: Bool, confidence: Double = 0.0, failureReason: String? = nil, extractedData: IDExtractedData? = nil) {
+    init(isVerified: Bool, confidence: Double = 0.0, failureReason: String? = nil, extractedData: IDExtractedData? = nil, documentType: DocumentType = .other) {
         self.isVerified = isVerified
         self.confidence = confidence
         self.failureReason = failureReason
         self.verifiedAt = Date()
         self.extractedData = extractedData
+        self.documentType = documentType
     }
 }
 
