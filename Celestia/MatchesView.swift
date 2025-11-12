@@ -401,10 +401,10 @@ struct MatchesView: View {
                 }
             }
             .padding(16)
-            .padding(.bottom, 80)
+            .padding(.bottom, 100)
         }
     }
-    
+
     // MARK: - Loading State
 
     private var loadingView: some View {
@@ -418,7 +418,7 @@ struct MatchesView: View {
                 }
             }
             .padding(16)
-            .padding(.bottom, 80)
+            .padding(.bottom, 100)
         }
     }
     

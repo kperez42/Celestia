@@ -269,10 +269,10 @@ struct MessagesView: View {
                 }
             }
             .padding(20)
-            .padding(.bottom, 80)
+            .padding(.bottom, 100)
         }
     }
-    
+
     // MARK: - Loading View
 
     private var loadingView: some View {
@@ -283,7 +283,7 @@ struct MessagesView: View {
                 }
             }
             .padding(20)
-            .padding(.bottom, 80)
+            .padding(.bottom, 100)
         }
     }
     

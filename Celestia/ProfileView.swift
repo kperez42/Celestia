@@ -1212,7 +1212,7 @@ struct ProfileView: View {
             }
         }
         .padding(.horizontal, 20)
-        .padding(.bottom, 30)
+        .padding(.bottom, 100)
     }
     
     private func actionButton(icon: String, title: String, color: Color, action: @escaping () -> Void) -> some View {

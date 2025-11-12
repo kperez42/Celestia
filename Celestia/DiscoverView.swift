@@ -186,63 +186,90 @@ struct DiscoverView: View {
                     Button {
                         Task { await viewModel.handlePass() }
                     } label: {
-                        Image(systemName: "xmark")
-                            .font(.title)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                            .frame(width: 64, height: 64)
-                            .background(
-                                LinearGradient(
-                                    colors: [Color.red.opacity(0.9), Color.red],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
+                        ZStack {
+                            if viewModel.isProcessingAction {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            } else {
+                                Image(systemName: "xmark")
+                                    .font(.title)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        .frame(width: 64, height: 64)
+                        .background(
+                            LinearGradient(
+                                colors: [Color.red.opacity(0.9), Color.red],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
                             )
-                            .clipShape(Circle())
-                            .shadow(color: .red.opacity(0.4), radius: 8, y: 4)
+                        )
+                        .clipShape(Circle())
+                        .shadow(color: .red.opacity(0.4), radius: 8, y: 4)
                     }
+                    .disabled(viewModel.isProcessingAction)
+                    .opacity(viewModel.isProcessingAction ? 0.6 : 1.0)
 
                     // Super Like button
                     Button {
                         Task { await viewModel.handleSuperLike() }
                     } label: {
-                        Image(systemName: "star.fill")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                            .frame(width: 56, height: 56)
-                            .background(
-                                LinearGradient(
-                                    colors: [Color.blue, Color.cyan],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
+                        ZStack {
+                            if viewModel.isProcessingAction {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            } else {
+                                Image(systemName: "star.fill")
+                                    .font(.title2)
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        .frame(width: 56, height: 56)
+                        .background(
+                            LinearGradient(
+                                colors: [Color.blue, Color.cyan],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
                             )
-                            .clipShape(Circle())
-                            .shadow(color: .blue.opacity(0.4), radius: 8, y: 4)
+                        )
+                        .clipShape(Circle())
+                        .shadow(color: .blue.opacity(0.4), radius: 8, y: 4)
                     }
+                    .disabled(viewModel.isProcessingAction)
+                    .opacity(viewModel.isProcessingAction ? 0.6 : 1.0)
 
                     // Like button
                     Button {
                         Task { await viewModel.handleLike() }
                     } label: {
-                        Image(systemName: "heart.fill")
-                            .font(.title)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                            .frame(width: 64, height: 64)
-                            .background(
-                                LinearGradient(
-                                    colors: [Color.green.opacity(0.9), Color.green],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
+                        ZStack {
+                            if viewModel.isProcessingAction {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            } else {
+                                Image(systemName: "heart.fill")
+                                    .font(.title)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        .frame(width: 64, height: 64)
+                        .background(
+                            LinearGradient(
+                                colors: [Color.green.opacity(0.9), Color.green],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
                             )
-                            .clipShape(Circle())
-                            .shadow(color: .green.opacity(0.4), radius: 8, y: 4)
+                        )
+                        .clipShape(Circle())
+                        .shadow(color: .green.opacity(0.4), radius: 8, y: 4)
                     }
+                    .disabled(viewModel.isProcessingAction)
+                    .opacity(viewModel.isProcessingAction ? 0.6 : 1.0)
                 }
                 .frame(maxWidth: .infinity) // Center the buttons
-                .padding(.bottom, 120) // Stay above tab bar and safe area
+                .padding(.bottom, 100) // Stay above tab bar and safe area
             }
         }
     }
