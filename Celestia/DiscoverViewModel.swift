@@ -158,12 +158,46 @@ class DiscoverViewModel: ObservableObject {
         // TODO: Implement pass logic
     }
 
+    /// Handle super like action
+    func handleSuperLike() async {
+        guard currentIndex < users.count else { return }
+        let user = users[currentIndex]
+
+        // Move to next card
+        withAnimation {
+            currentIndex += 1
+            dragOffset = .zero
+        }
+
+        // TODO: Implement super like logic (send super like interest, check for match, etc.)
+    }
+
     /// Apply filters
     func applyFilters() {
         // TODO: Implement filter logic
         currentIndex = 0
         users.removeAll()
         // Re-load users with filters
+    }
+
+    /// Reset filters to default
+    func resetFilters() {
+        hasActiveFilters = false
+        applyFilters()
+    }
+
+    /// Shuffle users
+    func shuffleUsers() {
+        users.shuffle()
+        currentIndex = 0
+    }
+
+    /// Dismiss match animation
+    func dismissMatchAnimation() {
+        withAnimation {
+            showingMatchAnimation = false
+            matchedUser = nil
+        }
     }
 
     /// Load users (no parameters version for view)
