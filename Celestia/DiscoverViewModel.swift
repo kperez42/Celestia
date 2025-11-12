@@ -101,7 +101,7 @@ class DiscoverViewModel: ObservableObject {
                 guard !Task.isCancelled else { return }
                 completion(true)
             } catch {
-                print("Error sending interest: \(error)")
+                Logger.shared.error("Error sending interest", category: .matching, error: error)
                 guard !Task.isCancelled else { return }
                 completion(false)
             }
@@ -151,7 +151,7 @@ class DiscoverViewModel: ObservableObject {
             if !canLike {
                 isProcessingAction = false
                 // Show upgrade prompt (TODO: implement upgrade sheet)
-                print("⚠️ Daily like limit reached. Please upgrade to Premium for unlimited likes!")
+                Logger.shared.warning("Daily like limit reached. User needs to upgrade to Premium", category: .matching)
                 return
             }
         }
@@ -182,12 +182,12 @@ class DiscoverViewModel: ObservableObject {
                     self.showingMatchAnimation = true
                     HapticManager.shared.notification(.success)
                 }
-                print("💕 It's a match with \(likedUser.fullName)!")
+                Logger.shared.info("Match created with \(likedUser.fullName)", category: .matching)
             } else {
-                print("✅ Like sent to \(likedUser.fullName)")
+                Logger.shared.info("Like sent to \(likedUser.fullName)", category: .matching)
             }
         } catch {
-            print("❌ Error sending like: \(error.localizedDescription)")
+            Logger.shared.error("Error sending like", category: .matching, error: error)
             // Still move forward even if like fails
         }
 
@@ -221,7 +221,7 @@ class DiscoverViewModel: ObservableObject {
 
             return likesRemaining > 0
         } catch {
-            print("Error checking daily like limit: \(error)")
+            Logger.shared.error("Error checking daily like limit", category: .database, error: error)
             return true // Allow on error
         }
     }
@@ -239,7 +239,7 @@ class DiscoverViewModel: ObservableObject {
             ])
             await AuthService.shared.fetchUser()
         } catch {
-            print("Error decrementing daily likes: \(error)")
+            Logger.shared.error("Error decrementing daily likes", category: .database, error: error)
         }
     }
 
@@ -267,9 +267,9 @@ class DiscoverViewModel: ObservableObject {
                 fromUserId: currentUserId,
                 toUserId: passedUserId
             )
-            print("✅ Pass recorded for \(passedUser.fullName)")
+            Logger.shared.info("Pass recorded for \(passedUser.fullName)", category: .matching)
         } catch {
-            print("❌ Error recording pass: \(error.localizedDescription)")
+            Logger.shared.error("Error recording pass", category: .matching, error: error)
             // Still move forward even if pass fails
         }
 
@@ -293,7 +293,7 @@ class DiscoverViewModel: ObservableObject {
         if currentUser.superLikesRemaining <= 0 {
             isProcessingAction = false
             // Show purchase prompt (TODO: implement purchase sheet)
-            print("⚠️ No Super Likes remaining. Please purchase more!")
+            Logger.shared.warning("No Super Likes remaining. User needs to purchase more", category: .payment)
             return
         }
 
@@ -321,12 +321,12 @@ class DiscoverViewModel: ObservableObject {
                     self.showingMatchAnimation = true
                     HapticManager.shared.notification(.success)
                 }
-                print("💕 Super Like resulted in a match with \(superLikedUser.fullName)!")
+                Logger.shared.info("Super Like resulted in a match with \(superLikedUser.fullName)", category: .matching)
             } else {
-                print("⭐ Super Like sent to \(superLikedUser.fullName)")
+                Logger.shared.info("Super Like sent to \(superLikedUser.fullName)", category: .matching)
             }
         } catch {
-            print("❌ Error sending super like: \(error.localizedDescription)")
+            Logger.shared.error("Error sending super like", category: .matching, error: error)
             // Still move forward even if super like fails
         }
 
@@ -345,9 +345,9 @@ class DiscoverViewModel: ObservableObject {
                 "superLikesRemaining": FieldValue.increment(Int64(-1))
             ])
             await AuthService.shared.fetchUser()
-            print("✅ Super Like used. Remaining: \(AuthService.shared.currentUser?.superLikesRemaining ?? 0)")
+            Logger.shared.info("Super Like used. Remaining: \(AuthService.shared.currentUser?.superLikesRemaining ?? 0)", category: .matching)
         } catch {
-            print("Error decrementing super likes: \(error)")
+            Logger.shared.error("Error decrementing super likes", category: .database, error: error)
         }
     }
 

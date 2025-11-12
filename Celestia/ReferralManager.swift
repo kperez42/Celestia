@@ -44,7 +44,7 @@ class ReferralManager: ObservableObject {
                 return fullCode
             }
 
-            print("⚠️ Referral code collision detected (attempt \(attempt)/5): \(fullCode)")
+            Logger.shared.warning("Referral code collision detected (attempt \(attempt)/5): \(fullCode)", category: .referral)
         }
 
         // If we still can't generate a unique code after 5 attempts, use timestamp
@@ -82,13 +82,13 @@ class ReferralManager: ObservableObject {
             .getDocuments()
 
         guard let referrerDoc = querySnapshot.documents.first else {
-            print("Invalid referral code: \(referralCode)")
+            Logger.shared.warning("Invalid referral code: \(referralCode)", category: .referral)
             throw ReferralError.invalidCode
         }
 
         let referrerId = referrerDoc.documentID
         guard let newUserId = newUser.id, referrerId != newUserId else {
-            print("Cannot refer yourself")
+            Logger.shared.warning("User attempted to refer themselves", category: .referral)
             throw ReferralError.selfReferral
         }
 
@@ -100,7 +100,7 @@ class ReferralManager: ObservableObject {
             .getDocuments()
 
         if !existingReferralSnapshot.documents.isEmpty {
-            print("User has already been referred")
+            Logger.shared.warning("User has already been referred", category: .referral)
             throw ReferralError.alreadyReferred
         }
 
@@ -112,7 +112,7 @@ class ReferralManager: ObservableObject {
             .getDocuments()
 
         if emailCheckSnapshot.documents.count > 1 {
-            print("Email has already been referred with a different account")
+            Logger.shared.warning("Email has already been referred with a different account", category: .referral)
             throw ReferralError.emailAlreadyReferred
         }
 
@@ -139,7 +139,7 @@ class ReferralManager: ObservableObject {
         // Update referrer stats
         try await updateReferrerStats(userId: referrerId)
 
-        print("Referral processed successfully: \(referralCode)")
+        Logger.shared.info("Referral processed successfully: \(referralCode)", category: .referral)
     }
 
     // MARK: - Award Premium Days
@@ -183,7 +183,7 @@ class ReferralManager: ObservableObject {
             "expiryDate": Timestamp(date: expiryDate)
         ])
 
-        print("Awarded \(days) premium days to user \(userId) for \(reason)")
+        Logger.shared.info("Awarded \(days) premium days to user \(userId) for \(reason)", category: .referral)
     }
 
     // MARK: - Update Referrer Stats
@@ -265,7 +265,7 @@ class ReferralManager: ObservableObject {
 
             return !snapshot.documents.isEmpty
         } catch {
-            print("Error validating referral code: \(error)")
+            Logger.shared.error("Error validating referral code", category: .referral, error: error)
             return false
         }
     }
@@ -325,9 +325,9 @@ class ReferralManager: ObservableObject {
                 "timestamp": Timestamp(date: Date()),
                 "platform": "iOS"
             ])
-            print("✅ Tracked share for code: \(code) via \(shareMethod)")
+            Logger.shared.info("Tracked share for code: \(code) via \(shareMethod)", category: .analytics)
         } catch {
-            print("⚠️ Failed to track share: \(error.localizedDescription)")
+            Logger.shared.error("Failed to track share", category: .analytics, error: error)
         }
     }
 }

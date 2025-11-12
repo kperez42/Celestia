@@ -140,12 +140,10 @@ class AuthService: ObservableObject {
 
         do {
             try await Auth.auth().sendPasswordReset(withEmail: sanitizedEmail)
-            print("✅ Password reset email sent to: \(sanitizedEmail)")
+            Logger.shared.auth("Password reset email sent to: \(sanitizedEmail)", level: .info)
         } catch let error as NSError {
-            print("❌ Password reset error:")
-            print("  - Domain: \(error.domain)")
-            print("  - Code: \(error.code)")
-            print("  - Description: \(error.localizedDescription)")
+            Logger.shared.auth("Password reset error", level: .error)
+            Logger.shared.error("Password reset failed", category: .authentication, error: error)
 
             // User-friendly error messages
             if error.domain == "FIRAuthErrorDomain" {
@@ -203,14 +201,14 @@ class AuthService: ObservableObject {
             throw CelestiaError.ageRestriction
         }
 
-        print("🔵 Creating user with email: \(sanitizedEmail)")
+        Logger.shared.auth("Creating user with email: \(sanitizedEmail)", level: .info)
 
         do {
             // Step 1: Create Firebase Auth user
             let result = try await Auth.auth().createUser(withEmail: sanitizedEmail, password: sanitizedPassword)
             self.userSession = result.user
-            print("✅ Firebase Auth user created: \(result.user.uid)")
-            
+            Logger.shared.auth("Firebase Auth user created: \(result.user.uid)", level: .info)
+
             // Step 2: Create User object with all required fields
             var user = User(
                 id: result.user.uid,
@@ -240,7 +238,7 @@ class AuthService: ObservableObject {
                 user.referredByCode = sanitizedReferralCode
             }
 
-            print("🔵 Attempting to save user to Firestore...")
+            Logger.shared.auth("Attempting to save user to Firestore", level: .info)
 
             // Step 3: Save to Firestore
             guard let userId = user.id else {
@@ -250,7 +248,7 @@ class AuthService: ObservableObject {
             let encodedUser = try Firestore.Encoder().encode(user)
             try await Firestore.firestore().collection("users").document(userId).setData(encodedUser)
 
-            print("✅ User saved to Firestore successfully")
+            Logger.shared.auth("User saved to Firestore successfully", level: .info)
 
             // Step 4: Send email verification with action code settings
             let actionCodeSettings = ActionCodeSettings()
@@ -260,12 +258,10 @@ class AuthService: ObservableObject {
 
             do {
                 try await result.user.sendEmailVerification(with: actionCodeSettings)
-                print("✅ Verification email sent to \(sanitizedEmail)")
+                Logger.shared.auth("Verification email sent to \(sanitizedEmail)", level: .info)
             } catch let emailError as NSError {
-                print("⚠️ Email verification send failed:")
-                print("  - Domain: \(emailError.domain)")
-                print("  - Code: \(emailError.code)")
-                print("  - Description: \(emailError.localizedDescription)")
+                Logger.shared.auth("Email verification send failed", level: .warning)
+                Logger.shared.error("Failed to send verification email", category: .authentication, error: emailError)
                 // Don't fail account creation if email fails to send
             }
 
@@ -273,7 +269,7 @@ class AuthService: ObservableObject {
             do {
                 // Generate unique referral code for new user
                 try await ReferralManager.shared.initializeReferralCode(for: &user)
-                print("✅ Referral code initialized for user")
+                Logger.shared.info("Referral code initialized for user", category: .referral)
 
                 // Process referral if code was provided
                 if !sanitizedReferralCode.isEmpty {
@@ -282,7 +278,7 @@ class AuthService: ObservableObject {
                             newUser: user,
                             referralCode: sanitizedReferralCode
                         )
-                        print("✅ Referral processed successfully")
+                        Logger.shared.info("Referral processed successfully", category: .referral)
 
                         // Set success message for UI
                         await MainActor.run {
@@ -293,17 +289,17 @@ class AuthService: ObservableObject {
                         await MainActor.run {
                             self.referralErrorMessage = referralError.localizedDescription
                         }
-                        print("⚠️ Referral error: \(referralError.localizedDescription)")
+                        Logger.shared.warning("Referral error: \(referralError.localizedDescription)", category: .referral)
                     } catch {
                         // Generic referral error
                         await MainActor.run {
                             self.referralErrorMessage = "Unable to process referral code. Your account was created successfully."
                         }
-                        print("⚠️ Unexpected referral error: \(error.localizedDescription)")
+                        Logger.shared.error("Unexpected referral error", category: .referral, error: error)
                     }
                 }
             } catch {
-                print("⚠️ Error initializing referral code: \(error.localizedDescription)")
+                Logger.shared.error("Error initializing referral code", category: .referral, error: error)
                 // Don't fail account creation if referral code initialization fails
             }
 
@@ -311,16 +307,13 @@ class AuthService: ObservableObject {
             await fetchUser()
             isLoading = false
 
-            print("✅ Account creation completed - Please verify your email")
+            Logger.shared.auth("Account creation completed - Please verify your email", level: .info)
         } catch let error as NSError {
             isLoading = false
-            
+
             // Detailed error logging
-            print("❌ Error creating user:")
-            print("  - Domain: \(error.domain)")
-            print("  - Code: \(error.code)")
-            print("  - Description: \(error.localizedDescription)")
-            print("  - User Info: \(error.userInfo)")
+            Logger.shared.auth("Error creating user", level: .error)
+            Logger.shared.error("User creation failed - Domain: \(error.domain), Code: \(error.code)", category: .authentication, error: error)
             
             // User-friendly error messages
             if error.domain == "FIRAuthErrorDomain" {
@@ -351,60 +344,56 @@ class AuthService: ObservableObject {
             self.userSession = nil
             self.currentUser = nil
             self.isEmailVerified = false
-            print("✅ User signed out")
+            Logger.shared.auth("User signed out successfully", level: .info)
         } catch {
-            print("❌ Error signing out: \(error.localizedDescription)")
+            Logger.shared.error("Error signing out", category: .authentication, error: error)
         }
     }
     
     @MainActor
     func fetchUser() async {
-        guard let uid = Auth.auth().currentUser?.uid else { 
-            print("⚠️ No current user to fetch")
-            return 
+        guard let uid = Auth.auth().currentUser?.uid else {
+            Logger.shared.auth("No current user to fetch", level: .warning)
+            return
         }
-        
-        print("🔵 Fetching user data for: \(uid)")
-        
+
+        Logger.shared.auth("Fetching user data for: \(uid)", level: .debug)
+
         do {
             let snapshot = try await Firestore.firestore().collection("users").document(uid).getDocument()
-            
+
             if snapshot.exists {
                 // FIXED: Try both decoding methods
                 if let data = snapshot.data() {
-                    print("📄 Raw Firestore data keys: \(data.keys.joined(separator: ", "))")
-                    
+                    Logger.shared.database("Raw Firestore data keys: \(data.keys.joined(separator: ", "))", level: .debug)
+
                     // Try using the dictionary initializer first (more forgiving)
                     self.currentUser = User(dictionary: data)
-                    
+
                     if let user = currentUser {
-                        print("✅ User data fetched successfully")
-                        print("  - Name: \(user.fullName)")
-                        print("  - Email: \(user.email)")
-                        print("  - Location: \(user.location)")
+                        Logger.shared.auth("User data fetched successfully - Name: \(user.fullName), Email: \(user.email)", level: .info)
                     }
                 } else {
-                    print("⚠️ Document exists but has no data")
+                    Logger.shared.auth("Document exists but has no data", level: .warning)
                     // Create a minimal user document
                     await createMissingUserDocument(uid: uid)
                 }
             } else {
-                print("⚠️ User document does not exist in Firestore for uid: \(uid)")
+                Logger.shared.auth("User document does not exist in Firestore for uid: \(uid)", level: .warning)
                 // Create the missing user document
                 await createMissingUserDocument(uid: uid)
             }
         } catch {
-            print("❌ Error fetching user: \(error.localizedDescription)")
-            print("Full error: \(error)")
+            Logger.shared.error("Error fetching user", category: .database, error: error)
         }
     }
     
     @MainActor
     private func createMissingUserDocument(uid: String) async {
-        print("🔧 Creating missing user document for uid: \(uid)")
-        
+        Logger.shared.auth("Creating missing user document for uid: \(uid)", level: .info)
+
         guard let firebaseUser = Auth.auth().currentUser else {
-            print("❌ Cannot create document - no Firebase auth user")
+            Logger.shared.auth("Cannot create document - no Firebase auth user", level: .error)
             return
         }
         
@@ -434,12 +423,12 @@ class AuthService: ObservableObject {
         do {
             let encodedUser = try Firestore.Encoder().encode(user)
             try await Firestore.firestore().collection("users").document(uid).setData(encodedUser)
-            print("✅ Missing user document created successfully")
-            
+            Logger.shared.auth("Missing user document created successfully", level: .info)
+
             // Now fetch it
             await fetchUser()
         } catch {
-            print("❌ Error creating missing user document: \(error)")
+            Logger.shared.error("Error creating missing user document", category: .database, error: error)
         }
     }
     
@@ -449,26 +438,26 @@ class AuthService: ObservableObject {
         let encodedUser = try Firestore.Encoder().encode(user)
         try await Firestore.firestore().collection("users").document(uid).setData(encodedUser, merge: true)
         self.currentUser = user
-        print("✅ User updated successfully")
+        Logger.shared.auth("User updated successfully", level: .info)
     }
-    
+
     @MainActor
     func deleteAccount() async throws {
         guard let user = Auth.auth().currentUser else { return }
         guard let uid = user.uid as String? else { return }
-        
-        print("🔵 Deleting account: \(uid)")
-        
+
+        Logger.shared.auth("Deleting account: \(uid)", level: .info)
+
         // Delete user data from Firestore
         try await Firestore.firestore().collection("users").document(uid).delete()
-        
+
         // Delete auth account
         try await user.delete()
-        
+
         self.userSession = nil
         self.currentUser = nil
 
-        print("✅ Account deleted successfully")
+        Logger.shared.auth("Account deleted successfully", level: .info)
     }
 
     // MARK: - Email Verification
@@ -481,7 +470,7 @@ class AuthService: ObservableObject {
         }
 
         guard !user.isEmailVerified else {
-            print("✅ Email already verified")
+            Logger.shared.auth("Email already verified", level: .info)
             return
         }
 
@@ -493,12 +482,10 @@ class AuthService: ObservableObject {
 
         do {
             try await user.sendEmailVerification(with: actionCodeSettings)
-            print("✅ Verification email sent to \(user.email ?? "")")
+            Logger.shared.auth("Verification email sent to \(user.email ?? "")", level: .info)
         } catch let error as NSError {
-            print("⚠️ Email verification send failed:")
-            print("  - Domain: \(error.domain)")
-            print("  - Code: \(error.code)")
-            print("  - Description: \(error.localizedDescription)")
+            Logger.shared.auth("Email verification send failed", level: .error)
+            Logger.shared.error("Failed to send verification email", category: .authentication, error: error)
             throw error
         }
     }
@@ -514,7 +501,7 @@ class AuthService: ObservableObject {
 
         // Update published property to trigger view updates
         self.isEmailVerified = user.isEmailVerified
-        print("✅ User reloaded - Email verified: \(user.isEmailVerified)")
+        Logger.shared.auth("User reloaded - Email verified: \(user.isEmailVerified)", level: .info)
 
         // Update local state
         if user.isEmailVerified {
