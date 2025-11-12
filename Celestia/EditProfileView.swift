@@ -35,7 +35,11 @@ struct EditProfileView: View {
     @State private var showLanguagePicker = false
     @State private var showInterestPicker = false
     @State private var showPromptsEditor = false
-    
+    @State private var photos: [String]
+    @State private var selectedPhotoItems: [PhotosPickerItem] = []
+    @State private var isUploadingPhotos = false
+    @State private var uploadProgress: Double = 0.0
+
     let genderOptions = ["Male", "Female", "Non-binary", "Other"]
     let lookingForOptions = ["Men", "Women", "Everyone"]
     let predefinedLanguages = [
@@ -60,6 +64,7 @@ struct EditProfileView: View {
         _languages = State(initialValue: user?.languages ?? [])
         _interests = State(initialValue: user?.interests ?? [])
         _prompts = State(initialValue: user?.prompts ?? [])
+        _photos = State(initialValue: user?.photos ?? [])
     }
     
     var body: some View {
@@ -72,10 +77,13 @@ struct EditProfileView: View {
                     VStack(spacing: 25) {
                         // Hero Profile Photo Section
                         profilePhotoSection
-                        
+
+                        // Photo Gallery Section
+                        photoGallerySection
+
                         // Progress Indicator
                         profileCompletionProgress
-                        
+
                         // Basic Info Card
                         basicInfoSection
                         
@@ -264,7 +272,83 @@ struct EditProfileView: View {
                 }
             }
     }
-    
+
+    // MARK: - Photo Gallery Section
+
+    private var photoGallerySection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Photo Gallery")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                    Text("Add up to 6 photos")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                // Upload progress indicator
+                if isUploadingPhotos {
+                    HStack(spacing: 8) {
+                        ProgressView(value: uploadProgress)
+                            .frame(width: 50)
+                        Text("\(Int(uploadProgress * 100))%")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+
+            // Photo grid with drag-and-drop reordering
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                ForEach(Array(photos.enumerated()), id: \.offset) { index, photoURL in
+                    PhotoGridItem(
+                        photoURL: photoURL,
+                        onDelete: {
+                            deletePhoto(at: index)
+                        },
+                        onMoveUp: index > 0 ? {
+                            movePhoto(from: index, to: index - 1)
+                        } : nil,
+                        onMoveDown: index < photos.count - 1 ? {
+                            movePhoto(from: index, to: index + 1)
+                        } : nil
+                    )
+                }
+
+                // Add photo button
+                if photos.count < 6 {
+                    PhotosPicker(selection: $selectedPhotoItems, maxSelectionCount: 6 - photos.count, matching: .images) {
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.purple.opacity(0.3), style: StrokeStyle(lineWidth: 2, dash: [8]))
+                            .frame(height: 120)
+                            .overlay {
+                                VStack(spacing: 8) {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.title)
+                                        .foregroundColor(.purple)
+                                    Text("Add Photo")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
+        .onChange(of: selectedPhotoItems) { _, newItems in
+            Task {
+                await uploadNewPhotos(newItems)
+            }
+        }
+    }
+
     // MARK: - Profile Completion Progress
     
     private var profileCompletionProgress: some View {
@@ -799,6 +883,7 @@ struct EditProfileView: View {
                 user.languages = languages
                 user.interests = interests
                 user.prompts = prompts
+                user.photos = photos
 
                 try await authService.updateUser(user)
                 
@@ -1006,6 +1091,170 @@ struct InterestPickerView: View {
                     }
                 }
             }
+        }
+    }
+
+    // MARK: - Photo Management Functions
+
+    private func deletePhoto(at index: Int) {
+        withAnimation {
+            photos.remove(at: index)
+        }
+        HapticManager.shared.impact(.medium)
+    }
+
+    private func movePhoto(from source: Int, to destination: Int) {
+        withAnimation {
+            let photo = photos.remove(at: source)
+            photos.insert(photo, at: destination)
+        }
+        HapticManager.shared.impact(.light)
+    }
+
+    private func uploadNewPhotos(_ items: [PhotosPickerItem]) async {
+        guard !items.isEmpty else { return }
+
+        await MainActor.run {
+            isUploadingPhotos = true
+            uploadProgress = 0.0
+        }
+
+        for (index, item) in items.enumerated() {
+            do {
+                if let data = try await item.loadTransferable(type: Data.self),
+                   let uiImage = UIImage(data: data) {
+
+                    // Update progress
+                    await MainActor.run {
+                        uploadProgress = Double(index) / Double(items.count)
+                    }
+
+                    // Upload to Firebase Storage
+                    if let userId = authService.currentUser?.id {
+                        let photoURL = try await PhotoUploadService.shared.uploadPhoto(
+                            uiImage,
+                            userId: userId,
+                            imageType: .gallery
+                        )
+
+                        await MainActor.run {
+                            photos.append(photoURL)
+                        }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = "Failed to upload photo: \(error.localizedDescription)"
+                    showErrorAlert = true
+                }
+                Logger.shared.error("Photo upload failed: \(error.localizedDescription)", category: .general)
+            }
+        }
+
+        await MainActor.run {
+            uploadProgress = 1.0
+            isUploadingPhotos = false
+            selectedPhotoItems = []
+        }
+    }
+}
+
+// MARK: - Photo Grid Item
+
+struct PhotoGridItem: View {
+    let photoURL: String
+    let onDelete: () -> Void
+    let onMoveUp: (() -> Void)?
+    let onMoveDown: (() -> Void)?
+
+    @State private var showDeleteConfirmation = false
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            // Photo
+            AsyncImage(url: URL(string: photoURL)) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                case .failure:
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.2))
+                        .overlay {
+                            Image(systemName: "photo")
+                                .foregroundColor(.gray)
+                        }
+                case .empty:
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.1))
+                        .overlay {
+                            ProgressView()
+                        }
+                @unknown default:
+                    EmptyView()
+                }
+            }
+            .frame(height: 120)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            // Controls overlay
+            VStack(spacing: 4) {
+                // Delete button
+                Button {
+                    showDeleteConfirmation = true
+                } label: {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 28, height: 28)
+                        .overlay {
+                            Image(systemName: "trash.fill")
+                                .font(.system(size: 12))
+                                .foregroundColor(.white)
+                        }
+                        .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
+                }
+
+                // Reorder buttons
+                if onMoveUp != nil || onMoveDown != nil {
+                    VStack(spacing: 2) {
+                        if let moveUp = onMoveUp {
+                            Button(action: moveUp) {
+                                Circle()
+                                    .fill(Color.white)
+                                    .frame(width: 24, height: 24)
+                                    .overlay {
+                                        Image(systemName: "chevron.up")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundColor(.purple)
+                                    }
+                                    .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+                            }
+                        }
+
+                        if let moveDown = onMoveDown {
+                            Button(action: moveDown) {
+                                Circle()
+                                    .fill(Color.white)
+                                    .frame(width: 24, height: 24)
+                                    .overlay {
+                                        Image(systemName: "chevron.down")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundColor(.purple)
+                                    }
+                                    .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(6)
+        }
+        .confirmationDialog("Delete this photo?", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                onDelete()
+            }
+            Button("Cancel", role: .cancel) {}
         }
     }
 }
