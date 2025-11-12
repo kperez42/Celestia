@@ -16,6 +16,7 @@ class AuthService: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var isEmailVerified = false
+    @Published var referralBonusMessage: String?
 
     static let shared = AuthService()
     
@@ -280,6 +281,11 @@ class AuthService: ObservableObject {
                         referralCode: sanitizedReferralCode
                     )
                     print("✅ Referral processed successfully")
+
+                    // Set success message for UI
+                    await MainActor.run {
+                        self.referralBonusMessage = "🎉 Referral bonus activated! You've received \(ReferralRewards.newUserBonusDays) days of Premium!"
+                    }
                 }
             } catch {
                 print("⚠️ Error handling referral: \(error.localizedDescription)")

@@ -399,7 +399,11 @@ struct ReferralDashboardView: View {
     }
 
     private func referralRow(referral: Referral) -> some View {
-        HStack(spacing: 16) {
+        let isNew = referral.status == .completed &&
+                    referral.completedAt != nil &&
+                    Date().timeIntervalSince(referral.completedAt!) < 86400 // 24 hours
+
+        return HStack(spacing: 16) {
             // Status Icon
             ZStack {
                 Circle()
@@ -409,12 +413,32 @@ struct ReferralDashboardView: View {
                 Image(systemName: referral.status == .completed ? "checkmark.circle.fill" : "clock.fill")
                     .font(.title3)
                     .foregroundColor(referral.status == .completed ? .green : .orange)
+
+                // New badge
+                if isNew {
+                    Text("NEW")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.red)
+                        .cornerRadius(8)
+                        .offset(x: 20, y: -20)
+                }
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(referral.status == .completed ? "Completed" : "Pending")
-                    .font(.headline)
-                    .foregroundColor(.primary)
+                HStack(spacing: 6) {
+                    Text(referral.status == .completed ? "Completed" : "Pending")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+
+                    if isNew {
+                        Image(systemName: "sparkles")
+                            .font(.caption)
+                            .foregroundColor(.purple)
+                    }
+                }
 
                 Text(referral.createdAt.formatted(date: .abbreviated, time: .omitted))
                     .font(.caption)
@@ -436,9 +460,15 @@ struct ReferralDashboardView: View {
             }
         }
         .padding(16)
-        .background(Color.white)
+        .background(
+            LinearGradient(
+                colors: isNew ? [Color.purple.opacity(0.05), Color.pink.opacity(0.05)] : [Color.white, Color.white],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
         .cornerRadius(12)
-        .shadow(color: .black.opacity(0.05), radius: 5, y: 2)
+        .shadow(color: .black.opacity(isNew ? 0.1 : 0.05), radius: isNew ? 8 : 5, y: isNew ? 4 : 2)
     }
 
     // MARK: - Leaderboard

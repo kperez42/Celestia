@@ -186,6 +186,13 @@ struct SignUpView: View {
                 dismiss()
             }
         }
+        .alert("Referral Bonus", isPresented: .constant(authService.referralBonusMessage != nil)) {
+            Button("Awesome! 🎉") {
+                authService.referralBonusMessage = nil
+            }
+        } message: {
+            Text(authService.referralBonusMessage ?? "")
+        }
     }
     
     // MARK: - Step 1: Basic Info
