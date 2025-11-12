@@ -46,7 +46,7 @@ class InterestService: ObservableObject {
 
         // Check if interest already exists
         if let existingInterest = try? await fetchInterest(fromUserId: fromUserId, toUserId: toUserId) {
-            print("Interest already sent to this user: \(existingInterest.id ?? "unknown")")
+            Logger.shared.info("Interest already sent to this user: \(existingInterest.id ?? "unknown")", category: .matching)
             return
         }
 
@@ -65,7 +65,7 @@ class InterestService: ObservableObject {
         )
         
         let docRef = try db.collection("interests").addDocument(from: interest)
-        print("✅ Interest sent: \(docRef.documentID)")
+        Logger.shared.info("Interest sent: \(docRef.documentID)", category: .matching)
 
         // Check for mutual match
         if let mutualInterest = try? await fetchInterest(fromUserId: toUserId, toUserId: fromUserId),
@@ -159,9 +159,9 @@ class InterestService: ObservableObject {
             .order(by: "timestamp", descending: true)
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self else { return }
-                
+
                 if let error = error {
-                    print("❌ Error listening to interests: \(error)")
+                    Logger.shared.error("Error listening to interests", category: .matching, error: error)
                     Task { @MainActor in
                         self.error = error
                     }
@@ -195,16 +195,16 @@ class InterestService: ObservableObject {
             await matchCreator.createMatch(user1Id: fromUserId, user2Id: toUserId)
         }
 
-        print("✅ Interest accepted")
+        Logger.shared.info("Interest accepted", category: .matching)
     }
-    
+
     func rejectInterest(interestId: String) async throws {
         try await db.collection("interests").document(interestId).updateData([
             "status": "rejected",
             "rejectedAt": FieldValue.serverTimestamp()
         ])
 
-        print("✅ Interest rejected")
+        Logger.shared.info("Interest rejected", category: .matching)
     }
     
     // MARK: - Check if Liked
@@ -214,7 +214,7 @@ class InterestService: ObservableObject {
             let interest = try await fetchInterest(fromUserId: fromUserId, toUserId: toUserId)
             return interest != nil
         } catch {
-            print("Error checking if liked: \(error)")
+            Logger.shared.error("Error checking if liked", category: .matching, error: error)
             return false
         }
     }
@@ -235,7 +235,7 @@ class InterestService: ObservableObject {
                 .getDocuments()
             return snapshot.documents.count
         } catch {
-            print("Error getting interest count: \(error)")
+            Logger.shared.error("Error getting interest count", category: .matching, error: error)
             return 0
         }
     }
