@@ -223,8 +223,8 @@ class CrashlyticsManager {
         let metric = HTTPMetric(url: url, httpMethod: HTTPMethod(rawValue: httpMethod) ?? .get)
 
         metric?.responseCode = responseCode
-        metric?.requestPayloadSize = requestSize
-        metric?.responsePayloadSize = responseSize
+        metric?.requestPayloadSize = Int(requestSize)
+        metric?.responsePayloadSize = Int(responseSize)
 
         Logger.shared.debug(
             "Network request tracked: \(httpMethod) \(url.path) - \(responseCode)",
