@@ -291,6 +291,34 @@ class AnalyticsManager: ObservableObject, AnalyticsManagerProtocol {
         ])
     }
 
+    // MARK: - Profile Insights
+
+    /// Fetch profile insights for a user
+    func fetchProfileInsights(for userId: String) async throws -> ProfileInsights {
+        // This is a placeholder implementation
+        // In a real app, this would fetch analytics data from Firebase Analytics
+        // or a custom analytics backend
+
+        var insights = ProfileInsights()
+
+        // For now, return default/mock data
+        // TODO: Implement actual analytics data fetching from Firebase
+        insights.profileViews = Int.random(in: 50...200)
+        insights.viewsThisWeek = Int.random(in: 10...50)
+        insights.viewsLastWeek = Int.random(in: 10...50)
+        insights.swipesReceived = Int.random(in: 30...150)
+        insights.likesReceived = Int.random(in: 15...100)
+        insights.likeRate = Double(insights.likesReceived) / Double(max(insights.swipesReceived, 1))
+        insights.matchCount = Int.random(in: 5...30)
+        insights.matchRate = Double(insights.matchCount) / Double(max(insights.likesReceived, 1))
+        insights.profileScore = Int.random(in: 60...95)
+        insights.lastActiveDate = Date()
+
+        Logger.shared.debug("Fetched profile insights for user: \(userId)", category: .analytics)
+
+        return insights
+    }
+
     // MARK: - Private Methods
 
     private func queueEvent(_ event: AnalyticsEvent, parameters: [String: Any]) {
