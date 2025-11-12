@@ -535,7 +535,7 @@ class AuthService: ObservableObject {
                 await fetchUser()
             }
         } catch let error as NSError {
-            Logger.shared.auth("Email verification failed", level: .error, error: error)
+            Logger.shared.error("Email verification failed", category: .authentication, error: error)
 
             // Handle specific Firebase Auth errors
             if error.domain == "FIRAuthErrorDomain" {
