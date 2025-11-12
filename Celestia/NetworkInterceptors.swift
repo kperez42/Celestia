@@ -46,7 +46,7 @@ struct AnalyticsInterceptor: RequestInterceptor, ResponseInterceptor {
     func intercept(request: inout URLRequest) async throws {
         // Track API call
         if let url = request.url {
-            AnalyticsManager.shared.logEvent(.featureUsed, parameters: [
+            await AnalyticsManager.shared.logEvent(.featureUsed, parameters: [
                 "feature": "api_call",
                 "endpoint": url.path,
                 "method": request.httpMethod ?? "GET"
@@ -57,7 +57,7 @@ struct AnalyticsInterceptor: RequestInterceptor, ResponseInterceptor {
     func intercept(data: Data, response: URLResponse) async throws -> Data {
         // Track API response
         if let httpResponse = response as? HTTPURLResponse {
-            AnalyticsManager.shared.logEvent(.performance, parameters: [
+            await AnalyticsManager.shared.logEvent(.performance, parameters: [
                 "operation": "api_response",
                 "status_code": httpResponse.statusCode,
                 "response_size": data.count
