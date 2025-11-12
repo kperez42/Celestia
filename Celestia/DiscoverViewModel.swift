@@ -136,19 +136,45 @@ class DiscoverViewModel: ObservableObject {
     func handleLike() async {
         guard currentIndex < users.count, !isProcessingAction else { return }
         isProcessingAction = true
-        let user = users[currentIndex]
 
-        // Move to next card
+        let likedUser = users[currentIndex]
+        guard let currentUserId = AuthService.shared.currentUser?.id,
+              let likedUserId = likedUser.id else {
+            isProcessingAction = false
+            return
+        }
+
+        // Move to next card with animation
         withAnimation {
             currentIndex += 1
             dragOffset = .zero
         }
 
-        // Simulate network delay
-        try? await Task.sleep(nanoseconds: 300_000_000)
-        isProcessingAction = false
+        // Send like to backend
+        do {
+            let isMatch = try await SwipeService.shared.likeUser(
+                fromUserId: currentUserId,
+                toUserId: likedUserId,
+                isSuperLike: false
+            )
 
-        // TODO: Implement like logic (send interest, check for match, etc.)
+            if isMatch {
+                // Show match animation
+                await MainActor.run {
+                    self.matchedUser = likedUser
+                    self.showingMatchAnimation = true
+                    HapticManager.shared.notification(.success)
+                }
+                print("💕 It's a match with \(likedUser.fullName)!")
+            } else {
+                print("✅ Like sent to \(likedUser.fullName)")
+            }
+        } catch {
+            print("❌ Error sending like: \(error.localizedDescription)")
+            // Still move forward even if like fails
+        }
+
+        isProcessingAction = false
     }
 
     /// Handle pass action
@@ -156,36 +182,79 @@ class DiscoverViewModel: ObservableObject {
         guard currentIndex < users.count, !isProcessingAction else { return }
         isProcessingAction = true
 
-        // Move to next card
+        let passedUser = users[currentIndex]
+        guard let currentUserId = AuthService.shared.currentUser?.id,
+              let passedUserId = passedUser.id else {
+            isProcessingAction = false
+            return
+        }
+
+        // Move to next card with animation
         withAnimation {
             currentIndex += 1
             dragOffset = .zero
         }
 
-        // Simulate network delay
-        try? await Task.sleep(nanoseconds: 300_000_000)
-        isProcessingAction = false
+        // Record pass in backend
+        do {
+            try await SwipeService.shared.passUser(
+                fromUserId: currentUserId,
+                toUserId: passedUserId
+            )
+            print("✅ Pass recorded for \(passedUser.fullName)")
+        } catch {
+            print("❌ Error recording pass: \(error.localizedDescription)")
+            // Still move forward even if pass fails
+        }
 
-        // TODO: Implement pass logic
+        isProcessingAction = false
     }
 
     /// Handle super like action
     func handleSuperLike() async {
         guard currentIndex < users.count, !isProcessingAction else { return }
         isProcessingAction = true
-        let user = users[currentIndex]
 
-        // Move to next card
+        let superLikedUser = users[currentIndex]
+        guard let currentUserId = AuthService.shared.currentUser?.id,
+              let superLikedUserId = superLikedUser.id else {
+            isProcessingAction = false
+            return
+        }
+
+        // Move to next card with animation
         withAnimation {
             currentIndex += 1
             dragOffset = .zero
         }
 
-        // Simulate network delay
-        try? await Task.sleep(nanoseconds: 300_000_000)
-        isProcessingAction = false
+        // Send super like to backend
+        do {
+            let isMatch = try await SwipeService.shared.likeUser(
+                fromUserId: currentUserId,
+                toUserId: superLikedUserId,
+                isSuperLike: true
+            )
 
-        // TODO: Implement super like logic (send super like interest, check for match, etc.)
+            if isMatch {
+                // Show match animation
+                await MainActor.run {
+                    self.matchedUser = superLikedUser
+                    self.showingMatchAnimation = true
+                    HapticManager.shared.notification(.success)
+                }
+                print("💕 Super Like resulted in a match with \(superLikedUser.fullName)!")
+            } else {
+                print("⭐ Super Like sent to \(superLikedUser.fullName)")
+            }
+
+            // TODO: Deduct super like from user's balance when consumables are implemented
+        } catch {
+            print("❌ Error sending super like: \(error.localizedDescription)")
+            // Still move forward even if super like fails
+        }
+
+        isProcessingAction = false
     }
 
     /// Apply filters
