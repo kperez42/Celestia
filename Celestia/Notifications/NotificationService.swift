@@ -23,6 +23,10 @@ class NotificationService: ObservableObject, NotificationServiceProtocol, Notifi
     private let manager = PushNotificationManager.shared
     private let badgeManager = BadgeManager.shared
 
+    // MARK: - Published Properties
+
+    @Published var notificationHistory: [NotificationData] = []
+
     // MARK: - Initialization
 
     private init() {
@@ -337,13 +341,35 @@ extension NotificationService {
 
     /// Listen to notifications for a user
     func listenToNotifications(userId: String) {
-        // TODO: Implement real-time notification listening
+        // TODO: Implement real-time notification listening from Firestore
         Logger.shared.debug("Listening to notifications for user: \(userId)", category: .general)
+
+        // For now, load some mock data for testing
+        loadMockNotificationHistory()
     }
 
     /// Stop listening to notifications
     nonisolated func stopListening() {
         // TODO: Implement stopping notification listener
         Logger.shared.debug("Stopped listening to notifications", category: .general)
+    }
+
+    /// Load mock notification history (for development)
+    private func loadMockNotificationHistory() {
+        // This is temporary mock data - in production, load from Firestore
+        notificationHistory = [
+            NotificationData(
+                type: .newMatch,
+                title: "New Match!",
+                body: "You matched with Sarah",
+                timestamp: Date().addingTimeInterval(-3600)
+            ),
+            NotificationData(
+                type: .newMessage,
+                title: "New Message",
+                body: "Sarah sent you a message",
+                timestamp: Date().addingTimeInterval(-7200)
+            )
+        ]
     }
 }
