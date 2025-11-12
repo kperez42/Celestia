@@ -105,10 +105,29 @@ class MessageService: ObservableObject {
             throw CelestiaError.messageTooLong
         }
 
-        // Content moderation
-        guard ContentModerator.shared.isAppropriate(sanitizedText) else {
-            let violations = ContentModerator.shared.getViolations(sanitizedText)
-            throw CelestiaError.inappropriateContentWithReasons(violations)
+        // Content moderation - use server-side validation if available
+        do {
+            // Try server-side validation first (more secure)
+            let validationResponse = try await BackendAPIService.shared.validateContent(
+                sanitizedText,
+                type: .message
+            )
+
+            guard validationResponse.isAppropriate else {
+                Logger.shared.warning("Content flagged by server: \(validationResponse.violations.joined(separator: ", "))", category: .moderation)
+                throw CelestiaError.inappropriateContentWithReasons(validationResponse.violations)
+            }
+
+            Logger.shared.debug("Content validated server-side ✅", category: .moderation)
+
+        } catch is BackendAPIError {
+            // Fallback to client-side validation if server unavailable
+            Logger.shared.warning("Server-side validation unavailable, using client-side", category: .moderation)
+
+            guard ContentModerator.shared.isAppropriate(sanitizedText) else {
+                let violations = ContentModerator.shared.getViolations(sanitizedText)
+                throw CelestiaError.inappropriateContentWithReasons(violations)
+            }
         }
 
         let message = Message(
