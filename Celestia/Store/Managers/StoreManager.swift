@@ -359,7 +359,7 @@ class StoreManager: ObservableObject {
 
     /// Get product for a premium plan
     func getProduct(for plan: PremiumPlan) -> Product? {
-        let productID = plan.productIdentifier
+        let productID = plan.productID
         return products.first { $0.id == productID }
     }
 
@@ -387,39 +387,6 @@ enum PurchaseError: LocalizedError {
             return "Purchase verification failed"
         case .userCancelled:
             return "Purchase cancelled"
-        }
-    }
-}
-
-// MARK: - PremiumPlan
-
-enum PremiumPlan: String, CaseIterable {
-    case monthly = "monthly"
-    case annual = "annual"
-    case lifetime = "lifetime"
-
-    var productIdentifier: String {
-        switch self {
-        case .monthly:
-            return ProductIdentifiers.subscriptionPlusMonthly
-        case .annual:
-            return ProductIdentifiers.subscriptionPlusYearly
-        case .lifetime:
-            return ProductIdentifiers.consumableLifetimePremium
-        }
-    }
-
-    var expiryDate: Date? {
-        let calendar = Calendar.current
-        let now = Date()
-
-        switch self {
-        case .monthly:
-            return calendar.date(byAdding: .month, value: 1, to: now)
-        case .annual:
-            return calendar.date(byAdding: .year, value: 1, to: now)
-        case .lifetime:
-            return nil // No expiry for lifetime
         }
     }
 }
