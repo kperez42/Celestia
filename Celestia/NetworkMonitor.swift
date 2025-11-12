@@ -9,6 +9,7 @@
 import Foundation
 import Network
 import Combine
+import SwiftUI
 
 // MARK: - Network Status
 
@@ -76,7 +77,7 @@ class NetworkMonitor: ObservableObject {
 
     // MARK: - Singleton
 
-    static let shared = NetworkMonitor()
+    nonisolated(unsafe) static let shared = NetworkMonitor()
 
     // MARK: - Published Properties
 

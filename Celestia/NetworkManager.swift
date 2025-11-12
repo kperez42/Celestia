@@ -87,19 +87,6 @@ struct NetworkResponse {
     let metrics: URLSessionTaskMetrics?
 }
 
-// MARK: - Request Interceptor Protocol
-
-protocol RequestInterceptor {
-    func adapt(_ request: URLRequest) async throws -> URLRequest
-    func retry(_ request: URLRequest, for session: URLSession, dueTo error: Error) async throws -> Bool
-}
-
-// MARK: - Response Interceptor Protocol
-
-protocol ResponseInterceptor {
-    func intercept(_ response: NetworkResponse) async throws -> NetworkResponse
-}
-
 // MARK: - Network Manager
 
 class NetworkManager: NetworkManagerProtocol {
@@ -117,8 +104,8 @@ class NetworkManager: NetworkManagerProtocol {
     @Published private(set) var isNetworkAvailable = true
     @Published private(set) var connectionType: NWInterface.InterfaceType?
 
-    private var requestInterceptors: [RequestInterceptor] = []
-    private var responseInterceptors: [ResponseInterceptor] = []
+    private var requestAdapters: [NetworkRequestAdapter] = []
+    private var responseAdapters: [NetworkResponseAdapter] = []
 
     private let maxRetryAttempts = 3
     private let baseRetryDelay: TimeInterval = 1.0
@@ -174,14 +161,14 @@ class NetworkManager: NetworkManagerProtocol {
         return isNetworkAvailable
     }
 
-    // MARK: - Interceptor Management
+    // MARK: - Adapter Management
 
-    func addRequestInterceptor(_ interceptor: RequestInterceptor) {
-        requestInterceptors.append(interceptor)
+    func addRequestAdapter(_ adapter: NetworkRequestAdapter) {
+        requestAdapters.append(adapter)
     }
 
-    func addResponseInterceptor(_ interceptor: ResponseInterceptor) {
-        responseInterceptors.append(interceptor)
+    func addResponseAdapter(_ adapter: NetworkResponseAdapter) {
+        responseAdapters.append(adapter)
     }
 
     // MARK: - Request Execution
@@ -205,9 +192,9 @@ class NetworkManager: NetworkManagerProtocol {
             }
         }
 
-        // Apply request interceptors
-        for interceptor in requestInterceptors {
-            urlRequest = try await interceptor.adapt(urlRequest)
+        // Apply request adapters
+        for adapter in requestAdapters {
+            urlRequest = try await adapter.adapt(urlRequest)
         }
 
         do {
@@ -246,10 +233,10 @@ class NetworkManager: NetworkManagerProtocol {
                 throw NetworkError.serverError(httpResponse.statusCode)
             }
 
-            // Apply response interceptors
+            // Apply response adapters
             var networkResponse = NetworkResponse(data: data, response: httpResponse, metrics: nil)
-            for interceptor in responseInterceptors {
-                networkResponse = try await interceptor.intercept(networkResponse)
+            for adapter in responseAdapters {
+                networkResponse = try await adapter.intercept(networkResponse)
             }
 
             // Decode response
@@ -449,10 +436,21 @@ class NetworkManager: NetworkManagerProtocol {
     }
 }
 
-// MARK: - Default Interceptors
+// MARK: - Network Manager Request Adapters
+// Note: These are different from the interceptors in NetworkInterceptors.swift
+// These use a different signature for NetworkManager's specific needs
 
-// Auth Token Interceptor
-class AuthTokenInterceptor: RequestInterceptor {
+protocol NetworkRequestAdapter {
+    func adapt(_ request: URLRequest) async throws -> URLRequest
+    func retry(_ request: URLRequest, for session: URLSession, dueTo error: Error) async throws -> Bool
+}
+
+protocol NetworkResponseAdapter {
+    func intercept(_ response: NetworkResponse) async throws -> NetworkResponse
+}
+
+// Auth Token Adapter
+class AuthTokenAdapter: NetworkRequestAdapter {
     func adapt(_ request: URLRequest) async throws -> URLRequest {
         var modifiedRequest = request
 
@@ -472,8 +470,8 @@ class AuthTokenInterceptor: RequestInterceptor {
     }
 }
 
-// Logging Interceptor
-class LoggingInterceptor: ResponseInterceptor {
+// Network Logging Adapter
+class NetworkLoggingAdapter: NetworkResponseAdapter {
     func intercept(_ response: NetworkResponse) async throws -> NetworkResponse {
         Logger.shared.network(
             "Response: \(response.response.statusCode) - \(response.data.count) bytes",
