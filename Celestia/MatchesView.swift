@@ -226,7 +226,7 @@ struct MatchesView: View {
             }
             .padding(.bottom, 16)
         }
-        .frame(minHeight: matchService.matches.isEmpty ? 110 : 160)
+        .frame(height: matchService.matches.isEmpty ? 110 : 160)
     }
     
     private var premiumBadge: some View {
