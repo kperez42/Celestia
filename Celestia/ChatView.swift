@@ -10,6 +10,7 @@ import SwiftUI
 struct ChatView: View {
     @EnvironmentObject var authService: AuthService
     @StateObject private var messageService = MessageService.shared
+    @StateObject private var safetyManager = SafetyManager.shared
 
     let match: Match
     let otherUser: User
@@ -19,7 +20,10 @@ struct ChatView: View {
     @State private var isOtherUserTyping = false
     @State private var showingUnmatchConfirmation = false
     @State private var showingUserProfile = false
+    @State private var showingReportSheet = false
     @State private var isSending = false
+    @State private var conversationSafetyReport: ConversationSafetyReport?
+    @State private var showSafetyWarning = false
     @Environment(\.dismiss) var dismiss
 
     var body: some View {
@@ -28,6 +32,11 @@ struct ChatView: View {
             customHeader
 
             Divider()
+
+            // Safety warning banner
+            if let safetyReport = conversationSafetyReport, !safetyReport.isSafe, showSafetyWarning {
+                safetyWarningBanner(report: safetyReport)
+            }
 
             // Messages
             messagesScrollView
@@ -54,7 +63,7 @@ struct ChatView: View {
                             dismiss()
                         }
                     } catch {
-                        print("Error unmatching: \(error)")
+                        Logger.shared.error("Error unmatching", category: .matching, error: error)
                     }
                 }
             }
@@ -73,6 +82,23 @@ struct ChatView: View {
         )
         .sheet(isPresented: $showingUserProfile) {
             UserDetailView(user: otherUser)
+        }
+        .sheet(isPresented: $showingReportSheet) {
+            if let userId = otherUser.id {
+                ReportUserView(
+                    reportedUserId: userId,
+                    reportedUserName: otherUser.fullName,
+                    context: .chat
+                )
+            }
+        }
+        .onChange(of: messageService.messages.count) {
+            // Check conversation safety whenever new messages arrive
+            checkConversationSafety()
+        }
+        .task {
+            // Initial safety check
+            checkConversationSafety()
         }
     }
 
@@ -119,6 +145,11 @@ struct ChatView: View {
                             .font(.system(size: 12))
                             .foregroundColor(.blue)
                     }
+
+                    // Safety score badge
+                    if let safetyReport = conversationSafetyReport {
+                        safetyScoreBadge(report: safetyReport)
+                    }
                 }
 
                 if isOtherUserTyping {
@@ -156,6 +187,15 @@ struct ChatView: View {
                     HapticManager.shared.impact(.light)
                 } label: {
                     Label("View Profile", systemImage: "person.circle")
+                }
+
+                Divider()
+
+                Button {
+                    showingReportSheet = true
+                    HapticManager.shared.impact(.light)
+                } label: {
+                    Label("Report User", systemImage: "exclamationmark.triangle")
                 }
 
                 Button(role: .destructive) {
@@ -363,12 +403,156 @@ struct ChatView: View {
                 )
                 HapticManager.shared.notification(.success)
             } catch {
-                print("Error sending message: \(error)")
+                Logger.shared.error("Error sending message", category: .messaging, error: error)
                 HapticManager.shared.notification(.error)
                 // Could show error alert here
             }
             isSending = false
         }
+    }
+
+    // MARK: - Safety Features
+
+    /// Check conversation for scam patterns
+    private func checkConversationSafety() {
+        // Convert Message objects to ChatMessage for scam detection
+        let chatMessages = messageService.messages.map { message in
+            ChatMessage(
+                text: message.text,
+                senderId: message.senderId,
+                timestamp: message.timestamp
+            )
+        }
+
+        guard !chatMessages.isEmpty else { return }
+
+        Task {
+            let safetyReport = await safetyManager.checkConversationSafety(messages: chatMessages)
+
+            await MainActor.run {
+                conversationSafetyReport = safetyReport
+                showSafetyWarning = !safetyReport.isSafe
+
+                // Log safety check
+                if !safetyReport.isSafe {
+                    Logger.shared.warning("Scam detected in conversation. Score: \(safetyReport.scamAnalysis.scamScore)", category: .general)
+                }
+            }
+        }
+    }
+
+    /// Safety warning banner view
+    private func safetyWarningBanner(report: ConversationSafetyReport) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 18))
+                    .foregroundColor(.white)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Safety Warning")
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+
+                    Text(report.warnings.first ?? "This conversation shows signs of a potential scam")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.9))
+                }
+
+                Spacer()
+
+                Button {
+                    showSafetyWarning = false
+                    HapticManager.shared.impact(.light)
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14))
+                        .foregroundColor(.white)
+                        .padding(4)
+                }
+            }
+
+            // Scam types
+            if !report.scamAnalysis.scamTypes.isEmpty {
+                HStack(spacing: 6) {
+                    ForEach(report.scamAnalysis.scamTypes.prefix(2), id: \.self) { scamType in
+                        Text(scamType.displayName)
+                            .font(.caption2)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.white.opacity(0.2))
+                            .cornerRadius(8)
+                            .foregroundColor(.white)
+                    }
+                }
+            }
+
+            // Action buttons
+            HStack(spacing: 12) {
+                Button {
+                    showingReportSheet = true
+                    HapticManager.shared.impact(.medium)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "flag.fill")
+                        Text("Report")
+                    }
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.white.opacity(0.3))
+                    .cornerRadius(12)
+                }
+
+                Button {
+                    showingUnmatchConfirmation = true
+                    HapticManager.shared.impact(.medium)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "xmark.circle.fill")
+                        Text("Block")
+                    }
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.white.opacity(0.3))
+                    .cornerRadius(12)
+                }
+            }
+        }
+        .padding()
+        .background(
+            LinearGradient(
+                colors: [Color.red, Color.orange],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        )
+        .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
+    }
+
+    /// Safety score badge
+    private func safetyScoreBadge(report: ConversationSafetyReport) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: report.isSafe ? "checkmark.shield.fill" : "exclamationmark.shield.fill")
+                .font(.system(size: 10))
+                .foregroundColor(report.isSafe ? .green : (report.scamAnalysis.scamScore >= 0.8 ? .red : .orange))
+
+            Text(String(format: "%.0f%%", (1.0 - report.scamAnalysis.scamScore) * 100))
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(report.isSafe ? .green : (report.scamAnalysis.scamScore >= 0.8 ? .red : .orange))
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(
+            Capsule()
+                .fill(report.isSafe ? Color.green.opacity(0.15) : (report.scamAnalysis.scamScore >= 0.8 ? Color.red.opacity(0.15) : Color.orange.opacity(0.15)))
+        )
     }
 }
 

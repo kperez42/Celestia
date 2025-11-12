@@ -29,14 +29,14 @@ struct CelestiaApp: App {
     }
 
     private func handleDeepLink(_ url: URL) {
-        print("📱 Deep link received: \(url)")
+        Logger.shared.info("Deep link received: \(url)", category: .general)
 
         // Handle celestia://join/CEL-XXXXXXXX or https://celestia.app/join/CEL-XXXXXXXX
         if url.pathComponents.contains("join"),
            let code = url.pathComponents.last,
            code.hasPrefix("CEL-") {
             deepLinkManager.referralCode = code
-            print("✅ Extracted referral code from deep link: \(code)")
+            Logger.shared.info("Extracted referral code from deep link: \(code)", category: .referral)
         }
     }
 }
