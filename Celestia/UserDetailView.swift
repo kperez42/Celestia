@@ -12,39 +12,49 @@ struct UserDetailView: View {
     @StateObject private var viewModel = DiscoverViewModel()
     @EnvironmentObject var authService: AuthService
     @Environment(\.dismiss) var dismiss
-    
+
     @State private var showingInterestSent = false
     @State private var showingMatched = false
-    
+
+    // Filter out empty photo URLs
+    private var validPhotos: [String] {
+        let photos = user.photos.isEmpty ? [user.profileImageURL] : user.photos
+        return photos.filter { !$0.isEmpty }
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
                 // Photos carousel
                 TabView {
-                    // FIXED: Changed from photoURLs to photos
-                    ForEach(user.photos.isEmpty ? [user.profileImageURL] : user.photos, id: \.self) { photoURL in
-                        if !photoURL.isEmpty {
-                            AsyncImage(url: URL(string: photoURL)) { image in
+                    // Filter out empty photo URLs
+                    ForEach(validPhotos, id: \.self) { photoURL in
+                        AsyncImage(url: URL(string: photoURL)) { phase in
+                            switch phase {
+                            case .success(let image):
                                 image
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
-                            } placeholder: {
-                                Color.gray.opacity(0.3)
+                            case .failure:
+                                // Error state - show retry option
+                                VStack(spacing: 12) {
+                                    Image(systemName: "photo.badge.exclamationmark")
+                                        .font(.system(size: 60))
+                                        .foregroundColor(.gray)
+                                    Text("Failed to load image")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                }
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .background(Color.gray.opacity(0.2))
+                            case .empty:
+                                // Loading state
+                                ProgressView()
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    .background(Color.gray.opacity(0.2))
+                            @unknown default:
+                                Color.gray.opacity(0.2)
                             }
-                        } else {
-                            Rectangle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [Color.purple.opacity(0.6), Color.blue.opacity(0.4)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .overlay(
-                                    Image(systemName: "person.fill")
-                                        .font(.system(size: 80))
-                                        .foregroundColor(.white.opacity(0.7))
-                                )
                         }
                     }
                 }

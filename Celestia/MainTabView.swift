@@ -192,7 +192,7 @@ struct TabBarButton: View {
                     // Badge
                     if badgeCount > 0 {
                         Text("\(badgeCount)")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.system(size: 11, weight: .bold))
                             .foregroundColor(.white)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 2)
@@ -210,10 +210,10 @@ struct TabBarButton: View {
                             .scaleEffect(isSelected ? 1.1 : 1.0)
                     }
                 }
-                
+
                 // Title
                 Text(title)
-                    .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
+                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
                     .foregroundColor(isSelected ? .purple : .gray)
             }
             .frame(maxWidth: .infinity)
