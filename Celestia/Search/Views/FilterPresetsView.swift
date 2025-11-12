@@ -54,7 +54,8 @@ struct FilterPresetsView: View {
         Section {
             ForEach(presetManager.presets) { preset in
                 PresetRow(preset: preset) {
-                    onSelect(presetManager.usePreset(preset))
+                    _ = presetManager.usePreset(preset) // Track usage
+                    onSelect(preset)
                 }
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                     Button(role: .destructive) {
@@ -255,7 +256,7 @@ struct SearchHistoryView: View {
     @StateObject private var presetManager = FilterPresetManager.shared
     @Environment(\.dismiss) private var dismiss
 
-    let onSelect: (FilterPreset) -> Void
+    let onSelect: (SearchFilter) -> Void
 
     var body: some View {
         NavigationView {

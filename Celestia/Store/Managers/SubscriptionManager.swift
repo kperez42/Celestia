@@ -113,14 +113,16 @@ class SubscriptionManager: ObservableObject {
             return
         }
 
-        let status = subscription.status
-
         // Update status
-        for result in status {
-            guard case .verified(let renewalInfo) = result.renewalInfo,
-                  case .verified(let transaction) = result.transaction else {
-                continue
-            }
+        do {
+            let status = try await subscription.status
+
+            for result in status {
+                guard case .verified(let renewalInfo) = result.renewalInfo,
+                      case .verified(let transaction) = result.transaction else {
+                    continue
+                }
+
 
             // Get tier from product ID
             guard let productType = getProductType(for: transaction.productID),
@@ -144,6 +146,9 @@ class SubscriptionManager: ObservableObject {
             Logger.shared.info("Subscription status updated: \(tier.displayName), active: \(result.state == .subscribed)", category: .general)
 
             break // Only process the first (current) subscription
+            }
+        } catch {
+            Logger.shared.error("Failed to fetch subscription status: \(error.localizedDescription)", category: .general)
         }
     }
 

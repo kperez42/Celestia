@@ -238,7 +238,7 @@ class StoreManager: ObservableObject {
             // Iterate through any transactions that don't come from a direct call to `purchase()`
             for await result in Transaction.updates {
                 do {
-                    let transaction = try self.checkVerified(result)
+                    let transaction = try await self.checkVerified(result)
 
                     // Deliver content
                     await self.deliverContent(for: transaction)
@@ -250,7 +250,9 @@ class StoreManager: ObservableObject {
                     await self.updatePurchasedProducts()
 
                 } catch {
-                    Logger.shared.error("Transaction update failed: \(error.localizedDescription)", category: .general)
+                    await MainActor.run {
+                        Logger.shared.error("Transaction update failed: \(error.localizedDescription)", category: .general)
+                    }
                 }
             }
         }
