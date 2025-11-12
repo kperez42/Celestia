@@ -16,6 +16,7 @@ struct ReferralDashboardView: View {
     @State private var referralStats: ReferralStats?
     @State private var selectedTab = 0
     @State private var copiedToClipboard = false
+    @State private var animateStats = false
 
     var body: some View {
         NavigationStack {
@@ -70,6 +71,9 @@ struct ReferralDashboardView: View {
             }
             .task {
                 await loadData()
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.1)) {
+                    animateStats = true
+                }
             }
             .overlay {
                 if copiedToClipboard {
@@ -232,9 +236,16 @@ struct ReferralDashboardView: View {
 
     private func statCard(number: String, label: String, icon: String, color: Color) -> some View {
         VStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundColor(color)
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.15))
+                    .frame(width: 50, height: 50)
+                    .blur(radius: 8)
+
+                Image(systemName: icon)
+                    .font(.title2)
+                    .foregroundColor(color)
+            }
 
             Text(number)
                 .font(.title2)
@@ -250,6 +261,8 @@ struct ReferralDashboardView: View {
         .background(Color.white)
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+        .scaleEffect(animateStats ? 1 : 0.8)
+        .opacity(animateStats ? 1 : 0)
     }
 
     // MARK: - Tab Selector
@@ -325,19 +338,58 @@ struct ReferralDashboardView: View {
     }
 
     private var emptyReferralsCard: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "person.crop.circle.badge.plus")
-                .font(.system(size: 60))
-                .foregroundColor(.gray.opacity(0.3))
+        VStack(spacing: 20) {
+            ZStack {
+                Circle()
+                    .fill(Color.purple.opacity(0.1))
+                    .frame(width: 100, height: 100)
+                    .blur(radius: 20)
 
-            Text("No Referrals Yet")
-                .font(.headline)
-                .foregroundColor(.primary)
+                Image(systemName: "person.crop.circle.badge.plus")
+                    .font(.system(size: 60))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
 
-            Text("Start sharing your code to earn premium days!")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
+            VStack(spacing: 8) {
+                Text("No Referrals Yet")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+
+                Text("Start sharing your code to earn premium days!")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            Button {
+                showShareSheet = true
+                HapticManager.shared.impact(.medium)
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "square.and.arrow.up.fill")
+                    Text("Share Now")
+                        .fontWeight(.semibold)
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
+                .background(
+                    LinearGradient(
+                        colors: [.purple, .pink],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(12)
+            }
+            .scaleButton()
         }
         .frame(maxWidth: .infinity)
         .padding(40)
@@ -404,18 +456,35 @@ struct ReferralDashboardView: View {
     }
 
     private var emptyLeaderboardCard: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "trophy.fill")
-                .font(.system(size: 60))
-                .foregroundColor(.gray.opacity(0.3))
+        VStack(spacing: 20) {
+            ZStack {
+                Circle()
+                    .fill(Color.yellow.opacity(0.2))
+                    .frame(width: 100, height: 100)
+                    .blur(radius: 20)
 
-            Text("No Leaders Yet")
-                .font(.headline)
-                .foregroundColor(.primary)
+                Image(systemName: "trophy.fill")
+                    .font(.system(size: 60))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.yellow, .orange],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
 
-            Text("Be the first to refer friends!")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+            VStack(spacing: 8) {
+                Text("No Leaders Yet")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+
+                Text("Be the first to refer friends and top the leaderboard!")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(40)

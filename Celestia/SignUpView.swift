@@ -12,24 +12,26 @@ struct SignUpView: View {
     @Environment(\.dismiss) var dismiss
 
     @State private var currentStep = 1
-    
+
     // Step 1: Basic info
     @State private var email = ""
     @State private var password = ""
     @State private var confirmPassword = ""
-    
+
     // Step 2: Profile info
     @State private var name = ""
     @State private var age = ""
     @State private var gender = "Male"
     @State private var lookingFor = "Everyone"
-    
+
     // Step 3: Location
     @State private var location = ""
     @State private var country = ""
 
     // Referral code (optional)
     @State private var referralCode = ""
+    @State private var isValidatingReferral = false
+    @State private var referralCodeValid: Bool? = nil
 
     let genderOptions = ["Male", "Female", "Non-binary", "Other"]
     let lookingForOptions = ["Men", "Women", "Everyone"]
@@ -352,23 +354,62 @@ struct SignUpView: View {
                         .foregroundColor(.secondary)
                 }
 
-                TextField("CEL-XXXXXXXX", text: $referralCode)
-                    .textInputAutocapitalization(.characters)
-                    .padding()
-                    .background(Color(.systemBackground))
-                    .cornerRadius(10)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.purple.opacity(0.3), lineWidth: 1)
-                    )
+                HStack {
+                    TextField("CEL-XXXXXXXX", text: $referralCode)
+                        .textInputAutocapitalization(.characters)
+                        .onChange(of: referralCode) { oldValue, newValue in
+                            validateReferralCode(newValue)
+                        }
 
-                HStack(spacing: 4) {
-                    Image(systemName: "sparkles")
-                        .font(.caption2)
-                        .foregroundColor(.purple)
-                    Text("Get 3 days of Premium free!")
-                        .font(.caption)
-                        .foregroundColor(.purple)
+                    if isValidatingReferral {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    } else if let isValid = referralCodeValid {
+                        Image(systemName: isValid ? "checkmark.circle.fill" : "xmark.circle.fill")
+                            .foregroundColor(isValid ? .green : .red)
+                            .font(.title3)
+                    }
+                }
+                .padding()
+                .background(Color(.systemBackground))
+                .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(
+                            referralCodeValid == true ? Color.green :
+                            referralCodeValid == false ? Color.red :
+                            Color.purple.opacity(0.3),
+                            lineWidth: 2
+                        )
+                )
+
+                if referralCodeValid == true {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.caption)
+                            .foregroundColor(.green)
+                        Text("Valid code! You'll get 3 days of Premium free!")
+                            .font(.caption)
+                            .foregroundColor(.green)
+                    }
+                } else if referralCodeValid == false {
+                    HStack(spacing: 6) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                        Text("Invalid referral code")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
+                } else if referralCode.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "sparkles")
+                            .font(.caption2)
+                            .foregroundColor(.purple)
+                        Text("Get 3 days of Premium free with a code!")
+                            .font(.caption)
+                            .foregroundColor(.purple)
+                    }
                 }
             }
             .padding(.top, 8)
@@ -440,6 +481,37 @@ struct SignUpView: View {
                     print("Error creating account: \(error)")
                     // Error is handled by AuthService setting errorMessage
                 }
+            }
+        }
+    }
+
+    // MARK: - Referral Code Validation
+
+    func validateReferralCode(_ code: String) {
+        let trimmedCode = code.trimmingCharacters(in: .whitespaces).uppercased()
+
+        // Reset validation if code is empty
+        guard !trimmedCode.isEmpty else {
+            referralCodeValid = nil
+            return
+        }
+
+        // Don't validate if code is too short
+        guard trimmedCode.count >= 8 else {
+            referralCodeValid = nil
+            return
+        }
+
+        isValidatingReferral = true
+        referralCodeValid = nil
+
+        Task {
+            let isValid = await ReferralManager.shared.validateReferralCode(trimmedCode)
+
+            await MainActor.run {
+                isValidatingReferral = false
+                referralCodeValid = isValid
+                HapticManager.shared.notification(isValid ? .success : .error)
             }
         }
     }
