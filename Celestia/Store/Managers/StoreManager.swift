@@ -356,6 +356,72 @@ class StoreManager: ObservableObject {
         Logger.shared.warning("Promo code redemption not available on simulator", category: .general)
         #endif
     }
+
+    /// Get product for a premium plan
+    func getProduct(for plan: PremiumPlan) -> Product? {
+        let productID = plan.productIdentifier
+        return products.first { $0.id == productID }
+    }
+
+    /// Check if user has active subscription
+    var hasActiveSubscription: Bool {
+        return SubscriptionManager.shared.subscriptionStatus.isActive
+    }
+}
+
+// MARK: - PurchaseError
+
+enum PurchaseError: LocalizedError {
+    case productNotFound
+    case purchaseFailed
+    case verificationFailed
+    case userCancelled
+
+    var errorDescription: String? {
+        switch self {
+        case .productNotFound:
+            return "Product not found"
+        case .purchaseFailed:
+            return "Purchase failed"
+        case .verificationFailed:
+            return "Purchase verification failed"
+        case .userCancelled:
+            return "Purchase cancelled"
+        }
+    }
+}
+
+// MARK: - PremiumPlan
+
+enum PremiumPlan: String, CaseIterable {
+    case monthly = "monthly"
+    case annual = "annual"
+    case lifetime = "lifetime"
+
+    var productIdentifier: String {
+        switch self {
+        case .monthly:
+            return ProductIdentifiers.subscriptionPlusMonthly
+        case .annual:
+            return ProductIdentifiers.subscriptionPlusYearly
+        case .lifetime:
+            return ProductIdentifiers.consumableLifetimePremium
+        }
+    }
+
+    var expiryDate: Date? {
+        let calendar = Calendar.current
+        let now = Date()
+
+        switch self {
+        case .monthly:
+            return calendar.date(byAdding: .month, value: 1, to: now)
+        case .annual:
+            return calendar.date(byAdding: .year, value: 1, to: now)
+        case .lifetime:
+            return nil // No expiry for lifetime
+        }
+    }
 }
 
 // MARK: - Product Extensions

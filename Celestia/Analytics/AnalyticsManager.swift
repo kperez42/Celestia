@@ -337,7 +337,9 @@ class AnalyticsManager: ObservableObject, AnalyticsManagerProtocol {
 
     private func setupPeriodicFlush() {
         Timer.scheduledTimer(withTimeInterval: flushInterval, repeats: true) { [weak self] _ in
-            self?.flushEvents()
+            Task { @MainActor in
+                self?.flushEvents()
+            }
         }
     }
 

@@ -96,7 +96,8 @@ class FeatureFlagManager: ObservableObject {
             return override
         }
 
-        return remoteConfig.configValue(forKey: flag.key).stringValue ?? flag.defaultValue as? String ?? ""
+        let value = remoteConfig.configValue(forKey: flag.key).stringValue
+        return value ?? (flag.defaultValue as? String ?? "")
     }
 
     /// Get integer value for a feature flag

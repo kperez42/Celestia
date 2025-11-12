@@ -8,14 +8,15 @@
 import SwiftUI
 
 struct NotificationSettingsView: View {
-    @StateObject private var notificationService = NotificationService.shared
+    @StateObject private var preferences = NotificationPreferences.shared
+    @StateObject private var pushManager = PushNotificationManager.shared
     @Environment(\.dismiss) var dismiss
 
     var body: some View {
         List {
             // Permission status
             Section {
-                if notificationService.hasNotificationPermission {
+                if pushManager.hasNotificationPermission {
                     HStack {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundColor(.green)
@@ -37,7 +38,7 @@ struct NotificationSettingsView: View {
 
                         Button {
                             Task {
-                                await notificationService.requestPermission()
+                                await pushManager.requestPermission()
                             }
                         } label: {
                             Text("Enable Notifications")
@@ -66,35 +67,35 @@ struct NotificationSettingsView: View {
                     icon: "heart.circle.fill",
                     title: "New Matches",
                     description: "When you match with someone",
-                    isOn: $notificationService.preferences.newMatches
+                    isOn: $preferences.newMatches
                 )
 
                 NotificationToggle(
                     icon: "message.circle.fill",
                     title: "Messages",
                     description: "When you receive a new message",
-                    isOn: $notificationService.preferences.messages
+                    isOn: $preferences.messages
                 )
 
                 NotificationToggle(
                     icon: "eye.circle.fill",
                     title: "Profile Views",
                     description: "When someone views your profile",
-                    isOn: $notificationService.preferences.profileViews
+                    isOn: $preferences.profileViews
                 )
 
                 NotificationToggle(
                     icon: "star.circle.fill",
                     title: "Likes",
                     description: "When someone likes your profile",
-                    isOn: $notificationService.preferences.likes
+                    isOn: $preferences.likes
                 )
 
                 NotificationToggle(
                     icon: "sparkles",
                     title: "Secret Admirer",
                     description: "Mystery likes and special alerts",
-                    isOn: $notificationService.preferences.secretAdmirer
+                    isOn: $preferences.secretAdmirer
                 )
             }
 
@@ -104,20 +105,20 @@ struct NotificationSettingsView: View {
                     icon: "calendar.circle.fill",
                     title: "Weekly Digest",
                     description: "Your week in review (Sundays at 6 PM)",
-                    isOn: $notificationService.preferences.weeklyDigest
+                    isOn: $preferences.weeklyDigest
                 )
 
                 NotificationToggle(
                     icon: "bell.circle.fill",
                     title: "Activity Reminders",
                     description: "Gentle nudges to stay active",
-                    isOn: $notificationService.preferences.activityReminders
+                    isOn: $preferences.activityReminders
                 )
             }
 
             // Sound & Badge
             Section("Preferences") {
-                Toggle(isOn: $notificationService.preferences.sound) {
+                Toggle(isOn: $preferences.sound) {
                     HStack {
                         Image(systemName: "speaker.wave.2.fill")
                             .foregroundStyle(
@@ -137,7 +138,7 @@ struct NotificationSettingsView: View {
                     }
                 }
 
-                Toggle(isOn: $notificationService.preferences.badge) {
+                Toggle(isOn: $preferences.badge) {
                     HStack {
                         Image(systemName: "app.badge.fill")
                             .foregroundStyle(
@@ -160,7 +161,7 @@ struct NotificationSettingsView: View {
 
             // Quiet Hours
             Section {
-                Toggle(isOn: $notificationService.preferences.quietHoursEnabled) {
+                Toggle(isOn: $preferences.quietHoursEnabled) {
                     HStack {
                         Image(systemName: "moon.fill")
                             .foregroundStyle(
@@ -180,23 +181,23 @@ struct NotificationSettingsView: View {
                     }
                 }
 
-                if notificationService.preferences.quietHoursEnabled {
+                if preferences.quietHoursEnabled {
                     DatePicker(
                         "Start Time",
-                        selection: $notificationService.preferences.quietHoursStart,
+                        selection: $preferences.quietHoursStart,
                         displayedComponents: .hourAndMinute
                     )
 
                     DatePicker(
                         "End Time",
-                        selection: $notificationService.preferences.quietHoursEnd,
+                        selection: $preferences.quietHoursEnd,
                         displayedComponents: .hourAndMinute
                     )
                 }
             } header: {
                 Text("Quiet Hours")
             } footer: {
-                if notificationService.preferences.quietHoursEnabled {
+                if preferences.quietHoursEnabled {
                     Text("Notifications will be paused during these hours")
                 }
             }
@@ -223,10 +224,10 @@ struct NotificationSettingsView: View {
         .navigationTitle("Notifications")
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: notificationService.preferences) { _ in
-            notificationService.savePreferences()
+            preferences.save()
         }
         .task {
-            await notificationService.checkPermissionStatus()
+            await pushManager.checkPermissionStatus()
         }
     }
 }
@@ -272,14 +273,14 @@ struct NotificationHistoryView: View {
 
     var body: some View {
         List {
-            if notificationService.notificationHistory.isEmpty {
+            if pushManager.notificationHistory.isEmpty {
                 ContentUnavailableView {
                     Label("No Notifications", systemImage: "bell.slash")
                 } description: {
                     Text("Your notification history will appear here")
                 }
             } else {
-                ForEach(notificationService.notificationHistory, id: \.timestamp) { notification in
+                ForEach(pushManager.notificationHistory, id: \.timestamp) { notification in
                     NotificationHistoryRow(notification: notification)
                 }
             }
