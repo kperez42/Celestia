@@ -223,9 +223,6 @@ struct NotificationSettingsView: View {
         }
         .navigationTitle("Notifications")
         .navigationBarTitleDisplayMode(.inline)
-        .onChange(of: notificationService.preferences) { _ in
-            preferences.save()
-        }
         .task {
             await pushManager.checkPermissionStatus()
         }
@@ -273,14 +270,14 @@ struct NotificationHistoryView: View {
 
     var body: some View {
         List {
-            if pushManager.notificationHistory.isEmpty {
+            if notificationService.notificationHistory.isEmpty {
                 ContentUnavailableView {
                     Label("No Notifications", systemImage: "bell.slash")
                 } description: {
                     Text("Your notification history will appear here")
                 }
             } else {
-                ForEach(pushManager.notificationHistory, id: \.timestamp) { notification in
+                ForEach(notificationService.notificationHistory, id: \.timestamp) { notification in
                     NotificationHistoryRow(notification: notification)
                 }
             }
