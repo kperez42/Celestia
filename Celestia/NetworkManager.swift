@@ -305,8 +305,7 @@ class NetworkManager: NetworkManagerProtocol {
 
         Logger.shared.network(
             "Request error: \(networkError.errorDescription ?? "Unknown error")",
-            level: .error,
-            error: error
+            level: .error
         )
 
         // Check if we should retry

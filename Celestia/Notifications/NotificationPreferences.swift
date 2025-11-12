@@ -78,6 +78,53 @@ class NotificationPreferences: ObservableObject {
         didSet { save() }
     }
 
+    // MARK: - Convenience Aliases for SwiftUI Bindings
+
+    var newMatches: Bool {
+        get { newMatchesEnabled }
+        set { newMatchesEnabled = newValue }
+    }
+
+    var messages: Bool {
+        get { newMessagesEnabled }
+        set { newMessagesEnabled = newValue }
+    }
+
+    var profileViews: Bool {
+        get { profileViewsEnabled }
+        set { profileViewsEnabled = newValue }
+    }
+
+    var likes: Bool {
+        get { superLikesEnabled }
+        set { superLikesEnabled = newValue }
+    }
+
+    var secretAdmirer: Bool {
+        get { superLikesEnabled }
+        set { superLikesEnabled = newValue }
+    }
+
+    var weeklyDigest: Bool {
+        get { generalUpdatesEnabled }
+        set { generalUpdatesEnabled = newValue }
+    }
+
+    var activityReminders: Bool {
+        get { matchRemindersEnabled }
+        set { matchRemindersEnabled = newValue }
+    }
+
+    var sound: Bool {
+        get { soundEnabled }
+        set { soundEnabled = newValue }
+    }
+
+    var badge: Bool {
+        get { true } // Always enabled, not configurable
+        set { }
+    }
+
     // MARK: - Private Properties
 
     private let defaults = UserDefaults.standard

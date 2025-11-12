@@ -207,6 +207,14 @@ class AnalyticsManager: ObservableObject, AnalyticsManagerProtocol {
         ])
     }
 
+    /// Track match between two users
+    func trackMatch(user1Id: String, user2Id: String) async throws {
+        logEvent(.match, parameters: [
+            "user1_id": user1Id,
+            "user2_id": user2Id
+        ])
+    }
+
     /// Track message sent
     func trackMessageSent(matchId: String, messageLength: Int, hasMedia: Bool) {
         logEvent(.messageSent, parameters: [
@@ -221,6 +229,34 @@ class AnalyticsManager: ObservableObject, AnalyticsManagerProtocol {
         logEvent(.swipe, parameters: [
             "action": action.rawValue,
             "user_id": userId
+        ])
+    }
+
+    /// Track swipe with direction
+    func trackSwipe(swipedUserId: String, swiperUserId: String, direction: AnalyticsSwipeDirection) async throws {
+        let action: AnalyticsSwipeAction
+        switch direction {
+        case .right:
+            action = .like
+        case .left:
+            action = .dislike
+        case .up:
+            action = .superLike
+        }
+
+        logEvent(.swipe, parameters: [
+            "action": action.rawValue,
+            "swiped_user_id": swipedUserId,
+            "swiper_user_id": swiperUserId,
+            "direction": direction.rawValue
+        ])
+    }
+
+    /// Track profile view
+    func trackProfileView(viewedUserId: String, viewerUserId: String) async throws {
+        logEvent(.profileViewed, parameters: [
+            "viewed_user_id": viewedUserId,
+            "viewer_user_id": viewerUserId
         ])
     }
 
@@ -263,6 +299,34 @@ class AnalyticsManager: ObservableObject, AnalyticsManagerProtocol {
         ])
     }
 
+    // MARK: - Profile Insights
+
+    /// Fetch profile insights for a user
+    func fetchProfileInsights(for userId: String) async throws -> ProfileInsights {
+        // This is a placeholder implementation
+        // In a real app, this would fetch analytics data from Firebase Analytics
+        // or a custom analytics backend
+
+        var insights = ProfileInsights()
+
+        // For now, return default/mock data
+        // TODO: Implement actual analytics data fetching from Firebase
+        insights.profileViews = Int.random(in: 50...200)
+        insights.viewsThisWeek = Int.random(in: 10...50)
+        insights.viewsLastWeek = Int.random(in: 10...50)
+        insights.swipesReceived = Int.random(in: 30...150)
+        insights.likesReceived = Int.random(in: 15...100)
+        insights.likeRate = Double(insights.likesReceived) / Double(max(insights.swipesReceived, 1))
+        insights.matchCount = Int.random(in: 5...30)
+        insights.matchRate = Double(insights.matchCount) / Double(max(insights.likesReceived, 1))
+        insights.profileScore = Int.random(in: 60...95)
+        insights.lastActiveDate = Date()
+
+        Logger.shared.debug("Fetched profile insights for user: \(userId)", category: .analytics)
+
+        return insights
+    }
+
     // MARK: - Private Methods
 
     private func queueEvent(_ event: AnalyticsEvent, parameters: [String: Any]) {
@@ -281,7 +345,9 @@ class AnalyticsManager: ObservableObject, AnalyticsManagerProtocol {
 
     private func setupPeriodicFlush() {
         Timer.scheduledTimer(withTimeInterval: flushInterval, repeats: true) { [weak self] _ in
-            self?.flushEvents()
+            Task { @MainActor in
+                self?.flushEvents()
+            }
         }
     }
 
@@ -353,6 +419,12 @@ enum AnalyticsEvent {
     case subscriptionManaged
     case consumablePurchased
     case consumableUsed
+    case purchaseInitiated
+    case purchaseCompleted
+    case purchaseCancelled
+    case purchaseFailed
+    case purchasesRestored
+    case promoCodeRedeemed
 
     // Social
     case profileShared
@@ -440,6 +512,12 @@ enum AnalyticsEvent {
         case .subscriptionManaged: return "subscription_managed"
         case .consumablePurchased: return "consumable_purchased"
         case .consumableUsed: return "consumable_used"
+        case .purchaseInitiated: return "purchase_initiated"
+        case .purchaseCompleted: return "purchase_completed"
+        case .purchaseCancelled: return "purchase_cancelled"
+        case .purchaseFailed: return "purchase_failed"
+        case .purchasesRestored: return "purchases_restored"
+        case .promoCodeRedeemed: return "promo_code_redeemed"
         case .profileShared: return "share"
         case .referralSent: return "referral_sent"
         case .referralCompleted: return "referral_completed"
@@ -498,6 +576,14 @@ enum AnalyticsSwipeAction: String {
     case like = "like"
     case dislike = "dislike"
     case superLike = "super_like"
+}
+
+// MARK: - Analytics Swipe Direction
+
+enum AnalyticsSwipeDirection: String {
+    case left = "left"
+    case right = "right"
+    case up = "up"
 }
 
 // MARK: - Supporting Types

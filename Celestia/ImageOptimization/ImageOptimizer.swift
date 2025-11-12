@@ -74,7 +74,7 @@ class ImageOptimizer {
     /// Compress image to target file size (in bytes)
     func compress(_ image: UIImage, targetSize: Int, tolerance: Int = 50_000) -> Data? {
         var compression: CGFloat = 1.0
-        var data = image.jpegData(compressionQuality: compression)
+        let data = image.jpegData(compressionQuality: compression)
 
         guard var imageData = data else { return nil }
 

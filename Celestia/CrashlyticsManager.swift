@@ -210,6 +210,32 @@ class CrashlyticsManager {
 
     // MARK: - Network Monitoring
 
+    /// Convert string HTTP method to Firebase HTTPMethod enum
+    private func httpMethodFromString(_ method: String) -> HTTPMethod {
+        switch method.uppercased() {
+        case "GET":
+            return .get
+        case "POST":
+            return .post
+        case "PUT":
+            return .put
+        case "DELETE":
+            return .delete
+        case "HEAD":
+            return .head
+        case "PATCH":
+            return .patch
+        case "OPTIONS":
+            return .options
+        case "TRACE":
+            return .trace
+        case "CONNECT":
+            return .connect
+        default:
+            return .get
+        }
+    }
+
     /// Track a network request
     func trackNetworkRequest(
         url: URL,
@@ -220,11 +246,12 @@ class CrashlyticsManager {
         requestSize: Int64 = 0,
         responseSize: Int64 = 0
     ) {
-        let metric = HTTPMetric(url: url, httpMethod: HTTPMethod(rawValue: httpMethod) ?? .get)
+        let method = httpMethodFromString(httpMethod)
+        let metric = HTTPMetric(url: url, httpMethod: method)
 
         metric?.responseCode = responseCode
-        metric?.requestPayloadSize = requestSize
-        metric?.responsePayloadSize = responseSize
+        metric?.requestPayloadSize = Int(requestSize)
+        metric?.responsePayloadSize = Int(responseSize)
 
         Logger.shared.debug(
             "Network request tracked: \(httpMethod) \(url.path) - \(responseCode)",

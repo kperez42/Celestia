@@ -179,7 +179,7 @@ class ImageUploadService {
             } catch {
                 // If upload fails, delete already uploaded images
                 for uploadedURL in uploadedURLs {
-                    try? await deleteImage(urlString: uploadedURL)
+                    try? await deleteImage(url: uploadedURL)
                 }
                 throw error
             }

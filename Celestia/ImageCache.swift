@@ -263,7 +263,7 @@ struct SimpleCachedAsyncImage<Content: View, Placeholder: View>: View {
 }
 
 // Convenience initializer with default placeholder
-extension CachedAsyncImage where Placeholder == Color {
+extension SimpleCachedAsyncImage where Placeholder == Color {
     init(
         url: URL?,
         @ViewBuilder content: @escaping (Image) -> Content

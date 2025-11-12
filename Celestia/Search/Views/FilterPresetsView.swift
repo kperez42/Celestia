@@ -54,7 +54,8 @@ struct FilterPresetsView: View {
         Section {
             ForEach(presetManager.presets) { preset in
                 PresetRow(preset: preset) {
-                    onSelect(presetManager.usePreset(preset))
+                    _ = presetManager.usePreset(preset) // Track usage
+                    onSelect(preset)
                 }
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                     Button(role: .destructive) {

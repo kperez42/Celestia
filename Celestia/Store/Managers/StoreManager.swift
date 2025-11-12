@@ -238,7 +238,7 @@ class StoreManager: ObservableObject {
             // Iterate through any transactions that don't come from a direct call to `purchase()`
             for await result in Transaction.updates {
                 do {
-                    let transaction = try self.checkVerified(result)
+                    let transaction = try await self.checkVerified(result)
 
                     // Deliver content
                     await self.deliverContent(for: transaction)
@@ -250,7 +250,9 @@ class StoreManager: ObservableObject {
                     await self.updatePurchasedProducts()
 
                 } catch {
-                    Logger.shared.error("Transaction update failed: \(error.localizedDescription)", category: .general)
+                    await MainActor.run {
+                        Logger.shared.error("Transaction update failed: \(error.localizedDescription)", category: .general)
+                    }
                 }
             }
         }
@@ -343,18 +345,49 @@ class StoreManager: ObservableObject {
     /// Present promo code redemption sheet
     func presentPromoCodeRedemption() async {
         #if !targetEnvironment(simulator)
-        do {
-            try await AppStore.presentCodeRedemptionSheet()
+        // Use StoreKit 1 API for code redemption
+        await MainActor.run {
+            SKPaymentQueue.default().presentCodeRedemptionSheet()
 
             // Track analytics
             AnalyticsManager.shared.logEvent(.promoCodeRedeemed, parameters: [:])
-
-        } catch {
-            Logger.shared.error("Failed to present promo code sheet: \(error.localizedDescription)", category: .general)
         }
         #else
         Logger.shared.warning("Promo code redemption not available on simulator", category: .general)
         #endif
+    }
+
+    /// Get product for a premium plan
+    func getProduct(for plan: PremiumPlan) -> Product? {
+        let productID = plan.productID
+        return products.first { $0.id == productID }
+    }
+
+    /// Check if user has active subscription
+    var hasActiveSubscription: Bool {
+        return SubscriptionManager.shared.subscriptionStatus.isActive
+    }
+}
+
+// MARK: - PurchaseError
+
+enum PurchaseError: LocalizedError {
+    case productNotFound
+    case purchaseFailed
+    case verificationFailed
+    case userCancelled
+
+    var errorDescription: String? {
+        switch self {
+        case .productNotFound:
+            return "Product not found"
+        case .purchaseFailed:
+            return "Purchase failed"
+        case .verificationFailed:
+            return "Purchase verification failed"
+        case .userCancelled:
+            return "Purchase cancelled"
+        }
     }
 }
 

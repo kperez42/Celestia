@@ -226,7 +226,7 @@ struct ProfileCard: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 if let height = profile.heightFormatted {
-                    SearchSearchTagView(text: height, icon: "ruler")
+                    SearchTagView(text: height, icon: "ruler")
                 }
 
                 if let education = profile.education {

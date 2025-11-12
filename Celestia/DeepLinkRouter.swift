@@ -321,19 +321,20 @@ class DeepLinkRouter: ObservableObject {
 
         CrashlyticsManager.shared.logEvent("email_verification_link_opened")
 
+        // TODO: Implement email verification with token
+        // The AuthServiceProtocol needs a verifyEmail(withToken:) method
+        // For now, just reload the user to check verification status
         do {
-            // Verify the email using the token
-            // This would typically make an API call to your backend
-            try await DependencyContainer.shared.authService.verifyEmail(withToken: token)
+            try await DependencyContainer.shared.authService.reloadUser()
 
-            logger.info("Email verified successfully", category: .general)
+            logger.info("Email verification checked successfully", category: .general)
             CrashlyticsManager.shared.logEvent("email_verification_success")
 
             // Show success message to user
             // You can use a toast/alert system here
 
         } catch {
-            logger.error("Email verification failed", category: .general, error: error)
+            logger.error("Email verification check failed", category: .general, error: error)
             CrashlyticsManager.shared.recordError(error, userInfo: [
                 "action": "email_verification",
                 "token": token

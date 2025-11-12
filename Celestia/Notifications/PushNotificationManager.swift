@@ -27,6 +27,12 @@ class PushNotificationManager: NSObject, ObservableObject {
     @Published var apnsToken: String?
     @Published private(set) var badgeCount: Int = 0
 
+    // MARK: - Computed Properties
+
+    var hasNotificationPermission: Bool {
+        return authorizationStatus == .authorized || authorizationStatus == .provisional
+    }
+
     // MARK: - Properties
 
     private let preferences = NotificationPreferences.shared
@@ -80,6 +86,16 @@ class PushNotificationManager: NSObject, ObservableObject {
             Logger.shared.error("Failed to request notification authorization", category: .general, error: error)
             return false
         }
+    }
+
+    /// Request permission (alias for requestAuthorization)
+    func requestPermission() async -> Bool {
+        return await requestAuthorization()
+    }
+
+    /// Check current permission status
+    func checkPermissionStatus() async {
+        await updateAuthorizationStatus()
     }
 
     /// Register for remote notifications

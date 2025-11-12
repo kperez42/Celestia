@@ -113,14 +113,16 @@ class SubscriptionManager: ObservableObject {
             return
         }
 
-        let status = subscription.status
-
         // Update status
-        for await result in status {
-            guard case .verified(let renewalInfo) = result.renewalInfo,
-                  case .verified(let transaction) = result.transaction else {
-                continue
-            }
+        do {
+            let status = try await subscription.status
+
+            for result in status {
+                guard case .verified(let renewalInfo) = result.renewalInfo,
+                      case .verified(let transaction) = result.transaction else {
+                    continue
+                }
+
 
             // Get tier from product ID
             guard let productType = getProductType(for: transaction.productID),
@@ -144,6 +146,9 @@ class SubscriptionManager: ObservableObject {
             Logger.shared.info("Subscription status updated: \(tier.displayName), active: \(result.state == .subscribed)", category: .general)
 
             break // Only process the first (current) subscription
+            }
+        } catch {
+            Logger.shared.error("Failed to fetch subscription status: \(error.localizedDescription)", category: .general)
         }
     }
 
@@ -336,7 +341,12 @@ class SubscriptionManager: ObservableObject {
     func manageSubscription() async {
         #if !targetEnvironment(simulator)
         do {
-            try await AppStore.showManageSubscriptions(in: UIApplication.shared.connectedScenes.first as? UIWindowScene)
+            guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene else {
+                Logger.shared.error("No window scene available", category: .general)
+                return
+            }
+
+            try await AppStore.showManageSubscriptions(in: windowScene)
 
             // Track analytics
             AnalyticsManager.shared.logEvent(.subscriptionManaged, parameters: [:])
@@ -371,7 +381,7 @@ class SubscriptionManager: ObservableObject {
                 "isPremium": true,
                 "premiumTier": tier.rawValue,
                 "subscriptionTier": tier.displayName,
-                "subscriptionPeriod": subscriptionStatus.period.rawValue,
+                "subscriptionPeriod": subscriptionStatus.period?.rawValue ?? "unknown",
                 "subscriptionExpiryDate": Timestamp(date: expirationDate),
                 "lastPurchaseDate": Timestamp(date: transaction.purchaseDate),
                 "originalTransactionId": transaction.originalID,

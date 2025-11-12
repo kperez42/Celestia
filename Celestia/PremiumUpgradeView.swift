@@ -647,18 +647,18 @@ struct PremiumUpgradeView: View {
                 guard let product = storeManager.getProduct(for: selectedPlan) else {
                     throw PurchaseError.productNotFound
                 }
-                
-                let success = try await storeManager.purchase(product)
-                
-                if success {
+
+                let result = try await storeManager.purchase(product)
+
+                if result.isSuccess {
                     // Update Firestore
                     if var user = authService.currentUser {
                         user.isPremium = true
                         user.premiumTier = selectedPlan.rawValue
-                        user.subscriptionExpiryDate = selectedPlan.expiryDate
+                        user.subscriptionExpiryDate = nil // Use SubscriptionManager for expiry tracking
                         try await authService.updateUser(user)
                     }
-                    
+
                     await MainActor.run {
                         isProcessing = false
                         showPurchaseSuccess = true
