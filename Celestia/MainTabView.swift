@@ -17,7 +17,8 @@ struct MainTabView: View {
     @State private var showTabAnimation = false
     @State private var unreadCount = 0
     @State private var newMatchesCount = 0
-    
+    @State private var badgeUpdateTimer: Timer?
+
     var body: some View {
         ZStack(alignment: .bottom) {
             // Main content
@@ -83,6 +84,11 @@ struct MainTabView: View {
         }
         .task {
             await loadBadgeCounts()
+        }
+        .onDisappear {
+            // Invalidate timer to prevent memory leak
+            badgeUpdateTimer?.invalidate()
+            badgeUpdateTimer = nil
         }
     }
     
@@ -166,10 +172,10 @@ struct MainTabView: View {
     
     private func loadBadgeCounts() async {
         guard let userId = authService.currentUser?.id else { return }
-        
+
         // Load unread messages count
         unreadCount = await messageService.getUnreadMessageCount(userId: userId)
-        
+
         // Load new matches count
         do {
             try await matchService.fetchMatches(userId: userId)
@@ -177,9 +183,12 @@ struct MainTabView: View {
         } catch {
             print("Error loading badge counts: \(error)")
         }
-        
-        // Update periodically
-        Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { _ in
+
+        // Invalidate existing timer to prevent leaks
+        badgeUpdateTimer?.invalidate()
+
+        // Update periodically - store timer reference for proper cleanup
+        badgeUpdateTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { _ in
             Task {
                 unreadCount = await messageService.getUnreadMessageCount(userId: userId)
                 do {
