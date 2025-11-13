@@ -436,10 +436,15 @@ class SyncEngine {
 
         let photoData = try JSONDecoder().decode(PhotoData.self, from: operation.data)
 
+        // Convert Data to UIImage
+        guard let image = UIImage(data: photoData.imageData) else {
+            throw OfflineManagerError.invalidData("Failed to convert data to image")
+        }
+
         // Upload photo via ImageUploadService
         let imageURL = try await ImageUploadService.shared.uploadImage(
-            imageData: photoData.imageData,
-            userId: photoData.userId
+            image,
+            path: "profile_photos/\(photoData.userId)/\(UUID().uuidString).jpg"
         )
 
         Logger.shared.info("Successfully synced photo upload: \(imageURL)", category: .storage)
@@ -498,12 +503,17 @@ class SyncEngine {
 
         let reportData = try JSONDecoder().decode(ReportData.self, from: operation.data)
 
+        // Convert string reason to enum
+        guard let reportReason = ReportReason(rawValue: reportData.reason) else {
+            throw OfflineManagerError.invalidData("Invalid report reason: \(reportData.reason)")
+        }
+
         // Execute report via BlockReportService
         try await BlockReportService.shared.reportUser(
-            reporterId: reportData.reporterId,
-            reportedUserId: reportData.reportedUserId,
-            reason: reportData.reason,
-            details: reportData.details
+            userId: reportData.reportedUserId,
+            currentUserId: reportData.reporterId,
+            reason: reportReason,
+            additionalDetails: reportData.details
         )
 
         Logger.shared.info("Successfully synced user report", category: .moderation)
@@ -522,8 +532,8 @@ class SyncEngine {
 
         // Execute block via BlockReportService
         try await BlockReportService.shared.blockUser(
-            blockerId: blockData.blockerId,
-            blockedUserId: blockData.blockedUserId
+            userId: blockData.blockedUserId,
+            currentUserId: blockData.blockerId
         )
 
         Logger.shared.info("Successfully synced user block", category: .moderation)
