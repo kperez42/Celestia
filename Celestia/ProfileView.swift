@@ -113,12 +113,15 @@ struct ProfileView: View {
             .navigationBarHidden(true)
             .sheet(isPresented: $showingEditProfile) {
                 EditProfileView()
+                    .environmentObject(authService)
             }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
+                    .environmentObject(authService)
             }
             .fullScreenCover(isPresented: $showingPremiumUpgrade) {
                 PremiumUpgradeView()
+                    .environmentObject(authService)
             }
             .fullScreenCover(isPresented: $showingPhotoViewer) {
                 if let user = authService.currentUser {
@@ -135,6 +138,7 @@ struct ProfileView: View {
             }
             .sheet(isPresented: $showingInsights) {
                 ProfileInsightsView()
+                    .environmentObject(authService)
             }
             .confirmationDialog("Are you sure you want to sign out?", isPresented: $showingLogoutConfirmation, titleVisibility: .visible) {
                 Button("Sign Out", role: .destructive) {
