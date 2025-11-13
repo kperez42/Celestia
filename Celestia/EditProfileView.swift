@@ -35,15 +35,30 @@ struct EditProfileView: View {
     @State private var showLanguagePicker = false
     @State private var showInterestPicker = false
     @State private var showPromptsEditor = false
-
-    // Photo gallery management
-    @State private var photos: [String] = []
+    @State private var photos: [String]
     @State private var selectedPhotoItems: [PhotosPickerItem] = []
     @State private var isUploadingPhotos = false
     @State private var uploadProgress: Double = 0.0
-    
+
+    // Advanced profile fields
+    @State private var height: Int?
+    @State private var religion: String?
+    @State private var relationshipGoal: String?
+    @State private var smoking: String?
+    @State private var drinking: String?
+    @State private var pets: String?
+    @State private var exercise: String?
+    @State private var diet: String?
+
     let genderOptions = ["Male", "Female", "Non-binary", "Other"]
     let lookingForOptions = ["Men", "Women", "Everyone"]
+    let religionOptions = ["Prefer not to say", "Agnostic", "Atheist", "Buddhist", "Catholic", "Christian", "Hindu", "Jewish", "Muslim", "Spiritual", "Other"]
+    let relationshipGoalOptions = ["Prefer not to say", "Casual dating", "Relationship", "Long-term partner", "Marriage", "Open to anything"]
+    let smokingOptions = ["Prefer not to say", "Non-smoker", "Social smoker", "Regular smoker", "Trying to quit"]
+    let drinkingOptions = ["Prefer not to say", "Non-drinker", "Social drinker", "Regular drinker"]
+    let petsOptions = ["Prefer not to say", "No pets", "Dog", "Cat", "Dog & Cat", "Other pets"]
+    let exerciseOptions = ["Prefer not to say", "Never", "Sometimes", "Often", "Daily"]
+    let dietOptions = ["Prefer not to say", "Anything", "Vegetarian", "Vegan", "Pescatarian", "Halal", "Kosher", "Other"]
     let predefinedLanguages = [
         "English", "Spanish", "French", "German", "Italian", "Portuguese",
         "Russian", "Chinese", "Japanese", "Korean", "Arabic", "Hindi"
@@ -67,6 +82,16 @@ struct EditProfileView: View {
         _interests = State(initialValue: user?.interests ?? [])
         _prompts = State(initialValue: user?.prompts ?? [])
         _photos = State(initialValue: user?.photos ?? [])
+
+        // Initialize advanced profile fields
+        _height = State(initialValue: user?.height)
+        _religion = State(initialValue: user?.religion)
+        _relationshipGoal = State(initialValue: user?.relationshipGoal)
+        _smoking = State(initialValue: user?.smoking)
+        _drinking = State(initialValue: user?.drinking)
+        _pets = State(initialValue: user?.pets)
+        _exercise = State(initialValue: user?.exercise)
+        _diet = State(initialValue: user?.diet)
     }
     
     var body: some View {
@@ -85,7 +110,7 @@ struct EditProfileView: View {
 
                         // Progress Indicator
                         profileCompletionProgress
-                        
+
                         // Basic Info Card
                         basicInfoSection
                         
@@ -94,7 +119,10 @@ struct EditProfileView: View {
                         
                         // Preferences Card
                         preferencesSection
-                        
+
+                        // Lifestyle & More Section
+                        lifestyleSection
+
                         // Languages Card
                         languagesSection
                         
@@ -278,117 +306,79 @@ struct EditProfileView: View {
     // MARK: - Photo Gallery Section
 
     private var photoGallerySection: some View {
-        VStack(spacing: 15) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack {
-                SectionHeader(icon: "photo.on.rectangle.angled", title: "Photo Gallery", color: .blue)
-
-                Spacer()
-
-                Text("\(photos.count)/6")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-
-            if isUploadingPhotos {
-                VStack(spacing: 12) {
-                    ProgressView(value: uploadProgress, total: 1.0)
-                        .progressViewStyle(.linear)
-                        .tint(.purple)
-
-                    Text("Uploading photos... \(Int(uploadProgress * 100))%")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Photo Gallery")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                    Text("Add up to 6 photos")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                .padding()
-            }
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    // Existing photos
-                    ForEach(Array(photos.enumerated()), id: \.offset) { index, photoURL in
-                        ZStack(alignment: .topTrailing) {
-                            AsyncImage(url: URL(string: photoURL)) { phase in
-                                switch phase {
-                                case .success(let image):
-                                    image
-                                        .resizable()
-                                        .scaledToFill()
-                                case .failure:
-                                    Color.gray.opacity(0.3)
-                                        .overlay {
-                                            Image(systemName: "photo")
-                                                .foregroundColor(.gray)
-                                        }
-                                case .empty:
-                                    ProgressView()
-                                @unknown default:
-                                    Color.gray.opacity(0.3)
-                                }
-                            }
-                            .frame(width: 120, height: 160)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                Spacer()
 
-                            // Delete button
-                            Button {
-                                deletePhoto(at: index)
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.title3)
-                                    .foregroundColor(.white)
-                                    .background(Circle().fill(Color.red))
-                            }
-                            .padding(8)
-                        }
-                    }
-
-                    // Add photos button
-                    if photos.count < 6 {
-                        PhotosPicker(
-                            selection: $selectedPhotoItems,
-                            maxSelectionCount: 6 - photos.count,
-                            matching: .images
-                        ) {
-                            VStack(spacing: 12) {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.system(size: 40))
-                                    .foregroundStyle(
-                                        LinearGradient(
-                                            colors: [.purple, .pink],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-
-                                Text("Add Photos")
-                                    .font(.caption)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(.secondary)
-                            }
-                            .frame(width: 120, height: 160)
-                            .background(Color(.systemGray6))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                        .onChange(of: selectedPhotoItems) { _, newItems in
-                            if !newItems.isEmpty {
-                                uploadNewPhotos()
-                            }
-                        }
+                // Upload progress indicator
+                if isUploadingPhotos {
+                    HStack(spacing: 8) {
+                        ProgressView(value: uploadProgress)
+                            .frame(width: 50)
+                        Text("\(Int(uploadProgress * 100))%")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
                 }
-                .padding(.horizontal, 4)
             }
 
-            Text("Add up to 6 photos to showcase your personality")
-                .font(.caption)
-                .foregroundColor(.gray)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            // Photo grid with drag-and-drop reordering
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                ForEach(Array(photos.enumerated()), id: \.offset) { index, photoURL in
+                    PhotoGridItem(
+                        photoURL: photoURL,
+                        onDelete: {
+                            deletePhoto(at: index)
+                        },
+                        onMoveUp: index > 0 ? {
+                            movePhoto(from: index, to: index - 1)
+                        } : nil,
+                        onMoveDown: index < photos.count - 1 ? {
+                            movePhoto(from: index, to: index + 1)
+                        } : nil
+                    )
+                }
+
+                // Add photo button
+                if photos.count < 6 {
+                    PhotosPicker(selection: $selectedPhotoItems, maxSelectionCount: 6 - photos.count, matching: .images) {
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.purple.opacity(0.3), style: StrokeStyle(lineWidth: 2, dash: [8]))
+                            .frame(height: 120)
+                            .overlay {
+                                VStack(spacing: 8) {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.title)
+                                        .foregroundColor(.purple)
+                                    Text("Add Photo")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                    }
+                }
+            }
         }
-        .padding(20)
+        .padding()
         .background(Color.white)
         .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 8)
+        .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
+        .onChange(of: selectedPhotoItems) { _, newItems in
+            Task {
+                await uploadNewPhotos(newItems)
+            }
+        }
     }
-    
+
     // MARK: - Profile Completion Progress
     
     private var profileCompletionProgress: some View {
@@ -619,17 +609,17 @@ struct EditProfileView: View {
     }
     
     // MARK: - Preferences Section
-    
+
     private var preferencesSection: some View {
         VStack(spacing: 15) {
             SectionHeader(icon: "heart.fill", title: "Dating Preferences", color: .pink)
-            
+
             VStack(alignment: .leading, spacing: 8) {
                 Text("Looking for")
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(.secondary)
-                
+
                 Picker("Looking for", selection: $lookingFor) {
                     ForEach(lookingForOptions, id: \.self) { option in
                         Text(option).tag(option)
@@ -643,7 +633,195 @@ struct EditProfileView: View {
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 8)
     }
-    
+
+    // MARK: - Lifestyle Section
+
+    private var lifestyleSection: some View {
+        VStack(spacing: 20) {
+            SectionHeader(icon: "person.crop.circle.fill", title: "Lifestyle & More", color: .orange)
+
+            // Height
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Height")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+
+                HStack {
+                    TextField("e.g., 170", value: $height, format: .number)
+                        .keyboardType(.numberPad)
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+
+                    Text("cm")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 8)
+                }
+
+                if let h = height {
+                    Text("≈ \(heightToFeetInches(h))")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+            }
+
+            // Relationship Goal
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Relationship Goal")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+
+                Picker("Relationship Goal", selection: Binding(
+                    get: { relationshipGoal ?? "Prefer not to say" },
+                    set: { relationshipGoal = $0 == "Prefer not to say" ? nil : $0 }
+                )) {
+                    ForEach(relationshipGoalOptions, id: \.self) { option in
+                        Text(option).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
+            }
+
+            // Religion
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Religion")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+
+                Picker("Religion", selection: Binding(
+                    get: { religion ?? "Prefer not to say" },
+                    set: { religion = $0 == "Prefer not to say" ? nil : $0 }
+                )) {
+                    ForEach(religionOptions, id: \.self) { option in
+                        Text(option).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
+            }
+
+            // Smoking & Drinking Row
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Smoking")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+
+                    Picker("Smoking", selection: Binding(
+                        get: { smoking ?? "Prefer not to say" },
+                        set: { smoking = $0 == "Prefer not to say" ? nil : $0 }
+                    )) {
+                        ForEach(smokingOptions, id: \.self) { option in
+                            Text(option).tag(option)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Drinking")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+
+                    Picker("Drinking", selection: Binding(
+                        get: { drinking ?? "Prefer not to say" },
+                        set: { drinking = $0 == "Prefer not to say" ? nil : $0 }
+                    )) {
+                        ForEach(drinkingOptions, id: \.self) { option in
+                            Text(option).tag(option)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                }
+            }
+
+            // Exercise & Diet Row
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Exercise")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+
+                    Picker("Exercise", selection: Binding(
+                        get: { exercise ?? "Prefer not to say" },
+                        set: { exercise = $0 == "Prefer not to say" ? nil : $0 }
+                    )) {
+                        ForEach(exerciseOptions, id: \.self) { option in
+                            Text(option).tag(option)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Diet")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+
+                    Picker("Diet", selection: Binding(
+                        get: { diet ?? "Prefer not to say" },
+                        set: { diet = $0 == "Prefer not to say" ? nil : $0 }
+                    )) {
+                        ForEach(dietOptions, id: \.self) { option in
+                            Text(option).tag(option)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                }
+            }
+
+            // Pets
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Pets")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+
+                Picker("Pets", selection: Binding(
+                    get: { pets ?? "Prefer not to say" },
+                    set: { pets = $0 == "Prefer not to say" ? nil : $0 }
+                )) {
+                    ForEach(petsOptions, id: \.self) { option in
+                        Text(option).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
+            }
+        }
+        .padding(20)
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 8)
+    }
+
     // MARK: - Languages Section
     
     private var languagesSection: some View {
@@ -893,6 +1071,13 @@ struct EditProfileView: View {
         }
         return "Almost there!"
     }
+
+    private func heightToFeetInches(_ cm: Int) -> String {
+        let totalInches = Double(cm) / 2.54
+        let feet = Int(totalInches / 12)
+        let inches = Int(totalInches.truncatingRemainder(dividingBy: 12))
+        return "\(feet)'\(inches)\""
+    }
     
     private func saveProfile() {
         guard var user = authService.currentUser else { return }
@@ -901,9 +1086,9 @@ struct EditProfileView: View {
             showErrorAlert = true
             return
         }
-
+        
         isLoading = true
-
+        
         Task {
             do {
                 // Upload profile image if changed
@@ -911,7 +1096,7 @@ struct EditProfileView: View {
                     let imageURL = try await ImageUploadService.shared.uploadProfileImage(profileImage, userId: userId)
                     user.profileImageURL = imageURL
                 }
-
+                
                 // Update user data
                 user.fullName = fullName
                 user.age = ageInt
@@ -925,8 +1110,18 @@ struct EditProfileView: View {
                 user.prompts = prompts
                 user.photos = photos
 
-                try await authService.updateUser(user)
+                // Update advanced profile fields
+                user.height = height
+                user.religion = religion
+                user.relationshipGoal = relationshipGoal
+                user.smoking = smoking
+                user.drinking = drinking
+                user.pets = pets
+                user.exercise = exercise
+                user.diet = diet
 
+                try await authService.updateUser(user)
+                
                 await MainActor.run {
                     isLoading = false
                     showSuccessAlert = true
@@ -935,68 +1130,6 @@ struct EditProfileView: View {
                 await MainActor.run {
                     isLoading = false
                     errorMessage = "Failed to save changes. Please try again."
-                    showErrorAlert = true
-                }
-            }
-        }
-    }
-
-    // MARK: - Photo Management Functions
-
-    private func deletePhoto(at index: Int) {
-        guard index < photos.count else { return }
-        withAnimation {
-            photos.remove(at: index)
-        }
-    }
-
-    private func movePhoto(from source: IndexSet, to destination: Int) {
-        photos.move(fromOffsets: source, toOffset: destination)
-    }
-
-    private func uploadNewPhotos() {
-        guard !selectedPhotoItems.isEmpty else { return }
-        guard let userId = authService.currentUser?.id else { return }
-
-        isUploadingPhotos = true
-        uploadProgress = 0.0
-
-        Task {
-            do {
-                let totalPhotos = selectedPhotoItems.count
-                var uploadedURLs: [String] = []
-
-                for (index, item) in selectedPhotoItems.enumerated() {
-                    guard let data = try? await item.loadTransferable(type: Data.self),
-                          let image = UIImage(data: data) else {
-                        continue
-                    }
-
-                    // Upload using ImageUploadService
-                    let photoURL = try await ImageUploadService.shared.uploadGalleryPhoto(
-                        image,
-                        userId: userId,
-                        index: photos.count + uploadedURLs.count
-                    )
-                    uploadedURLs.append(photoURL)
-
-                    // Update progress
-                    await MainActor.run {
-                        uploadProgress = Double(index + 1) / Double(totalPhotos)
-                    }
-                }
-
-                await MainActor.run {
-                    photos.append(contentsOf: uploadedURLs)
-                    selectedPhotoItems.removeAll()
-                    isUploadingPhotos = false
-                    uploadProgress = 0.0
-                }
-            } catch {
-                await MainActor.run {
-                    isUploadingPhotos = false
-                    uploadProgress = 0.0
-                    errorMessage = "Failed to upload photos. Please try again."
                     showErrorAlert = true
                 }
             }
@@ -1193,6 +1326,170 @@ struct InterestPickerView: View {
                     }
                 }
             }
+        }
+    }
+
+    // MARK: - Photo Management Functions
+
+    private func deletePhoto(at index: Int) {
+        withAnimation {
+            photos.remove(at: index)
+        }
+        HapticManager.shared.impact(.medium)
+    }
+
+    private func movePhoto(from source: Int, to destination: Int) {
+        withAnimation {
+            let photo = photos.remove(at: source)
+            photos.insert(photo, at: destination)
+        }
+        HapticManager.shared.impact(.light)
+    }
+
+    private func uploadNewPhotos(_ items: [PhotosPickerItem]) async {
+        guard !items.isEmpty else { return }
+
+        await MainActor.run {
+            isUploadingPhotos = true
+            uploadProgress = 0.0
+        }
+
+        for (index, item) in items.enumerated() {
+            do {
+                if let data = try await item.loadTransferable(type: Data.self),
+                   let uiImage = UIImage(data: data) {
+
+                    // Update progress
+                    await MainActor.run {
+                        uploadProgress = Double(index) / Double(items.count)
+                    }
+
+                    // Upload to Firebase Storage
+                    if let userId = authService.currentUser?.id {
+                        let photoURL = try await PhotoUploadService.shared.uploadPhoto(
+                            uiImage,
+                            userId: userId,
+                            imageType: .gallery
+                        )
+
+                        await MainActor.run {
+                            photos.append(photoURL)
+                        }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = "Failed to upload photo: \(error.localizedDescription)"
+                    showErrorAlert = true
+                }
+                Logger.shared.error("Photo upload failed: \(error.localizedDescription)", category: .general)
+            }
+        }
+
+        await MainActor.run {
+            uploadProgress = 1.0
+            isUploadingPhotos = false
+            selectedPhotoItems = []
+        }
+    }
+}
+
+// MARK: - Photo Grid Item
+
+struct PhotoGridItem: View {
+    let photoURL: String
+    let onDelete: () -> Void
+    let onMoveUp: (() -> Void)?
+    let onMoveDown: (() -> Void)?
+
+    @State private var showDeleteConfirmation = false
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            // Photo
+            AsyncImage(url: URL(string: photoURL)) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                case .failure:
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.2))
+                        .overlay {
+                            Image(systemName: "photo")
+                                .foregroundColor(.gray)
+                        }
+                case .empty:
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.1))
+                        .overlay {
+                            ProgressView()
+                        }
+                @unknown default:
+                    EmptyView()
+                }
+            }
+            .frame(height: 120)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            // Controls overlay
+            VStack(spacing: 4) {
+                // Delete button
+                Button {
+                    showDeleteConfirmation = true
+                } label: {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 28, height: 28)
+                        .overlay {
+                            Image(systemName: "trash.fill")
+                                .font(.system(size: 12))
+                                .foregroundColor(.white)
+                        }
+                        .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
+                }
+
+                // Reorder buttons
+                if onMoveUp != nil || onMoveDown != nil {
+                    VStack(spacing: 2) {
+                        if let moveUp = onMoveUp {
+                            Button(action: moveUp) {
+                                Circle()
+                                    .fill(Color.white)
+                                    .frame(width: 24, height: 24)
+                                    .overlay {
+                                        Image(systemName: "chevron.up")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundColor(.purple)
+                                    }
+                                    .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+                            }
+                        }
+
+                        if let moveDown = onMoveDown {
+                            Button(action: moveDown) {
+                                Circle()
+                                    .fill(Color.white)
+                                    .frame(width: 24, height: 24)
+                                    .overlay {
+                                        Image(systemName: "chevron.down")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundColor(.purple)
+                                    }
+                                    .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(6)
+        }
+        .confirmationDialog("Delete this photo?", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                onDelete()
+            }
+            Button("Cancel", role: .cancel) {}
         }
     }
 }
