@@ -184,20 +184,22 @@ struct SavedProfileCard: View {
             ZStack(alignment: .topTrailing) {
                 VStack(spacing: 0) {
                     // Profile image
-                    if let imageURL = savedProfile.user.photos.first, let url = URL(string: imageURL) {
-                        AsyncImage(url: url) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        } placeholder: {
-                            Color.gray.opacity(0.2)
+                    Group {
+                        if let imageURL = savedProfile.user.photos.first, let url = URL(string: imageURL) {
+                            AsyncImage(url: url) { image in
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                            } placeholder: {
+                                Color.gray.opacity(0.2)
+                            }
+                        } else {
+                            LinearGradient(
+                                colors: [.purple.opacity(0.6), .pink.opacity(0.5)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
                         }
-                    } else {
-                        LinearGradient(
-                            colors: [.purple.opacity(0.6), .pink.opacity(0.5)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
                     }
                     .frame(height: 200)
                     .clipped()
@@ -403,14 +405,6 @@ class SavedProfilesViewModel: ObservableObject {
             Logger.shared.error("Error saving profile", category: .general, error: error)
         }
     }
-}
-
-// MARK: - Analytics Events Extension
-
-extension AnalyticsEvent {
-    static let profileSaved = AnalyticsEvent(rawValue: "profile_saved")
-    static let profileUnsaved = AnalyticsEvent(rawValue: "profile_unsaved")
-    static let savedProfilesCleared = AnalyticsEvent(rawValue: "saved_profiles_cleared")
 }
 
 #Preview {

@@ -74,6 +74,11 @@ enum AnalyticsEvent: String {
     case experimentVariantAssigned = "experiment_variant_assigned"
     case featureFlagChanged = "feature_flag_changed"
     case fraudDetected = "fraud_detected"
+
+    // Saved Profiles
+    case profileSaved = "profile_saved"
+    case profileUnsaved = "profile_unsaved"
+    case savedProfilesCleared = "saved_profiles_cleared"
 }
 
 // MARK: - Analytics Manager
