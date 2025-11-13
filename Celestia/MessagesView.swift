@@ -85,6 +85,7 @@ struct MessagesView: View {
                 if let selectedMatch = selectedMatch {
                     NavigationStack {
                         ChatView(match: selectedMatch.0, otherUser: selectedMatch.1)
+                            .environmentObject(authService)
                     }
                 }
             }

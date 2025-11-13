@@ -291,6 +291,7 @@ struct ProfileViewerCard: View {
         .buttonStyle(ScaleButtonStyle())
         .sheet(isPresented: $showUserDetail) {
             UserDetailView(user: viewer.user)
+                .environmentObject(authService)
         }
     }
 }

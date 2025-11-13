@@ -138,6 +138,7 @@ struct MatchesView: View {
             .sheet(item: $selectedMatch) { match in
                 if let user = getMatchedUser(match) {
                     UserDetailView(user: user)
+                        .environmentObject(authService)
                 }
             }
         }

@@ -198,6 +198,7 @@ struct MutualLikeCard: View {
         .buttonStyle(ScaleButtonStyle())
         .sheet(isPresented: $showUserDetail) {
             UserDetailView(user: user)
+                .environmentObject(authService)
         }
     }
 }
