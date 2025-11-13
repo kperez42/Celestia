@@ -35,7 +35,7 @@ struct EditProfileView: View {
     @State private var showLanguagePicker = false
     @State private var showInterestPicker = false
     @State private var showPromptsEditor = false
-    @State private var photos: [String]
+    @State private var photos: [String] = []
     @State private var selectedPhotoItems: [PhotosPickerItem] = []
     @State private var isUploadingPhotos = false
     @State private var uploadProgress: Double = 0.0
