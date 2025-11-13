@@ -104,13 +104,21 @@ class ReferralManager: ObservableObject {
             throw ReferralError.alreadyReferred
         }
 
-        // Check if user's email was already used with a different account
+        // Fetch users with matching email
         let emailCheckSnapshot = try await db.collection("users")
             .whereField("email", isEqualTo: newUser.email)
-            .whereField("referredByCode", isNotEqualTo: nil)
-            .limit(to: 1)
+            .limit(to: 5)  // Get a few to check
             .getDocuments()
 
+        // Filter for users with referredByCode
+        let usersWithReferral = emailCheckSnapshot.documents.filter { doc in
+            let data = doc.data()
+            return data["referredByCode"] != nil && !(data["referredByCode"] is NSNull)
+        }
+
+        if !usersWithReferral.isEmpty {
+            // Email was already used with a referral code
+        }
         if emailCheckSnapshot.documents.count > 1 {
             Logger.shared.warning("Email has already been referred with a different account", category: .referral)
             throw ReferralError.emailAlreadyReferred
