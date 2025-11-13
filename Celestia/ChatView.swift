@@ -80,7 +80,7 @@ struct ChatView: View {
             Text("You won't be able to message each other anymore, and this match will be removed from your list.")
         }
         .detectScreenshots(
-            context: .chat(
+            context: ScreenshotDetectionService.ScreenshotContext.chat(
                 matchId: match.id ?? "",
                 otherUserId: otherUser.id ?? ""
             ),
@@ -90,13 +90,7 @@ struct ChatView: View {
             UserDetailView(user: otherUser)
         }
         .sheet(isPresented: $showingReportSheet) {
-            if let userId = otherUser.id {
-                ReportUserView(
-                    reportedUserId: userId,
-                    reportedUserName: otherUser.fullName,
-                    context: .chat
-                )
-            }
+            ReportUserView(user: otherUser)
         }
         .onChange(of: messageService.messages.count) {
             // Check conversation safety whenever new messages arrive
