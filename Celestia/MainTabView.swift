@@ -23,7 +23,7 @@ struct MainTabView: View {
         ZStack(alignment: .bottom) {
             // Main content
             TabView(selection: $selectedTab) {
-                // Discover
+                // Discover - Load immediately (tab 0)
                 FeedDiscoverView()
                     .tag(0)
                     .transition(.asymmetric(
@@ -31,37 +31,45 @@ struct MainTabView: View {
                         removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
                     ))
 
-                // Matches
-                MatchesView()
-                    .tag(1)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
-                        removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
-                    ))
+                // Matches - Lazy load
+                LazyTabContent(tabIndex: 1, currentTab: selectedTab) {
+                    MatchesView()
+                }
+                .tag(1)
+                .transition(.asymmetric(
+                    insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
+                    removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
+                ))
 
-                // Messages
-                MessagesView(selectedTab: $selectedTab)
-                    .tag(2)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
-                        removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
-                    ))
+                // Messages - Lazy load
+                LazyTabContent(tabIndex: 2, currentTab: selectedTab) {
+                    MessagesView(selectedTab: $selectedTab)
+                }
+                .tag(2)
+                .transition(.asymmetric(
+                    insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
+                    removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
+                ))
 
-                // Saved
-                SavedProfilesView()
-                    .tag(3)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
-                        removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
-                    ))
+                // Saved - Lazy load
+                LazyTabContent(tabIndex: 3, currentTab: selectedTab) {
+                    SavedProfilesView()
+                }
+                .tag(3)
+                .transition(.asymmetric(
+                    insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
+                    removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
+                ))
 
-                // Profile
-                ProfileView()
-                    .tag(4)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
-                        removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
-                    ))
+                // Profile - Lazy load
+                LazyTabContent(tabIndex: 4, currentTab: selectedTab) {
+                    ProfileView()
+                }
+                .tag(4)
+                .transition(.asymmetric(
+                    insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
+                    removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
+                ))
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .ignoresSafeArea(.keyboard)

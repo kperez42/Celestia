@@ -15,6 +15,7 @@ struct FeedDiscoverView: View {
     @State private var displayedUsers: [User] = []
     @State private var currentPage = 0
     @State private var isLoading = false
+    @State private var isInitialLoad = true
     @State private var showFilters = false
     @State private var selectedUser: User?
     @State private var showUserDetail = false
@@ -34,59 +35,65 @@ struct FeedDiscoverView: View {
                 Color(.systemGroupedBackground)
                     .ignoresSafeArea()
 
-                // Main scroll view
-                ScrollView {
-                    LazyVStack(spacing: 16) {
-                        ForEach(Array(displayedUsers.enumerated()), id: \.element.id) { index, user in
-                            ProfileFeedCard(
-                                user: user,
-                                onLike: {
-                                    handleLike(user: user)
-                                },
-                                onFavorite: {
-                                    handleFavorite(user: user)
-                                },
-                                onMessage: {
-                                    handleMessage(user: user)
-                                },
-                                onViewPhotos: {
-                                    selectedUser = user
-                                    showPhotoGallery = true
-                                }
-                            )
-                            .onAppear {
-                                if index == displayedUsers.count - preloadThreshold {
-                                    loadMoreUsers()
+                // Main content
+                if isInitialLoad {
+                    // Skeleton loader for initial load
+                    initialLoadingView
+                } else {
+                    // Main scroll view
+                    ScrollView {
+                        LazyVStack(spacing: 16) {
+                            ForEach(Array(displayedUsers.enumerated()), id: \.element.id) { index, user in
+                                ProfileFeedCard(
+                                    user: user,
+                                    onLike: {
+                                        handleLike(user: user)
+                                    },
+                                    onFavorite: {
+                                        handleFavorite(user: user)
+                                    },
+                                    onMessage: {
+                                        handleMessage(user: user)
+                                    },
+                                    onViewPhotos: {
+                                        selectedUser = user
+                                        showPhotoGallery = true
+                                    }
+                                )
+                                .onAppear {
+                                    if index == displayedUsers.count - preloadThreshold {
+                                        loadMoreUsers()
+                                    }
                                 }
                             }
-                        }
 
-                        // Loading indicator
-                        if isLoading {
-                            ProgressView()
-                                .padding()
-                        }
+                            // Loading indicator (for pagination)
+                            if isLoading {
+                                ProgressView()
+                                    .padding()
+                            }
 
-                        // End of results
-                        if !isLoading && displayedUsers.count >= users.count && users.count > 0 {
-                            endOfResultsView
-                        }
+                            // End of results
+                            if !isLoading && displayedUsers.count >= users.count && users.count > 0 {
+                                endOfResultsView
+                            }
 
-                        // Error state
-                        if !errorMessage.isEmpty {
-                            errorStateView
+                            // Error state
+                            if !errorMessage.isEmpty {
+                                errorStateView
+                            }
+                            // Empty state
+                            else if !isLoading && displayedUsers.isEmpty {
+                                emptyStateView
+                            }
                         }
-                        // Empty state
-                        else if !isLoading && displayedUsers.isEmpty {
-                            emptyStateView
-                        }
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+                        .padding(.bottom)
                     }
-                    .padding(.horizontal)
-                    .padding(.top, 8)
-                    .padding(.bottom)
-                }
-                .refreshable {
-                    await refreshFeed()
+                    .refreshable {
+                        await refreshFeed()
+                    }
                 }
 
                 // Match animation overlay
@@ -142,6 +149,20 @@ struct FeedDiscoverView: View {
                     await reloadWithFilters()
                 }
             }
+        }
+    }
+
+    // MARK: - Initial Loading View
+
+    private var initialLoadingView: some View {
+        ScrollView {
+            LazyVStack(spacing: 16) {
+                ForEach(0..<3, id: \.self) { _ in
+                    ProfileFeedCardSkeleton()
+                }
+            }
+            .padding(.horizontal)
+            .padding(.top, 8)
         }
     }
 
@@ -318,11 +339,17 @@ struct FeedDiscoverView: View {
         await MainActor.run {
             users = TestData.discoverUsers
             loadMoreUsers()
+            isInitialLoad = false
         }
         return
         #endif
 
-        guard let currentUserId = authService.currentUser?.id else { return }
+        guard let currentUserId = authService.currentUser?.id else {
+            await MainActor.run {
+                isInitialLoad = false
+            }
+            return
+        }
 
         isLoading = true
         defer { isLoading = false }
@@ -359,12 +386,14 @@ struct FeedDiscoverView: View {
             await MainActor.run {
                 users = UserService.shared.users
                 errorMessage = ""  // Clear any previous errors
+                isInitialLoad = false  // Hide skeleton and show content
                 loadMoreUsers()
             }
         } catch {
             Logger.shared.error("Error loading users", category: .database, error: error)
             await MainActor.run {
                 errorMessage = "Failed to load users. Please check your connection and try again."
+                isInitialLoad = false  // Show error state instead of skeleton
             }
         }
     }
