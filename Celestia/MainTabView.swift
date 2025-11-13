@@ -14,7 +14,6 @@ struct MainTabView: View {
 
     @State private var selectedTab = 0
     @State private var previousTab = 0
-    @State private var showTabAnimation = false
     @State private var unreadCount = 0
     @State private var newMatchesCount = 0
     @State private var badgeUpdateTimer: Timer?
@@ -26,54 +25,33 @@ struct MainTabView: View {
                 // Discover - Load immediately (tab 0)
                 FeedDiscoverView()
                     .tag(0)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
-                        removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
-                    ))
 
                 // Matches - Lazy load
                 LazyTabContent(tabIndex: 1, currentTab: selectedTab) {
                     MatchesView()
                 }
                 .tag(1)
-                .transition(.asymmetric(
-                    insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
-                    removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
-                ))
 
                 // Messages - Lazy load
                 LazyTabContent(tabIndex: 2, currentTab: selectedTab) {
                     MessagesView(selectedTab: $selectedTab)
                 }
                 .tag(2)
-                .transition(.asymmetric(
-                    insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
-                    removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
-                ))
 
                 // Saved - Lazy load
                 LazyTabContent(tabIndex: 3, currentTab: selectedTab) {
                     SavedProfilesView()
                 }
                 .tag(3)
-                .transition(.asymmetric(
-                    insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
-                    removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
-                ))
 
                 // Profile - Lazy load
                 LazyTabContent(tabIndex: 4, currentTab: selectedTab) {
                     ProfileView()
                 }
                 .tag(4)
-                .transition(.asymmetric(
-                    insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
-                    removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
-                ))
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
+            .tabViewStyle(.automatic)
             .ignoresSafeArea(.keyboard)
-            .animation(.easeInOut(duration: 0.3), value: selectedTab)
             
             // Custom Tab Bar
             customTabBar
@@ -81,14 +59,7 @@ struct MainTabView: View {
         .ignoresSafeArea(.keyboard)
         .onChange(of: selectedTab) { oldValue, newValue in
             previousTab = oldValue
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                showTabAnimation = true
-            }
             HapticManager.shared.selection()
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                showTabAnimation = false
-            }
         }
         .task {
             await loadBadgeCounts()
@@ -239,7 +210,13 @@ struct TabBarButton: View {
     }
 
     var body: some View {
-        Button(action: action) {
+        Button(action: {
+            isPressed = true
+            action()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                isPressed = false
+            }
+        }) {
             VStack(spacing: 4) {
                 ZStack(alignment: .topTrailing) {
                     // Icon
@@ -306,15 +283,6 @@ struct TabBarButton: View {
             .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
         }
         .buttonStyle(PlainButtonStyle())
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in
-                    isPressed = true
-                }
-                .onEnded { _ in
-                    isPressed = false
-                }
-        )
         .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isSelected)
     }
