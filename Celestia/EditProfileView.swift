@@ -1135,6 +1135,70 @@ struct EditProfileView: View {
             }
         }
     }
+
+    // MARK: - Photo Management Functions
+
+    private func deletePhoto(at index: Int) {
+        withAnimation {
+            photos.remove(at: index)
+        }
+        HapticManager.shared.impact(.medium)
+    }
+
+    private func movePhoto(from source: Int, to destination: Int) {
+        withAnimation {
+            let photo = photos.remove(at: source)
+            photos.insert(photo, at: destination)
+        }
+        HapticManager.shared.impact(.light)
+    }
+
+    private func uploadNewPhotos(_ items: [PhotosPickerItem]) async {
+        guard !items.isEmpty else { return }
+
+        await MainActor.run {
+            isUploadingPhotos = true
+            uploadProgress = 0.0
+        }
+
+        for (index, item) in items.enumerated() {
+            do {
+                if let data = try await item.loadTransferable(type: Data.self),
+                   let uiImage = UIImage(data: data) {
+
+                    // Update progress
+                    await MainActor.run {
+                        uploadProgress = Double(index) / Double(items.count)
+                    }
+
+                    // Upload to Firebase Storage
+                    if let userId = authService.currentUser?.id {
+                        let photoURL = try await PhotoUploadService.shared.uploadPhoto(
+                            uiImage,
+                            userId: userId,
+                            imageType: .gallery
+                        )
+
+                        await MainActor.run {
+                            photos.append(photoURL)
+                        }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = "Failed to upload photo: \(error.localizedDescription)"
+                    showErrorAlert = true
+                }
+                Logger.shared.error("Photo upload failed: \(error.localizedDescription)", category: .general)
+            }
+        }
+
+        await MainActor.run {
+            uploadProgress = 1.0
+            isUploadingPhotos = false
+            selectedPhotoItems = []
+        }
+    }
 }
 
 // MARK: - Supporting Views
@@ -1326,70 +1390,6 @@ struct InterestPickerView: View {
                     }
                 }
             }
-        }
-    }
-
-    // MARK: - Photo Management Functions
-
-    private func deletePhoto(at index: Int) {
-        withAnimation {
-            photos.remove(at: index)
-        }
-        HapticManager.shared.impact(.medium)
-    }
-
-    private func movePhoto(from source: Int, to destination: Int) {
-        withAnimation {
-            let photo = photos.remove(at: source)
-            photos.insert(photo, at: destination)
-        }
-        HapticManager.shared.impact(.light)
-    }
-
-    private func uploadNewPhotos(_ items: [PhotosPickerItem]) async {
-        guard !items.isEmpty else { return }
-
-        await MainActor.run {
-            isUploadingPhotos = true
-            uploadProgress = 0.0
-        }
-
-        for (index, item) in items.enumerated() {
-            do {
-                if let data = try await item.loadTransferable(type: Data.self),
-                   let uiImage = UIImage(data: data) {
-
-                    // Update progress
-                    await MainActor.run {
-                        uploadProgress = Double(index) / Double(items.count)
-                    }
-
-                    // Upload to Firebase Storage
-                    if let userId = authService.currentUser?.id {
-                        let photoURL = try await PhotoUploadService.shared.uploadPhoto(
-                            uiImage,
-                            userId: userId,
-                            imageType: .gallery
-                        )
-
-                        await MainActor.run {
-                            photos.append(photoURL)
-                        }
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    errorMessage = "Failed to upload photo: \(error.localizedDescription)"
-                    showErrorAlert = true
-                }
-                Logger.shared.error("Photo upload failed: \(error.localizedDescription)", category: .general)
-            }
-        }
-
-        await MainActor.run {
-            uploadProgress = 1.0
-            isUploadingPhotos = false
-            selectedPhotoItems = []
         }
     }
 }
