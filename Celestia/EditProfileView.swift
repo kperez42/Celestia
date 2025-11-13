@@ -35,6 +35,12 @@ struct EditProfileView: View {
     @State private var showLanguagePicker = false
     @State private var showInterestPicker = false
     @State private var showPromptsEditor = false
+
+    // Photo gallery management
+    @State private var photos: [String] = []
+    @State private var selectedPhotoItems: [PhotosPickerItem] = []
+    @State private var isUploadingPhotos = false
+    @State private var uploadProgress: Double = 0.0
     
     let genderOptions = ["Male", "Female", "Non-binary", "Other"]
     let lookingForOptions = ["Men", "Women", "Everyone"]
@@ -60,6 +66,7 @@ struct EditProfileView: View {
         _languages = State(initialValue: user?.languages ?? [])
         _interests = State(initialValue: user?.interests ?? [])
         _prompts = State(initialValue: user?.prompts ?? [])
+        _photos = State(initialValue: user?.photos ?? [])
     }
     
     var body: some View {
@@ -72,7 +79,10 @@ struct EditProfileView: View {
                     VStack(spacing: 25) {
                         // Hero Profile Photo Section
                         profilePhotoSection
-                        
+
+                        // Photo Gallery Section
+                        photoGallerySection
+
                         // Progress Indicator
                         profileCompletionProgress
                         
@@ -263,6 +273,120 @@ struct EditProfileView: View {
                         .foregroundColor(.white.opacity(0.7))
                 }
             }
+    }
+
+    // MARK: - Photo Gallery Section
+
+    private var photoGallerySection: some View {
+        VStack(spacing: 15) {
+            HStack {
+                SectionHeader(icon: "photo.on.rectangle.angled", title: "Photo Gallery", color: .blue)
+
+                Spacer()
+
+                Text("\(photos.count)/6")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            if isUploadingPhotos {
+                VStack(spacing: 12) {
+                    ProgressView(value: uploadProgress, total: 1.0)
+                        .progressViewStyle(.linear)
+                        .tint(.purple)
+
+                    Text("Uploading photos... \(Int(uploadProgress * 100))%")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding()
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    // Existing photos
+                    ForEach(Array(photos.enumerated()), id: \.offset) { index, photoURL in
+                        ZStack(alignment: .topTrailing) {
+                            AsyncImage(url: URL(string: photoURL)) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                case .failure:
+                                    Color.gray.opacity(0.3)
+                                        .overlay {
+                                            Image(systemName: "photo")
+                                                .foregroundColor(.gray)
+                                        }
+                                case .empty:
+                                    ProgressView()
+                                @unknown default:
+                                    Color.gray.opacity(0.3)
+                                }
+                            }
+                            .frame(width: 120, height: 160)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                            // Delete button
+                            Button {
+                                deletePhoto(at: index)
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.title3)
+                                    .foregroundColor(.white)
+                                    .background(Circle().fill(Color.red))
+                            }
+                            .padding(8)
+                        }
+                    }
+
+                    // Add photos button
+                    if photos.count < 6 {
+                        PhotosPicker(
+                            selection: $selectedPhotoItems,
+                            maxSelectionCount: 6 - photos.count,
+                            matching: .images
+                        ) {
+                            VStack(spacing: 12) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 40))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [.purple, .pink],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+
+                                Text("Add Photos")
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.secondary)
+                            }
+                            .frame(width: 120, height: 160)
+                            .background(Color(.systemGray6))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                        .onChange(of: selectedPhotoItems) { _, newItems in
+                            if !newItems.isEmpty {
+                                uploadNewPhotos()
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 4)
+            }
+
+            Text("Add up to 6 photos to showcase your personality")
+                .font(.caption)
+                .foregroundColor(.gray)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(20)
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 8)
     }
     
     // MARK: - Profile Completion Progress
@@ -777,9 +901,9 @@ struct EditProfileView: View {
             showErrorAlert = true
             return
         }
-        
+
         isLoading = true
-        
+
         Task {
             do {
                 // Upload profile image if changed
@@ -787,7 +911,7 @@ struct EditProfileView: View {
                     let imageURL = try await ImageUploadService.shared.uploadProfileImage(profileImage, userId: userId)
                     user.profileImageURL = imageURL
                 }
-                
+
                 // Update user data
                 user.fullName = fullName
                 user.age = ageInt
@@ -799,9 +923,10 @@ struct EditProfileView: View {
                 user.languages = languages
                 user.interests = interests
                 user.prompts = prompts
+                user.photos = photos
 
                 try await authService.updateUser(user)
-                
+
                 await MainActor.run {
                     isLoading = false
                     showSuccessAlert = true
@@ -810,6 +935,68 @@ struct EditProfileView: View {
                 await MainActor.run {
                     isLoading = false
                     errorMessage = "Failed to save changes. Please try again."
+                    showErrorAlert = true
+                }
+            }
+        }
+    }
+
+    // MARK: - Photo Management Functions
+
+    private func deletePhoto(at index: Int) {
+        guard index < photos.count else { return }
+        withAnimation {
+            photos.remove(at: index)
+        }
+    }
+
+    private func movePhoto(from source: IndexSet, to destination: Int) {
+        photos.move(fromOffsets: source, toOffset: destination)
+    }
+
+    private func uploadNewPhotos() {
+        guard !selectedPhotoItems.isEmpty else { return }
+        guard let userId = authService.currentUser?.id else { return }
+
+        isUploadingPhotos = true
+        uploadProgress = 0.0
+
+        Task {
+            do {
+                let totalPhotos = selectedPhotoItems.count
+                var uploadedURLs: [String] = []
+
+                for (index, item) in selectedPhotoItems.enumerated() {
+                    guard let data = try? await item.loadTransferable(type: Data.self),
+                          let image = UIImage(data: data) else {
+                        continue
+                    }
+
+                    // Upload using ImageUploadService
+                    let photoURL = try await ImageUploadService.shared.uploadGalleryPhoto(
+                        image,
+                        userId: userId,
+                        index: photos.count + uploadedURLs.count
+                    )
+                    uploadedURLs.append(photoURL)
+
+                    // Update progress
+                    await MainActor.run {
+                        uploadProgress = Double(index + 1) / Double(totalPhotos)
+                    }
+                }
+
+                await MainActor.run {
+                    photos.append(contentsOf: uploadedURLs)
+                    selectedPhotoItems.removeAll()
+                    isUploadingPhotos = false
+                    uploadProgress = 0.0
+                }
+            } catch {
+                await MainActor.run {
+                    isUploadingPhotos = false
+                    uploadProgress = 0.0
+                    errorMessage = "Failed to upload photos. Please try again."
                     showErrorAlert = true
                 }
             }
