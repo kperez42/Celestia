@@ -81,6 +81,72 @@ struct User: Identifiable, Codable {
         get { fullName }
         set { fullName = newValue }
     }
+
+    // Custom encoding to handle nil values properly for Firebase
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        try container.encodeIfPresent(id, forKey: .id)
+        try container.encode(email, forKey: .email)
+        try container.encode(fullName, forKey: .fullName)
+        try container.encode(age, forKey: .age)
+        try container.encode(gender, forKey: .gender)
+        try container.encode(lookingFor, forKey: .lookingFor)
+        try container.encode(bio, forKey: .bio)
+        try container.encode(location, forKey: .location)
+        try container.encode(country, forKey: .country)
+        try container.encodeIfPresent(latitude, forKey: .latitude)
+        try container.encodeIfPresent(longitude, forKey: .longitude)
+        try container.encode(languages, forKey: .languages)
+        try container.encode(interests, forKey: .interests)
+        try container.encode(photos, forKey: .photos)
+        try container.encode(profileImageURL, forKey: .profileImageURL)
+        try container.encode(timestamp, forKey: .timestamp)
+        try container.encode(lastActive, forKey: .lastActive)
+        try container.encode(isOnline, forKey: .isOnline)
+        try container.encode(isPremium, forKey: .isPremium)
+        try container.encode(isVerified, forKey: .isVerified)
+        try container.encodeIfPresent(premiumTier, forKey: .premiumTier)
+        try container.encodeIfPresent(subscriptionExpiryDate, forKey: .subscriptionExpiryDate)
+        try container.encode(ageRangeMin, forKey: .ageRangeMin)
+        try container.encode(ageRangeMax, forKey: .ageRangeMax)
+        try container.encode(maxDistance, forKey: .maxDistance)
+        try container.encode(showMeInSearch, forKey: .showMeInSearch)
+        try container.encode(likesGiven, forKey: .likesGiven)
+        try container.encode(likesReceived, forKey: .likesReceived)
+        try container.encode(matchCount, forKey: .matchCount)
+        try container.encode(profileViews, forKey: .profileViews)
+        try container.encodeIfPresent(fcmToken, forKey: .fcmToken)
+        try container.encode(notificationsEnabled, forKey: .notificationsEnabled)
+        try container.encodeIfPresent(educationLevel, forKey: .educationLevel)
+        try container.encodeIfPresent(height, forKey: .height)
+        try container.encodeIfPresent(religion, forKey: .religion)
+        try container.encodeIfPresent(relationshipGoal, forKey: .relationshipGoal)
+        try container.encodeIfPresent(smoking, forKey: .smoking)
+        try container.encodeIfPresent(drinking, forKey: .drinking)
+        try container.encodeIfPresent(pets, forKey: .pets)
+        try container.encodeIfPresent(exercise, forKey: .exercise)
+        try container.encodeIfPresent(diet, forKey: .diet)
+        try container.encode(prompts, forKey: .prompts)
+        try container.encode(referralStats, forKey: .referralStats)
+        try container.encodeIfPresent(referredByCode, forKey: .referredByCode)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case email, fullName, age, gender, lookingFor, bio
+        case location, country, latitude, longitude
+        case languages, interests, photos, profileImageURL
+        case timestamp, lastActive, isOnline
+        case isPremium, isVerified, premiumTier, subscriptionExpiryDate
+        case ageRangeMin, ageRangeMax, maxDistance, showMeInSearch
+        case likesGiven, likesReceived, matchCount, profileViews
+        case fcmToken, notificationsEnabled
+        case educationLevel, height, religion, relationshipGoal
+        case smoking, drinking, pets, exercise, diet
+        case prompts
+        case referralStats, referredByCode
+    }
     
     // Initialize from dictionary (for legacy code)
     init(dictionary: [String: Any]) {

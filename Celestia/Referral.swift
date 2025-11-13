@@ -31,6 +31,20 @@ struct Referral: Identifiable, Codable {
         case completedAt
         case rewardClaimed
     }
+
+    // Custom encoding to handle nil values properly for Firebase
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        try container.encodeIfPresent(id, forKey: .id)
+        try container.encode(referrerUserId, forKey: .referrerUserId)
+        try container.encodeIfPresent(referredUserId, forKey: .referredUserId)
+        try container.encode(referralCode, forKey: .referralCode)
+        try container.encode(status, forKey: .status)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encodeIfPresent(completedAt, forKey: .completedAt)
+        try container.encode(rewardClaimed, forKey: .rewardClaimed)
+    }
 }
 
 enum ReferralStatus: String, Codable {
