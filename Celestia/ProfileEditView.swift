@@ -217,7 +217,7 @@ struct ProfileEditView: View {
                     dismiss()
                 }
             } catch {
-                print("Error saving profile: \(error)")
+                Logger.shared.error("Error saving profile", category: .general, error: error)
                 await MainActor.run {
                     isSaving = false
                 }

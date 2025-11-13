@@ -96,7 +96,7 @@ struct SendInterestView: View {
                             showSuccess = true
                         } catch {
                             isLoading = false
-                            print("Error sending interest: \(error)")
+                            Logger.shared.error("Error sending interest", category: .matching, error: error)
                         }
                     }
                 } label: {

@@ -171,7 +171,7 @@ struct SafetyCenterView: View {
                         do {
                             try await safetyManager.triggerEmergency()
                         } catch {
-                            print("Error triggering emergency: \(error)")
+                            Logger.shared.error("Error triggering emergency", category: .general, error: error)
                         }
                     }
                 }) {

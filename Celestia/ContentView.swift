@@ -30,15 +30,15 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.3), value: isAuthenticated)
         .animation(.easeInOut(duration: 0.3), value: needsEmailVerification)
         .onChange(of: authService.userSession?.uid) { newValue in
-            print("🔍 ContentView: userSession changed to: \(newValue ?? "nil")")
+            Logger.shared.debug("ContentView: userSession changed to: \(newValue ?? "nil")", category: .general)
             updateAuthenticationState()
         }
         .onChange(of: authService.isEmailVerified) { newValue in
-            print("🔍 ContentView: isEmailVerified changed to: \(newValue)")
+            Logger.shared.debug("ContentView: isEmailVerified changed to: \(newValue)", category: .general)
             updateAuthenticationState()
         }
         .onAppear {
-            print("🔍 ContentView: onAppear - userSession: \(authService.userSession?.uid ?? "nil")")
+            Logger.shared.debug("ContentView: onAppear - userSession: \(authService.userSession?.uid ?? "nil")", category: .general)
             updateAuthenticationState()
         }
     }
@@ -46,7 +46,7 @@ struct ContentView: View {
     private func updateAuthenticationState() {
         isAuthenticated = (authService.userSession != nil)
         needsEmailVerification = isAuthenticated && !authService.isEmailVerified
-        print("🔍 ContentView: isAuthenticated=\(isAuthenticated), needsEmailVerification=\(needsEmailVerification)")
+        Logger.shared.debug("ContentView: isAuthenticated=\(isAuthenticated), needsEmailVerification=\(needsEmailVerification)", category: .general)
     }
 }
 

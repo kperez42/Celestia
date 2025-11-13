@@ -232,7 +232,7 @@ struct SettingsView: View {
                         do {
                             try await authService.deleteAccount()
                         } catch {
-                            print("Error deleting account: \(error)")
+                            Logger.shared.error("Error deleting account", category: .general, error: error)
                         }
                     }
                 }

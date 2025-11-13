@@ -403,7 +403,7 @@ struct MessagesView: View {
                 }
             }
         } catch {
-            print("Error loading messages: \(error)")
+            Logger.shared.error("Error loading messages", category: .messaging, error: error)
         }
     }
     

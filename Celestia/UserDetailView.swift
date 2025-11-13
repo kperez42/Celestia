@@ -228,7 +228,7 @@ struct UserDetailView: View {
                         viewerUserId: currentUserId
                     )
                 } catch {
-                    print("❌ Error tracking profile view: \(error)")
+                    Logger.shared.error("Error tracking profile view", category: .general, error: error)
                 }
             }
         }

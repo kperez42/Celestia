@@ -177,7 +177,7 @@ class BlockReportService: ObservableObject {
                 try await document.reference.updateData(["isActive": false])
             }
         } catch {
-            print("Error removing match: \(error.localizedDescription)")
+            Logger.shared.error("Error removing match", category: .moderation, error: error)
         }
     }
 }

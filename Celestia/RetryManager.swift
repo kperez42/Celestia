@@ -57,7 +57,7 @@ class RetryManager {
             do {
                 let result = try await operation()
                 if attempt > 1 {
-                    print("✅ Operation succeeded on attempt \(attempt)")
+                    Logger.shared.info("Operation succeeded on attempt \(attempt)", category: .networking)
                 }
                 return result
             } catch {
@@ -65,13 +65,13 @@ class RetryManager {
 
                 // Check if error is retryable
                 if !isRetryable(error: error) {
-                    print("❌ Non-retryable error: \(error)")
+                    Logger.shared.error("Non-retryable error", category: .networking, error: error)
                     throw error
                 }
 
                 // If this was the last attempt, throw the error
                 if attempt == config.maxAttempts {
-                    print("❌ All \(config.maxAttempts) attempts failed")
+                    Logger.shared.error("All \(config.maxAttempts) attempts failed", category: .networking, error: error)
                     throw error
                 }
 
@@ -79,7 +79,7 @@ class RetryManager {
                 let jitter = Double.random(in: 0.8...1.2)
                 let delay = min(currentDelay * jitter, config.maxDelay)
 
-                print("⚠️ Attempt \(attempt) failed. Retrying in \(String(format: "%.1f", delay))s...")
+                Logger.shared.warning("Attempt \(attempt) failed. Retrying in \(String(format: "%.1f", delay))s...", category: .networking)
 
                 // Wait before retrying
                 try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))

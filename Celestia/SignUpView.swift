@@ -193,7 +193,7 @@ struct SignUpView: View {
                 referralCode = deepLinkCode
                 validateReferralCode(deepLinkCode)
                 deepLinkManager.clearReferralCode()
-                print("✅ Pre-filled referral code from deep link: \(deepLinkCode)")
+                Logger.shared.info("Pre-filled referral code from deep link: \(deepLinkCode)", category: .referral)
             }
         }
         .alert("Referral Bonus", isPresented: .constant(authService.referralBonusMessage != nil)) {
@@ -502,7 +502,7 @@ struct SignUpView: View {
                         referralCode: referralCode.trimmingCharacters(in: .whitespaces)
                     )
                 } catch {
-                    print("Error creating account: \(error)")
+                    Logger.shared.error("Error creating account", category: .authentication, error: error)
                     // Error is handled by AuthService setting errorMessage
                 }
             }

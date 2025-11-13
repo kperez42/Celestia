@@ -548,7 +548,7 @@ struct MatchesView: View {
                 }
             }
         } catch {
-            print("Error loading matches: \(error)")
+            Logger.shared.error("Error loading matches", category: .matching, error: error)
         }
     }
     

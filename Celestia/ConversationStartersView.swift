@@ -273,7 +273,7 @@ struct CompactStarterButton: View {
             currentUser: TestData.currentUser,
             otherUser: TestData.discoverUsers[0]
         ) { message in
-            print("Selected: \(message)")
+            Logger.shared.debug("Selected: \(message)", category: .ui)
         }
 
         Spacer()
@@ -282,7 +282,7 @@ struct CompactStarterButton: View {
             currentUser: TestData.currentUser,
             otherUser: TestData.discoverUsers[0]
         ) { message in
-            print("Selected: \(message)")
+            Logger.shared.debug("Selected: \(message)", category: .ui)
         }
         .padding()
     }

@@ -181,7 +181,7 @@ struct MainTabView: View {
             try await matchService.fetchMatches(userId: userId)
             newMatchesCount = matchService.matches.filter { $0.lastMessage == nil }.count
         } catch {
-            print("Error loading badge counts: \(error)")
+            Logger.shared.error("Error loading badge counts", category: .general, error: error)
         }
 
         // Invalidate existing timer to prevent leaks
@@ -195,7 +195,7 @@ struct MainTabView: View {
                     try await matchService.fetchMatches(userId: userId)
                     newMatchesCount = matchService.matches.filter { $0.lastMessage == nil }.count
                 } catch {
-                    print("Error updating badge counts: \(error)")
+                    Logger.shared.error("Error updating badge counts", category: .general, error: error)
                 }
             }
         }

@@ -256,7 +256,7 @@ struct SimpleCachedAsyncImage<Content: View, Placeholder: View>: View {
                 await MainActor.run {
                     self.isLoading = false
                 }
-                print("Failed to load image: \(error)")
+                Logger.shared.error("Failed to load image", category: .storage, error: error)
             }
         }
     }

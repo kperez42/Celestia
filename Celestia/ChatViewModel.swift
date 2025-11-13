@@ -48,7 +48,7 @@ class ChatViewModel: ObservableObject {
                 .compactMap { try? $0.data(as: Match.self) }
                 .sorted { ($0.lastMessageTimestamp ?? $0.timestamp) > ($1.lastMessageTimestamp ?? $1.timestamp) }
         } catch {
-            print("Error loading matches: \(error)")
+            Logger.shared.error("Error loading matches", category: .messaging, error: error)
         }
     }
     
@@ -80,7 +80,7 @@ class ChatViewModel: ObservableObject {
                     guard let self = self else { return }
                     
                     if let error = error {
-                        print("Error loading messages: \(error)")
+                        Logger.shared.error("Error loading messages", category: .messaging, error: error)
                         return
                     }
                     
@@ -111,7 +111,7 @@ class ChatViewModel: ObservableObject {
                     )
                 }
             } catch {
-                print("Error sending message: \(error)")
+                Logger.shared.error("Error sending message", category: .messaging, error: error)
             }
         }
     }

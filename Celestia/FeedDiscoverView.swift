@@ -303,7 +303,7 @@ struct FeedDiscoverView: View {
                 loadMoreUsers()
             }
         } catch {
-            print("❌ Error loading users: \(error)")
+            Logger.shared.error("Error loading users", category: .database, error: error)
         }
     }
 
@@ -363,7 +363,7 @@ struct FeedDiscoverView: View {
                     )
                 }
             } catch {
-                print("❌ Error tracking like: \(error)")
+                Logger.shared.error("Error tracking like", category: .matching, error: error)
             }
         }
     }
@@ -385,7 +385,7 @@ struct FeedDiscoverView: View {
         selectedUser = user
         // NOTE: Navigation to messaging should be implemented using NavigationPath or coordinator
         // For now, user should match first before messaging
-        print("Message user: \(user.fullName)")
+        Logger.shared.debug("Message user: \(user.fullName)", category: .messaging)
     }
 }
 
