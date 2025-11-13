@@ -57,7 +57,7 @@ class SubscriptionManager: ObservableObject {
         Logger.shared.info("Updating subscription status", category: .general)
 
         // Check active subscriptions
-        for await result in Transaction.currentEntitlements {
+        for await result in StoreKit.Transaction.currentEntitlements {
             guard case .verified(let transaction) = result else {
                 continue
             }
@@ -79,7 +79,7 @@ class SubscriptionManager: ObservableObject {
         saveSubscriptionStatus()
     }
 
-    private func updateTier(from transaction: Transaction) async {
+    private func updateTier(from transaction: StoreKit.Transaction) async {
         let productId = transaction.productID
 
         // Map product ID to tier
@@ -120,7 +120,7 @@ class SubscriptionManager: ObservableObject {
     }
 
     /// Update subscription from transaction (called by StoreManager)
-    func updateSubscription(tier: SubscriptionTier, transaction: Transaction) async {
+    func updateSubscription(tier: SubscriptionTier, transaction: StoreKit.Transaction) async {
         await updateTier(from: transaction)
     }
 
@@ -176,7 +176,7 @@ class SubscriptionManager: ObservableObject {
     private func startMonitoringTransactions() {
         statusUpdateTask = Task {
             // Monitor transaction updates
-            for await result in Transaction.updates {
+            for await result in StoreKit.Transaction.updates {
                 guard case .verified(let transaction) = result else {
                     continue
                 }
