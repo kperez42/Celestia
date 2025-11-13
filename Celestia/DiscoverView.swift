@@ -151,132 +151,94 @@ struct DiscoverView: View {
 
     private var cardStackView: some View {
         ZStack {
-            ForEach(Array(viewModel.users.enumerated().filter { $0.offset >= viewModel.currentIndex && $0.offset < viewModel.currentIndex + 3 }), id: \.offset) { index, user in
-                let cardIndex = index - viewModel.currentIndex
+            // Card stack layer (lower z-index)
+            ZStack {
+                ForEach(Array(viewModel.users.enumerated().filter { $0.offset >= viewModel.currentIndex && $0.offset < viewModel.currentIndex + 3 }), id: \.offset) { index, user in
+                    let cardIndex = index - viewModel.currentIndex
 
-                UserCardView(user: user)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
-                    .padding(.bottom, 200) // Space for buttons and tab bar
-                    .offset(y: CGFloat(cardIndex * 8))
-                    .scaleEffect(1.0 - CGFloat(cardIndex) * 0.05)
-                    .opacity(1.0 - Double(cardIndex) * 0.2)
-                    .zIndex(Double(3 - cardIndex))
-                    .offset(cardIndex == 0 ? viewModel.dragOffset : .zero)
-                    .rotationEffect(.degrees(cardIndex == 0 ? Double(viewModel.dragOffset.width / 20) : 0))
-                    .onTapGesture {
-                        if cardIndex == 0 {
-                            viewModel.showUserDetail(user)
-                        }
-                    }
-                    .gesture(
-                        cardIndex == 0 ? DragGesture()
-                            .onChanged { value in
-                                viewModel.dragOffset = value.translation
+                    UserCardView(user: user)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 16)
+                        .padding(.bottom, 200) // Space for buttons and tab bar
+                        .offset(y: CGFloat(cardIndex * 8))
+                        .scaleEffect(1.0 - CGFloat(cardIndex) * 0.05)
+                        .opacity(1.0 - Double(cardIndex) * 0.2)
+                        .zIndex(Double(3 - cardIndex))
+                        .offset(cardIndex == 0 ? viewModel.dragOffset : .zero)
+                        .rotationEffect(.degrees(cardIndex == 0 ? Double(viewModel.dragOffset.width / 20) : 0))
+                        .contentShape(Rectangle()) // Define tappable area
+                        .onTapGesture {
+                            if cardIndex == 0 {
+                                viewModel.showUserDetail(user)
                             }
-                            .onEnded { value in
-                                viewModel.handleSwipeEnd(value: value)
-                            } : nil
-                    )
+                        }
+                        .gesture(
+                            cardIndex == 0 ? DragGesture(minimumDistance: 10)
+                                .onChanged { value in
+                                    viewModel.dragOffset = value.translation
+                                }
+                                .onEnded { value in
+                                    viewModel.handleSwipeEnd(value: value)
+                                } : nil
+                        )
+                }
             }
+            .zIndex(0)
 
-            // Action buttons overlay - Fixed centered position
+            // Action buttons overlay - Separate layer with higher z-index
             VStack {
                 Spacer()
 
-                HStack(spacing: 20) {
+                // Button container with explicit hit testing
+                HStack(spacing: 24) {
                     // Pass button
-                    Button {
+                    SwipeActionButton(
+                        icon: "xmark",
+                        iconSize: .title,
+                        iconWeight: .bold,
+                        size: 68,
+                        colors: [Color.red.opacity(0.9), Color.red],
+                        shadowColor: .red.opacity(0.4),
+                        isProcessing: viewModel.isProcessingAction
+                    ) {
                         Task { await viewModel.handlePass() }
-                    } label: {
-                        ZStack {
-                            if viewModel.isProcessingAction {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            } else {
-                                Image(systemName: "xmark")
-                                    .font(.title)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.white)
-                            }
-                        }
-                        .frame(width: 64, height: 64)
-                        .background(
-                            LinearGradient(
-                                colors: [Color.red.opacity(0.9), Color.red],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .clipShape(Circle())
-                        .shadow(color: .red.opacity(0.4), radius: 8, y: 4)
                     }
                     .disabled(viewModel.isProcessingAction)
-                    .opacity(viewModel.isProcessingAction ? 0.6 : 1.0)
-                    .actionButton()
 
                     // Super Like button
-                    Button {
+                    SwipeActionButton(
+                        icon: "star.fill",
+                        iconSize: .title2,
+                        iconWeight: .semibold,
+                        size: 60,
+                        colors: [Color.blue, Color.cyan],
+                        shadowColor: .blue.opacity(0.4),
+                        isProcessing: viewModel.isProcessingAction
+                    ) {
                         Task { await viewModel.handleSuperLike() }
-                    } label: {
-                        ZStack {
-                            if viewModel.isProcessingAction {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            } else {
-                                Image(systemName: "star.fill")
-                                    .font(.title2)
-                                    .foregroundColor(.white)
-                            }
-                        }
-                        .frame(width: 56, height: 56)
-                        .background(
-                            LinearGradient(
-                                colors: [Color.blue, Color.cyan],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .clipShape(Circle())
-                        .shadow(color: .blue.opacity(0.4), radius: 8, y: 4)
                     }
                     .disabled(viewModel.isProcessingAction)
-                    .opacity(viewModel.isProcessingAction ? 0.6 : 1.0)
-                    .actionButton()
 
                     // Like button
-                    Button {
+                    SwipeActionButton(
+                        icon: "heart.fill",
+                        iconSize: .title,
+                        iconWeight: .bold,
+                        size: 68,
+                        colors: [Color.green.opacity(0.9), Color.green],
+                        shadowColor: .green.opacity(0.4),
+                        isProcessing: viewModel.isProcessingAction
+                    ) {
                         Task { await viewModel.handleLike() }
-                    } label: {
-                        ZStack {
-                            if viewModel.isProcessingAction {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            } else {
-                                Image(systemName: "heart.fill")
-                                    .font(.title)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.white)
-                            }
-                        }
-                        .frame(width: 64, height: 64)
-                        .background(
-                            LinearGradient(
-                                colors: [Color.green.opacity(0.9), Color.green],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .clipShape(Circle())
-                        .shadow(color: .green.opacity(0.4), radius: 8, y: 4)
                     }
                     .disabled(viewModel.isProcessingAction)
-                    .opacity(viewModel.isProcessingAction ? 0.6 : 1.0)
-                    .actionButton()
                 }
-                .frame(maxWidth: .infinity) // Center the buttons
+                .padding(.horizontal, 24)
                 .padding(.bottom, 100) // Stay above tab bar and safe area
+                .frame(maxWidth: .infinity)
             }
+            .zIndex(100) // Ensure buttons are always on top
+            .allowsHitTesting(true) // Explicitly enable hit testing for buttons
         }
     }
     
@@ -313,14 +275,17 @@ struct DiscoverView: View {
             VStack(spacing: 12) {
                 if viewModel.hasActiveFilters {
                     Button {
+                        HapticManager.shared.impact(.medium)
                         viewModel.resetFilters()
                     } label: {
-                        HStack {
+                        HStack(spacing: 8) {
                             Image(systemName: "arrow.counterclockwise")
+                                .font(.body.weight(.semibold))
                             Text("Clear Filters")
+                                .font(.headline)
                         }
                         .frame(maxWidth: .infinity)
-                        .padding()
+                        .padding(.vertical, 16)
                         .foregroundColor(.white)
                         .background(
                             LinearGradient(
@@ -330,7 +295,9 @@ struct DiscoverView: View {
                             )
                         )
                         .cornerRadius(16)
+                        .contentShape(RoundedRectangle(cornerRadius: 16))
                     }
+                    .buttonStyle(ScaleButtonStyle(scaleEffect: 0.96))
                     .padding(.horizontal, 40)
                 }
 
@@ -340,16 +307,20 @@ struct DiscoverView: View {
                         await viewModel.loadUsers()
                     }
                 } label: {
-                    HStack {
+                    HStack(spacing: 8) {
                         Image(systemName: "arrow.clockwise")
+                            .font(.body.weight(.semibold))
                         Text("Refresh")
+                            .font(.headline)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding()
+                    .padding(.vertical, 16)
                     .foregroundColor(.purple)
                     .background(Color(.systemGray6))
                     .cornerRadius(16)
+                    .contentShape(RoundedRectangle(cornerRadius: 16))
                 }
+                .buttonStyle(ScaleButtonStyle(scaleEffect: 0.96))
                 .padding(.horizontal, 40)
             }
 
@@ -443,6 +414,7 @@ struct UserCardView: View {
                     startPoint: .init(x: 0.5, y: 0.6),
                     endPoint: .bottom
                 )
+                .allowsHitTesting(false) // Allow touches to pass through to buttons below
 
                 // User info overlay
                 VStack(alignment: .leading, spacing: 12) {
@@ -526,6 +498,71 @@ struct UserCardView: View {
             .cornerRadius(20)
         }
         .frame(maxHeight: .infinity) // Fill available space
+    }
+}
+
+// MARK: - Swipe Action Button Component
+
+/// Reusable button component for swipe actions with improved touch handling
+struct SwipeActionButton: View {
+    let icon: String
+    let iconSize: Font
+    let iconWeight: Font.Weight
+    let size: CGFloat
+    let colors: [Color]
+    let shadowColor: Color
+    let isProcessing: Bool
+    let action: () -> Void
+
+    @State private var isPressed = false
+
+    var body: some View {
+        Button {
+            HapticManager.shared.impact(.medium)
+            action()
+        } label: {
+            ZStack {
+                if isProcessing {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(1.2)
+                } else {
+                    Image(systemName: icon)
+                        .font(iconSize)
+                        .fontWeight(iconWeight)
+                        .foregroundColor(.white)
+                }
+            }
+            .frame(width: size, height: size)
+            .background(
+                LinearGradient(
+                    colors: colors,
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .opacity(isProcessing ? 0.7 : 1.0)
+            )
+            .clipShape(Circle())
+            .shadow(color: shadowColor, radius: isPressed ? 4 : 8, y: isPressed ? 2 : 4)
+            .scaleEffect(isPressed ? 0.85 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
+            .contentShape(Circle()) // Ensure full circle is tappable
+        }
+        .buttonStyle(PlainButtonStyle()) // Prevent default button styling
+        .opacity(isProcessing ? 0.6 : 1.0)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    if !isPressed {
+                        isPressed = true
+                    }
+                }
+                .onEnded { _ in
+                    isPressed = false
+                }
+        )
+        // Ensure minimum tap target size (44x44 points)
+        .frame(minWidth: max(size, 44), minHeight: max(size, 44))
     }
 }
 

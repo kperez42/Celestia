@@ -19,6 +19,7 @@ const receiptValidation = require('./modules/receiptValidation');
 const contentModeration = require('./modules/contentModeration');
 const rateLimiting = require('./modules/rateLimiting');
 const adminDashboard = require('./modules/adminDashboard');
+const notifications = require('./modules/notifications');
 
 // ============================================================================
 // API ENDPOINTS
@@ -514,6 +515,85 @@ function getConsumablesForTier(tier) {
   };
   return consumables[tier] || consumables.basic;
 }
+
+// ============================================================================
+// PUSH NOTIFICATIONS
+// ============================================================================
+
+/**
+ * Sends a match notification
+ */
+exports.sendMatchNotification = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { userId, matchData } = data;
+
+  try {
+    await notifications.sendMatchNotification(userId, matchData);
+    return { success: true };
+  } catch (error) {
+    functions.logger.error('Send match notification error', { error: error.message });
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
+ * Sends a message notification
+ */
+exports.sendMessageNotification = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { userId, messageData } = data;
+
+  try {
+    await notifications.sendMessageNotification(userId, messageData);
+    return { success: true };
+  } catch (error) {
+    functions.logger.error('Send message notification error', { error: error.message });
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
+ * Sends a like notification (premium users only)
+ */
+exports.sendLikeNotification = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { userId, likeData } = data;
+
+  try {
+    await notifications.sendLikeNotification(userId, likeData);
+    return { success: true };
+  } catch (error) {
+    functions.logger.error('Send like notification error', { error: error.message });
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
+ * Scheduled function to send daily engagement reminders
+ * Runs daily at 9 AM and 7 PM
+ */
+exports.sendDailyReminders = functions.pubsub
+  .schedule('0 9,19 * * *')
+  .timeZone('America/New_York')
+  .onRun(async (context) => {
+    try {
+      const result = await notifications.sendDailyEngagementReminders();
+      functions.logger.info('Daily reminders sent', result);
+      return result;
+    } catch (error) {
+      functions.logger.error('Daily reminders error', { error: error.message });
+      return { error: error.message };
+    }
+  });
 
 // Export admin object for use in modules
 exports.admin = admin;

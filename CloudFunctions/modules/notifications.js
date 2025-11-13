@@ -1,0 +1,355 @@
+/**
+ * Notifications Module
+ * Handles FCM push notifications with rich content and custom sounds
+ */
+
+const admin = require('firebase-admin');
+const functions = require('firebase-functions');
+
+/**
+ * Sends a push notification via FCM
+ * @param {string} token - FCM token
+ * @param {object} notification - Notification data
+ * @returns {object} Result
+ */
+async function sendPushNotification(token, notification) {
+  try {
+    const message = {
+      token,
+      notification: {
+        title: notification.title,
+        body: notification.body,
+        imageUrl: notification.imageUrl
+      },
+      data: notification.data || {},
+      apns: {
+        payload: {
+          aps: {
+            sound: notification.sound || 'default',
+            badge: notification.badge || 0,
+            category: notification.category || 'DEFAULT',
+            'mutable-content': 1 // Enable rich notifications
+          }
+        },
+        fcm_options: {
+          image: notification.imageUrl
+        }
+      },
+      android: {
+        notification: {
+          sound: notification.sound || 'default',
+          channelId: notification.channel || 'default',
+          priority: 'high',
+          defaultSound: true,
+          defaultVibrateTimings: true,
+          defaultLightSettings: true,
+          imageUrl: notification.imageUrl
+        }
+      }
+    };
+
+    const response = await admin.messaging().send(message);
+
+    functions.logger.info('Push notification sent', { token, messageId: response });
+
+    return {
+      success: true,
+      messageId: response
+    };
+
+  } catch (error) {
+    functions.logger.error('Push notification failed', { error: error.message, token });
+    throw error;
+  }
+}
+
+/**
+ * Sends a match notification
+ * @param {string} userId - User to notify
+ * @param {object} matchData - Match information
+ */
+async function sendMatchNotification(userId, matchData) {
+  const userDoc = await admin.firestore().collection('users').doc(userId).get();
+
+  if (!userDoc.exists) {
+    throw new Error('User not found');
+  }
+
+  const user = userDoc.data();
+  const fcmToken = user.fcmToken;
+
+  if (!fcmToken) {
+    functions.logger.info('No FCM token for user', { userId });
+    return;
+  }
+
+  // Check if notifications are enabled
+  if (!user.notificationsEnabled) {
+    functions.logger.info('Notifications disabled for user', { userId });
+    return;
+  }
+
+  const notification = {
+    title: "It's a Match! 💕",
+    body: `You and ${matchData.matchedUserName} liked each other!`,
+    sound: 'match_sound.wav',
+    badge: await getUnreadCount(userId),
+    category: 'MATCH',
+    imageUrl: matchData.matchedUserPhoto,
+    data: {
+      type: 'match',
+      matchId: matchData.matchId,
+      userId: matchData.matchedUserId,
+      userName: matchData.matchedUserName
+    }
+  };
+
+  await sendPushNotification(fcmToken, notification);
+
+  // Log the notification
+  await admin.firestore().collection('notification_logs').add({
+    userId,
+    type: 'match',
+    matchId: matchData.matchId,
+    sentAt: admin.firestore.FieldValue.serverTimestamp(),
+    delivered: true
+  });
+}
+
+/**
+ * Sends a message notification
+ * @param {string} userId - User to notify
+ * @param {object} messageData - Message information
+ */
+async function sendMessageNotification(userId, messageData) {
+  const userDoc = await admin.firestore().collection('users').doc(userId).get();
+
+  if (!userDoc.exists) {
+    return;
+  }
+
+  const user = userDoc.data();
+  const fcmToken = user.fcmToken;
+
+  if (!fcmToken || !user.notificationsEnabled) {
+    return;
+  }
+
+  const notification = {
+    title: messageData.senderName,
+    body: messageData.hasImage ? '📷 Sent a photo' : messageData.text,
+    sound: 'default',
+    badge: await getUnreadCount(userId),
+    category: 'MESSAGE',
+    imageUrl: messageData.imageUrl,
+    data: {
+      type: 'message',
+      matchId: messageData.matchId,
+      senderId: messageData.senderId,
+      senderName: messageData.senderName,
+      messageId: messageData.messageId
+    }
+  };
+
+  await sendPushNotification(fcmToken, notification);
+
+  await admin.firestore().collection('notification_logs').add({
+    userId,
+    type: 'message',
+    matchId: messageData.matchId,
+    messageId: messageData.messageId,
+    sentAt: admin.firestore.FieldValue.serverTimestamp(),
+    delivered: true
+  });
+}
+
+/**
+ * Sends a like notification (premium users only)
+ * @param {string} userId - User to notify
+ * @param {object} likeData - Like information
+ */
+async function sendLikeNotification(userId, likeData) {
+  const userDoc = await admin.firestore().collection('users').doc(userId).get();
+
+  if (!userDoc.exists) {
+    return;
+  }
+
+  const user = userDoc.data();
+
+  // Only send to premium users
+  if (!user.isPremium) {
+    functions.logger.info('Like notification skipped - user not premium', { userId });
+    return;
+  }
+
+  const fcmToken = user.fcmToken;
+
+  if (!fcmToken || !user.notificationsEnabled) {
+    return;
+  }
+
+  const isSuperLike = likeData.isSuperLike || false;
+
+  const notification = {
+    title: isSuperLike ? 'Someone Super Liked You! ⭐' : 'Someone Likes You! ❤️',
+    body: `${likeData.likerName} ${isSuperLike ? 'super liked' : 'liked'} your profile`,
+    sound: isSuperLike ? 'super_like_sound.wav' : 'default',
+    badge: await getUnreadCount(userId),
+    category: 'LIKE',
+    imageUrl: likeData.likerPhoto,
+    data: {
+      type: isSuperLike ? 'super_like' : 'like',
+      likerId: likeData.likerId,
+      likerName: likeData.likerName
+    }
+  };
+
+  await sendPushNotification(fcmToken, notification);
+
+  await admin.firestore().collection('notification_logs').add({
+    userId,
+    type: isSuperLike ? 'super_like' : 'like',
+    likerId: likeData.likerId,
+    sentAt: admin.firestore.FieldValue.serverTimestamp(),
+    delivered: true
+  });
+}
+
+/**
+ * Sends daily engagement reminders to inactive users
+ */
+async function sendDailyEngagementReminders() {
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
+
+  // Get users who were active 24-48 hours ago
+  const inactiveUsers = await admin.firestore()
+    .collection('users')
+    .where('lastActive', '>', twoDaysAgo)
+    .where('lastActive', '<', oneDayAgo)
+    .where('notificationsEnabled', '==', true)
+    .get();
+
+  functions.logger.info('Sending engagement reminders', { count: inactiveUsers.size });
+
+  const promises = [];
+
+  for (const userDoc of inactiveUsers.docs) {
+    const user = userDoc.data();
+    const userId = userDoc.id;
+
+    if (!user.fcmToken) {
+      continue;
+    }
+
+    // Get personalized stats
+    const stats = await getPersonalizedStats(userId);
+
+    let title = "We miss you! 💔";
+    let body = "Come back and see what's new";
+
+    // Personalize based on stats
+    if (stats.newMatches > 0) {
+      title = `You have ${stats.newMatches} new match${stats.newMatches === 1 ? '' : 'es'}! 💕`;
+      body = "Don't keep them waiting!";
+    } else if (stats.profileViews > 5) {
+      title = `${stats.profileViews} people viewed your profile! 👀`;
+      body = "Someone might be interested in you";
+    } else if (stats.newLikes > 0) {
+      title = `You have ${stats.newLikes} new like${stats.newLikes === 1 ? '' : 's'}! ❤️`;
+      body = "Check out who likes you";
+    }
+
+    const notification = {
+      title,
+      body,
+      sound: 'default',
+      badge: await getUnreadCount(userId),
+      category: 'ENGAGEMENT',
+      data: {
+        type: 'engagement_reminder',
+        newMatches: stats.newMatches.toString(),
+        profileViews: stats.profileViews.toString(),
+        newLikes: stats.newLikes.toString()
+      }
+    };
+
+    promises.push(sendPushNotification(user.fcmToken, notification));
+  }
+
+  await Promise.allSettled(promises);
+
+  functions.logger.info('Engagement reminders sent', { sent: promises.length });
+
+  return { sent: promises.length };
+}
+
+/**
+ * Gets unread message count for a user
+ * @param {string} userId - User ID
+ * @returns {number} Unread count
+ */
+async function getUnreadCount(userId) {
+  try {
+    const snapshot = await admin.firestore()
+      .collection('messages')
+      .where('receiverId', '==', userId)
+      .where('isRead', '==', false)
+      .get();
+
+    return snapshot.size;
+  } catch (error) {
+    return 0;
+  }
+}
+
+/**
+ * Gets personalized stats for a user
+ * @param {string} userId - User ID
+ * @returns {object} Stats
+ */
+async function getPersonalizedStats(userId) {
+  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  // Get new matches
+  const matchesSnapshot = await admin.firestore()
+    .collection('matches')
+    .where('user1Id', '==', userId)
+    .where('timestamp', '>', yesterday)
+    .get();
+
+  const newMatches = matchesSnapshot.size;
+
+  // Get profile views
+  const viewsSnapshot = await admin.firestore()
+    .collection('profile_views')
+    .where('viewedUserId', '==', userId)
+    .where('timestamp', '>', yesterday)
+    .get();
+
+  const profileViews = viewsSnapshot.size;
+
+  // Get new likes
+  const likesSnapshot = await admin.firestore()
+    .collection('likes')
+    .where('targetUserId', '==', userId)
+    .where('timestamp', '>', yesterday)
+    .get();
+
+  const newLikes = likesSnapshot.size;
+
+  return {
+    newMatches,
+    profileViews,
+    newLikes
+  };
+}
+
+module.exports = {
+  sendPushNotification,
+  sendMatchNotification,
+  sendMessageNotification,
+  sendLikeNotification,
+  sendDailyEngagementReminders
+};

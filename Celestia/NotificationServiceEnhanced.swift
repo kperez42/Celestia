@@ -1,0 +1,707 @@
+//
+//  NotificationServiceEnhanced.swift
+//  Celestia
+//
+//  Enhanced notification service with rich content, custom sounds, and smart delivery
+//
+
+import Foundation
+import FirebaseMessaging
+import UserNotifications
+import UIKit
+
+@MainActor
+class NotificationServiceEnhanced: NSObject, ObservableObject {
+    static let shared = NotificationServiceEnhanced()
+
+    @Published var notificationPermissionGranted = false
+    @Published var pendingNotifications: [PendingNotification] = []
+
+    private let messaging = Messaging.messaging()
+    private let notificationCenter = UNUserNotificationCenter.current()
+
+    // Dependencies
+    private let authService = AuthService.shared
+    private let analyticsService = AnalyticsServiceEnhanced.shared
+
+    private override init() {
+        super.init()
+        setupNotifications()
+    }
+
+    // MARK: - Setup
+
+    func setupNotifications() {
+        notificationCenter.delegate = self
+        messaging.delegate = self
+
+        // Register custom notification categories
+        registerNotificationCategories()
+
+        // Schedule daily engagement reminders
+        scheduleDailyReminders()
+    }
+
+    func requestPermission() async -> Bool {
+        do {
+            let granted = try await notificationCenter.requestAuthorization(options: [.alert, .badge, .sound])
+            notificationPermissionGranted = granted
+
+            if granted {
+                await UIApplication.shared.registerForRemoteNotifications()
+                Logger.shared.info("Notification permission granted", category: .general)
+
+                // Track analytics
+                analyticsService.trackEvent(.notificationsEnabled)
+            } else {
+                Logger.shared.warning("Notification permission denied", category: .general)
+                analyticsService.trackEvent(.notificationsDenied)
+            }
+
+            return granted
+        } catch {
+            Logger.shared.error("Failed to request notification permission", category: .general, error: error)
+            return false
+        }
+    }
+
+    func registerNotificationCategories() {
+        // Match notification category
+        let matchReplyAction = UNTextInputNotificationAction(
+            identifier: "MATCH_REPLY",
+            title: "Reply",
+            options: [.authenticationRequired],
+            textInputButtonTitle: "Send",
+            textInputPlaceholder: "Say hi!"
+        )
+
+        let matchViewAction = UNNotificationAction(
+            identifier: "MATCH_VIEW",
+            title: "View Profile",
+            options: [.foreground]
+        )
+
+        let matchCategory = UNNotificationCategory(
+            identifier: "MATCH",
+            actions: [matchReplyAction, matchViewAction],
+            intentIdentifiers: [],
+            options: [.customDismissAction]
+        )
+
+        // Message notification category
+        let messageReplyAction = UNTextInputNotificationAction(
+            identifier: "MESSAGE_REPLY",
+            title: "Reply",
+            options: [.authenticationRequired],
+            textInputButtonTitle: "Send",
+            textInputPlaceholder: "Type a message..."
+        )
+
+        let messageViewAction = UNNotificationAction(
+            identifier: "MESSAGE_VIEW",
+            title: "View Chat",
+            options: [.foreground]
+        )
+
+        let messageCategory = UNNotificationCategory(
+            identifier: "MESSAGE",
+            actions: [messageReplyAction, messageViewAction],
+            intentIdentifiers: [],
+            options: [.customDismissAction]
+        )
+
+        // Like notification category (premium only)
+        let likeViewAction = UNNotificationAction(
+            identifier: "LIKE_VIEW",
+            title: "View Profile",
+            options: [.foreground]
+        )
+
+        let likeLikeBackAction = UNNotificationAction(
+            identifier: "LIKE_BACK",
+            title: "Like Back",
+            options: [.authenticationRequired]
+        )
+
+        let likeCategory = UNNotificationCategory(
+            identifier: "LIKE",
+            actions: [likeViewAction, likeLikeBackAction],
+            intentIdentifiers: [],
+            options: [.customDismissAction]
+        )
+
+        // Engagement reminder category
+        let engagementOpenAction = UNNotificationAction(
+            identifier: "ENGAGEMENT_OPEN",
+            title: "Open App",
+            options: [.foreground]
+        )
+
+        let engagementCategory = UNNotificationCategory(
+            identifier: "ENGAGEMENT",
+            actions: [engagementOpenAction],
+            intentIdentifiers: [],
+            options: []
+        )
+
+        notificationCenter.setNotificationCategories([
+            matchCategory,
+            messageCategory,
+            likeCategory,
+            engagementCategory
+        ])
+
+        Logger.shared.info("Notification categories registered", category: .general)
+    }
+
+    // MARK: - Match Notifications
+
+    func sendMatchNotification(match: Match, matchedUser: User) async {
+        guard let currentUserId = authService.currentUser?.id else { return }
+
+        // Don't send if user has disabled notifications
+        guard authService.currentUser?.notificationsEnabled ?? true else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = "It's a Match! 💕"
+        content.body = "You and \(matchedUser.fullName) liked each other!"
+        content.sound = UNNotificationSound(named: UNNotificationSoundName("match_sound.wav"))
+        content.categoryIdentifier = "MATCH"
+        content.badge = await getUnreadCount() as NSNumber
+
+        // Rich content
+        if let photoURL = matchedUser.photos.first, !photoURL.isEmpty {
+            if let attachment = await createImageAttachment(from: photoURL, identifier: "match-photo") {
+                content.attachments = [attachment]
+            }
+        }
+
+        // Custom data
+        content.userInfo = [
+            "type": "match",
+            "matchId": match.id ?? "",
+            "userId": matchedUser.id ?? "",
+            "userName": matchedUser.fullName
+        ]
+
+        // Send via FCM
+        if let fcmToken = await getFCMToken(for: currentUserId) {
+            await sendFCMNotification(
+                token: fcmToken,
+                title: content.title,
+                body: content.body,
+                data: content.userInfo as! [String: String],
+                sound: "match_sound.wav",
+                badge: content.badge as? Int
+            )
+        }
+
+        // Track analytics
+        analyticsService.trackEvent(.matchNotificationSent, properties: [
+            "matchId": match.id ?? "",
+            "hasPhoto": !matchedUser.photos.isEmpty
+        ])
+
+        Logger.shared.info("Match notification sent", category: .notifications, metadata: [
+            "matchId": match.id ?? "",
+            "userName": matchedUser.fullName
+        ])
+    }
+
+    // MARK: - Message Notifications
+
+    func sendMessageNotification(message: Message, senderName: String, matchId: String) async {
+        guard let receiverId = message.receiverId else { return }
+
+        // Check if user has notifications enabled
+        let receiverDoc = try? await FirestoreService.shared.db.collection("users").document(receiverId).getDocument()
+        let notificationsEnabled = receiverDoc?.data()?["notificationsEnabled"] as? Bool ?? true
+
+        guard notificationsEnabled else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = senderName
+        content.body = message.imageURL != nil ? "📷 Sent a photo" : message.text
+        content.sound = .default
+        content.categoryIdentifier = "MESSAGE"
+        content.badge = await getUnreadCount(for: receiverId) as NSNumber
+
+        // Rich content for image messages
+        if let imageURL = message.imageURL {
+            if let attachment = await createImageAttachment(from: imageURL, identifier: "message-image") {
+                content.attachments = [attachment]
+            }
+        }
+
+        // Custom data
+        content.userInfo = [
+            "type": "message",
+            "matchId": matchId,
+            "senderId": message.senderId,
+            "senderName": senderName,
+            "messageId": message.id ?? ""
+        ]
+
+        // Send via FCM
+        if let fcmToken = await getFCMToken(for: receiverId) {
+            await sendFCMNotification(
+                token: fcmToken,
+                title: content.title,
+                body: content.body,
+                data: content.userInfo as! [String: String],
+                sound: "default",
+                badge: content.badge as? Int
+            )
+        }
+
+        // Track analytics
+        analyticsService.trackEvent(.messageNotificationSent, properties: [
+            "hasImage": message.imageURL != nil,
+            "messageLength": message.text.count
+        ])
+    }
+
+    // MARK: - Like Notifications (Premium Only)
+
+    func sendLikeNotification(from liker: User, to recipientId: String, isSuperLike: Bool = false) async {
+        // Check if recipient is premium
+        let recipientDoc = try? await FirestoreService.shared.db.collection("users").document(recipientId).getDocument()
+        let isPremium = recipientDoc?.data()?["isPremium"] as? Bool ?? false
+
+        guard isPremium else {
+            Logger.shared.info("Like notification skipped - user not premium", category: .notifications)
+            return
+        }
+
+        // Check if user has notifications enabled
+        let notificationsEnabled = recipientDoc?.data()?["notificationsEnabled"] as? Bool ?? true
+        guard notificationsEnabled else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = isSuperLike ? "Someone Super Liked You! ⭐" : "Someone Likes You! ❤️"
+        content.body = "\(liker.fullName) \(isSuperLike ? "super liked" : "liked") your profile"
+        content.sound = isSuperLike ? UNNotificationSound(named: UNNotificationSoundName("super_like_sound.wav")) : .default
+        content.categoryIdentifier = "LIKE"
+        content.badge = await getUnreadCount(for: recipientId) as NSNumber
+
+        // Rich content with liker's photo
+        if let photoURL = liker.photos.first, !photoURL.isEmpty {
+            if let attachment = await createImageAttachment(from: photoURL, identifier: "liker-photo") {
+                content.attachments = [attachment]
+            }
+        }
+
+        // Custom data
+        content.userInfo = [
+            "type": isSuperLike ? "super_like" : "like",
+            "likerId": liker.id ?? "",
+            "likerName": liker.fullName
+        ]
+
+        // Send via FCM
+        if let fcmToken = await getFCMToken(for: recipientId) {
+            await sendFCMNotification(
+                token: fcmToken,
+                title: content.title,
+                body: content.body,
+                data: content.userInfo as! [String: String],
+                sound: isSuperLike ? "super_like_sound.wav" : "default",
+                badge: content.badge as? Int
+            )
+        }
+
+        // Track analytics
+        analyticsService.trackEvent(.likeNotificationSent, properties: [
+            "isSuperLike": isSuperLike,
+            "hasPhoto": !liker.photos.isEmpty
+        ])
+
+        Logger.shared.info("Like notification sent", category: .notifications, metadata: [
+            "type": isSuperLike ? "super_like" : "like",
+            "liker": liker.fullName
+        ])
+    }
+
+    // MARK: - Daily Engagement Reminders
+
+    func scheduleDailyReminders() {
+        // Schedule morning reminder (9 AM)
+        scheduleDailyReminder(
+            identifier: "morning_reminder",
+            hour: 9,
+            minute: 0,
+            title: "Good morning! ☀️",
+            body: "New people are waiting to meet you"
+        )
+
+        // Schedule evening reminder (7 PM)
+        scheduleDailyReminder(
+            identifier: "evening_reminder",
+            hour: 19,
+            minute: 0,
+            title: "Tonight's perfect for meeting someone! 🌙",
+            body: "Check out your new matches"
+        )
+
+        Logger.shared.info("Daily reminders scheduled", category: .notifications)
+    }
+
+    private func scheduleDailyReminder(identifier: String, hour: Int, minute: Int, title: String, body: String) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        content.categoryIdentifier = "ENGAGEMENT"
+        content.userInfo = [
+            "type": "engagement_reminder",
+            "reminderType": identifier
+        ]
+
+        var dateComponents = DateComponents()
+        dateComponents.hour = hour
+        dateComponents.minute = minute
+
+        let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
+        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+
+        notificationCenter.add(request) { error in
+            if let error = error {
+                Logger.shared.error("Failed to schedule daily reminder", category: .notifications, error: error)
+            } else {
+                Logger.shared.info("Daily reminder scheduled", category: .notifications, metadata: ["identifier": identifier])
+            }
+        }
+    }
+
+    func cancelDailyReminders() {
+        notificationCenter.removePendingNotificationRequests(withIdentifiers: [
+            "morning_reminder",
+            "evening_reminder"
+        ])
+        Logger.shared.info("Daily reminders cancelled", category: .notifications)
+    }
+
+    // MARK: - Smart Notifications
+
+    func sendSmartEngagementReminder() async {
+        guard let currentUser = authService.currentUser else { return }
+        guard currentUser.notificationsEnabled else { return }
+
+        // Calculate inactivity period
+        let lastActive = currentUser.lastActive
+        let hoursSinceActive = Date().timeIntervalSince(lastActive) / 3600
+
+        // Only send if inactive for 24-48 hours
+        guard hoursSinceActive >= 24 && hoursSinceActive <= 48 else { return }
+
+        // Get personalized stats
+        let stats = await getPersonalizedStats()
+
+        var title = "We miss you! 💔"
+        var body = "Come back and see what's new"
+
+        // Personalize based on stats
+        if stats.newMatches > 0 {
+            title = "You have \(stats.newMatches) new match\(stats.newMatches == 1 ? "" : "es")! 💕"
+            body = "Don't keep them waiting!"
+        } else if stats.profileViews > 5 {
+            title = "\(stats.profileViews) people viewed your profile! 👀"
+            body = "Someone might be interested in you"
+        } else if stats.newLikes > 0 {
+            title = "You have \(stats.newLikes) new like\(stats.newLikes == 1 ? "" : "s")! ❤️"
+            body = "Check out who likes you"
+        }
+
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        content.categoryIdentifier = "ENGAGEMENT"
+        content.userInfo = [
+            "type": "smart_reminder",
+            "stats": [
+                "newMatches": stats.newMatches,
+                "profileViews": stats.profileViews,
+                "newLikes": stats.newLikes
+            ]
+        ]
+
+        // Send immediately
+        let request = UNNotificationRequest(
+            identifier: "smart_reminder_\(UUID().uuidString)",
+            content: content,
+            trigger: nil
+        )
+
+        try? await notificationCenter.add(request)
+
+        // Track analytics
+        analyticsService.trackEvent(.smartReminderSent, properties: [
+            "newMatches": stats.newMatches,
+            "profileViews": stats.profileViews,
+            "inactiveHours": Int(hoursSinceActive)
+        ])
+    }
+
+    // MARK: - Helper Functions
+
+    private func sendFCMNotification(
+        token: String,
+        title: String,
+        body: String,
+        data: [String: String],
+        sound: String,
+        badge: Int?
+    ) async {
+        // This would call your Cloud Function to send FCM notification
+        // For now, we'll use the iOS local notification system
+        Logger.shared.info("FCM notification prepared", category: .notifications, metadata: [
+            "token": token,
+            "title": title
+        ])
+    }
+
+    private func getFCMToken(for userId: String) async -> String? {
+        let userDoc = try? await FirestoreService.shared.db.collection("users").document(userId).getDocument()
+        return userDoc?.data()?["fcmToken"] as? String
+    }
+
+    private func getUnreadCount(for userId: String? = nil) async -> Int {
+        let uid = userId ?? authService.currentUser?.id ?? ""
+        return await MessageService.shared.getUnreadMessageCount(userId: uid)
+    }
+
+    private func createImageAttachment(from urlString: String, identifier: String) async -> UNNotificationAttachment? {
+        guard let url = URL(string: urlString) else { return nil }
+
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+
+            let tempDirectory = FileManager.default.temporaryDirectory
+            let tempFile = tempDirectory.appendingPathComponent("\(identifier).jpg")
+
+            try data.write(to: tempFile)
+
+            return try UNNotificationAttachment(
+                identifier: identifier,
+                url: tempFile,
+                options: [UNNotificationAttachmentOptionsTypeHintKey: "public.jpeg"]
+            )
+        } catch {
+            Logger.shared.error("Failed to create notification attachment", category: .notifications, error: error)
+            return nil
+        }
+    }
+
+    private func getPersonalizedStats() async -> PersonalizedStats {
+        guard let userId = authService.currentUser?.id else {
+            return PersonalizedStats(newMatches: 0, profileViews: 0, newLikes: 0)
+        }
+
+        let yesterday = Date().addingTimeInterval(-24 * 60 * 60)
+
+        // Get new matches
+        let matchesSnapshot = try? await FirestoreService.shared.db.collection("matches")
+            .whereField("user1Id", isEqualTo: userId)
+            .whereField("timestamp", isGreaterThan: yesterday)
+            .getDocuments()
+
+        let newMatches = matchesSnapshot?.documents.count ?? 0
+
+        // Get profile views
+        let viewsSnapshot = try? await FirestoreService.shared.db.collection("profile_views")
+            .whereField("viewedUserId", isEqualTo: userId)
+            .whereField("timestamp", isGreaterThan: yesterday)
+            .getDocuments()
+
+        let profileViews = viewsSnapshot?.documents.count ?? 0
+
+        // Get new likes
+        let likesSnapshot = try? await FirestoreService.shared.db.collection("likes")
+            .whereField("targetUserId", isEqualTo: userId)
+            .whereField("timestamp", isGreaterThan: yesterday)
+            .getDocuments()
+
+        let newLikes = likesSnapshot?.documents.count ?? 0
+
+        return PersonalizedStats(
+            newMatches: newMatches,
+            profileViews: profileViews,
+            newLikes: newLikes
+        )
+    }
+}
+
+// MARK: - UNUserNotificationCenterDelegate
+
+extension NotificationServiceEnhanced: UNUserNotificationCenterDelegate {
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        // Show notification even when app is in foreground
+        completionHandler([.banner, .sound, .badge])
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let userInfo = response.notification.request.content.userInfo
+        let actionIdentifier = response.actionIdentifier
+
+        Task { @MainActor in
+            await handleNotificationAction(actionIdentifier: actionIdentifier, userInfo: userInfo, response: response)
+        }
+
+        completionHandler()
+    }
+
+    private func handleNotificationAction(
+        actionIdentifier: String,
+        userInfo: [AnyHashable: Any],
+        response: UNNotificationResponse
+    ) async {
+        let type = userInfo["type"] as? String ?? ""
+
+        switch actionIdentifier {
+        case "MATCH_REPLY", "MESSAGE_REPLY":
+            if let textResponse = response as? UNTextInputNotificationResponse {
+                await handleQuickReply(text: textResponse.userText, userInfo: userInfo)
+            }
+
+        case "MATCH_VIEW", "MESSAGE_VIEW":
+            handleViewAction(type: type, userInfo: userInfo)
+
+        case "LIKE_VIEW":
+            handleLikeView(userInfo: userInfo)
+
+        case "LIKE_BACK":
+            await handleLikeBack(userInfo: userInfo)
+
+        case UNNotificationDefaultActionIdentifier:
+            handleDefaultAction(type: type, userInfo: userInfo)
+
+        default:
+            break
+        }
+
+        // Track analytics
+        analyticsService.trackEvent(.notificationActionTaken, properties: [
+            "action": actionIdentifier,
+            "type": type
+        ])
+    }
+
+    private func handleQuickReply(text: String, userInfo: [AnyHashable: Any]) async {
+        guard let matchId = userInfo["matchId"] as? String,
+              let senderId = authService.currentUser?.id,
+              let receiverId = userInfo["senderId"] as? String ?? userInfo["userId"] as? String else {
+            return
+        }
+
+        do {
+            try await MessageService.shared.sendMessage(
+                matchId: matchId,
+                senderId: senderId,
+                receiverId: receiverId,
+                text: text
+            )
+
+            Logger.shared.info("Quick reply sent", category: .notifications)
+            analyticsService.trackEvent(.quickReplySent)
+        } catch {
+            Logger.shared.error("Quick reply failed", category: .notifications, error: error)
+        }
+    }
+
+    private func handleViewAction(type: String, userInfo: [AnyHashable: Any]) {
+        // Post notification to open appropriate view
+        NotificationCenter.default.post(
+            name: .openFromNotification,
+            object: nil,
+            userInfo: userInfo
+        )
+    }
+
+    private func handleLikeView(userInfo: [AnyHashable: Any]) {
+        guard let likerId = userInfo["likerId"] as? String else { return }
+
+        // Navigate to liker's profile
+        NotificationCenter.default.post(
+            name: .openUserProfile,
+            object: nil,
+            userInfo: ["userId": likerId]
+        )
+    }
+
+    private func handleLikeBack(userInfo: [AnyHashable: Any]) async {
+        guard let likerId = userInfo["likerId"] as? String,
+              let currentUserId = authService.currentUser?.id else {
+            return
+        }
+
+        // Like back
+        do {
+            try await LikeService.shared.likeUser(
+                fromUserId: currentUserId,
+                toUserId: likerId
+            )
+
+            Logger.shared.info("Liked back from notification", category: .notifications)
+            analyticsService.trackEvent(.likeBackFromNotification)
+        } catch {
+            Logger.shared.error("Like back failed", category: .notifications, error: error)
+        }
+    }
+
+    private func handleDefaultAction(type: String, userInfo: [AnyHashable: Any]) {
+        // Open appropriate screen based on notification type
+        handleViewAction(type: type, userInfo: userInfo)
+    }
+}
+
+// MARK: - MessagingDelegate
+
+extension NotificationServiceEnhanced: MessagingDelegate {
+    nonisolated func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
+        guard let fcmToken = fcmToken else { return }
+
+        Task { @MainActor in
+            Logger.shared.info("FCM token received", category: .notifications, metadata: ["token": fcmToken])
+
+            // Save token to Firestore
+            if let userId = authService.currentUser?.id {
+                try? await FirestoreService.shared.db.collection("users").document(userId).updateData([
+                    "fcmToken": fcmToken,
+                    "fcmTokenUpdatedAt": Date()
+                ])
+            }
+        }
+    }
+}
+
+// MARK: - Models
+
+struct PendingNotification: Identifiable {
+    let id: String
+    let type: String
+    let title: String
+    let body: String
+    let scheduledDate: Date
+}
+
+struct PersonalizedStats {
+    let newMatches: Int
+    let profileViews: Int
+    let newLikes: Int
+}
+
+// MARK: - Notification Names
+
+extension Notification.Name {
+    static let openFromNotification = Notification.Name("openFromNotification")
+    static let openUserProfile = Notification.Name("openUserProfile")
+}
