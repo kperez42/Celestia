@@ -80,7 +80,7 @@ struct ChatView: View {
             Text("You won't be able to message each other anymore, and this match will be removed from your list.")
         }
         .detectScreenshots(
-            context: .chat(
+            context: ScreenshotDetectionService.ScreenshotContext.chat(
                 matchId: match.id ?? "",
                 otherUserId: otherUser.id ?? ""
             ),
