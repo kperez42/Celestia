@@ -80,29 +80,6 @@ struct SocialMediaVerificationView: View {
 
 // MARK: - Safety Tools Views
 
-struct BlockedUsersView: View {
-    @Environment(\.dismiss) var dismiss
-
-    var body: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "hand.raised.fill")
-                .font(.system(size: 60))
-                .foregroundColor(.red)
-
-            Text("Blocked Users")
-                .font(.title.bold())
-
-            Text("Manage your blocked accounts. Coming soon")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-        }
-        .navigationTitle("Blocked Users")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
 struct ReportingCenterView: View {
     @Environment(\.dismiss) var dismiss
 
