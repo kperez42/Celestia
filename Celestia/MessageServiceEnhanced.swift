@@ -426,7 +426,7 @@ class MessageServiceEnhanced: ObservableObject {
     }
 
     private func updateMergedMessages() {
-        mergeMessages(firebaseMessages: messages.filter { !$0.id.isEmpty })
+        mergeMessages(firebaseMessages: messages.filter { $0.id?.isEmpty == false })
     }
 
     private func removeConfirmedOptimisticMessages(firebaseMessages: [Message]) {
