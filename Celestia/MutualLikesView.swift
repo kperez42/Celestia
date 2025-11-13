@@ -135,6 +135,7 @@ struct MutualLikesView: View {
 
 struct MutualLikeCard: View {
     let user: User
+    @EnvironmentObject var authService: AuthService
     @State private var showUserDetail = false
 
     var body: some View {
