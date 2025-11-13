@@ -81,7 +81,7 @@ protocol MessageServiceProtocol: ObservableObject {
     func listenToMessages(matchId: String)
     func stopListening()
     func sendMessage(matchId: String, senderId: String, receiverId: String, text: String) async throws
-    func sendImageMessage(matchId: String, senderId: String, receiverId: String, imageURL: String) async throws
+    func sendImageMessage(matchId: String, senderId: String, receiverId: String, imageURL: String, caption: String?) async throws
     func deleteMessage(messageId: String) async throws
 }
 
@@ -103,7 +103,7 @@ protocol ReferralManagerProtocol: ObservableObject {
     var leaderboard: [ReferralLeaderboardEntry] { get }
     var isLoading: Bool { get }
 
-    func generateReferralCode(for userId: String) -> String
+    func generateReferralCode(for userId: String) async throws -> String
     func initializeReferralCode(for user: inout User) async throws
     func processReferralSignup(newUser: User, referralCode: String) async throws
     func awardPremiumDays(userId: String, days: Int, reason: String) async throws

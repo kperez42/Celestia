@@ -30,9 +30,9 @@ class MessageService: ObservableObject {
             .order(by: "timestamp", descending: false)
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self else { return }
-                
+
                 if let error = error {
-                    print("❌ Error listening to messages: \(error)")
+                    Logger.shared.error("Error listening to messages", category: .messaging, error: error)
                     Task { @MainActor in
                         self.error = error
                     }
@@ -132,7 +132,7 @@ class MessageService: ObservableObject {
             )
         }
 
-        print("✅ Message sent successfully")
+        Logger.shared.info("Message sent successfully", category: .messaging)
     }
     
     /// Send an image message
@@ -140,20 +140,24 @@ class MessageService: ObservableObject {
         matchId: String,
         senderId: String,
         receiverId: String,
-        imageURL: String
+        imageURL: String,
+        caption: String? = nil
     ) async throws {
+        let messageText = caption?.isEmpty == false ? caption! : "📷 Photo"
+        let lastMessageText = caption?.isEmpty == false ? "📷 \(caption!)" : "📷 Photo"
+
         let message = Message(
             matchId: matchId,
             senderId: senderId,
             receiverId: receiverId,
-            text: "📷 Photo",
+            text: messageText,
             imageURL: imageURL
         )
 
         _ = try db.collection("messages").addDocument(from: message)
 
         try await db.collection("matches").document(matchId).updateData([
-            "lastMessage": "📷 Photo",
+            "lastMessage": lastMessageText,
             "lastMessageTimestamp": FieldValue.serverTimestamp(),
             "unreadCount.\(receiverId)": FieldValue.increment(Int64(1))
         ])
@@ -181,10 +185,10 @@ class MessageService: ObservableObject {
             try await db.collection("matches").document(matchId).updateData([
                 "unreadCount.\(userId)": 0
             ])
-            
-            print("✅ Messages marked as read")
+
+            Logger.shared.info("Messages marked as read", category: .messaging)
         } catch {
-            print("❌ Error marking messages as read: \(error)")
+            Logger.shared.error("Error marking messages as read", category: .messaging, error: error)
         }
     }
     
@@ -205,7 +209,7 @@ class MessageService: ObservableObject {
             }
             try await batch.commit()
         } catch {
-            print("❌ Error marking messages as delivered: \(error)")
+            Logger.shared.error("Error marking messages as delivered", category: .messaging, error: error)
         }
     }
     
@@ -253,7 +257,7 @@ class MessageService: ObservableObject {
                 .getDocuments()
             return snapshot.documents.count
         } catch {
-            print("Error getting unread count: \(error)")
+            Logger.shared.error("Error getting unread count", category: .messaging, error: error)
             return 0
         }
     }

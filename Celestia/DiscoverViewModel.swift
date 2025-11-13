@@ -23,6 +23,7 @@ class DiscoverViewModel: ObservableObject {
     @Published var showingFilters = false
     @Published var dragOffset: CGSize = .zero
     @Published var isProcessingAction = false
+    @Published var showingUpgradeSheet = false
 
     var remainingCount: Int {
         return max(0, users.count - currentIndex)
@@ -101,7 +102,7 @@ class DiscoverViewModel: ObservableObject {
                 guard !Task.isCancelled else { return }
                 completion(true)
             } catch {
-                print("Error sending interest: \(error)")
+                Logger.shared.error("Error sending interest", category: .matching, error: error)
                 guard !Task.isCancelled else { return }
                 completion(false)
             }
@@ -136,19 +137,111 @@ class DiscoverViewModel: ObservableObject {
     func handleLike() async {
         guard currentIndex < users.count, !isProcessingAction else { return }
         isProcessingAction = true
-        let user = users[currentIndex]
 
-        // Move to next card
+        let likedUser = users[currentIndex]
+        guard let currentUser = AuthService.shared.currentUser,
+              let currentUserId = currentUser.id,
+              let likedUserId = likedUser.id else {
+            isProcessingAction = false
+            return
+        }
+
+        // Check daily like limit for non-premium users
+        if !currentUser.isPremium {
+            let canLike = await checkDailyLikeLimit()
+            if !canLike {
+                isProcessingAction = false
+                showingUpgradeSheet = true
+                Logger.shared.warning("Daily like limit reached. User needs to upgrade to Premium", category: .matching)
+                return
+            }
+        }
+
+        // Move to next card with animation
         withAnimation {
             currentIndex += 1
             dragOffset = .zero
         }
 
-        // Simulate network delay
-        try? await Task.sleep(nanoseconds: 300_000_000)
-        isProcessingAction = false
+        // Send like to backend
+        do {
+            let isMatch = try await SwipeService.shared.likeUser(
+                fromUserId: currentUserId,
+                toUserId: likedUserId,
+                isSuperLike: false
+            )
 
-        // TODO: Implement like logic (send interest, check for match, etc.)
+            // Decrement daily like counter if not premium
+            if !currentUser.isPremium {
+                await decrementDailyLikes()
+            }
+
+            if isMatch {
+                // Show match animation
+                await MainActor.run {
+                    self.matchedUser = likedUser
+                    self.showingMatchAnimation = true
+                    HapticManager.shared.notification(.success)
+                }
+                Logger.shared.info("Match created with \(likedUser.fullName)", category: .matching)
+            } else {
+                Logger.shared.info("Like sent to \(likedUser.fullName)", category: .matching)
+            }
+        } catch {
+            Logger.shared.error("Error sending like", category: .matching, error: error)
+            // Still move forward even if like fails
+        }
+
+        isProcessingAction = false
+    }
+
+    /// Check if user has daily likes remaining
+    private func checkDailyLikeLimit() async -> Bool {
+        guard let userId = AuthService.shared.currentUser?.id else { return false }
+
+        let db = Firestore.firestore()
+        let userRef = db.collection("users").document(userId)
+
+        do {
+            let document = try await userRef.getDocument()
+            guard let data = document.data() else { return false }
+
+            let lastResetDate = (data["lastLikeResetDate"] as? Timestamp)?.dateValue() ?? Date()
+            var likesRemaining = data["likesRemainingToday"] as? Int ?? 50
+
+            // Check if we need to reset (new day)
+            if !Calendar.current.isDate(lastResetDate, inSameDayAs: Date()) {
+                // Reset to 50 likes
+                try await userRef.updateData([
+                    "likesRemainingToday": 50,
+                    "lastLikeResetDate": Timestamp(date: Date())
+                ])
+                await AuthService.shared.fetchUser()
+                return true
+            }
+
+            return likesRemaining > 0
+        } catch {
+            Logger.shared.error("Error checking daily like limit", category: .database, error: error)
+            return true // Allow on error
+        }
+    }
+
+    /// Decrement daily like count
+    private func decrementDailyLikes() async {
+        guard let userId = AuthService.shared.currentUser?.id else { return }
+
+        let db = Firestore.firestore()
+        let userRef = db.collection("users").document(userId)
+
+        do {
+            try await userRef.updateData([
+                "likesRemainingToday": FieldValue.increment(Int64(-1))
+            ])
+            await AuthService.shared.fetchUser()
+        } catch {
+            Logger.shared.error("Error decrementing daily likes", category: .database, error: error)
+        }
     }
 
     /// Handle pass action
@@ -156,44 +249,134 @@ class DiscoverViewModel: ObservableObject {
         guard currentIndex < users.count, !isProcessingAction else { return }
         isProcessingAction = true
 
-        // Move to next card
+        let passedUser = users[currentIndex]
+        guard let currentUserId = AuthService.shared.currentUser?.id,
+              let passedUserId = passedUser.id else {
+            isProcessingAction = false
+            return
+        }
+
+        // Move to next card with animation
         withAnimation {
             currentIndex += 1
             dragOffset = .zero
         }
 
-        // Simulate network delay
-        try? await Task.sleep(nanoseconds: 300_000_000)
-        isProcessingAction = false
+        // Record pass in backend
+        do {
+            try await SwipeService.shared.passUser(
+                fromUserId: currentUserId,
+                toUserId: passedUserId
+            )
+            Logger.shared.info("Pass recorded for \(passedUser.fullName)", category: .matching)
+        } catch {
+            Logger.shared.error("Error recording pass", category: .matching, error: error)
+            // Still move forward even if pass fails
+        }
 
-        // TODO: Implement pass logic
+        isProcessingAction = false
     }
 
     /// Handle super like action
     func handleSuperLike() async {
         guard currentIndex < users.count, !isProcessingAction else { return }
         isProcessingAction = true
-        let user = users[currentIndex]
 
-        // Move to next card
+        let superLikedUser = users[currentIndex]
+        guard let currentUser = AuthService.shared.currentUser,
+              let currentUserId = currentUser.id,
+              let superLikedUserId = superLikedUser.id else {
+            isProcessingAction = false
+            return
+        }
+
+        // Check if user has super likes remaining
+        if currentUser.superLikesRemaining <= 0 {
+            isProcessingAction = false
+            showingUpgradeSheet = true
+            Logger.shared.warning("No Super Likes remaining. User needs to purchase more", category: .payment)
+            return
+        }
+
+        // Move to next card with animation
         withAnimation {
             currentIndex += 1
             dragOffset = .zero
         }
 
-        // Simulate network delay
-        try? await Task.sleep(nanoseconds: 300_000_000)
-        isProcessingAction = false
+        // Send super like to backend
+        do {
+            let isMatch = try await SwipeService.shared.likeUser(
+                fromUserId: currentUserId,
+                toUserId: superLikedUserId,
+                isSuperLike: true
+            )
 
-        // TODO: Implement super like logic (send super like interest, check for match, etc.)
+            // Deduct super like from balance
+            await decrementSuperLikes()
+
+            if isMatch {
+                // Show match animation
+                await MainActor.run {
+                    self.matchedUser = superLikedUser
+                    self.showingMatchAnimation = true
+                    HapticManager.shared.notification(.success)
+                }
+                Logger.shared.info("Super Like resulted in a match with \(superLikedUser.fullName)", category: .matching)
+            } else {
+                Logger.shared.info("Super Like sent to \(superLikedUser.fullName)", category: .matching)
+            }
+        } catch {
+            Logger.shared.error("Error sending super like", category: .matching, error: error)
+            // Still move forward even if super like fails
+        }
+
+        isProcessingAction = false
+    }
+
+    /// Decrement super like count
+    private func decrementSuperLikes() async {
+        guard let userId = AuthService.shared.currentUser?.id else { return }
+
+        let db = Firestore.firestore()
+        let userRef = db.collection("users").document(userId)
+
+        do {
+            try await userRef.updateData([
+                "superLikesRemaining": FieldValue.increment(Int64(-1))
+            ])
+            await AuthService.shared.fetchUser()
+            Logger.shared.info("Super Like used. Remaining: \(AuthService.shared.currentUser?.superLikesRemaining ?? 0)", category: .matching)
+        } catch {
+            Logger.shared.error("Error decrementing super likes", category: .database, error: error)
+        }
     }
 
     /// Apply filters
     func applyFilters() {
-        // TODO: Implement filter logic
         currentIndex = 0
+
+        guard let currentUser = AuthService.shared.currentUser else {
+            Logger.shared.warning("Cannot apply filters: No current user", category: .matching)
+            return
+        }
+
+        // Get current user location
+        let currentLocation: (lat: Double, lon: Double)? = {
+            if let lat = currentUser.latitude, let lon = currentUser.longitude {
+                return (lat, lon)
+            }
+            return nil
+        }()
+
+        // Clear current users and reload with filters
         users.removeAll()
-        // Re-load users with filters
+        lastDocument = nil
+
+        // Reload users which will automatically apply filters through loadUsers(currentUser:)
+        loadUsers(currentUser: currentUser)
+
+        Logger.shared.info("Filters applied. Active filters: \(DiscoveryFilters.shared.hasActiveFilters)", category: .matching)
     }
 
     /// Reset filters to default
@@ -223,8 +406,12 @@ class DiscoverViewModel: ObservableObject {
 
     /// Load users (no parameters version for view)
     func loadUsers() async {
-        // TODO: Get current user from AuthService and call loadUsers(currentUser:)
-        // For now, just stub
+        guard let currentUser = AuthService.shared.currentUser else {
+            Logger.shared.warning("Cannot load users: No current user", category: .matching)
+            return
+        }
+
+        loadUsers(currentUser: currentUser)
     }
 
     /// Cleanup method to cancel ongoing tasks

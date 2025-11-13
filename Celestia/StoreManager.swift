@@ -243,7 +243,7 @@ class StoreManager: ObservableObject {
         case .consumable(let type):
             // Add consumable to balance
             let amount = getConsumableAmount(for: transaction.productID)
-            SubscriptionManager.shared.addConsumable(type, amount: amount)
+            await SubscriptionManager.shared.addConsumable(type, amount: amount)
         }
     }
 

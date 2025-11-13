@@ -28,7 +28,7 @@ protocol NotificationSending {
 
 protocol MessageSending {
     func sendMessage(matchId: String, senderId: String, receiverId: String, text: String) async throws
-    func sendImageMessage(matchId: String, senderId: String, receiverId: String, imageURL: String) async throws
+    func sendImageMessage(matchId: String, senderId: String, receiverId: String, imageURL: String, caption: String?) async throws
 }
 
 // MARK: - User Service Protocol
