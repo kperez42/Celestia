@@ -567,14 +567,3 @@ struct OfflineIndicator: View {
         }
     }
 }
-
-// MARK: - String Extension for Hashing
-
-extension String {
-    /// Generate SHA256 hash for cache keys
-    func sha256() -> String {
-        let data = Data(self.utf8)
-        let hash = SHA256.hash(data: data)
-        return hash.compactMap { String(format: "%02x", $0) }.joined()
-    }
-}
