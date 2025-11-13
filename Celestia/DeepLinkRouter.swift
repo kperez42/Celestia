@@ -95,7 +95,7 @@ class DeepLinkRouter: ObservableObject {
 
         // Check if user is authenticated for protected routes
         if requiresAuthentication(deepLink) {
-            guard DependencyContainer.shared.authService.userSession != nil else {
+            guard AuthService.shared.userSession != nil else {
                 logger.warning("Deep link requires authentication, storing for later", category: .general)
                 pendingDeepLink = deepLink
                 return false
@@ -323,7 +323,7 @@ class DeepLinkRouter: ObservableObject {
 
         do {
             // Apply the verification action code
-            try await DependencyContainer.shared.authService.verifyEmail(withToken: token)
+            try await AuthService.shared.verifyEmail(withToken: token)
 
             logger.info("Email verification completed successfully", category: .general)
             CrashlyticsManager.shared.logEvent("email_verification_success")

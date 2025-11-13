@@ -135,7 +135,7 @@ class PushNotificationManager: NSObject, ObservableObject {
 
     /// Send tokens to backend
     private func sendTokenToBackend(apnsToken: String?, fcmToken: String?) async {
-        guard let userId = DependencyContainer.shared.authService.currentUser?.id else {
+        guard let userId = AuthService.shared.currentUser?.id else {
             Logger.shared.warning("Cannot send token: user not authenticated", category: .general)
             return
         }
