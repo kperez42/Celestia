@@ -178,6 +178,13 @@ class ImageUploadService {
         return try await uploadImage(image, path: "chat_images/\(matchId)")
     }
 
+    func uploadGalleryPhoto(_ image: UIImage, userId: String, index: Int) async throws -> String {
+        guard !userId.isEmpty else {
+            throw CelestiaError.invalidData
+        }
+        return try await uploadImage(image, path: "gallery_photos/\(userId)/photo_\(index)")
+    }
+
     // MARK: - Batch Upload
 
     func uploadMultipleImages(_ images: [UIImage], path: String, maxImages: Int = 6) async throws -> [String] {
