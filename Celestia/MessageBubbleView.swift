@@ -128,23 +128,65 @@ struct MessageBubbleGradient: View {
             if isFromCurrentUser {
                 Spacer(minLength: 60)
             }
-            
+
             VStack(alignment: isFromCurrentUser ? .trailing : .leading, spacing: 4) {
-                // Message text
-                Text(message.text)
-                    .padding(12)
-                    .background {
-                        bubbleBackground
+                // Message content (image or text)
+                if let imageURL = message.imageURL, !imageURL.isEmpty {
+                    // Image message
+                    AsyncImage(url: URL(string: imageURL)) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                                .frame(maxWidth: 250, maxHeight: 300)
+                                .clipShape(RoundedRectangle(cornerRadius: 16))
+                                .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+                        case .failure(_):
+                            HStack(spacing: 8) {
+                                Image(systemName: "photo")
+                                    .foregroundColor(.secondary)
+                                Text("Image unavailable")
+                                    .font(.subheadline)
+                            }
+                            .padding(12)
+                            .background(Color.gray.opacity(0.3))
+                            .cornerRadius(16)
+                        case .empty:
+                            ProgressView()
+                                .frame(width: 250, height: 200)
+                                .background(Color.gray.opacity(0.1))
+                                .cornerRadius(16)
+                        @unknown default:
+                            EmptyView()
+                        }
                     }
-                    .foregroundColor(isFromCurrentUser ? .white : .primary)
-                    .cornerRadius(16)
-                
+
+                    // Caption if text exists
+                    if !message.text.isEmpty {
+                        Text(message.text)
+                            .font(.subheadline)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .foregroundColor(isFromCurrentUser ? .white.opacity(0.9) : .primary)
+                    }
+                } else {
+                    // Text message
+                    Text(message.text)
+                        .padding(12)
+                        .background {
+                            bubbleBackground
+                        }
+                        .foregroundColor(isFromCurrentUser ? .white : .primary)
+                        .cornerRadius(16)
+                }
+
                 // Timestamp with read indicators
                 HStack(spacing: 4) {
                     Text(message.timestamp.timeAgoDisplay())
                         .font(.caption2)
                         .foregroundColor(.secondary)
-                    
+
                     if isFromCurrentUser {
                         if message.isRead {
                             Image(systemName: "checkmark.circle.fill")
@@ -158,7 +200,7 @@ struct MessageBubbleGradient: View {
                     }
                 }
             }
-            
+
             if !isFromCurrentUser {
                 Spacer(minLength: 60)
             }

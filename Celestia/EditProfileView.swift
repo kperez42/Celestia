@@ -40,8 +40,25 @@ struct EditProfileView: View {
     @State private var isUploadingPhotos = false
     @State private var uploadProgress: Double = 0.0
 
+    // Advanced profile fields
+    @State private var height: Int?
+    @State private var religion: String?
+    @State private var relationshipGoal: String?
+    @State private var smoking: String?
+    @State private var drinking: String?
+    @State private var pets: String?
+    @State private var exercise: String?
+    @State private var diet: String?
+
     let genderOptions = ["Male", "Female", "Non-binary", "Other"]
     let lookingForOptions = ["Men", "Women", "Everyone"]
+    let religionOptions = ["Prefer not to say", "Agnostic", "Atheist", "Buddhist", "Catholic", "Christian", "Hindu", "Jewish", "Muslim", "Spiritual", "Other"]
+    let relationshipGoalOptions = ["Prefer not to say", "Casual dating", "Relationship", "Long-term partner", "Marriage", "Open to anything"]
+    let smokingOptions = ["Prefer not to say", "Non-smoker", "Social smoker", "Regular smoker", "Trying to quit"]
+    let drinkingOptions = ["Prefer not to say", "Non-drinker", "Social drinker", "Regular drinker"]
+    let petsOptions = ["Prefer not to say", "No pets", "Dog", "Cat", "Dog & Cat", "Other pets"]
+    let exerciseOptions = ["Prefer not to say", "Never", "Sometimes", "Often", "Daily"]
+    let dietOptions = ["Prefer not to say", "Anything", "Vegetarian", "Vegan", "Pescatarian", "Halal", "Kosher", "Other"]
     let predefinedLanguages = [
         "English", "Spanish", "French", "German", "Italian", "Portuguese",
         "Russian", "Chinese", "Japanese", "Korean", "Arabic", "Hindi"
@@ -65,6 +82,16 @@ struct EditProfileView: View {
         _interests = State(initialValue: user?.interests ?? [])
         _prompts = State(initialValue: user?.prompts ?? [])
         _photos = State(initialValue: user?.photos ?? [])
+
+        // Initialize advanced profile fields
+        _height = State(initialValue: user?.height)
+        _religion = State(initialValue: user?.religion)
+        _relationshipGoal = State(initialValue: user?.relationshipGoal)
+        _smoking = State(initialValue: user?.smoking)
+        _drinking = State(initialValue: user?.drinking)
+        _pets = State(initialValue: user?.pets)
+        _exercise = State(initialValue: user?.exercise)
+        _diet = State(initialValue: user?.diet)
     }
     
     var body: some View {
@@ -92,7 +119,10 @@ struct EditProfileView: View {
                         
                         // Preferences Card
                         preferencesSection
-                        
+
+                        // Lifestyle & More Section
+                        lifestyleSection
+
                         // Languages Card
                         languagesSection
                         
@@ -579,17 +609,17 @@ struct EditProfileView: View {
     }
     
     // MARK: - Preferences Section
-    
+
     private var preferencesSection: some View {
         VStack(spacing: 15) {
             SectionHeader(icon: "heart.fill", title: "Dating Preferences", color: .pink)
-            
+
             VStack(alignment: .leading, spacing: 8) {
                 Text("Looking for")
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(.secondary)
-                
+
                 Picker("Looking for", selection: $lookingFor) {
                     ForEach(lookingForOptions, id: \.self) { option in
                         Text(option).tag(option)
@@ -603,7 +633,195 @@ struct EditProfileView: View {
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 8)
     }
-    
+
+    // MARK: - Lifestyle Section
+
+    private var lifestyleSection: some View {
+        VStack(spacing: 20) {
+            SectionHeader(icon: "person.crop.circle.fill", title: "Lifestyle & More", color: .orange)
+
+            // Height
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Height")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+
+                HStack {
+                    TextField("e.g., 170", value: $height, format: .number)
+                        .keyboardType(.numberPad)
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+
+                    Text("cm")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 8)
+                }
+
+                if let h = height {
+                    Text("≈ \(heightToFeetInches(h))")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+            }
+
+            // Relationship Goal
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Relationship Goal")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+
+                Picker("Relationship Goal", selection: Binding(
+                    get: { relationshipGoal ?? "Prefer not to say" },
+                    set: { relationshipGoal = $0 == "Prefer not to say" ? nil : $0 }
+                )) {
+                    ForEach(relationshipGoalOptions, id: \.self) { option in
+                        Text(option).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
+            }
+
+            // Religion
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Religion")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+
+                Picker("Religion", selection: Binding(
+                    get: { religion ?? "Prefer not to say" },
+                    set: { religion = $0 == "Prefer not to say" ? nil : $0 }
+                )) {
+                    ForEach(religionOptions, id: \.self) { option in
+                        Text(option).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
+            }
+
+            // Smoking & Drinking Row
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Smoking")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+
+                    Picker("Smoking", selection: Binding(
+                        get: { smoking ?? "Prefer not to say" },
+                        set: { smoking = $0 == "Prefer not to say" ? nil : $0 }
+                    )) {
+                        ForEach(smokingOptions, id: \.self) { option in
+                            Text(option).tag(option)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Drinking")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+
+                    Picker("Drinking", selection: Binding(
+                        get: { drinking ?? "Prefer not to say" },
+                        set: { drinking = $0 == "Prefer not to say" ? nil : $0 }
+                    )) {
+                        ForEach(drinkingOptions, id: \.self) { option in
+                            Text(option).tag(option)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                }
+            }
+
+            // Exercise & Diet Row
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Exercise")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+
+                    Picker("Exercise", selection: Binding(
+                        get: { exercise ?? "Prefer not to say" },
+                        set: { exercise = $0 == "Prefer not to say" ? nil : $0 }
+                    )) {
+                        ForEach(exerciseOptions, id: \.self) { option in
+                            Text(option).tag(option)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Diet")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+
+                    Picker("Diet", selection: Binding(
+                        get: { diet ?? "Prefer not to say" },
+                        set: { diet = $0 == "Prefer not to say" ? nil : $0 }
+                    )) {
+                        ForEach(dietOptions, id: \.self) { option in
+                            Text(option).tag(option)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                }
+            }
+
+            // Pets
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Pets")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+
+                Picker("Pets", selection: Binding(
+                    get: { pets ?? "Prefer not to say" },
+                    set: { pets = $0 == "Prefer not to say" ? nil : $0 }
+                )) {
+                    ForEach(petsOptions, id: \.self) { option in
+                        Text(option).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
+            }
+        }
+        .padding(20)
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 8)
+    }
+
     // MARK: - Languages Section
     
     private var languagesSection: some View {
@@ -853,6 +1071,13 @@ struct EditProfileView: View {
         }
         return "Almost there!"
     }
+
+    private func heightToFeetInches(_ cm: Int) -> String {
+        let totalInches = Double(cm) / 2.54
+        let feet = Int(totalInches / 12)
+        let inches = Int(totalInches.truncatingRemainder(dividingBy: 12))
+        return "\(feet)'\(inches)\""
+    }
     
     private func saveProfile() {
         guard var user = authService.currentUser else { return }
@@ -884,6 +1109,16 @@ struct EditProfileView: View {
                 user.interests = interests
                 user.prompts = prompts
                 user.photos = photos
+
+                // Update advanced profile fields
+                user.height = height
+                user.religion = religion
+                user.relationshipGoal = relationshipGoal
+                user.smoking = smoking
+                user.drinking = drinking
+                user.pets = pets
+                user.exercise = exercise
+                user.diet = diet
 
                 try await authService.updateUser(user)
                 

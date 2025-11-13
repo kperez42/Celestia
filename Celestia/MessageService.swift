@@ -140,20 +140,24 @@ class MessageService: ObservableObject {
         matchId: String,
         senderId: String,
         receiverId: String,
-        imageURL: String
+        imageURL: String,
+        caption: String? = nil
     ) async throws {
+        let messageText = caption?.isEmpty == false ? caption! : "📷 Photo"
+        let lastMessageText = caption?.isEmpty == false ? "📷 \(caption!)" : "📷 Photo"
+
         let message = Message(
             matchId: matchId,
             senderId: senderId,
             receiverId: receiverId,
-            text: "📷 Photo",
+            text: messageText,
             imageURL: imageURL
         )
 
         _ = try db.collection("messages").addDocument(from: message)
 
         try await db.collection("matches").document(matchId).updateData([
-            "lastMessage": "📷 Photo",
+            "lastMessage": lastMessageText,
             "lastMessageTimestamp": FieldValue.serverTimestamp(),
             "unreadCount.\(receiverId)": FieldValue.increment(Int64(1))
         ])

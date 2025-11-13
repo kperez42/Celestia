@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import PhotosUI
 
 struct ChatView: View {
     @EnvironmentObject var authService: AuthService
@@ -24,6 +25,11 @@ struct ChatView: View {
     @State private var isSending = false
     @State private var conversationSafetyReport: ConversationSafetyReport?
     @State private var showSafetyWarning = false
+
+    // Image message states
+    @State private var selectedImageItem: PhotosPickerItem?
+    @State private var selectedImage: UIImage?
+    @State private var showImagePreview = false
     @Environment(\.dismiss) var dismiss
 
     var body: some View {
@@ -302,7 +308,51 @@ struct ChatView: View {
 
     private var messageInputBar: some View {
         VStack(spacing: 8) {
+            // Image preview
+            if let image = selectedImage {
+                HStack {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 80, height: 80)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                    TextField("Add a caption...", text: $messageText, axis: .vertical)
+                        .padding(.horizontal, 8)
+                        .lineLimit(1...3)
+
+                    Button {
+                        selectedImage = nil
+                        selectedImageItem = nil
+                        messageText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
+            }
+
             HStack(spacing: 12) {
+                // Photo picker button
+                PhotosPicker(selection: $selectedImageItem, matching: .images) {
+                    Image(systemName: "photo.fill")
+                        .font(.title3)
+                        .foregroundColor(.purple)
+                }
+                .onChange(of: selectedImageItem) { _, newItem in
+                    Task {
+                        if let data = try? await newItem?.loadTransferable(type: Data.self),
+                           let uiImage = UIImage(data: data) {
+                            selectedImage = uiImage
+                        }
+                    }
+                }
+
                 // Text input
                 TextField("Message...", text: $messageText, axis: .vertical)
                     .focused($isInputFocused)
@@ -326,10 +376,10 @@ struct ChatView: View {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle(tint: .purple))
                         } else {
-                            Image(systemName: messageText.isEmpty ? "arrow.up.circle" : "arrow.up.circle.fill")
+                            Image(systemName: (messageText.isEmpty && selectedImage == nil) ? "arrow.up.circle" : "arrow.up.circle.fill")
                                 .font(.system(size: 32))
                                 .foregroundStyle(
-                                    messageText.isEmpty ?
+                                    (messageText.isEmpty && selectedImage == nil) ?
                                     LinearGradient(colors: [.gray.opacity(0.5)], startPoint: .leading, endPoint: .trailing) :
                                     LinearGradient(colors: [.purple, .pink], startPoint: .leading, endPoint: .trailing)
                                 )
@@ -337,7 +387,7 @@ struct ChatView: View {
                     }
                     .frame(width: 32, height: 32)
                 }
-                .disabled(messageText.isEmpty || isSending)
+                .disabled((messageText.isEmpty && selectedImage == nil) || isSending)
             }
 
             // Character count (if over 100 characters)
@@ -372,40 +422,67 @@ struct ChatView: View {
     }
     
     private func sendMessage() {
-        guard !messageText.isEmpty, !isSending else { return }
+        // Need either text or image
+        let hasText = !messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasImage = selectedImage != nil
 
-        let text = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else {
-            messageText = ""
-            return
-        }
+        guard (hasText || hasImage) && !isSending else { return }
 
         guard let matchId = match.id else { return }
+        guard let currentUserId = authService.currentUser?.id else { return }
+        guard let receiverId = otherUser.id else { return }
 
         // Haptic feedback
         HapticManager.shared.impact(.light)
 
+        // Capture values before clearing
+        let text = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let imageToSend = selectedImage
+
         // Clear input immediately for better UX
         messageText = ""
-
-        guard let currentUserId = authService.currentUser?.id else { return }
-        guard let receiverId = otherUser.id else { return }
+        selectedImage = nil
+        selectedImageItem = nil
 
         isSending = true
 
         Task {
             do {
-                try await messageService.sendMessage(
-                    matchId: matchId,
-                    senderId: currentUserId,
-                    receiverId: receiverId,
-                    text: text
-                )
+                if let image = imageToSend {
+                    // Upload image first
+                    let imageURL = try await ImageUploadService.shared.uploadChatImage(image, matchId: matchId)
+
+                    // Send image message (with optional caption)
+                    try await messageService.sendImageMessage(
+                        matchId: matchId,
+                        senderId: currentUserId,
+                        receiverId: receiverId,
+                        imageURL: imageURL,
+                        caption: text.isEmpty ? nil : text
+                    )
+                } else {
+                    // Send text-only message
+                    try await messageService.sendMessage(
+                        matchId: matchId,
+                        senderId: currentUserId,
+                        receiverId: receiverId,
+                        text: text
+                    )
+                }
                 HapticManager.shared.notification(.success)
             } catch {
                 Logger.shared.error("Error sending message", category: .messaging, error: error)
                 HapticManager.shared.notification(.error)
-                // Could show error alert here
+
+                // Restore message on failure
+                await MainActor.run {
+                    if let image = imageToSend {
+                        selectedImage = image
+                    }
+                    if !text.isEmpty {
+                        messageText = text
+                    }
+                }
             }
             isSending = false
         }
