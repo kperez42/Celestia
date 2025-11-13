@@ -88,7 +88,11 @@ struct SafetyCenterView: View {
 
             VStack(spacing: 12) {
                 NavigationLink {
-                    PhotoVerificationView()
+                    if let userId = AuthService.shared.currentUser?.id {
+                        PhotoVerificationView(userId: userId)
+                    } else {
+                        Text("Please log in to verify")
+                    }
                 } label: {
                     SafetyOptionRow(
                         icon: "camera.fill",
