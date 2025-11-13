@@ -142,7 +142,7 @@ struct MainTabView: View {
         }
         .padding(.horizontal, 8)
         .padding(.top, 8)
-        .padding(.bottom, 8)
+        .padding(.bottom, -20)
         .background(
             ZStack {
                 // Blur effect
