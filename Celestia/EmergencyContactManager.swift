@@ -188,7 +188,7 @@ class EmergencyContactManager: ObservableObject {
 
 // MARK: - Emergency Contact Model
 
-struct EmergencyContact: Identifiable, Codable {
+struct EmergencyContact: Identifiable, Codable, Hashable {
     let id: String
     var name: String
     var phoneNumber: String
@@ -211,11 +211,20 @@ struct EmergencyContact: Identifiable, Codable {
 
         return phoneNumber
     }
+
+    // Hashable conformance - use id for hashing
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+
+    static func == (lhs: EmergencyContact, rhs: EmergencyContact) -> Bool {
+        lhs.id == rhs.id
+    }
 }
 
 // MARK: - Contact Relationship
 
-enum ContactRelationship: String, Codable, CaseIterable {
+enum ContactRelationship: String, Codable, CaseIterable, Hashable {
     case family = "family"
     case friend = "friend"
     case partner = "partner"
@@ -260,7 +269,7 @@ enum ContactRelationship: String, Codable, CaseIterable {
 
 // MARK: - Notification Preferences
 
-struct EmergencyNotificationPreferences: Codable {
+struct EmergencyNotificationPreferences: Codable, Hashable {
     var receiveScheduledDateAlerts: Bool = true
     var receiveCheckInAlerts: Bool = true
     var receiveEmergencyAlerts: Bool = true

@@ -444,7 +444,7 @@ class ShareDateViewModel: ObservableObject {
         do {
             let dateShare: [String: Any] = [
                 "userId": userId,
-                "matchId": match.id,
+                "matchId": match.id as Any,
                 "matchName": match.fullName,
                 "dateTime": Timestamp(date: dateTime),
                 "location": location,
