@@ -9,8 +9,8 @@ import SwiftUI
 
 struct ProfileView: View {
     @EnvironmentObject var authService: AuthService
-    @StateObject private var userService = UserService.shared
-    
+    @ObservedObject private var userService = UserService.shared
+
     @State private var showingEditProfile = false
     @State private var showingSettings = false
     @State private var showingPremiumUpgrade = false
@@ -34,7 +34,7 @@ struct ProfileView: View {
                         VStack(spacing: 0) {
                             // Hero header with profile photo
                             heroSection(user: user)
-                            
+
                             // Content sections
                             VStack(spacing: 20) {
                                 // Profile completion
@@ -42,7 +42,7 @@ struct ProfileView: View {
                                     profileCompletionCard(user: user)
                                         .padding(.top, 20)
                                 }
-                                
+
                                 // Stats row
                                 statsRow(user: user)
 
@@ -51,7 +51,7 @@ struct ProfileView: View {
 
                                 // Edit profile button
                                 editButton
-                                
+
                                 // Verification card (if not verified)
                                 if !user.isVerified {
                                     verificationCard
@@ -63,7 +63,7 @@ struct ProfileView: View {
                                 } else {
                                     premiumUpgradeCard
                                 }
-                                
+
                                 // About section
                                 if !user.bio.isEmpty {
                                     aboutSection(bio: user.bio)
@@ -76,34 +76,37 @@ struct ProfileView: View {
 
                                 // Details grid
                                 detailsCard(user: user)
-                                
+
                                 // Photo gallery
                                 if !user.photos.isEmpty {
                                     photoGallerySection(photos: user.photos)
                                 }
-                                
+
                                 // Languages
                                 if !user.languages.isEmpty {
                                     languagesCard(languages: user.languages)
                                 }
-                                
+
                                 // Interests
                                 if !user.interests.isEmpty {
                                     interestsCard(interests: user.interests)
                                 }
-                                
+
                                 // Preferences
                                 preferencesCard(user: user)
-                                
+
                                 // Activity & Achievements
                                 achievementsCard(user: user)
-                                
+
                                 // Action buttons
                                 actionButtons
                             }
                             .padding(.top, -40)
                         }
                     }
+                } else {
+                    // Loading state while user data loads
+                    profileLoadingView
                 }
             }
             .navigationTitle("")
@@ -1237,8 +1240,82 @@ struct ProfileView: View {
         }
     }
     
+    // MARK: - Loading View
+
+    private var profileLoadingView: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                // Hero header skeleton
+                ZStack {
+                    LinearGradient(
+                        colors: [.purple.opacity(0.3), .pink.opacity(0.2)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .frame(height: 340)
+
+                    VStack {
+                        Spacer()
+
+                        // Profile image skeleton
+                        SkeletonView()
+                            .frame(width: 160, height: 160)
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.white, lineWidth: 4)
+                            )
+                            .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
+                    }
+                    .padding(.bottom, 40)
+                }
+
+                // Content section skeletons
+                VStack(spacing: 20) {
+                    // Stats row skeleton
+                    HStack(spacing: 12) {
+                        ForEach(0..<3, id: \.self) { _ in
+                            SkeletonView()
+                                .frame(height: 80)
+                                .cornerRadius(16)
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, -20)
+
+                    // Card skeletons
+                    ForEach(0..<5, id: \.self) { _ in
+                        VStack(alignment: .leading, spacing: 12) {
+                            SkeletonView()
+                                .frame(width: 120, height: 20)
+                                .cornerRadius(6)
+
+                            SkeletonView()
+                                .frame(height: 16)
+                                .cornerRadius(6)
+
+                            SkeletonView()
+                                .frame(height: 16)
+                                .cornerRadius(6)
+
+                            SkeletonView()
+                                .frame(width: 200, height: 16)
+                                .cornerRadius(6)
+                        }
+                        .padding(20)
+                        .background(Color.white)
+                        .cornerRadius(16)
+                        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+                        .padding(.horizontal)
+                    }
+                }
+                .padding(.bottom, 30)
+            }
+        }
+    }
+
     // MARK: - Helper Functions
-    
+
     private func formatDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium

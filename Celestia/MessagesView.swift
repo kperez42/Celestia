@@ -9,9 +9,9 @@ import SwiftUI
 
 struct MessagesView: View {
     @EnvironmentObject var authService: AuthService
-    @StateObject private var matchService = MatchService.shared
-    @StateObject private var userService = UserService.shared
-    @StateObject private var messageService = MessageService.shared
+    @ObservedObject private var matchService = MatchService.shared
+    @ObservedObject private var userService = UserService.shared
+    @ObservedObject private var messageService = MessageService.shared
 
     @Binding var selectedTab: Int
 

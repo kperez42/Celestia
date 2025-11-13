@@ -9,9 +9,9 @@ import SwiftUI
 
 struct MainTabView: View {
     @EnvironmentObject var authService: AuthService
-    @StateObject private var matchService = MatchService.shared
-    @StateObject private var messageService = MessageService.shared
-    
+    @ObservedObject private var matchService = MatchService.shared
+    @ObservedObject private var messageService = MessageService.shared
+
     @State private var selectedTab = 0
     @State private var previousTab = 0
     @State private var showTabAnimation = false

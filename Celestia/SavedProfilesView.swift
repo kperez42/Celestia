@@ -137,11 +137,29 @@ struct SavedProfilesView: View {
     // MARK: - Loading View
 
     private var loadingView: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-            Text("Loading saved profiles...")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+        ScrollView {
+            VStack(spacing: 20) {
+                // Stats header skeleton
+                HStack(spacing: 20) {
+                    SkeletonView()
+                        .frame(height: 80)
+                        .cornerRadius(12)
+
+                    SkeletonView()
+                        .frame(height: 80)
+                        .cornerRadius(12)
+                }
+                .padding(.horizontal)
+
+                // Skeleton grid
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                    ForEach(0..<6, id: \.self) { _ in
+                        SavedProfileCardSkeleton()
+                    }
+                }
+                .padding(.horizontal)
+            }
+            .padding(.top)
         }
     }
 
@@ -298,6 +316,46 @@ struct SavedProfileCard: View {
             .shadow(color: .black.opacity(0.1), radius: 5, y: 2)
         }
         .buttonStyle(ScaleButtonStyle())
+    }
+}
+
+// MARK: - Saved Profile Card Skeleton
+
+struct SavedProfileCardSkeleton: View {
+    var body: some View {
+        VStack(spacing: 0) {
+            // Image area skeleton
+            SkeletonView()
+                .frame(height: 200)
+                .clipped()
+
+            // User info skeleton
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    SkeletonView()
+                        .frame(width: 90, height: 18)
+                        .cornerRadius(6)
+
+                    SkeletonView()
+                        .frame(width: 30, height: 18)
+                        .cornerRadius(6)
+
+                    Spacer()
+                }
+
+                SkeletonView()
+                    .frame(width: 110, height: 14)
+                    .cornerRadius(6)
+
+                SkeletonView()
+                    .frame(width: 100, height: 14)
+                    .cornerRadius(6)
+            }
+            .padding(12)
+        }
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.1), radius: 5, y: 2)
     }
 }
 
