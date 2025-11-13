@@ -155,19 +155,19 @@ struct InterestsViewEnhanced: View {
     private var filterBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
-                FilterChip(
+                InterestFilterChip(
                     title: "Nearby",
                     icon: "location.fill",
                     isSelected: $filterNearby
                 )
 
-                FilterChip(
+                InterestFilterChip(
                     title: "New",
                     icon: "sparkles",
                     isSelected: $filterNew
                 )
 
-                FilterChip(
+                InterestFilterChip(
                     title: "Online",
                     icon: "circle.fill",
                     isSelected: $filterOnline
@@ -543,9 +543,9 @@ struct InterestsViewEnhanced: View {
     }
 }
 
-// MARK: - Filter Chip
+// MARK: - Interest Filter Chip
 
-struct FilterChip: View {
+struct InterestFilterChip: View {
     let title: String
     let icon: String
     @Binding var isSelected: Bool

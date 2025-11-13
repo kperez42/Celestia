@@ -88,21 +88,21 @@ struct ProfileViewersView: View {
     private var statsCard: some View {
         VStack(spacing: 12) {
             HStack(spacing: 20) {
-                StatBox(
+                ViewerStatBox(
                     value: "\(viewModel.viewers.count)",
                     label: "Total Views",
                     icon: "eye.fill",
                     color: .blue
                 )
 
-                StatBox(
+                ViewerStatBox(
                     value: "\(viewModel.todayCount)",
                     label: "Today",
                     icon: "calendar",
                     color: .green
                 )
 
-                StatBox(
+                ViewerStatBox(
                     value: "\(viewModel.weekCount)",
                     label: "This Week",
                     icon: "chart.line.uptrend.xyaxis",
@@ -200,9 +200,9 @@ struct ProfileViewersView: View {
     }
 }
 
-// MARK: - Stat Box
+// MARK: - Viewer Stat Box
 
-struct StatBox: View {
+struct ViewerStatBox: View {
     let value: String
     let label: String
     let icon: String
@@ -228,7 +228,7 @@ struct StatBox: View {
 // MARK: - Profile Viewer Card
 
 struct ProfileViewerCard: View {
-    let viewer: ProfileViewer
+    let viewer: ViewerInfo
     @State private var showUserDetail = false
 
     var body: some View {
@@ -295,7 +295,7 @@ struct ProfileViewerCard: View {
 
 // MARK: - Profile Viewer Model
 
-struct ProfileViewer: Identifiable {
+struct ViewerInfo: Identifiable {
     let id: String
     let user: User
     let timestamp: Date
@@ -305,7 +305,7 @@ struct ProfileViewer: Identifiable {
 
 @MainActor
 class ProfileViewersViewModel: ObservableObject {
-    @Published var viewers: [ProfileViewer] = []
+    @Published var viewers: [ViewerInfo] = []
     @Published var isLoading = false
 
     var todayCount: Int {
@@ -333,7 +333,7 @@ class ProfileViewersViewModel: ObservableObject {
                 .limit(to: 50)
                 .getDocuments()
 
-            var viewersList: [ProfileViewer] = []
+            var viewersList: [ViewerInfo] = []
 
             for doc in viewsSnapshot.documents {
                 let data = doc.data()
@@ -343,7 +343,7 @@ class ProfileViewersViewModel: ObservableObject {
                     // Fetch viewer user details
                     let userDoc = try await db.collection("users").document(viewerId).getDocument()
                     if let user = try? userDoc.data(as: User.self) {
-                        viewersList.append(ProfileViewer(
+                        viewersList.append(ViewerInfo(
                             id: doc.documentID,
                             user: user,
                             timestamp: timestamp

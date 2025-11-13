@@ -408,9 +408,9 @@ class SavedProfilesViewModel: ObservableObject {
 // MARK: - Analytics Events Extension
 
 extension AnalyticsEvent {
-    static let profileSaved = AnalyticsEvent(name: "profile_saved")
-    static let profileUnsaved = AnalyticsEvent(name: "profile_unsaved")
-    static let savedProfilesCleared = AnalyticsEvent(name: "saved_profiles_cleared")
+    static let profileSaved = AnalyticsEvent(rawValue: "profile_saved")
+    static let profileUnsaved = AnalyticsEvent(rawValue: "profile_unsaved")
+    static let savedProfilesCleared = AnalyticsEvent(rawValue: "saved_profiles_cleared")
 }
 
 #Preview {

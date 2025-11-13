@@ -87,7 +87,7 @@ struct InterestsView: View {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
                 ForEach(interestService.receivedInterests) { interest in
                     if let user = users[interest.fromUserId] {
-                        InterestCard(
+                        BasicInterestCard(
                             interest: interest,
                             user: user,
                             isBlurred: !(authService.currentUser?.isPremium ?? false),
@@ -244,15 +244,15 @@ struct InterestsView: View {
     }
 }
 
-// MARK: - Interest Card
+// MARK: - Basic Interest Card
 
-struct InterestCard: View {
+struct BasicInterestCard: View {
     let interest: Interest
     let user: User
     let isBlurred: Bool
     let onAccept: () -> Void
     let onReject: () -> Void
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // User image

@@ -46,9 +46,17 @@ struct MainTabView: View {
                         removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
                     ))
 
+                // Saved
+                SavedProfilesView()
+                    .tag(3)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
+                        removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
+                    ))
+
                 // Profile
                 ProfileView()
-                    .tag(3)
+                    .tag(4)
                     .transition(.asymmetric(
                         insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
                         removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
@@ -112,14 +120,24 @@ struct MainTabView: View {
                 selectedTab = 2
             }
 
-            // Profile
+            // Saved
             TabBarButton(
-                icon: "person.fill",
-                title: "Profile",
+                icon: "bookmark.fill",
+                title: "Saved",
                 isSelected: selectedTab == 3,
                 badgeCount: 0
             ) {
                 selectedTab = 3
+            }
+
+            // Profile
+            TabBarButton(
+                icon: "person.fill",
+                title: "Profile",
+                isSelected: selectedTab == 4,
+                badgeCount: 0
+            ) {
+                selectedTab = 4
             }
         }
         .padding(.horizontal, 8)

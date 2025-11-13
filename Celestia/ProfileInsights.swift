@@ -9,57 +9,35 @@ import Foundation
 
 struct ProfileInsights: Codable {
     // View Analytics
-    var profileViews: Int
-    var viewsThisWeek: Int
-    var viewsLastWeek: Int
-    var profileViewers: [ProfileViewer]
+    var profileViews: Int = 0
+    var viewsThisWeek: Int = 0
+    var viewsLastWeek: Int = 0
+    var profileViewers: [ProfileViewer] = []
 
     // Swipe Statistics
-    var swipesReceived: Int
-    var likesReceived: Int
-    var passesReceived: Int
-    var likeRate: Double
+    var swipesReceived: Int = 0
+    var likesReceived: Int = 0
+    var passesReceived: Int = 0
+    var likeRate: Double = 0.0
 
     // Engagement Metrics
-    var matchCount: Int
-    var matchRate: Double
-    var responseRate: Double
-    var averageResponseTime: TimeInterval
+    var matchCount: Int = 0
+    var matchRate: Double = 0.0
+    var responseRate: Double = 0.0
+    var averageResponseTime: TimeInterval = 0
 
     // Photo Performance
-    var photoPerformance: [PhotoPerformance]
+    var photoPerformance: [PhotoPerformance] = []
     var bestPerformingPhoto: String?
 
     // Activity Insights
-    var peakActivityHours: [Int]
-    var lastActiveDate: Date
-    var daysActive: Int
+    var peakActivityHours: [Int] = []
+    var lastActiveDate: Date = Date()
+    var daysActive: Int = 0
 
     // Suggestions
-    var profileScore: Int
-    var suggestions: [ProfileSuggestion]
-
-    init() {
-        self.profileViews = 0
-        self.viewsThisWeek = 0
-        self.viewsLastWeek = 0
-        self.profileViewers = []
-        self.swipesReceived = 0
-        self.likesReceived = 0
-        self.passesReceived = 0
-        self.likeRate = 0.0
-        self.matchCount = 0
-        self.matchRate = 0.0
-        self.responseRate = 0.0
-        self.averageResponseTime = 0
-        self.photoPerformance = []
-        self.bestPerformingPhoto = nil
-        self.peakActivityHours = []
-        self.lastActiveDate = Date()
-        self.daysActive = 0
-        self.profileScore = 0
-        self.suggestions = []
-    }
+    var profileScore: Int = 0
+    var suggestions: [ProfileSuggestion] = []
 }
 
 struct ProfileViewer: Codable, Identifiable {
