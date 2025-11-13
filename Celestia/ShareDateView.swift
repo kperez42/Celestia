@@ -295,7 +295,7 @@ struct ContactSelectionRow: View {
                         .font(.body)
                         .foregroundColor(.primary)
 
-                    Text(contact.phone)
+                    Text(contact.phoneNumber)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -393,22 +393,6 @@ struct DateSharedConfirmationView: View {
 
 // MARK: - Models
 
-struct EmergencyContact: Identifiable, Hashable, Codable {
-    let id: String
-    var name: String
-    var phone: String
-    var relationship: String
-    var canReceiveDateUpdates: Bool = true
-
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
-    }
-
-    static func == (lhs: EmergencyContact, rhs: EmergencyContact) -> Bool {
-        lhs.id == rhs.id
-    }
-}
-
 struct DateShareConfirmation: Identifiable {
     let id = UUID()
     let sharedWith: [String]
@@ -430,11 +414,12 @@ class ShareDateViewModel: ObservableObject {
         do {
             let snapshot = try await db.collection("emergency_contacts")
                 .whereField("userId", isEqualTo: userId)
-                .whereField("canReceiveDateUpdates", isEqualTo: true)
                 .getDocuments()
 
             emergencyContacts = snapshot.documents.compactMap { doc in
-                try? doc.data(as: EmergencyContact.self)
+                let contact = try? doc.data(as: EmergencyContact.self)
+                // Filter for contacts that have date alerts enabled
+                return contact?.notificationPreferences.receiveScheduledDateAlerts == true ? contact : nil
             }
 
             Logger.shared.info("Loaded \(emergencyContacts.count) emergency contacts", category: .general)
