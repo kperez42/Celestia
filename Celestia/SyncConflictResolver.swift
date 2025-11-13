@@ -51,10 +51,7 @@ class SyncConflictResolver: ObservableObject {
     /// Adds a conflict to the resolution queue
     func addConflict(_ conflict: SyncConflict) {
         conflicts.append(conflict)
-        Logger.shared.warning("Sync conflict detected", category: .general, metadata: [
-            "entityType": conflict.entityType,
-            "entityId": conflict.entityId
-        ])
+        Logger.shared.warning("Sync conflict detected - entityType: \(conflict.entityType), entityId: \(conflict.entityId)", category: .general)
     }
 
     // MARK: - Conflict Resolution Strategies
@@ -89,9 +86,7 @@ class SyncConflictResolver: ObservableObject {
             conflicts[index].resolutionStrategy = strategy
         }
 
-        Logger.shared.info("Conflict resolved", category: .general, metadata: [
-            "strategy": "\(strategy)"
-        ])
+        Logger.shared.info("Conflict resolved - strategy: \(strategy)", category: .general)
     }
 
     /// Resolves all conflicts using auto-resolution rules
