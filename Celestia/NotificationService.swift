@@ -13,7 +13,7 @@ import FirebaseFirestore
 // MARK: - Notification Service
 
 @MainActor
-class NotificationService: ObservableObject, NotificationServiceProtocol, NotificationSending {
+class NotificationService: ObservableObject {
 
     // MARK: - Singleton
 

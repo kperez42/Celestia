@@ -89,7 +89,7 @@ struct NetworkResponse {
 
 // MARK: - Network Manager
 
-class NetworkManager: NetworkManagerProtocol {
+class NetworkManager {
 
     // MARK: - Singleton
 

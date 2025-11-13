@@ -84,7 +84,7 @@ enum AnalyticsEvent: String {
 // MARK: - Analytics Manager
 
 @MainActor
-class AnalyticsManager: ObservableObject, AnalyticsManagerProtocol {
+class AnalyticsManager: ObservableObject {
 
     // MARK: - Singleton
 
