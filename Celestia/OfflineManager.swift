@@ -12,6 +12,22 @@ import Combine
 import Network
 import CryptoKit
 
+// MARK: - Offline Manager Error
+
+enum OfflineManagerError: LocalizedError {
+    case invalidData(String)
+    case syncFailed(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidData(let message):
+            return "Invalid data: \(message)"
+        case .syncFailed(let message):
+            return "Sync failed: \(message)"
+        }
+    }
+}
+
 // MARK: - Offline Manager
 
 @MainActor
@@ -462,10 +478,7 @@ class SyncEngine {
         let deletionData = try JSONDecoder().decode(PhotoDeletionData.self, from: operation.data)
 
         // Delete photo via ImageUploadService
-        try await ImageUploadService.shared.deleteImage(
-            imageURL: deletionData.photoURL,
-            userId: deletionData.userId
-        )
+        try await ImageUploadService.shared.deleteImage(url: deletionData.photoURL)
 
         Logger.shared.info("Successfully synced photo deletion", category: .storage)
     }
