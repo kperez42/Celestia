@@ -18,7 +18,9 @@ struct Message: Identifiable, Codable {
     var timestamp: Date
     var isRead: Bool
     var isDelivered: Bool
-    
+    var readAt: Date? // Timestamp when message was read
+    var deliveredAt: Date? // Timestamp when message was delivered
+
     // For compatibility with ChatDetailView
     var senderID: String {
         get { senderId }
@@ -34,7 +36,9 @@ struct Message: Identifiable, Codable {
         imageURL: String? = nil,
         timestamp: Date = Date(),
         isRead: Bool = false,
-        isDelivered: Bool = false
+        isDelivered: Bool = false,
+        readAt: Date? = nil,
+        deliveredAt: Date? = nil
     ) {
         self.id = id
         self.matchId = matchId
@@ -45,5 +49,7 @@ struct Message: Identifiable, Codable {
         self.timestamp = timestamp
         self.isRead = isRead
         self.isDelivered = isDelivered
+        self.readAt = readAt
+        self.deliveredAt = deliveredAt
     }
 }

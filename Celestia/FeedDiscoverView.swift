@@ -25,6 +25,12 @@ struct FeedDiscoverView: View {
     @State private var favorites: Set<String> = []
     @State private var errorMessage: String = ""
 
+    // Action feedback toast
+    @State private var showActionToast = false
+    @State private var toastMessage = ""
+    @State private var toastIcon = ""
+    @State private var toastColor: Color = .green
+
     private let usersPerPage = 10
     private let preloadThreshold = 3 // Load more when 3 items from bottom
 
@@ -99,6 +105,33 @@ struct FeedDiscoverView: View {
                 // Match animation overlay
                 if showMatchAnimation {
                     matchCelebrationView
+                }
+
+                // Action feedback toast
+                if showActionToast {
+                    VStack {
+                        HStack(spacing: 12) {
+                            Image(systemName: toastIcon)
+                                .font(.title3)
+                                .foregroundColor(.white)
+
+                            Text(toastMessage)
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 14)
+                        .background(
+                            toastColor
+                                .shadow(color: toastColor.opacity(0.4), radius: 12, y: 6)
+                        )
+                        .cornerRadius(12)
+                        .padding(.top, 16)
+
+                        Spacer()
+                    }
+                    .transition(.move(edge: .top).combined(with: .opacity))
                 }
             }
             .navigationTitle("Discover")
@@ -426,6 +459,23 @@ struct FeedDiscoverView: View {
 
     // MARK: - Actions
 
+    private func showToast(message: String, icon: String, color: Color) {
+        toastMessage = message
+        toastIcon = icon
+        toastColor = color
+
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+            showActionToast = true
+        }
+
+        // Auto-hide after 2 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                showActionToast = false
+            }
+        }
+    }
+
     private func handleLike(user: User) {
         guard let currentUserId = authService.currentUser?.id,
               let userId = user.id else { return }
@@ -452,6 +502,15 @@ struct FeedDiscoverView: View {
                         user1Id: currentUserId,
                         user2Id: userId
                     )
+                } else {
+                    // Show toast for regular like (no match)
+                    await MainActor.run {
+                        showToast(
+                            message: "Liked \(user.fullName)!",
+                            icon: "heart.fill",
+                            color: .pink
+                        )
+                    }
                 }
             } catch {
                 Logger.shared.error("Error tracking like", category: .matching, error: error)
@@ -462,11 +521,25 @@ struct FeedDiscoverView: View {
     private func handleFavorite(user: User) {
         guard let userId = user.id else { return }
 
-        if favorites.contains(userId) {
+        let wasFavorited = favorites.contains(userId)
+
+        if wasFavorited {
             favorites.remove(userId)
+            showToast(
+                message: "Removed from saved",
+                icon: "star.slash",
+                color: .orange
+            )
         } else {
             favorites.insert(userId)
+            showToast(
+                message: "Saved \(user.fullName)",
+                icon: "star.fill",
+                color: .orange
+            )
         }
+
+        HapticManager.shared.impact(.light)
 
         // Save to UserDefaults
         UserDefaults.standard.set(Array(favorites), forKey: "favoriteUserIds")

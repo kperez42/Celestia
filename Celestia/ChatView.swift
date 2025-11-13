@@ -223,6 +223,11 @@ struct ChatView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 12) {
+                    // Show conversation starters if no messages
+                    if messageService.messages.isEmpty, let currentUser = authService.currentUser {
+                        conversationStartersView(currentUser: currentUser)
+                    }
+
                     ForEach(groupedMessages(), id: \.0) { section in
                         // Date divider
                         Text(section.0)
@@ -262,6 +267,69 @@ struct ChatView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Conversation Starters
+
+    private func conversationStartersView(currentUser: User) -> some View {
+        VStack(spacing: 16) {
+            // Header
+            VStack(spacing: 8) {
+                Image(systemName: "bubble.left.and.bubble.right.fill")
+                    .font(.system(size: 40))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+
+                Text("Start the Conversation")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+
+                Text("Choose an icebreaker to send")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.top, 40)
+            .padding(.bottom, 8)
+
+            // Conversation starters
+            VStack(spacing: 12) {
+                ForEach(ConversationStarters.shared.generateStarters(currentUser: currentUser, otherUser: otherUser)) { starter in
+                    Button {
+                        messageText = starter.text
+                        HapticManager.shared.impact(.light)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: starter.icon)
+                                .font(.title3)
+                                .foregroundColor(.purple)
+                                .frame(width: 32)
+
+                            Text(starter.text)
+                                .font(.body)
+                                .foregroundColor(.primary)
+                                .multilineTextAlignment(.leading)
+                                .lineLimit(2)
+
+                            Spacer()
+
+                            Image(systemName: "arrow.right.circle")
+                                .font(.title3)
+                                .foregroundColor(.purple.opacity(0.5))
+                        }
+                        .padding(16)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(12)
+                        .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal)
     }
 
     private func groupedMessages() -> [(String, [Message])] {
