@@ -189,13 +189,26 @@ struct MessageBubbleGradient: View {
 
                     if isFromCurrentUser {
                         if message.isRead {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.caption2)
-                                .foregroundColor(.blue)
+                            HStack(spacing: 2) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.caption2)
+                                    .foregroundColor(.blue)
+
+                                // Show read time if available
+                                if let readAt = message.readAt {
+                                    Text("• Read \(formatReadTime(readAt))")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
                         } else if message.isDelivered {
                             Image(systemName: "checkmark.circle")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
+                        } else {
+                            Image(systemName: "clock")
+                                .font(.caption2)
+                                .foregroundColor(.secondary.opacity(0.6))
                         }
                     }
                 }
@@ -217,6 +230,21 @@ struct MessageBubbleGradient: View {
             )
         } else {
             Color(.systemGray5)
+        }
+    }
+
+    private func formatReadTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        let calendar = Calendar.current
+
+        if calendar.isDateInToday(date) {
+            formatter.timeStyle = .short
+            return formatter.string(from: date)
+        } else if calendar.isDateInYesterday(date) {
+            return "yesterday"
+        } else {
+            formatter.dateFormat = "MMM d"
+            return formatter.string(from: date)
         }
     }
 }
