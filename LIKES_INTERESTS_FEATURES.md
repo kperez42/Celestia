@@ -2,14 +2,7 @@
 
 ## 🎉 New Features Implemented
 
-### 1. **Swipe Gestures on Interest Cards**
-- **Swipe Right** → Accept the interest (creates a match)
-- **Swipe Left** → Reject the interest
-- Visual feedback with colored backgrounds during swipe
-- Smooth animations and haptic feedback
-- Automatic card dismissal after swipe threshold
-
-### 2. **Smart Filters**
+### 1. **Smart Filters**
 Three filter options available at the top of the screen:
 
 #### 📍 **Nearby Filter**
@@ -25,7 +18,7 @@ Three filter options available at the top of the screen:
 - Green dot indicator on profile pictures
 - Increased chance of instant matches
 
-### 3. **Batch Actions**
+### 2. **Batch Actions**
 Select multiple interests at once for bulk operations:
 
 1. Tap **"Select"** button in toolbar
@@ -35,7 +28,7 @@ Select multiple interests at once for bulk operations:
    - **Remove** - Reject all selected interests
 4. Tap **"Done"** to exit selection mode
 
-### 4. **Undo Last Action**
+### 3. **Undo Last Action**
 Made a mistake? No problem!
 
 - After accepting or rejecting an interest, an undo toast appears
@@ -44,7 +37,7 @@ Made a mistake? No problem!
 - Shows user name and action type
 - Haptic feedback confirms undo
 
-### 5. **Daily Like Digest Notifications**
+### 4. **Daily Like Digest Notifications**
 
 #### For All Users:
 - **Time:** 8:00 PM daily
@@ -93,17 +86,17 @@ await NotificationServiceEnhanced.shared.sendPersonalizedLikeDigest()
 ## 🎨 UI/UX Details
 
 ### Visual Indicators:
-- ✅ **Green background** when swiping right (accept)
-- ❌ **Red background** when swiping left (reject)
 - 🟢 **Green dot** on online users
 - 💜 **Purple checkmark** for selected cards
 - 💜 **Purple border** around selected cards
+- ❤️ **Heart button** to accept
+- ❌ **X button** to reject
 
 ### Animations:
-- Smooth card rotation during swipe
 - Spring animations for button presses
 - Fade in/out for undo toast
 - Scale effects on all interactions
+- Smooth filter toggle transitions
 
 ### Haptic Feedback:
 - **Medium impact** - Accept action, undo
@@ -161,6 +154,7 @@ The following events are automatically tracked:
 - Filter usage (nearby, new, online)
 - Batch actions (accept all, reject all)
 - Undo actions
+- Accept/reject button usage
 
 ## 🚀 Future Enhancements
 
@@ -189,18 +183,20 @@ Potential additions for future versions:
 2. **Enable notifications** - Don't miss the daily digest
 3. **Check regularly** - New interests appear throughout the day
 4. **Premium benefits** - Upgrade to see who specifically likes you
-5. **Undo is your friend** - Don't worry about accidental swipes
+5. **Undo is your friend** - Don't worry about accidental clicks
+6. **Batch actions** - Use selection mode to quickly process multiple interests
 
 ## 🎯 Success Metrics
 
 Track these KPIs to measure feature success:
 - **Daily Active Users** viewing interests
-- **Swipe engagement rate** (swipes vs. button taps)
+- **Action engagement rate** (button taps per session)
 - **Filter usage** (% of sessions using filters)
 - **Batch action usage**
 - **Undo action frequency**
 - **Notification engagement rate**
 - **Like → Match conversion rate**
+- **Time spent on interests page**
 
 ## 📝 Implementation Notes
 

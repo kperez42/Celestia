@@ -214,7 +214,7 @@ struct InterestsViewEnhanced: View {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
                 ForEach(filteredInterests) { interest in
                     if let user = users[interest.fromUserId] {
-                        InterestCardSwipeable(
+                        InterestCard(
                             interest: interest,
                             user: user,
                             isBlurred: !(authService.currentUser?.isPremium ?? false),
@@ -585,105 +585,7 @@ struct FilterChip: View {
     }
 }
 
-// MARK: - Swipeable Interest Card
-
-struct InterestCardSwipeable: View {
-    let interest: Interest
-    let user: User
-    let isBlurred: Bool
-    let isSelected: Bool
-    let isSelectionMode: Bool
-    let onAccept: () -> Void
-    let onReject: () -> Void
-    let onSelect: () -> Void
-
-    @GestureState private var dragOffset: CGSize = .zero
-    @State private var swipeState: SwipeState = .none
-
-    enum SwipeState {
-        case none, accepting, rejecting
-    }
-
-    var body: some View {
-        ZStack {
-            // Background action indicators
-            if swipeState == .accepting {
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.green.opacity(0.2))
-                    .overlay {
-                        VStack {
-                            Image(systemName: "heart.fill")
-                                .font(.title)
-                                .foregroundColor(.green)
-                            Text("Accept")
-                                .font(.caption.weight(.semibold))
-                                .foregroundColor(.green)
-                        }
-                    }
-            } else if swipeState == .rejecting {
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.red.opacity(0.2))
-                    .overlay {
-                        VStack {
-                            Image(systemName: "xmark")
-                                .font(.title)
-                                .foregroundColor(.red)
-                            Text("Pass")
-                                .font(.caption.weight(.semibold))
-                                .foregroundColor(.red)
-                        }
-                    }
-            }
-
-            // Card content
-            InterestCard(
-                interest: interest,
-                user: user,
-                isBlurred: isBlurred,
-                isSelected: isSelected,
-                isSelectionMode: isSelectionMode,
-                onAccept: onAccept,
-                onReject: onReject,
-                onSelect: onSelect
-            )
-            .offset(x: dragOffset.width, y: 0)
-            .rotationEffect(.degrees(Double(dragOffset.width / 30)))
-            .gesture(
-                isSelectionMode ? nil :
-                DragGesture()
-                    .updating($dragOffset) { value, state, _ in
-                        state = value.translation
-
-                        // Update swipe state based on drag
-                        DispatchQueue.main.async {
-                            if value.translation.width > 50 {
-                                swipeState = .accepting
-                            } else if value.translation.width < -50 {
-                                swipeState = .rejecting
-                            } else {
-                                swipeState = .none
-                            }
-                        }
-                    }
-                    .onEnded { value in
-                        if value.translation.width > 100 {
-                            // Swipe right = accept
-                            HapticManager.shared.impact(.medium)
-                            onAccept()
-                        } else if value.translation.width < -100 {
-                            // Swipe left = reject
-                            HapticManager.shared.impact(.light)
-                            onReject()
-                        }
-                        swipeState = .none
-                    }
-            )
-        }
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: dragOffset)
-    }
-}
-
-// MARK: - Enhanced Interest Card
+// MARK: - Interest Card
 
 struct InterestCard: View {
     let interest: Interest
