@@ -482,6 +482,13 @@ struct FeedDiscoverView: View {
 
         Task {
             do {
+                // Send like to backend
+                let isMatch = try await SwipeService.shared.likeUser(
+                    fromUserId: currentUserId,
+                    toUserId: userId,
+                    isSuperLike: false
+                )
+
                 // Track analytics
                 try await AnalyticsManager.shared.trackSwipe(
                     swipedUserId: userId,
@@ -489,8 +496,8 @@ struct FeedDiscoverView: View {
                     direction: "right"
                 )
 
-                // Simulate match (10% chance)
-                if Int.random(in: 0...9) == 0 {
+                if isMatch {
+                    // It's a match!
                     await MainActor.run {
                         matchedUser = user
                         showMatchAnimation = true
@@ -513,7 +520,14 @@ struct FeedDiscoverView: View {
                     }
                 }
             } catch {
-                Logger.shared.error("Error tracking like", category: .matching, error: error)
+                Logger.shared.error("Error sending like", category: .matching, error: error)
+                await MainActor.run {
+                    showToast(
+                        message: "Failed to send like. Try again.",
+                        icon: "exclamationmark.triangle.fill",
+                        color: .red
+                    )
+                }
             }
         }
     }
