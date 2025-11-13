@@ -10,6 +10,7 @@ import Foundation
 import SwiftUI
 import Combine
 import Network
+import CryptoKit
 
 // MARK: - Offline Manager
 
@@ -364,52 +365,168 @@ class SyncEngine {
         // Decode message data
         struct MessageData: Codable {
             let matchId: String
+            let senderId: String
+            let receiverId: String
             let text: String
         }
 
         let messageData = try JSONDecoder().decode(MessageData.self, from: operation.data)
 
         // Send message via MessageService
-        // This would call your actual API
         Logger.shared.debug("Sending queued message to \(messageData.matchId)", category: .networking)
 
-        // Simulate API call
-        try await Task.sleep(nanoseconds: 500_000_000)
+        try await MessageService.shared.sendMessage(
+            matchId: messageData.matchId,
+            senderId: messageData.senderId,
+            receiverId: messageData.receiverId,
+            text: messageData.text
+        )
+
+        Logger.shared.info("Successfully synced message", category: .messaging)
     }
 
     private func executeUpdateProfile(_ operation: OfflineOperation) async throws {
         Logger.shared.debug("Updating profile from queue", category: .networking)
-        try await Task.sleep(nanoseconds: 500_000_000)
+
+        // Decode profile data
+        let user = try JSONDecoder().decode(User.self, from: operation.data)
+
+        // Update profile via AuthService
+        try await AuthService.shared.updateUser(user)
+
+        Logger.shared.info("Successfully synced profile update", category: .general)
     }
 
     private func executeSwipeAction(_ operation: OfflineOperation) async throws {
         Logger.shared.debug("Executing swipe action from queue", category: .networking)
-        try await Task.sleep(nanoseconds: 500_000_000)
+
+        // Decode swipe data
+        struct SwipeData: Codable {
+            let fromUserId: String
+            let toUserId: String
+            let isLike: Bool
+        }
+
+        let swipeData = try JSONDecoder().decode(SwipeData.self, from: operation.data)
+
+        // Execute swipe via SwipeService
+        if swipeData.isLike {
+            _ = try await SwipeService.shared.likeUser(
+                fromUserId: swipeData.fromUserId,
+                toUserId: swipeData.toUserId
+            )
+        } else {
+            try await SwipeService.shared.passUser(
+                fromUserId: swipeData.fromUserId,
+                toUserId: swipeData.toUserId
+            )
+        }
+
+        Logger.shared.info("Successfully synced swipe action", category: .matching)
     }
 
     private func executeUploadPhoto(_ operation: OfflineOperation) async throws {
         Logger.shared.debug("Uploading photo from queue", category: .networking)
-        try await Task.sleep(nanoseconds: 500_000_000)
+
+        // Decode photo data
+        struct PhotoData: Codable {
+            let userId: String
+            let imageData: Data
+        }
+
+        let photoData = try JSONDecoder().decode(PhotoData.self, from: operation.data)
+
+        // Upload photo via ImageUploadService
+        let imageURL = try await ImageUploadService.shared.uploadImage(
+            imageData: photoData.imageData,
+            userId: photoData.userId
+        )
+
+        Logger.shared.info("Successfully synced photo upload: \(imageURL)", category: .storage)
     }
 
     private func executeDeletePhoto(_ operation: OfflineOperation) async throws {
         Logger.shared.debug("Deleting photo from queue", category: .networking)
-        try await Task.sleep(nanoseconds: 500_000_000)
+
+        // Decode photo deletion data
+        struct PhotoDeletionData: Codable {
+            let userId: String
+            let photoURL: String
+        }
+
+        let deletionData = try JSONDecoder().decode(PhotoDeletionData.self, from: operation.data)
+
+        // Delete photo via ImageUploadService
+        try await ImageUploadService.shared.deleteImage(
+            imageURL: deletionData.photoURL,
+            userId: deletionData.userId
+        )
+
+        Logger.shared.info("Successfully synced photo deletion", category: .storage)
     }
 
     private func executeUnmatch(_ operation: OfflineOperation) async throws {
         Logger.shared.debug("Executing unmatch from queue", category: .networking)
-        try await Task.sleep(nanoseconds: 500_000_000)
+
+        // Decode unmatch data
+        struct UnmatchData: Codable {
+            let matchId: String
+            let userId: String
+        }
+
+        let unmatchData = try JSONDecoder().decode(UnmatchData.self, from: operation.data)
+
+        // Execute unmatch via MatchService
+        try await MatchService.shared.unmatch(
+            matchId: unmatchData.matchId,
+            userId: unmatchData.userId
+        )
+
+        Logger.shared.info("Successfully synced unmatch", category: .matching)
     }
 
     private func executeReportUser(_ operation: OfflineOperation) async throws {
         Logger.shared.debug("Executing report user from queue", category: .networking)
-        try await Task.sleep(nanoseconds: 500_000_000)
+
+        // Decode report data
+        struct ReportData: Codable {
+            let reporterId: String
+            let reportedUserId: String
+            let reason: String
+            let details: String
+        }
+
+        let reportData = try JSONDecoder().decode(ReportData.self, from: operation.data)
+
+        // Execute report via BlockReportService
+        try await BlockReportService.shared.reportUser(
+            reporterId: reportData.reporterId,
+            reportedUserId: reportData.reportedUserId,
+            reason: reportData.reason,
+            details: reportData.details
+        )
+
+        Logger.shared.info("Successfully synced user report", category: .moderation)
     }
 
     private func executeBlockUser(_ operation: OfflineOperation) async throws {
         Logger.shared.debug("Executing block user from queue", category: .networking)
-        try await Task.sleep(nanoseconds: 500_000_000)
+
+        // Decode block data
+        struct BlockData: Codable {
+            let blockerId: String
+            let blockedUserId: String
+        }
+
+        let blockData = try JSONDecoder().decode(BlockData.self, from: operation.data)
+
+        // Execute block via BlockReportService
+        try await BlockReportService.shared.blockUser(
+            blockerId: blockData.blockerId,
+            blockedUserId: blockData.blockedUserId
+        )
+
+        Logger.shared.info("Successfully synced user block", category: .moderation)
     }
 }
 
@@ -448,5 +565,16 @@ struct OfflineIndicator: View {
                 .cornerRadius(20)
             }
         }
+    }
+}
+
+// MARK: - String Extension for Hashing
+
+extension String {
+    /// Generate SHA256 hash for cache keys
+    func sha256() -> String {
+        let data = Data(self.utf8)
+        let hash = SHA256.hash(data: data)
+        return hash.compactMap { String(format: "%02x", $0) }.joined()
     }
 }
