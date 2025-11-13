@@ -301,7 +301,7 @@ class AnalyticsServiceEnhanced: ObservableObject {
                 let timeToMatch = matchTimestamp.timeIntervalSince(likeTimestamp)
 
                 timeToMatchData.append(TimeToMatchData(
-                    matchId: matchDoc.id,
+                    matchId: matchDoc.documentID,
                     likeTimestamp: likeTimestamp,
                     matchTimestamp: matchTimestamp,
                     timeToMatch: timeToMatch
@@ -410,7 +410,7 @@ class AnalyticsServiceEnhanced: ObservableObject {
 
         for matchDoc in matchesSnapshot.documents {
             let messagesSnapshot = try? await db.collection("messages")
-                .whereField("matchId", isEqualTo: matchDoc.id)
+                .whereField("matchId", isEqualTo: matchDoc.documentID)
                 .getDocuments()
 
             let messageCount = messagesSnapshot?.documents.count ?? 0
