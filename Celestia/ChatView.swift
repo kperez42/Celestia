@@ -90,13 +90,7 @@ struct ChatView: View {
             UserDetailView(user: otherUser)
         }
         .sheet(isPresented: $showingReportSheet) {
-            if let userId = otherUser.id {
-                ReportUserView(
-                    reportedUserId: userId,
-                    reportedUserName: otherUser.fullName,
-                    context: .chat
-                )
-            }
+            ReportUserView(user: otherUser)
         }
         .onChange(of: messageService.messages.count) {
             // Check conversation safety whenever new messages arrive
