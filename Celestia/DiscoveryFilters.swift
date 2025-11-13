@@ -38,7 +38,7 @@ class DiscoveryFilters: ObservableObject {
     func matchesFilters(user: User, currentUserLocation: (lat: Double, lon: Double)?) -> Bool {
         // Validate age bounds to prevent crashes
         guard user.age > 0, user.age < 150 else {
-            print("⚠️ Invalid user age: \(user.age)")
+            Logger.shared.warning("Invalid user age: \(user.age)", category: .matching)
             return false
         }
 
@@ -175,7 +175,7 @@ class DiscoveryFilters: ObservableObject {
         // Validate coordinates
         guard isValidLatitude(from.lat), isValidLongitude(from.lon),
               isValidLatitude(to.lat), isValidLongitude(to.lon) else {
-            print("⚠️ Invalid coordinates: from(\(from.lat), \(from.lon)) to(\(to.lat), \(to.lon))")
+            Logger.shared.warning("Invalid coordinates: from(\(from.lat), \(from.lon)) to(\(to.lat), \(to.lon))", category: .matching)
             return Double.infinity // Return max distance for invalid coordinates
         }
 
@@ -196,7 +196,7 @@ class DiscoveryFilters: ObservableObject {
 
         // Validate result
         guard distance.isFinite, distance >= 0 else {
-            print("⚠️ Invalid distance calculation result: \(distance)")
+            Logger.shared.warning("Invalid distance calculation result: \(distance)", category: .matching)
             return Double.infinity
         }
 

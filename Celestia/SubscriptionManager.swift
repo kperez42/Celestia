@@ -9,6 +9,7 @@
 import Foundation
 import StoreKit
 import Combine
+import FirebaseFirestore
 
 // MARK: - Subscription Manager
 
@@ -56,7 +57,7 @@ class SubscriptionManager: ObservableObject {
         Logger.shared.info("Updating subscription status", category: .general)
 
         // Check active subscriptions
-        for await result in Transaction.currentEntitlements {
+        for await result in StoreKit.Transaction.currentEntitlements {
             guard case .verified(let transaction) = result else {
                 continue
             }
@@ -78,7 +79,7 @@ class SubscriptionManager: ObservableObject {
         saveSubscriptionStatus()
     }
 
-    private func updateTier(from transaction: Transaction) async {
+    private func updateTier(from transaction: StoreKit.Transaction) async {
         let productId = transaction.productID
 
         // Map product ID to tier
@@ -103,7 +104,7 @@ class SubscriptionManager: ObservableObject {
         saveSubscriptionStatus()
 
         // Track analytics
-        await AnalyticsManager.shared.logEvent(.subscriptionActive, parameters: [
+        AnalyticsManager.shared.logEvent(.subscriptionActive, parameters: [
             "tier": tier.rawValue,
             "auto_renew": autoRenewEnabled
         ])
@@ -119,14 +120,55 @@ class SubscriptionManager: ObservableObject {
     }
 
     /// Update subscription from transaction (called by StoreManager)
-    func updateSubscription(tier: SubscriptionTier, transaction: Transaction) async {
+    func updateSubscription(tier: SubscriptionTier, transaction: StoreKit.Transaction) async {
         await updateTier(from: transaction)
     }
 
-    /// Add consumable purchase (not implemented - subscriptions only)
-    func addConsumable(_ type: ConsumableType, amount: Int) {
+    /// Add consumable purchase
+    func addConsumable(_ type: ConsumableType, amount: Int) async {
         Logger.shared.info("Consumable purchase: \(type) x\(amount)", category: .general)
-        // Consumables not currently implemented - would track boost purchases, etc.
+
+        guard let userId = AuthService.shared.currentUser?.id else {
+            Logger.shared.error("Cannot add consumable: No user logged in", category: .general)
+            return
+        }
+
+        let db = Firestore.firestore()
+        let userRef = db.collection("users").document(userId)
+
+        do {
+            switch type {
+            case .superLikes:
+                try await userRef.updateData([
+                    "superLikesRemaining": FieldValue.increment(Int64(amount))
+                ])
+                Logger.shared.info("✅ Added \(amount) Super Likes", category: .general)
+
+            case .boost:
+                try await userRef.updateData([
+                    "boostsRemaining": FieldValue.increment(Int64(amount))
+                ])
+                Logger.shared.info("✅ Added \(amount) Boosts", category: .general)
+
+            case .rewind:
+                try await userRef.updateData([
+                    "rewindsRemaining": FieldValue.increment(Int64(amount))
+                ])
+                Logger.shared.info("✅ Added \(amount) Rewinds", category: .general)
+
+            case .spotlight:
+                try await userRef.updateData([
+                    "spotlightsRemaining": FieldValue.increment(Int64(amount))
+                ])
+                Logger.shared.info("✅ Added \(amount) Spotlights", category: .general)
+            }
+
+            // Refresh user data
+            await AuthService.shared.fetchUser()
+
+        } catch {
+            Logger.shared.error("Failed to add consumable: \(error.localizedDescription)", category: .general)
+        }
     }
 
     // MARK: - Transaction Monitoring
@@ -134,7 +176,7 @@ class SubscriptionManager: ObservableObject {
     private func startMonitoringTransactions() {
         statusUpdateTask = Task {
             // Monitor transaction updates
-            for await result in Transaction.updates {
+            for await result in StoreKit.Transaction.updates {
                 guard case .verified(let transaction) = result else {
                     continue
                 }

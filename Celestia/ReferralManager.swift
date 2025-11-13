@@ -24,11 +24,32 @@ class ReferralManager: ObservableObject {
 
     // MARK: - Referral Code Generation
 
-    func generateReferralCode(for userId: String) -> String {
+    func generateReferralCode(for userId: String) async throws -> String {
         // Generate a unique 8-character code
         let characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-        let code = String((0..<8).map { _ in characters.randomElement()! })
-        return "CEL-\(code)"
+
+        // Try up to 5 times to generate a unique code
+        for attempt in 1...5 {
+            let code = String((0..<8).map { _ in characters.randomElement()! })
+            let fullCode = "CEL-\(code)"
+
+            // Check if code already exists
+            let snapshot = try await db.collection("users")
+                .whereField("referralStats.referralCode", isEqualTo: fullCode)
+                .limit(to: 1)
+                .getDocuments()
+
+            if snapshot.documents.isEmpty {
+                // Code is unique
+                return fullCode
+            }
+
+            Logger.shared.warning("Referral code collision detected (attempt \(attempt)/5): \(fullCode)", category: .referral)
+        }
+
+        // If we still can't generate a unique code after 5 attempts, use timestamp
+        let timestamp = Int(Date().timeIntervalSince1970)
+        return "CEL-\(String(timestamp).suffix(8))"
     }
 
     func initializeReferralCode(for user: inout User) async throws {
@@ -37,8 +58,8 @@ class ReferralManager: ObservableObject {
             return
         }
 
-        // Generate new code
-        let code = generateReferralCode(for: user.id ?? "")
+        // Generate new unique code
+        let code = try await generateReferralCode(for: user.id ?? "")
         user.referralStats.referralCode = code
 
         // Update in Firestore
@@ -61,14 +82,46 @@ class ReferralManager: ObservableObject {
             .getDocuments()
 
         guard let referrerDoc = querySnapshot.documents.first else {
-            print("Invalid referral code: \(referralCode)")
-            return
+            Logger.shared.warning("Invalid referral code: \(referralCode)", category: .referral)
+            throw ReferralError.invalidCode
         }
 
         let referrerId = referrerDoc.documentID
         guard let newUserId = newUser.id, referrerId != newUserId else {
-            print("Cannot refer yourself")
-            return
+            Logger.shared.warning("User attempted to refer themselves", category: .referral)
+            throw ReferralError.selfReferral
+        }
+
+        // Check if this email has already been referred
+        let existingReferralSnapshot = try await db.collection("referrals")
+            .whereField("referredUserId", isEqualTo: newUserId)
+            .whereField("status", isEqualTo: ReferralStatus.completed.rawValue)
+            .limit(to: 1)
+            .getDocuments()
+
+        if !existingReferralSnapshot.documents.isEmpty {
+            Logger.shared.warning("User has already been referred", category: .referral)
+            throw ReferralError.alreadyReferred
+        }
+
+        // Fetch users with matching email
+        let emailCheckSnapshot = try await db.collection("users")
+            .whereField("email", isEqualTo: newUser.email)
+            .limit(to: 5)  // Get a few to check
+            .getDocuments()
+
+        // Filter for users with referredByCode
+        let usersWithReferral = emailCheckSnapshot.documents.filter { doc in
+            let data = doc.data()
+            return data["referredByCode"] != nil && !(data["referredByCode"] is NSNull)
+        }
+
+        if !usersWithReferral.isEmpty {
+            // Email was already used with a referral code
+        }
+        if emailCheckSnapshot.documents.count > 1 {
+            Logger.shared.warning("Email has already been referred with a different account", category: .referral)
+            throw ReferralError.emailAlreadyReferred
         }
 
         // Create referral record
@@ -94,7 +147,7 @@ class ReferralManager: ObservableObject {
         // Update referrer stats
         try await updateReferrerStats(userId: referrerId)
 
-        print("Referral processed successfully: \(referralCode)")
+        Logger.shared.info("Referral processed successfully: \(referralCode)", category: .referral)
     }
 
     // MARK: - Award Premium Days
@@ -138,7 +191,7 @@ class ReferralManager: ObservableObject {
             "expiryDate": Timestamp(date: expiryDate)
         ])
 
-        print("Awarded \(days) premium days to user \(userId) for \(reason)")
+        Logger.shared.info("Awarded \(days) premium days to user \(userId) for \(reason)", category: .referral)
     }
 
     // MARK: - Update Referrer Stats
@@ -220,7 +273,7 @@ class ReferralManager: ObservableObject {
 
             return !snapshot.documents.isEmpty
         } catch {
-            print("Error validating referral code: \(error)")
+            Logger.shared.error("Error validating referral code", category: .referral, error: error)
             return false
         }
     }
@@ -267,5 +320,22 @@ class ReferralManager: ObservableObject {
 
     func getReferralURL(code: String) -> URL? {
         return URL(string: "https://celestia.app/join/\(code)")
+    }
+
+    // MARK: - Analytics
+
+    func trackShare(userId: String, code: String, shareMethod: String = "generic") async {
+        do {
+            try await db.collection("referralShares").addDocument(data: [
+                "userId": userId,
+                "referralCode": code,
+                "shareMethod": shareMethod,
+                "timestamp": Timestamp(date: Date()),
+                "platform": "iOS"
+            ])
+            Logger.shared.info("Tracked share for code: \(code) via \(shareMethod)", category: .analytics)
+        } catch {
+            Logger.shared.error("Failed to track share", category: .analytics, error: error)
+        }
     }
 }
