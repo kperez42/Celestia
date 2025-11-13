@@ -212,82 +212,10 @@ class SafetyManager: ObservableObject {
     // MARK: - Safety Tips
 
     private func loadSafetyTips() {
-        safetyTips = [
-            SafetyTip(
-                id: "1",
-                category: .meetingSafely,
-                title: "Meet in Public Places",
-                description: "Always meet your date in a public place with lots of people around for the first few dates.",
-                icon: "person.2.fill"
-            ),
-            SafetyTip(
-                id: "2",
-                category: .communication,
-                title: "Tell Someone Your Plans",
-                description: "Let a friend or family member know where you're going and who you're meeting. Use our check-in feature!",
-                icon: "message.fill"
-            ),
-            SafetyTip(
-                id: "3",
-                category: .personalInfo,
-                title: "Protect Personal Information",
-                description: "Don't share your home address, workplace, or financial details until you really know someone.",
-                icon: "lock.shield.fill"
-            ),
-            SafetyTip(
-                id: "4",
-                category: .transportation,
-                title: "Have Your Own Transportation",
-                description: "Drive yourself or use a rideshare service so you can leave whenever you want.",
-                icon: "car.fill"
-            ),
-            SafetyTip(
-                id: "5",
-                category: .scamAwareness,
-                title: "Watch for Red Flags",
-                description: "Be cautious if someone asks for money, avoids video calls, or rushes the relationship.",
-                icon: "exclamationmark.triangle.fill"
-            ),
-            SafetyTip(
-                id: "6",
-                category: .verification,
-                title: "Look for Verified Badges",
-                description: "Prioritize matching with users who have completed photo or ID verification.",
-                icon: "checkmark.seal.fill"
-            ),
-            SafetyTip(
-                id: "7",
-                category: .meetingSafely,
-                title: "Stay Sober",
-                description: "Limit alcohol consumption on first dates so you can stay alert and make good decisions.",
-                icon: "cup.and.saucer.fill"
-            ),
-            SafetyTip(
-                id: "8",
-                category: .communication,
-                title: "Trust Your Instincts",
-                description: "If something feels off, it probably is. Don't be afraid to end the date early or block someone.",
-                icon: "heart.circle.fill"
-            ),
-            SafetyTip(
-                id: "9",
-                category: .personalInfo,
-                title: "Use In-App Messaging",
-                description: "Keep conversations on Celestia until you feel comfortable sharing your phone number.",
-                icon: "bubble.left.and.bubble.right.fill"
-            ),
-            SafetyTip(
-                id: "10",
-                category: .scamAwareness,
-                title: "Never Send Money",
-                description: "Never send money or gift cards to someone you haven't met in person. This is always a scam.",
-                icon: "dollarsign.circle.fill"
-            )
-        ]
-    }
-
-    func getTipsByCategory(_ category: SafetyTipCategory) -> [SafetyTip] {
-        return safetyTips.filter { $0.category == category }
+        // Load all tips from all categories
+        safetyTips = TipCategory.allCases.flatMap { category in
+            SafetyTip.tips(for: category)
+        }
     }
 
     // MARK: - Helpers
@@ -422,38 +350,3 @@ enum AlertSeverity: String {
     }
 }
 
-// MARK: - Safety Tip
-
-struct SafetyTip: Identifiable {
-    let id: String
-    let category: SafetyTipCategory
-    let title: String
-    let description: String
-    let icon: String
-}
-
-enum SafetyTipCategory: String, CaseIterable {
-    case meetingSafely = "meeting_safely"
-    case communication = "communication"
-    case personalInfo = "personal_info"
-    case transportation = "transportation"
-    case scamAwareness = "scam_awareness"
-    case verification = "verification"
-
-    var displayName: String {
-        switch self {
-        case .meetingSafely:
-            return "Meeting Safely"
-        case .communication:
-            return "Communication"
-        case .personalInfo:
-            return "Personal Information"
-        case .transportation:
-            return "Transportation"
-        case .scamAwareness:
-            return "Scam Awareness"
-        case .verification:
-            return "Verification"
-        }
-    }
-}

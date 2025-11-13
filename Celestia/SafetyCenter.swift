@@ -84,7 +84,7 @@ struct SafetyCenterView: View {
 
     private var verificationSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            SectionHeader(title: "Verification", icon: "checkmark.seal.fill")
+            SafetySectionHeader(title: "Verification", icon: "checkmark.seal.fill")
 
             VStack(spacing: 12) {
                 NavigationLink {
@@ -142,7 +142,7 @@ struct SafetyCenterView: View {
 
     private var safetyToolsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            SectionHeader(title: "Safety Tools", icon: "shield.fill")
+            SafetySectionHeader(title: "Safety Tools", icon: "shield.fill")
 
             VStack(spacing: 12) {
                 NavigationLink {
@@ -186,7 +186,7 @@ struct SafetyCenterView: View {
 
     private var dateSafetySection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            SectionHeader(title: "Date Safety", icon: "calendar.badge.exclamationmark")
+            SafetySectionHeader(title: "Date Safety", icon: "calendar.badge.exclamationmark")
 
             VStack(spacing: 12) {
                 NavigationLink {
@@ -229,7 +229,7 @@ struct SafetyCenterView: View {
 
     private var emergencyContactsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            SectionHeader(title: "Emergency", icon: "phone.badge.plus")
+            SafetySectionHeader(title: "Emergency", icon: "phone.badge.plus")
 
             VStack(spacing: 12) {
                 NavigationLink {
@@ -261,7 +261,7 @@ struct SafetyCenterView: View {
 
     private var resourcesSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            SectionHeader(title: "Resources", icon: "book.fill")
+            SafetySectionHeader(title: "Resources", icon: "book.fill")
 
             VStack(spacing: 12) {
                 NavigationLink {
@@ -305,7 +305,7 @@ struct SafetyCenterView: View {
 
 // MARK: - Section Header
 
-struct SectionHeader: View {
+struct SafetySectionHeader: View {
     let title: String
     let icon: String
 

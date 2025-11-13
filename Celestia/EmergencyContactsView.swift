@@ -171,11 +171,11 @@ struct EmergencyContactCard: View {
                     Text(contact.name)
                         .font(.headline)
 
-                    Text(contact.phone)
+                    Text(contact.phoneNumber)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
 
-                    Text(contact.relationship)
+                    Text(contact.relationship.displayName)
                         .font(.caption)
                         .foregroundColor(.purple)
                         .padding(.horizontal, 8)
@@ -211,7 +211,7 @@ struct EmergencyContactCard: View {
 
             // Date Updates Toggle
             Toggle(isOn: Binding(
-                get: { contact.canReceiveDateUpdates },
+                get: { contact.notificationPreferences.receiveScheduledDateAlerts },
                 set: { _ in
                     Task {
                         await onToggleDateUpdates()
@@ -254,9 +254,7 @@ struct AddEmergencyContactView: View {
 
     @State private var name = ""
     @State private var phone = ""
-    @State private var relationship = "Friend"
-
-    let relationships = ["Friend", "Family", "Partner", "Roommate", "Coworker", "Other"]
+    @State private var relationship: ContactRelationship = .friend
 
     var body: some View {
         NavigationStack {
@@ -269,8 +267,8 @@ struct AddEmergencyContactView: View {
 
                 Section("Relationship") {
                     Picker("Relationship", selection: $relationship) {
-                        ForEach(relationships, id: \.self) { rel in
-                            Text(rel).tag(rel)
+                        ForEach(ContactRelationship.allCases, id: \.self) { rel in
+                            Text(rel.displayName).tag(rel)
                         }
                     }
                 }
@@ -296,9 +294,11 @@ struct AddEmergencyContactView: View {
                             let contact = EmergencyContact(
                                 id: UUID().uuidString,
                                 name: name,
-                                phone: phone,
+                                phoneNumber: phone,
+                                email: nil,
                                 relationship: relationship,
-                                canReceiveDateUpdates: true
+                                addedAt: Date(),
+                                notificationPreferences: EmergencyNotificationPreferences()
                             )
                             await onAdd(contact)
                             dismiss()
@@ -348,9 +348,16 @@ class EmergencyContactsViewModel: ObservableObject {
                     "userId": userId,
                     "id": contact.id,
                     "name": contact.name,
-                    "phone": contact.phone,
-                    "relationship": contact.relationship,
-                    "canReceiveDateUpdates": contact.canReceiveDateUpdates,
+                    "phoneNumber": contact.phoneNumber,
+                    "email": contact.email as Any,
+                    "relationship": contact.relationship.rawValue,
+                    "addedAt": Timestamp(date: contact.addedAt),
+                    "notificationPreferences": [
+                        "receiveScheduledDateAlerts": contact.notificationPreferences.receiveScheduledDateAlerts,
+                        "receiveCheckInAlerts": contact.notificationPreferences.receiveCheckInAlerts,
+                        "receiveEmergencyAlerts": contact.notificationPreferences.receiveEmergencyAlerts,
+                        "receiveMissedCheckInAlerts": contact.notificationPreferences.receiveMissedCheckInAlerts
+                    ],
                     "createdAt": Timestamp(date: Date())
                 ])
 
@@ -358,7 +365,7 @@ class EmergencyContactsViewModel: ObservableObject {
 
             AnalyticsServiceEnhanced.shared.trackEvent(
                 .emergencyContactAdded,
-                properties: ["relationship": contact.relationship]
+                properties: ["relationship": contact.relationship.rawValue]
             )
 
             Logger.shared.info("Emergency contact added: \(contact.name)", category: .general)
@@ -390,12 +397,14 @@ class EmergencyContactsViewModel: ObservableObject {
         guard let index = contacts.firstIndex(where: { $0.id == contact.id }) else { return }
 
         var updatedContact = contact
-        updatedContact.canReceiveDateUpdates.toggle()
+        updatedContact.notificationPreferences.receiveScheduledDateAlerts.toggle()
 
         do {
             try await db.collection("emergency_contacts")
                 .document(contact.id)
-                .updateData(["canReceiveDateUpdates": updatedContact.canReceiveDateUpdates])
+                .updateData([
+                    "notificationPreferences.receiveScheduledDateAlerts": updatedContact.notificationPreferences.receiveScheduledDateAlerts
+                ])
 
             contacts[index] = updatedContact
 
