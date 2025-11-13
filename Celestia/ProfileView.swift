@@ -278,17 +278,21 @@ struct ProfileView: View {
             // Top bar buttons
             VStack {
                 HStack {
-                    ShareLink(item: URL(string: "https://celestia.app/profile/\(user.id ?? "")")!, subject: Text("Check out \(user.fullName)'s profile"), message: Text("See \(user.fullName) on Celestia!")) {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.title3)
-                            .foregroundColor(.white)
-                            .frame(width: 44, height: 44)
-                            .background(Color.white.opacity(0.2))
-                            .clipShape(Circle())
+                    // Share button - only show if URL is valid
+                    if let userId = user.id,
+                       let shareURL = URL(string: "https://celestia.app/profile/\(userId)") {
+                        ShareLink(item: shareURL, subject: Text("Check out \(user.fullName)'s profile"), message: Text("See \(user.fullName) on Celestia!")) {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.title3)
+                                .foregroundColor(.white)
+                                .frame(width: 44, height: 44)
+                                .background(Color.white.opacity(0.2))
+                                .clipShape(Circle())
+                        }
+                        .simultaneousGesture(TapGesture().onEnded {
+                            HapticManager.shared.impact(.light)
+                        })
                     }
-                    .simultaneousGesture(TapGesture().onEnded {
-                        HapticManager.shared.impact(.light)
-                    })
 
                     Spacer()
 

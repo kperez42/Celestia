@@ -22,6 +22,7 @@ struct FeedDiscoverView: View {
     @State private var showMatchAnimation = false
     @State private var matchedUser: User?
     @State private var favorites: Set<String> = []
+    @State private var errorMessage: String = ""
 
     private let usersPerPage = 10
     private let preloadThreshold = 3 // Load more when 3 items from bottom
@@ -71,8 +72,12 @@ struct FeedDiscoverView: View {
                             endOfResultsView
                         }
 
+                        // Error state
+                        if !errorMessage.isEmpty {
+                            errorStateView
+                        }
                         // Empty state
-                        if !isLoading && displayedUsers.isEmpty {
+                        else if !isLoading && displayedUsers.isEmpty {
                             emptyStateView
                         }
                     }
@@ -173,6 +178,59 @@ struct FeedDiscoverView: View {
                         )
                     )
                     .cornerRadius(12)
+            }
+        }
+        .padding(40)
+    }
+
+    // MARK: - Error State
+
+    private var errorStateView: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 70))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.red.opacity(0.7), .orange.opacity(0.5)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            VStack(spacing: 12) {
+                Text("Oops! Something Went Wrong")
+                    .font(.title2)
+                    .fontWeight(.bold)
+
+                Text(errorMessage)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
+
+            Button {
+                errorMessage = ""  // Clear error
+                Task {
+                    await loadUsers()
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "arrow.clockwise")
+                    Text("Try Again")
+                }
+                .fontWeight(.semibold)
+                .foregroundColor(.white)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 14)
+                .background(
+                    LinearGradient(
+                        colors: [.purple, .pink],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(12)
             }
         }
         .padding(40)
@@ -300,10 +358,14 @@ struct FeedDiscoverView: View {
 
             await MainActor.run {
                 users = UserService.shared.users
+                errorMessage = ""  // Clear any previous errors
                 loadMoreUsers()
             }
         } catch {
             Logger.shared.error("Error loading users", category: .database, error: error)
+            await MainActor.run {
+                errorMessage = "Failed to load users. Please check your connection and try again."
+            }
         }
     }
 

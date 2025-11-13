@@ -17,7 +17,8 @@ struct WelcomeView: View {
     @State private var currentFeature = 0
     @State private var animateGradient = false
     @State private var showContent = false
-    
+    @State private var featureTimer: Timer?
+
     let features = [
         Feature(icon: "globe.americas.fill", title: "Connect Globally", description: "Meet people from 195+ countries"),
         Feature(icon: "heart.text.square.fill", title: "Smart Matching", description: "AI-powered compatibility algorithm"),
@@ -68,6 +69,11 @@ struct WelcomeView: View {
                 withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
                     animateGradient = true
                 }
+            }
+            .onDisappear {
+                // Invalidate timer to prevent memory leak
+                featureTimer?.invalidate()
+                featureTimer = nil
             }
         }
     }
@@ -279,7 +285,11 @@ struct WelcomeView: View {
     // MARK: - Helper Functions
     
     private func startFeatureTimer() {
-        Timer.scheduledTimer(withTimeInterval: 4.0, repeats: true) { _ in
+        // Invalidate existing timer before creating a new one
+        featureTimer?.invalidate()
+
+        // Store timer reference to prevent memory leak
+        featureTimer = Timer.scheduledTimer(withTimeInterval: 4.0, repeats: true) { _ in
             withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                 currentFeature = (currentFeature + 1) % features.count
             }
