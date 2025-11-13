@@ -9,10 +9,10 @@ import SwiftUI
 
 struct MatchesView: View {
     @EnvironmentObject var authService: AuthService
-    @StateObject private var matchService = MatchService.shared
-    @StateObject private var userService = UserService.shared
-    @StateObject private var messageService = MessageService.shared
-    
+    @ObservedObject private var matchService = MatchService.shared
+    @ObservedObject private var userService = UserService.shared
+    @ObservedObject private var messageService = MessageService.shared
+
     @State private var matchedUsers: [String: User] = [:]
     @State private var selectedTab = 0
     @State private var searchText = ""
@@ -21,7 +21,8 @@ struct MatchesView: View {
     @State private var showOnlyUnread = false
     @State private var selectedMatch: Match?
     @State private var showMatchDetail = false
-    
+    @State private var errorMessage: String = ""
+
     enum SortOption: String, CaseIterable {
         case recent = "Most Recent"
         case unread = "Unread First"
@@ -116,7 +117,9 @@ struct MatchesView: View {
                     }
                     
                     // Content
-                    if matchService.isLoading && matchService.matches.isEmpty {
+                    if !errorMessage.isEmpty {
+                        errorStateView
+                    } else if matchService.isLoading && matchService.matches.isEmpty {
                         loadingView
                     } else if matchService.matches.isEmpty {
                         emptyStateView
@@ -138,6 +141,7 @@ struct MatchesView: View {
             .sheet(item: $selectedMatch) { match in
                 if let user = getMatchedUser(match) {
                     UserDetailView(user: user)
+                        .environmentObject(authService)
                 }
             }
         }
@@ -162,7 +166,7 @@ struct MatchesView: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Matches")
-                            .font(.system(size: 36, weight: .bold))
+                            .font(.largeTitle.weight(.bold))
                             .foregroundColor(.white)
                         
                         if !matchService.matches.isEmpty {
@@ -502,9 +506,67 @@ struct MatchesView: View {
             Spacer()
         }
     }
-    
+
+    // MARK: - Error State
+
+    private var errorStateView: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 70))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.red.opacity(0.7), .orange.opacity(0.5)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            VStack(spacing: 12) {
+                Text("Oops! Something Went Wrong")
+                    .font(.title2)
+                    .fontWeight(.bold)
+
+                Text(errorMessage)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+            }
+
+            Button {
+                errorMessage = ""  // Clear error
+                Task {
+                    await loadMatches()
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "arrow.clockwise")
+                    Text("Try Again")
+                }
+                .fontWeight(.semibold)
+                .foregroundColor(.white)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 14)
+                .background(
+                    LinearGradient(
+                        colors: [.purple, .pink],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(12)
+            }
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemGroupedBackground))
+    }
+
     // MARK: - Helper Functions
-    
+
     private func loadMatches() async {
         // Check if we should use test data (no user ID or DEBUG mode)
         guard let userId = authService.currentUser?.id else {
@@ -536,6 +598,11 @@ struct MatchesView: View {
         do {
             try await matchService.fetchMatches(userId: userId)
 
+            // Clear any previous errors on successful load
+            await MainActor.run {
+                errorMessage = ""
+            }
+
             // Load user data for each match
             for match in matchService.matches {
                 let otherUserId = match.user1Id == userId ? match.user2Id : match.user1Id
@@ -548,7 +615,10 @@ struct MatchesView: View {
                 }
             }
         } catch {
-            print("Error loading matches: \(error)")
+            Logger.shared.error("Error loading matches", category: .matching, error: error)
+            await MainActor.run {
+                errorMessage = "Failed to load matches. Please check your connection and try again."
+            }
         }
     }
     
@@ -692,16 +762,7 @@ struct MatchProfileCard: View {
     private var profileImage: some View {
         Group {
             if let imageURL = URL(string: user.profileImageURL), !user.profileImageURL.isEmpty {
-                AsyncImage(url: imageURL) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    default:
-                        placeholderImage
-                    }
-                }
+                CachedCardImage(url: imageURL)
             } else {
                 placeholderImage
             }

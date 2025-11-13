@@ -29,33 +29,7 @@ struct UserDetailView: View {
                 TabView {
                     // Filter out empty photo URLs
                     ForEach(validPhotos, id: \.self) { photoURL in
-                        AsyncImage(url: URL(string: photoURL)) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                            case .failure:
-                                // Error state - show retry option
-                                VStack(spacing: 12) {
-                                    Image(systemName: "photo.badge.exclamationmark")
-                                        .font(.system(size: 60))
-                                        .foregroundColor(.gray)
-                                    Text("Failed to load image")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                }
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                .background(Color.gray.opacity(0.2))
-                            case .empty:
-                                // Loading state
-                                ProgressView()
-                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                    .background(Color.gray.opacity(0.2))
-                            @unknown default:
-                                Color.gray.opacity(0.2)
-                            }
-                        }
+                        CachedCardImage(url: URL(string: photoURL))
                     }
                 }
                 .frame(height: 450)
@@ -69,10 +43,10 @@ struct UserDetailView: View {
                             HStack(spacing: 10) {
                                 // FIXED: Changed from user.name to user.fullName
                                 Text(user.fullName)
-                                    .font(.system(size: 32, weight: .bold))
-                                
+                                    .font(.largeTitle.weight(.bold))
+
                                 Text("\(user.age)")
-                                    .font(.system(size: 28))
+                                    .font(.title2)
                                     .foregroundColor(.secondary)
                                 
                                 if user.isVerified {
@@ -195,7 +169,9 @@ struct UserDetailView: View {
                         .clipShape(Circle())
                         .shadow(color: Color.black.opacity(0.1), radius: 5)
                 }
-                
+                .accessibilityLabel("Pass")
+                .accessibilityHint("Skip this profile and return to browsing")
+
                 Button {
                     sendInterest()
                 } label: {
@@ -213,6 +189,8 @@ struct UserDetailView: View {
                         .clipShape(Circle())
                         .shadow(color: Color.purple.opacity(0.4), radius: 10)
                 }
+                .accessibilityLabel("Like")
+                .accessibilityHint("Send interest to \(user.fullName)")
             }
             .padding(.bottom, 30)
         }
@@ -228,7 +206,7 @@ struct UserDetailView: View {
                         viewerUserId: currentUserId
                     )
                 } catch {
-                    print("❌ Error tracking profile view: \(error)")
+                    Logger.shared.error("Error tracking profile view", category: .general, error: error)
                 }
             }
         }

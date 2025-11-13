@@ -203,7 +203,7 @@ struct InterestsView: View {
                 }
             }
         } catch {
-            print("Error loading interests: \(error)")
+            Logger.shared.error("Error loading interests", category: .matching, error: error)
         }
     }
     
@@ -225,7 +225,7 @@ struct InterestsView: View {
                 
                 await loadData()
             } catch {
-                print("Error accepting interest: \(error)")
+                Logger.shared.error("Error accepting interest", category: .matching, error: error)
             }
         }
     }
@@ -238,7 +238,7 @@ struct InterestsView: View {
                 try await interestService.rejectInterest(interestId: interestId)
                 await loadData()
             } catch {
-                print("Error rejecting interest: \(error)")
+                Logger.shared.error("Error rejecting interest", category: .matching, error: error)
             }
         }
     }

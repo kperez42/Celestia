@@ -196,13 +196,16 @@ extension String {
 
 // MARK: - Cached Async Image
 
-struct SimpleCachedAsyncImage<Content: View, Placeholder: View>: View {
+/// High-performance cached async image with memory and disk caching
+struct CachedAsyncImage<Content: View, Placeholder: View>: View {
     let url: URL?
     let content: (Image) -> Content
     let placeholder: () -> Placeholder
 
     @State private var image: UIImage?
     @State private var isLoading = false
+    @State private var loadError: Error?
+    @State private var retryCount = 0
 
     init(
         url: URL?,
@@ -218,6 +221,32 @@ struct SimpleCachedAsyncImage<Content: View, Placeholder: View>: View {
         Group {
             if let image = image {
                 content(Image(uiImage: image))
+            } else if let error = loadError {
+                // Error state with retry button
+                VStack(spacing: 12) {
+                    Image(systemName: "photo.badge.exclamationmark")
+                        .font(.system(size: 40))
+                        .foregroundColor(.gray)
+
+                    Text("Failed to load")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    Button {
+                        retryCount += 1
+                        loadError = nil
+                        loadImage()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.clockwise")
+                            Text("Retry")
+                        }
+                        .font(.caption)
+                        .foregroundColor(.purple)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.gray.opacity(0.2))
             } else {
                 placeholder()
                     .onAppear {
@@ -240,6 +269,7 @@ struct SimpleCachedAsyncImage<Content: View, Placeholder: View>: View {
 
         // Load from network
         isLoading = true
+        loadError = nil
 
         Task {
             do {
@@ -251,25 +281,253 @@ struct SimpleCachedAsyncImage<Content: View, Placeholder: View>: View {
                         self.image = downloadedImage
                         self.isLoading = false
                     }
+                } else {
+                    await MainActor.run {
+                        self.isLoading = false
+                        self.loadError = NSError(domain: "ImageCache", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid image data"])
+                    }
                 }
             } catch {
                 await MainActor.run {
                     self.isLoading = false
+                    self.loadError = error
                 }
-                print("Failed to load image: \(error)")
+                Logger.shared.error("Failed to load image from \(url.absoluteString)", category: .storage, error: error)
             }
         }
     }
 }
 
 // Convenience initializer with default placeholder
-extension SimpleCachedAsyncImage where Placeholder == Color {
+extension CachedAsyncImage where Placeholder == ProgressView<EmptyView, EmptyView> {
     init(
         url: URL?,
         @ViewBuilder content: @escaping (Image) -> Content
     ) {
         self.url = url
         self.content = content
-        self.placeholder = { Color.gray.opacity(0.2) }
+        self.placeholder = { ProgressView() }
+    }
+}
+
+// MARK: - Profile Image Variant
+
+/// Cached async image optimized for profile pictures (circular)
+struct CachedProfileImage: View {
+    let url: URL?
+    let size: CGFloat
+
+    @State private var image: UIImage?
+    @State private var isLoading = false
+    @State private var loadError: Error?
+    @State private var retryCount = 0
+
+    var body: some View {
+        Group {
+            if let image = image {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
+            } else if loadError != nil {
+                // Error state with retry button
+                ZStack {
+                    Circle()
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(width: size, height: size)
+
+                    VStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: size * 0.25))
+                            .foregroundColor(.gray)
+
+                        Button {
+                            retryCount += 1
+                            loadError = nil
+                            loadImage()
+                        } label: {
+                            Text("Retry")
+                                .font(.caption)
+                                .foregroundColor(.purple)
+                        }
+                    }
+                }
+            } else {
+                // Loading state
+                ZStack {
+                    Circle()
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(width: size, height: size)
+
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .purple))
+                }
+                .onAppear {
+                    loadImage()
+                }
+            }
+        }
+    }
+
+    private func loadImage() {
+        guard let url = url, !isLoading else { return }
+
+        let cacheKey = url.absoluteString
+
+        // Check cache first
+        if let cachedImage = ImageCache.shared.image(for: cacheKey) {
+            self.image = cachedImage
+            return
+        }
+
+        // Load from network
+        isLoading = true
+        loadError = nil
+
+        Task {
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+
+                if let downloadedImage = UIImage(data: data) {
+                    await MainActor.run {
+                        ImageCache.shared.setImage(downloadedImage, for: cacheKey)
+                        self.image = downloadedImage
+                        self.isLoading = false
+                    }
+                } else {
+                    await MainActor.run {
+                        self.isLoading = false
+                        self.loadError = NSError(domain: "ImageCache", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid image data"])
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    self.isLoading = false
+                    self.loadError = error
+                }
+                Logger.shared.error("Failed to load profile image", category: .storage, error: error)
+            }
+        }
+    }
+}
+
+// MARK: - Card Image Variant
+
+/// Cached async image optimized for card layouts (discover, matches)
+struct CachedCardImage: View {
+    let url: URL?
+
+    @State private var image: UIImage?
+    @State private var isLoading = false
+    @State private var loadError: Error?
+    @State private var retryCount = 0
+
+    var body: some View {
+        Group {
+            if let image = image {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } else if loadError != nil {
+                // Error state with elegant retry button
+                VStack(spacing: 12) {
+                    Image(systemName: "photo.badge.exclamationmark")
+                        .font(.system(size: 60))
+                        .foregroundColor(.gray.opacity(0.6))
+
+                    Text("Image unavailable")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+
+                    Button {
+                        retryCount += 1
+                        loadError = nil
+                        loadImage()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.clockwise")
+                            Text("Retry")
+                        }
+                        .font(.caption)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .cornerRadius(20)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(
+                    LinearGradient(
+                        colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.05)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+            } else {
+                // Loading state with brand gradient
+                ZStack {
+                    LinearGradient(
+                        colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.05)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .purple))
+                }
+                .onAppear {
+                    loadImage()
+                }
+            }
+        }
+    }
+
+    private func loadImage() {
+        guard let url = url, !isLoading else { return }
+
+        let cacheKey = url.absoluteString
+
+        // Check cache first
+        if let cachedImage = ImageCache.shared.image(for: cacheKey) {
+            self.image = cachedImage
+            return
+        }
+
+        // Load from network
+        isLoading = true
+        loadError = nil
+
+        Task {
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+
+                if let downloadedImage = UIImage(data: data) {
+                    await MainActor.run {
+                        ImageCache.shared.setImage(downloadedImage, for: cacheKey)
+                        self.image = downloadedImage
+                        self.isLoading = false
+                    }
+                } else {
+                    await MainActor.run {
+                        self.isLoading = false
+                        self.loadError = NSError(domain: "ImageCache", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid image data"])
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    self.isLoading = false
+                    self.loadError = error
+                }
+                Logger.shared.error("Failed to load card image", category: .storage, error: error)
+            }
+        }
     }
 }

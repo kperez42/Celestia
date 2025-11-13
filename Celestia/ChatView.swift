@@ -112,10 +112,12 @@ struct ChatView: View {
                 HapticManager.shared.impact(.light)
             } label: {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.body.weight(.semibold))
                     .foregroundColor(.purple)
                     .frame(width: 44, height: 44)
             }
+            .accessibilityLabel("Back")
+            .accessibilityHint("Return to messages list")
 
             // Profile image
             Circle()
@@ -324,6 +326,8 @@ struct ChatView: View {
                             .font(.title2)
                             .foregroundColor(.secondary)
                     }
+                    .accessibilityLabel("Remove image")
+                    .accessibilityHint("Cancel sending this image")
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 8)
@@ -338,6 +342,8 @@ struct ChatView: View {
                         .font(.title3)
                         .foregroundColor(.purple)
                 }
+                .accessibilityLabel("Attach photo")
+                .accessibilityHint("Select a photo to send")
                 .onChange(of: selectedImageItem) { _, newItem in
                     Task {
                         if let data = try? await newItem?.loadTransferable(type: Data.self),
@@ -354,6 +360,8 @@ struct ChatView: View {
                     .background(Color(.systemGray6))
                     .cornerRadius(20)
                     .lineLimit(1...5)
+                    .accessibilityLabel("Message")
+                    .accessibilityHint("Type your message to \(otherUser.fullName)")
                     .onChange(of: messageText) {
                         // Simulate typing indicator (in production, send to Firestore)
                         #if DEBUG
@@ -371,7 +379,7 @@ struct ChatView: View {
                                 .progressViewStyle(CircularProgressViewStyle(tint: .purple))
                         } else {
                             Image(systemName: (messageText.isEmpty && selectedImage == nil) ? "arrow.up.circle" : "arrow.up.circle.fill")
-                                .font(.system(size: 32))
+                                .font(.largeTitle)
                                 .foregroundStyle(
                                     (messageText.isEmpty && selectedImage == nil) ?
                                     LinearGradient(colors: [.gray.opacity(0.5)], startPoint: .leading, endPoint: .trailing) :
@@ -379,9 +387,12 @@ struct ChatView: View {
                                 )
                         }
                     }
-                    .frame(width: 32, height: 32)
+                    .frame(width: 44, height: 44)
                 }
                 .disabled((messageText.isEmpty && selectedImage == nil) || isSending)
+                .accessibilityLabel(isSending ? "Sending" : "Send message")
+                .accessibilityHint(isSending ? "Message is being sent" : "Send your message to \(otherUser.fullName)")
+                .accessibilityAddTraits((messageText.isEmpty && selectedImage == nil) ? .isButton : [.isButton])
             }
 
             // Character count (if over 100 characters)

@@ -23,6 +23,8 @@ struct SavedProfilesView: View {
 
                 if viewModel.isLoading {
                     loadingView
+                } else if !viewModel.errorMessage.isEmpty {
+                    errorStateView
                 } else if viewModel.savedProfiles.isEmpty {
                     emptyStateView
                 } else {
@@ -64,6 +66,7 @@ struct SavedProfilesView: View {
             }
             .sheet(item: $selectedUser) { user in
                 UserDetailView(user: user)
+                    .environmentObject(authService)
             }
         }
     }
@@ -134,11 +137,82 @@ struct SavedProfilesView: View {
     // MARK: - Loading View
 
     private var loadingView: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-            Text("Loading saved profiles...")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+        ScrollView {
+            VStack(spacing: 20) {
+                // Stats header skeleton
+                HStack(spacing: 20) {
+                    SkeletonView()
+                        .frame(height: 80)
+                        .cornerRadius(12)
+
+                    SkeletonView()
+                        .frame(height: 80)
+                        .cornerRadius(12)
+                }
+                .padding(.horizontal)
+
+                // Skeleton grid
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                    ForEach(0..<6, id: \.self) { _ in
+                        SavedProfileCardSkeleton()
+                    }
+                }
+                .padding(.horizontal)
+            }
+            .padding(.top)
+        }
+    }
+
+    // MARK: - Error State
+
+    private var errorStateView: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 80))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.red.opacity(0.6), .orange.opacity(0.4)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            VStack(spacing: 12) {
+                Text("Oops! Something Went Wrong")
+                    .font(.title2)
+                    .fontWeight(.bold)
+
+                Text(viewModel.errorMessage)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
+
+            Button {
+                Task {
+                    await viewModel.loadSavedProfiles()
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.body.weight(.semibold))
+                    Text("Try Again")
+                        .font(.headline)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .foregroundColor(.white)
+                .background(
+                    LinearGradient(
+                        colors: [.purple, .pink],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(16)
+            }
+            .padding(.horizontal, 40)
         }
     }
 
@@ -186,13 +260,7 @@ struct SavedProfileCard: View {
                     // Profile image
                     Group {
                         if let imageURL = savedProfile.user.photos.first, let url = URL(string: imageURL) {
-                            AsyncImage(url: url) { image in
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                            } placeholder: {
-                                Color.gray.opacity(0.2)
-                            }
+                            CachedCardImage(url: url)
                         } else {
                             LinearGradient(
                                 colors: [.purple.opacity(0.6), .pink.opacity(0.5)],
@@ -251,6 +319,46 @@ struct SavedProfileCard: View {
     }
 }
 
+// MARK: - Saved Profile Card Skeleton
+
+struct SavedProfileCardSkeleton: View {
+    var body: some View {
+        VStack(spacing: 0) {
+            // Image area skeleton
+            SkeletonView()
+                .frame(height: 200)
+                .clipped()
+
+            // User info skeleton
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    SkeletonView()
+                        .frame(width: 90, height: 18)
+                        .cornerRadius(6)
+
+                    SkeletonView()
+                        .frame(width: 30, height: 18)
+                        .cornerRadius(6)
+
+                    Spacer()
+                }
+
+                SkeletonView()
+                    .frame(width: 110, height: 14)
+                    .cornerRadius(6)
+
+                SkeletonView()
+                    .frame(width: 100, height: 14)
+                    .cornerRadius(6)
+            }
+            .padding(12)
+        }
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.1), radius: 5, y: 2)
+    }
+}
+
 // MARK: - Saved Profile Model
 
 struct SavedProfile: Identifiable {
@@ -266,6 +374,7 @@ struct SavedProfile: Identifiable {
 class SavedProfilesViewModel: ObservableObject {
     @Published var savedProfiles: [SavedProfile] = []
     @Published var isLoading = false
+    @Published var errorMessage = ""
 
     var savedThisWeek: Int {
         let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date())!
@@ -278,6 +387,7 @@ class SavedProfilesViewModel: ObservableObject {
         guard let currentUserId = AuthService.shared.currentUser?.id else { return }
 
         isLoading = true
+        errorMessage = ""
         defer { isLoading = false }
 
         do {
@@ -309,6 +419,7 @@ class SavedProfilesViewModel: ObservableObject {
             savedProfiles = profiles
             Logger.shared.info("Loaded \(profiles.count) saved profiles", category: .general)
         } catch {
+            errorMessage = error.localizedDescription
             Logger.shared.error("Error loading saved profiles", category: .general, error: error)
         }
     }

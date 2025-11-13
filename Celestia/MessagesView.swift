@@ -9,9 +9,9 @@ import SwiftUI
 
 struct MessagesView: View {
     @EnvironmentObject var authService: AuthService
-    @StateObject private var matchService = MatchService.shared
-    @StateObject private var userService = UserService.shared
-    @StateObject private var messageService = MessageService.shared
+    @ObservedObject private var matchService = MatchService.shared
+    @ObservedObject private var userService = UserService.shared
+    @ObservedObject private var messageService = MessageService.shared
 
     @Binding var selectedTab: Int
 
@@ -85,6 +85,7 @@ struct MessagesView: View {
                 if let selectedMatch = selectedMatch {
                     NavigationStack {
                         ChatView(match: selectedMatch.0, otherUser: selectedMatch.1)
+                            .environmentObject(authService)
                     }
                 }
             }
@@ -138,7 +139,7 @@ struct MessagesView: View {
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Messages")
-                                .font(.system(size: 36, weight: .bold))
+                                .font(.largeTitle.weight(.bold))
                                 .foregroundColor(.white)
                             
                             if !conversations.isEmpty {
@@ -403,7 +404,7 @@ struct MessagesView: View {
                 }
             }
         } catch {
-            print("Error loading messages: \(error)")
+            Logger.shared.error("Error loading messages", category: .messaging, error: error)
         }
     }
     
@@ -572,22 +573,13 @@ struct ConversationRow: View {
     private var profileImage: some View {
         Group {
             if let imageURL = URL(string: user.profileImageURL), !user.profileImageURL.isEmpty {
-                AsyncImage(url: imageURL) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    default:
-                        placeholderImage
-                    }
-                }
+                CachedProfileImage(url: imageURL, size: 70)
             } else {
                 placeholderImage
+                    .frame(width: 70, height: 70)
+                    .clipShape(Circle())
             }
         }
-        .frame(width: 70, height: 70)
-        .clipShape(Circle())
         .overlay(
             Circle()
                 .stroke(

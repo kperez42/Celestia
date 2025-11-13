@@ -116,7 +116,7 @@ struct FilterView: View {
                 )
                 dismiss()
             } catch {
-                print("Error applying filters: \(error)")
+                Logger.shared.error("Error applying filters", category: .database, error: error)
             }
         }
     }

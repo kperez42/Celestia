@@ -31,7 +31,7 @@ class SwipeService: ObservableObject {
             .document("\(fromUserId)_\(toUserId)")
             .setData(likeData)
 
-        print("✅ Like created: \(fromUserId) -> \(toUserId)")
+        Logger.shared.debug("Like created: \(fromUserId) -> \(toUserId)", category: .matching)
 
         // Check if the other user has also liked this user (mutual like)
         let mutualLikeDoc = try await db.collection("likes")
@@ -40,7 +40,7 @@ class SwipeService: ObservableObject {
 
         if mutualLikeDoc.exists, let data = mutualLikeDoc.data(), data["isActive"] as? Bool == true {
             // It's a match! Create the match
-            print("💕 Mutual like detected! Creating match...")
+            Logger.shared.info("Mutual like detected! Creating match", category: .matching)
             await MatchService.shared.createMatch(user1Id: fromUserId, user2Id: toUserId)
             return true
         }
@@ -62,7 +62,7 @@ class SwipeService: ObservableObject {
             .document("\(fromUserId)_\(toUserId)")
             .setData(passData)
 
-        print("✅ Pass created: \(fromUserId) -> \(toUserId)")
+        Logger.shared.debug("Pass created: \(fromUserId) -> \(toUserId)", category: .matching)
     }
 
     /// Check if user1 has already liked/passed user2

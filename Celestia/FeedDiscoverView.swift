@@ -15,6 +15,7 @@ struct FeedDiscoverView: View {
     @State private var displayedUsers: [User] = []
     @State private var currentPage = 0
     @State private var isLoading = false
+    @State private var isInitialLoad = true
     @State private var showFilters = false
     @State private var selectedUser: User?
     @State private var showUserDetail = false
@@ -22,6 +23,7 @@ struct FeedDiscoverView: View {
     @State private var showMatchAnimation = false
     @State private var matchedUser: User?
     @State private var favorites: Set<String> = []
+    @State private var errorMessage: String = ""
 
     private let usersPerPage = 10
     private let preloadThreshold = 3 // Load more when 3 items from bottom
@@ -33,55 +35,65 @@ struct FeedDiscoverView: View {
                 Color(.systemGroupedBackground)
                     .ignoresSafeArea()
 
-                // Main scroll view
-                ScrollView {
-                    LazyVStack(spacing: 16) {
-                        ForEach(Array(displayedUsers.enumerated()), id: \.element.id) { index, user in
-                            ProfileFeedCard(
-                                user: user,
-                                onLike: {
-                                    handleLike(user: user)
-                                },
-                                onFavorite: {
-                                    handleFavorite(user: user)
-                                },
-                                onMessage: {
-                                    handleMessage(user: user)
-                                },
-                                onViewPhotos: {
-                                    selectedUser = user
-                                    showPhotoGallery = true
-                                }
-                            )
-                            .onAppear {
-                                if index == displayedUsers.count - preloadThreshold {
-                                    loadMoreUsers()
+                // Main content
+                if isInitialLoad {
+                    // Skeleton loader for initial load
+                    initialLoadingView
+                } else {
+                    // Main scroll view
+                    ScrollView {
+                        LazyVStack(spacing: 16) {
+                            ForEach(Array(displayedUsers.enumerated()), id: \.element.id) { index, user in
+                                ProfileFeedCard(
+                                    user: user,
+                                    onLike: {
+                                        handleLike(user: user)
+                                    },
+                                    onFavorite: {
+                                        handleFavorite(user: user)
+                                    },
+                                    onMessage: {
+                                        handleMessage(user: user)
+                                    },
+                                    onViewPhotos: {
+                                        selectedUser = user
+                                        showPhotoGallery = true
+                                    }
+                                )
+                                .onAppear {
+                                    if index == displayedUsers.count - preloadThreshold {
+                                        loadMoreUsers()
+                                    }
                                 }
                             }
-                        }
 
-                        // Loading indicator
-                        if isLoading {
-                            ProgressView()
-                                .padding()
-                        }
+                            // Loading indicator (for pagination)
+                            if isLoading {
+                                ProgressView()
+                                    .padding()
+                            }
 
-                        // End of results
-                        if !isLoading && displayedUsers.count >= users.count && users.count > 0 {
-                            endOfResultsView
-                        }
+                            // End of results
+                            if !isLoading && displayedUsers.count >= users.count && users.count > 0 {
+                                endOfResultsView
+                            }
 
-                        // Empty state
-                        if !isLoading && displayedUsers.isEmpty {
-                            emptyStateView
+                            // Error state
+                            if !errorMessage.isEmpty {
+                                errorStateView
+                            }
+                            // Empty state
+                            else if !isLoading && displayedUsers.isEmpty {
+                                emptyStateView
+                            }
                         }
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+                        .padding(.bottom)
                     }
-                    .padding(.horizontal)
-                    .padding(.top, 8)
-                    .padding(.bottom)
-                }
-                .refreshable {
-                    await refreshFeed()
+                    .refreshable {
+                        await refreshFeed()
+                    }
                 }
 
                 // Match animation overlay
@@ -140,6 +152,20 @@ struct FeedDiscoverView: View {
         }
     }
 
+    // MARK: - Initial Loading View
+
+    private var initialLoadingView: some View {
+        ScrollView {
+            LazyVStack(spacing: 16) {
+                ForEach(0..<3, id: \.self) { _ in
+                    ProfileFeedCardSkeleton()
+                }
+            }
+            .padding(.horizontal)
+            .padding(.top, 8)
+        }
+    }
+
     // MARK: - Empty State
 
     private var emptyStateView: some View {
@@ -173,6 +199,59 @@ struct FeedDiscoverView: View {
                         )
                     )
                     .cornerRadius(12)
+            }
+        }
+        .padding(40)
+    }
+
+    // MARK: - Error State
+
+    private var errorStateView: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 70))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.red.opacity(0.7), .orange.opacity(0.5)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            VStack(spacing: 12) {
+                Text("Oops! Something Went Wrong")
+                    .font(.title2)
+                    .fontWeight(.bold)
+
+                Text(errorMessage)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
+
+            Button {
+                errorMessage = ""  // Clear error
+                Task {
+                    await loadUsers()
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "arrow.clockwise")
+                    Text("Try Again")
+                }
+                .fontWeight(.semibold)
+                .foregroundColor(.white)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 14)
+                .background(
+                    LinearGradient(
+                        colors: [.purple, .pink],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(12)
             }
         }
         .padding(40)
@@ -260,11 +339,17 @@ struct FeedDiscoverView: View {
         await MainActor.run {
             users = TestData.discoverUsers
             loadMoreUsers()
+            isInitialLoad = false
         }
         return
         #endif
 
-        guard let currentUserId = authService.currentUser?.id else { return }
+        guard let currentUserId = authService.currentUser?.id else {
+            await MainActor.run {
+                isInitialLoad = false
+            }
+            return
+        }
 
         isLoading = true
         defer { isLoading = false }
@@ -300,10 +385,16 @@ struct FeedDiscoverView: View {
 
             await MainActor.run {
                 users = UserService.shared.users
+                errorMessage = ""  // Clear any previous errors
+                isInitialLoad = false  // Hide skeleton and show content
                 loadMoreUsers()
             }
         } catch {
-            print("❌ Error loading users: \(error)")
+            Logger.shared.error("Error loading users", category: .database, error: error)
+            await MainActor.run {
+                errorMessage = "Failed to load users. Please check your connection and try again."
+                isInitialLoad = false  // Show error state instead of skeleton
+            }
         }
     }
 
@@ -363,7 +454,7 @@ struct FeedDiscoverView: View {
                     )
                 }
             } catch {
-                print("❌ Error tracking like: \(error)")
+                Logger.shared.error("Error tracking like", category: .matching, error: error)
             }
         }
     }
@@ -385,7 +476,7 @@ struct FeedDiscoverView: View {
         selectedUser = user
         // NOTE: Navigation to messaging should be implemented using NavigationPath or coordinator
         // For now, user should match first before messaging
-        print("Message user: \(user.fullName)")
+        Logger.shared.debug("Message user: \(user.fullName)", category: .messaging)
     }
 }
 
@@ -404,25 +495,15 @@ struct PhotoGalleryView: View {
 
                 if user.photos.isEmpty {
                     // Show profile image if no photos
-                    AsyncImage(url: URL(string: user.profileImageURL)) { image in
-                        image
-                            .resizable()
-                            .scaledToFit()
-                    } placeholder: {
-                        Color.gray
-                    }
+                    CachedCardImage(url: URL(string: user.profileImageURL))
+                        .scaledToFit()
                 } else {
                     // Photo gallery
                     TabView(selection: $selectedPhotoIndex) {
                         ForEach(Array(user.photos.enumerated()), id: \.offset) { index, photoURL in
-                            AsyncImage(url: URL(string: photoURL)) { image in
-                                image
-                                    .resizable()
-                                    .scaledToFit()
-                            } placeholder: {
-                                ProgressView()
-                            }
-                            .tag(index)
+                            CachedCardImage(url: URL(string: photoURL))
+                                .scaledToFit()
+                                .tag(index)
                         }
                     }
                     .tabViewStyle(.page(indexDisplayMode: .always))

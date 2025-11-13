@@ -806,7 +806,7 @@ struct ProfileInsightsView: View {
                 insights.daysActive = Int.random(in: 7...60)
                 insights.peakActivityHours = [20, 21, 19]
             } catch {
-                print("Error loading insights: \(error)")
+                Logger.shared.error("Error loading insights", category: .general, error: error)
                 // Fall back to basic data from user profile
                 if let user = authService.currentUser {
                     loadBasicInsights(user: user)

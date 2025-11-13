@@ -688,7 +688,7 @@ struct ReferralDashboardView: View {
             // Fetch leaderboard
             try await referralManager.fetchLeaderboard()
         } catch {
-            print("Error loading referral data: \(error)")
+            Logger.shared.error("Error loading referral data", category: .referral, error: error)
         }
     }
 

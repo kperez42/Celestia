@@ -145,13 +145,7 @@ struct MutualLikeCard: View {
             VStack(spacing: 0) {
                 // Profile image
                 if let imageURL = user.photos.first, let url = URL(string: imageURL) {
-                    AsyncImage(url: url) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        Color.gray.opacity(0.2)
-                    }
+                    CachedCardImage(url: url)
                 } else {
                     LinearGradient(
                         colors: [.purple.opacity(0.6), .pink.opacity(0.5)],
@@ -198,6 +192,7 @@ struct MutualLikeCard: View {
         .buttonStyle(ScaleButtonStyle())
         .sheet(isPresented: $showUserDetail) {
             UserDetailView(user: user)
+                .environmentObject(authService)
         }
     }
 }

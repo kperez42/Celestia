@@ -615,7 +615,7 @@ class PrivacySettingsViewModel: ObservableObject {
                     }
                 }
         } catch {
-            print("Error fetching contacts: \(error)")
+            Logger.shared.error("Error fetching contacts", category: .database, error: error)
         }
     }
 

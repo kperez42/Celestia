@@ -117,7 +117,7 @@ class ScreenshotDetectionService: ObservableObject {
         // Log to Firestore
         db.collection("screenshotEvents").addDocument(data: eventData) { error in
             if let error = error {
-                print("Error logging screenshot: \(error)")
+                Logger.shared.error("Error logging screenshot", category: .general, error: error)
             }
         }
     }
@@ -139,7 +139,7 @@ class ScreenshotDetectionService: ObservableObject {
 
         db.collection("notifications").addDocument(data: notificationData) { error in
             if let error = error {
-                print("Error sending screenshot notification: \(error)")
+                Logger.shared.error("Error sending screenshot notification", category: .general, error: error)
             }
         }
     }

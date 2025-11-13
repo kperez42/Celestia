@@ -109,7 +109,7 @@ struct SignInView: View {
                                     do {
                                         try await authService.signIn(withEmail: email, password: password)
                                     } catch {
-                                        print("Error signing in: \(error)")
+                                        Logger.shared.error("Error signing in", category: .authentication, error: error)
                                         // Error is handled by AuthService setting errorMessage
                                     }
                                 }

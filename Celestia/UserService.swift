@@ -122,7 +122,7 @@ class UserService: ObservableObject {
                 "profileViews": FieldValue.increment(Int64(1))
             ])
         } catch {
-            print("Error incrementing profile views: \(error)")
+            Logger.shared.error("Error incrementing profile views", category: .database, error: error)
         }
     }
     
@@ -134,7 +134,7 @@ class UserService: ObservableObject {
                 "isOnline": true
             ])
         } catch {
-            print("Error updating last active: \(error)")
+            Logger.shared.error("Error updating last active", category: .database, error: error)
         }
     }
     
@@ -146,7 +146,7 @@ class UserService: ObservableObject {
                 "lastActive": FieldValue.serverTimestamp()
             ])
         } catch {
-            print("Error setting user offline: \(error)")
+            Logger.shared.error("Error setting user offline", category: .database, error: error)
         }
     }
     

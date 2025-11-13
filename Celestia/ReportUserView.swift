@@ -320,7 +320,7 @@ struct BlockedUsersView: View {
                 await MainActor.run {
                     isLoading = false
                 }
-                print("Error loading blocked users: \(error)")
+                Logger.shared.error("Error loading blocked users", category: .moderation, error: error)
             }
         }
     }
@@ -337,7 +337,7 @@ struct BlockedUsersView: View {
                     HapticManager.shared.success()
                 }
             } catch {
-                print("Error unblocking user: \(error)")
+                Logger.shared.error("Error unblocking user", category: .moderation, error: error)
                 HapticManager.shared.error()
             }
         }

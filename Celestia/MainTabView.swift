@@ -9,20 +9,21 @@ import SwiftUI
 
 struct MainTabView: View {
     @EnvironmentObject var authService: AuthService
-    @StateObject private var matchService = MatchService.shared
-    @StateObject private var messageService = MessageService.shared
-    
+    @ObservedObject private var matchService = MatchService.shared
+    @ObservedObject private var messageService = MessageService.shared
+
     @State private var selectedTab = 0
     @State private var previousTab = 0
     @State private var showTabAnimation = false
     @State private var unreadCount = 0
     @State private var newMatchesCount = 0
-    
+    @State private var badgeUpdateTimer: Timer?
+
     var body: some View {
         ZStack(alignment: .bottom) {
             // Main content
             TabView(selection: $selectedTab) {
-                // Discover
+                // Discover - Load immediately (tab 0)
                 FeedDiscoverView()
                     .tag(0)
                     .transition(.asymmetric(
@@ -30,37 +31,45 @@ struct MainTabView: View {
                         removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
                     ))
 
-                // Matches
-                MatchesView()
-                    .tag(1)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
-                        removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
-                    ))
+                // Matches - Lazy load
+                LazyTabContent(tabIndex: 1, currentTab: selectedTab) {
+                    MatchesView()
+                }
+                .tag(1)
+                .transition(.asymmetric(
+                    insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
+                    removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
+                ))
 
-                // Messages
-                MessagesView(selectedTab: $selectedTab)
-                    .tag(2)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
-                        removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
-                    ))
+                // Messages - Lazy load
+                LazyTabContent(tabIndex: 2, currentTab: selectedTab) {
+                    MessagesView(selectedTab: $selectedTab)
+                }
+                .tag(2)
+                .transition(.asymmetric(
+                    insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
+                    removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
+                ))
 
-                // Saved
-                SavedProfilesView()
-                    .tag(3)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
-                        removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
-                    ))
+                // Saved - Lazy load
+                LazyTabContent(tabIndex: 3, currentTab: selectedTab) {
+                    SavedProfilesView()
+                }
+                .tag(3)
+                .transition(.asymmetric(
+                    insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
+                    removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
+                ))
 
-                // Profile
-                ProfileView()
-                    .tag(4)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
-                        removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
-                    ))
+                // Profile - Lazy load
+                LazyTabContent(tabIndex: 4, currentTab: selectedTab) {
+                    ProfileView()
+                }
+                .tag(4)
+                .transition(.asymmetric(
+                    insertion: .move(edge: selectedTab > previousTab ? .trailing : .leading).combined(with: .opacity),
+                    removal: .move(edge: selectedTab > previousTab ? .leading : .trailing).combined(with: .opacity)
+                ))
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .ignoresSafeArea(.keyboard)
@@ -83,6 +92,11 @@ struct MainTabView: View {
         }
         .task {
             await loadBadgeCounts()
+        }
+        .onDisappear {
+            // Invalidate timer to prevent memory leak
+            badgeUpdateTimer?.invalidate()
+            badgeUpdateTimer = nil
         }
     }
     
@@ -145,14 +159,14 @@ struct MainTabView: View {
         .padding(.bottom, -20)
         .background(
             ZStack {
-                // Blur effect
-                Color.white
+                // Blur effect - adapts to dark mode
+                Color(.systemBackground)
 
-                // Gradient overlay
+                // Gradient overlay - adapts to dark mode
                 LinearGradient(
                     colors: [
-                        Color.white.opacity(0.95),
-                        Color.white.opacity(0.98)
+                        Color(.systemBackground).opacity(0.95),
+                        Color(.systemBackground).opacity(0.98)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
@@ -166,27 +180,30 @@ struct MainTabView: View {
     
     private func loadBadgeCounts() async {
         guard let userId = authService.currentUser?.id else { return }
-        
+
         // Load unread messages count
         unreadCount = await messageService.getUnreadMessageCount(userId: userId)
-        
+
         // Load new matches count
         do {
             try await matchService.fetchMatches(userId: userId)
             newMatchesCount = matchService.matches.filter { $0.lastMessage == nil }.count
         } catch {
-            print("Error loading badge counts: \(error)")
+            Logger.shared.error("Error loading badge counts", category: .general, error: error)
         }
-        
-        // Update periodically
-        Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { _ in
+
+        // Invalidate existing timer to prevent leaks
+        badgeUpdateTimer?.invalidate()
+
+        // Update periodically - store timer reference for proper cleanup
+        badgeUpdateTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { _ in
             Task {
                 unreadCount = await messageService.getUnreadMessageCount(userId: userId)
                 do {
                     try await matchService.fetchMatches(userId: userId)
                     newMatchesCount = matchService.matches.filter { $0.lastMessage == nil }.count
                 } catch {
-                    print("Error updating badge counts: \(error)")
+                    Logger.shared.error("Error updating badge counts", category: .general, error: error)
                 }
             }
         }
@@ -201,16 +218,33 @@ struct TabBarButton: View {
     let isSelected: Bool
     let badgeCount: Int
     let action: () -> Void
-    
+
     @State private var isPressed = false
-    
+
+    private var accessibilityHint: String {
+        switch title {
+        case "Discover":
+            return "Browse potential matches"
+        case "Matches":
+            return "View your matches"
+        case "Messages":
+            return "Read and send messages"
+        case "Saved":
+            return "View saved profiles"
+        case "Profile":
+            return "Edit your profile and settings"
+        default:
+            return ""
+        }
+    }
+
     var body: some View {
         Button(action: action) {
             VStack(spacing: 4) {
                 ZStack(alignment: .topTrailing) {
                     // Icon
                     Image(systemName: icon)
-                        .font(.system(size: 20))
+                        .font(.title3)
                         .foregroundStyle(
                             isSelected ?
                             LinearGradient(
@@ -223,11 +257,11 @@ struct TabBarButton: View {
                         .frame(height: 24)
                         .scaleEffect(isPressed ? 0.85 : 1.0)
                         .scaleEffect(isSelected ? 1.05 : 1.0)
-                    
+
                     // Badge
                     if badgeCount > 0 {
                         Text("\(badgeCount)")
-                            .font(.system(size: 11, weight: .bold))
+                            .font(.caption2.weight(.bold))
                             .foregroundColor(.white)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 2)
@@ -248,7 +282,7 @@ struct TabBarButton: View {
 
                 // Title
                 Text(title)
-                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
+                    .font(.caption2.weight(isSelected ? .semibold : .regular))
                     .foregroundColor(isSelected ? .purple : .gray)
             }
             .frame(maxWidth: .infinity)
@@ -265,6 +299,11 @@ struct TabBarButton: View {
                         LinearGradient(colors: [Color.clear], startPoint: .leading, endPoint: .trailing)
                     )
             )
+            // Accessibility
+            .accessibilityLabel("\(title) tab")
+            .accessibilityHint(accessibilityHint)
+            .accessibilityValue(badgeCount > 0 ? "\(badgeCount) unread" : "")
+            .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
         }
         .buttonStyle(PlainButtonStyle())
         .simultaneousGesture(

@@ -46,6 +46,8 @@ struct DiscoverView: View {
                             }
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if !viewModel.errorMessage.isEmpty {
+                        errorStateView
                     } else if viewModel.users.isEmpty || viewModel.currentIndex >= viewModel.users.count {
                         emptyStateView
                     } else {
@@ -71,6 +73,7 @@ struct DiscoverView: View {
             .sheet(isPresented: $viewModel.showingUserDetail) {
                 if let user = viewModel.selectedUser {
                     UserDetailView(user: user)
+                        .environmentObject(authService)
                 }
             }
             .sheet(isPresented: $viewModel.showingFilters) {
@@ -242,8 +245,68 @@ struct DiscoverView: View {
         }
     }
     
+    // MARK: - Error State
+
+    private var errorStateView: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 80))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.red.opacity(0.6), .orange.opacity(0.4)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            VStack(spacing: 12) {
+                Text("Oops! Something Went Wrong")
+                    .font(.title2)
+                    .fontWeight(.bold)
+
+                Text(viewModel.errorMessage)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
+
+            Button {
+                HapticManager.shared.impact(.medium)
+                Task {
+                    await viewModel.loadUsers()
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.body.weight(.semibold))
+                    Text("Try Again")
+                        .font(.headline)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .foregroundColor(.white)
+                .background(
+                    LinearGradient(
+                        colors: [.purple, .pink],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(16)
+                .contentShape(RoundedRectangle(cornerRadius: 16))
+            }
+            .buttonStyle(ScaleButtonStyle(scaleEffect: 0.96))
+            .padding(.horizontal, 40)
+
+            Spacer()
+        }
+    }
+
     // MARK: - Empty State
-    
+
     private var emptyStateView: some View {
         VStack(spacing: 24) {
             Spacer()
@@ -385,24 +448,9 @@ struct UserCardView: View {
                     .shadow(radius: 10)
 
                 // User image with caching
-                AsyncImage(url: URL(string: user.profileImageURL)) { image in
-                    image
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: geometry.size.width, height: geometry.size.height)
-                        .clipped()
-                } placeholder: {
-                    LinearGradient(
-                        colors: [Color.purple.opacity(0.6), Color.pink.opacity(0.5)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .overlay {
-                        ProgressView()
-                            .scaleEffect(1.5)
-                            .tint(.white)
-                    }
-                }
+                CachedCardImage(url: URL(string: user.profileImageURL))
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .clipped()
 
                 // Gradient overlay for better text readability
                 LinearGradient(

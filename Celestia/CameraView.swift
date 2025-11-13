@@ -263,10 +263,10 @@ extension CameraManager: AVCapturePhotoCaptureDelegate {
 #Preview {
     CameraView(
         onPhotoCaptured: { image in
-            print("Photo captured: \(image.size)")
+            Logger.shared.debug("Photo captured: \(image.size)", category: .ui)
         },
         onCancel: {
-            print("Cancelled")
+            Logger.shared.debug("Cancelled", category: .ui)
         }
     )
 }

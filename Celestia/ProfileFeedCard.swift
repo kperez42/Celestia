@@ -51,33 +51,10 @@ struct ProfileFeedCard: View {
     // MARK: - Components
 
     private var profileImage: some View {
-        AsyncImage(url: URL(string: user.profileImageURL)) { phase in
-            switch phase {
-            case .success(let image):
-                image
-                    .resizable()
-                    .scaledToFill()
-            case .empty, .failure:
-                Rectangle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.purple.opacity(0.6), Color.pink.opacity(0.4)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .overlay(
-                        Image(systemName: "person.fill")
-                            .font(.system(size: 60))
-                            .foregroundColor(.white.opacity(0.7))
-                    )
-            @unknown default:
-                Color.gray.opacity(0.2)
-            }
-        }
-        .frame(height: 400)
-        .clipped()
-        .cornerRadius(16, corners: [.topLeft, .topRight])
+        CachedCardImage(url: URL(string: user.profileImageURL))
+            .frame(height: 400)
+            .clipped()
+            .cornerRadius(16, corners: [.topLeft, .topRight])
     }
 
     private var nameRow: some View {
@@ -260,6 +237,78 @@ struct ActionButton: View {
             }
         }
         .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - Profile Feed Card Skeleton
+
+struct ProfileFeedCardSkeleton: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Profile Image skeleton
+            SkeletonView()
+                .frame(height: 400)
+                .clipped()
+                .cornerRadius(16, corners: [.topLeft, .topRight])
+
+            // User Details skeleton
+            VStack(alignment: .leading, spacing: 8) {
+                // Name row skeleton
+                HStack(spacing: 8) {
+                    SkeletonView()
+                        .frame(width: 160, height: 28)
+                        .cornerRadius(6)
+
+                    Spacer()
+                }
+
+                // Location row skeleton
+                HStack(spacing: 4) {
+                    SkeletonView()
+                        .frame(width: 40, height: 16)
+                        .cornerRadius(6)
+
+                    SkeletonView()
+                        .frame(width: 180, height: 16)
+                        .cornerRadius(6)
+
+                    Spacer()
+                }
+
+                // Seeking row skeleton
+                SkeletonView()
+                    .frame(width: 220, height: 16)
+                    .cornerRadius(6)
+
+                // Last active skeleton
+                SkeletonView()
+                    .frame(width: 100, height: 14)
+                    .cornerRadius(6)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+
+            // Action Buttons skeleton
+            HStack(spacing: 12) {
+                ForEach(0..<4, id: \.self) { _ in
+                    VStack(spacing: 6) {
+                        SkeletonView()
+                            .frame(width: 56, height: 56)
+                            .clipShape(Circle())
+
+                        SkeletonView()
+                            .frame(width: 40, height: 12)
+                            .cornerRadius(4)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 16)
+        }
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
     }
 }
 

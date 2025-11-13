@@ -9,8 +9,8 @@ import SwiftUI
 
 struct ProfileView: View {
     @EnvironmentObject var authService: AuthService
-    @StateObject private var userService = UserService.shared
-    
+    @ObservedObject private var userService = UserService.shared
+
     @State private var showingEditProfile = false
     @State private var showingSettings = false
     @State private var showingPremiumUpgrade = false
@@ -34,7 +34,7 @@ struct ProfileView: View {
                         VStack(spacing: 0) {
                             // Hero header with profile photo
                             heroSection(user: user)
-                            
+
                             // Content sections
                             VStack(spacing: 20) {
                                 // Profile completion
@@ -42,7 +42,7 @@ struct ProfileView: View {
                                     profileCompletionCard(user: user)
                                         .padding(.top, 20)
                                 }
-                                
+
                                 // Stats row
                                 statsRow(user: user)
 
@@ -51,7 +51,7 @@ struct ProfileView: View {
 
                                 // Edit profile button
                                 editButton
-                                
+
                                 // Verification card (if not verified)
                                 if !user.isVerified {
                                     verificationCard
@@ -63,7 +63,7 @@ struct ProfileView: View {
                                 } else {
                                     premiumUpgradeCard
                                 }
-                                
+
                                 // About section
                                 if !user.bio.isEmpty {
                                     aboutSection(bio: user.bio)
@@ -76,34 +76,37 @@ struct ProfileView: View {
 
                                 // Details grid
                                 detailsCard(user: user)
-                                
+
                                 // Photo gallery
                                 if !user.photos.isEmpty {
                                     photoGallerySection(photos: user.photos)
                                 }
-                                
+
                                 // Languages
                                 if !user.languages.isEmpty {
                                     languagesCard(languages: user.languages)
                                 }
-                                
+
                                 // Interests
                                 if !user.interests.isEmpty {
                                     interestsCard(interests: user.interests)
                                 }
-                                
+
                                 // Preferences
                                 preferencesCard(user: user)
-                                
+
                                 // Activity & Achievements
                                 achievementsCard(user: user)
-                                
+
                                 // Action buttons
                                 actionButtons
                             }
                             .padding(.top, -40)
                         }
                     }
+                } else {
+                    // Loading state while user data loads
+                    profileLoadingView
                 }
             }
             .navigationTitle("")
@@ -232,12 +235,14 @@ struct ProfileView: View {
                 } label: {
                     profileImageView(user: user)
                 }
+                .accessibilityLabel("Profile photo")
+                .accessibilityHint("Tap to view full size photo and edit profile picture")
 
                 // Name and badges
                 VStack(spacing: 10) {
                     HStack(spacing: 8) {
                         Text(user.fullName)
-                            .font(.system(size: 32, weight: .bold))
+                            .font(.largeTitle.weight(.bold))
                             .foregroundColor(.white)
 
                         if user.isVerified {
@@ -278,17 +283,23 @@ struct ProfileView: View {
             // Top bar buttons
             VStack {
                 HStack {
-                    ShareLink(item: URL(string: "https://celestia.app/profile/\(user.id ?? "")")!, subject: Text("Check out \(user.fullName)'s profile"), message: Text("See \(user.fullName) on Celestia!")) {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.title3)
-                            .foregroundColor(.white)
-                            .frame(width: 44, height: 44)
-                            .background(Color.white.opacity(0.2))
-                            .clipShape(Circle())
+                    // Share button - only show if URL is valid
+                    if let userId = user.id,
+                       let shareURL = URL(string: "https://celestia.app/profile/\(userId)") {
+                        ShareLink(item: shareURL, subject: Text("Check out \(user.fullName)'s profile"), message: Text("See \(user.fullName) on Celestia!")) {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.title3)
+                                .foregroundColor(.white)
+                                .frame(width: 44, height: 44)
+                                .background(Color.white.opacity(0.2))
+                                .clipShape(Circle())
+                        }
+                        .simultaneousGesture(TapGesture().onEnded {
+                            HapticManager.shared.impact(.light)
+                        })
+                        .accessibilityLabel("Share profile")
+                        .accessibilityHint("Share your Celestia profile with others")
                     }
-                    .simultaneousGesture(TapGesture().onEnded {
-                        HapticManager.shared.impact(.light)
-                    })
 
                     Spacer()
 
@@ -303,6 +314,8 @@ struct ProfileView: View {
                             .background(Color.white.opacity(0.2))
                             .clipShape(Circle())
                     }
+                    .accessibilityLabel("Settings")
+                    .accessibilityHint("Manage your account and app preferences")
                 }
                 .padding(20)
                 .padding(.top, 40)
@@ -315,22 +328,13 @@ struct ProfileView: View {
     private func profileImageView(user: User) -> some View {
         Group {
             if let url = URL(string: user.profileImageURL), !user.profileImageURL.isEmpty {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    default:
-                        placeholderImage(initial: user.fullName.prefix(1))
-                    }
-                }
+                CachedProfileImage(url: url, size: 160)
             } else {
                 placeholderImage(initial: user.fullName.prefix(1))
+                    .frame(width: 160, height: 160)
+                    .clipShape(Circle())
             }
         }
-        .frame(width: 160, height: 160)
-        .clipShape(Circle())
         .overlay(
             Circle()
                 .stroke(
@@ -381,7 +385,7 @@ struct ProfileView: View {
             )
             
             Text(initial)
-                .font(.system(size: 64, weight: .bold))
+                .font(.custom("System", size: 64, relativeTo: .largeTitle).weight(.bold))
                 .foregroundColor(.white)
         }
     }
@@ -609,6 +613,8 @@ struct ProfileView: View {
             )
             .shadow(color: .purple.opacity(0.15), radius: 15, y: 8)
         }
+        .accessibilityLabel("Profile Insights")
+        .accessibilityHint("View your profile performance analytics and see who viewed your profile")
         .padding(.horizontal, 20)
     }
 
@@ -638,6 +644,8 @@ struct ProfileView: View {
             .cornerRadius(16)
             .shadow(color: .purple.opacity(0.4), radius: 15, y: 8)
         }
+        .accessibilityLabel("Edit Profile")
+        .accessibilityHint("Modify your profile information, photos, and preferences")
         .scaleButton()
         .padding(.horizontal, 20)
     }
@@ -717,6 +725,8 @@ struct ProfileView: View {
             )
             .shadow(color: .blue.opacity(0.15), radius: 15, y: 8)
         }
+        .accessibilityLabel("Get Verified")
+        .accessibilityHint("Complete photo verification to earn the blue checkmark badge and get 3x more matches")
         .padding(.horizontal, 20)
     }
 
@@ -850,9 +860,11 @@ struct ProfileView: View {
             )
             .shadow(color: .yellow.opacity(0.15), radius: 15, y: 8)
         }
+        .accessibilityLabel("Upgrade to Premium")
+        .accessibilityHint("Unlock unlimited likes, see who likes you, and access all premium features")
         .padding(.horizontal, 20)
     }
-    
+
     // MARK: - About Section
     
     private func aboutSection(bio: String) -> some View {
@@ -987,20 +999,17 @@ struct ProfileView: View {
                             showingPhotoViewer = true
                             HapticManager.shared.impact(.light)
                         } label: {
-                            AsyncImage(url: URL(string: photos[index])) { phase in
-                                switch phase {
-                                case .success(let image):
-                                    image
-                                        .resizable()
-                                        .scaledToFill()
-                                default:
-                                    Color.gray.opacity(0.3)
-                                }
+                            CachedAsyncImage(url: URL(string: photos[index])) { image in
+                                image
+                                    .resizable()
+                                    .scaledToFill()
                             }
                             .frame(width: 140, height: 200)
                             .cornerRadius(16)
                             .clipped()
                         }
+                        .accessibilityLabel("Photo \(index + 1) of \(photos.count)")
+                        .accessibilityHint("Tap to view full size")
                     }
                 }
                 .padding(.horizontal, 20)
@@ -1189,25 +1198,28 @@ struct ProfileView: View {
             actionButton(
                 icon: "questionmark.circle.fill",
                 title: "Help & Support",
-                color: .blue
+                color: .blue,
+                accessibilityHint: "Contact Celestia support team for assistance"
             ) {
                 if let url = URL(string: "mailto:support@celestia.app") {
                     UIApplication.shared.open(url)
                 }
             }
-            
+
             actionButton(
                 icon: "shield.checkered",
                 title: "Privacy & Safety",
-                color: .green
+                color: .green,
+                accessibilityHint: "Manage privacy settings and safety features"
             ) {
                 showingSettings = true
             }
-            
+
             actionButton(
                 icon: "arrow.right.square.fill",
                 title: "Sign Out",
-                color: .red
+                color: .red,
+                accessibilityHint: "Sign out of your Celestia account"
             ) {
                 showingLogoutConfirmation = true
             }
@@ -1216,26 +1228,26 @@ struct ProfileView: View {
         .padding(.bottom, 100)
     }
     
-    private func actionButton(icon: String, title: String, color: Color, action: @escaping () -> Void) -> some View {
+    private func actionButton(icon: String, title: String, color: Color, accessibilityHint: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 14) {
                 ZStack {
                     Circle()
                         .fill(color.opacity(0.15))
                         .frame(width: 44, height: 44)
-                    
+
                     Image(systemName: icon)
                         .font(.body)
                         .foregroundColor(color)
                 }
-                
+
                 Text(title)
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundColor(.primary)
-                
+
                 Spacer()
-                
+
                 Image(systemName: "chevron.right")
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -1245,10 +1257,86 @@ struct ProfileView: View {
             .cornerRadius(16)
             .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
         }
+        .accessibilityLabel(title)
+        .accessibilityHint(accessibilityHint)
     }
     
+    // MARK: - Loading View
+
+    private var profileLoadingView: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                // Hero header skeleton
+                ZStack {
+                    LinearGradient(
+                        colors: [.purple.opacity(0.3), .pink.opacity(0.2)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .frame(height: 340)
+
+                    VStack {
+                        Spacer()
+
+                        // Profile image skeleton
+                        SkeletonView()
+                            .frame(width: 160, height: 160)
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.white, lineWidth: 4)
+                            )
+                            .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
+                    }
+                    .padding(.bottom, 40)
+                }
+
+                // Content section skeletons
+                VStack(spacing: 20) {
+                    // Stats row skeleton
+                    HStack(spacing: 12) {
+                        ForEach(0..<3, id: \.self) { _ in
+                            SkeletonView()
+                                .frame(height: 80)
+                                .cornerRadius(16)
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, -20)
+
+                    // Card skeletons
+                    ForEach(0..<5, id: \.self) { _ in
+                        VStack(alignment: .leading, spacing: 12) {
+                            SkeletonView()
+                                .frame(width: 120, height: 20)
+                                .cornerRadius(6)
+
+                            SkeletonView()
+                                .frame(height: 16)
+                                .cornerRadius(6)
+
+                            SkeletonView()
+                                .frame(height: 16)
+                                .cornerRadius(6)
+
+                            SkeletonView()
+                                .frame(width: 200, height: 16)
+                                .cornerRadius(6)
+                        }
+                        .padding(20)
+                        .background(Color.white)
+                        .cornerRadius(16)
+                        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+                        .padding(.horizontal)
+                    }
+                }
+                .padding(.bottom, 30)
+            }
+        }
+    }
+
     // MARK: - Helper Functions
-    
+
     private func formatDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium

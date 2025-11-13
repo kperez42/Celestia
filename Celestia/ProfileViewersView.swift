@@ -240,23 +240,17 @@ struct ProfileViewerCard: View {
                 // Profile image
                 Group {
                     if let imageURL = viewer.user.photos.first, let url = URL(string: imageURL) {
-                        AsyncImage(url: url) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        } placeholder: {
-                            Color.gray.opacity(0.2)
-                        }
+                        CachedProfileImage(url: url, size: 60)
                     } else {
                         LinearGradient(
                             colors: [.purple.opacity(0.6), .pink.opacity(0.5)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
+                        .frame(width: 60, height: 60)
+                        .clipShape(Circle())
                     }
                 }
-                .frame(width: 60, height: 60)
-                .clipShape(Circle())
 
                 // User info
                 VStack(alignment: .leading, spacing: 4) {
@@ -291,6 +285,7 @@ struct ProfileViewerCard: View {
         .buttonStyle(ScaleButtonStyle())
         .sheet(isPresented: $showUserDetail) {
             UserDetailView(user: viewer.user)
+                .environmentObject(authService)
         }
     }
 }
