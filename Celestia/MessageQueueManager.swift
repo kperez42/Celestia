@@ -56,7 +56,7 @@ class MessageQueueManager: ObservableObject {
         queuedMessages.append(queuedMessage)
         saveQueuedMessages()
 
-        Logger.shared.info("Message queued", category: .messaging, metadata: ["messageId": queuedMessage.id])
+        Logger.shared.info("Message queued - messageId: \(queuedMessage.id)", category: .messaging)
 
         // Try to send immediately if online
         if networkMonitor.isConnected {
@@ -83,7 +83,7 @@ class MessageQueueManager: ObservableObject {
         }
 
         isSyncing = true
-        Logger.shared.info("Processing message queue", category: .messaging, metadata: ["count": "\(queuedMessages.count)"])
+        Logger.shared.info("Processing message queue - count: \(queuedMessages.count)", category: .messaging)
 
         // Process messages in order
         for i in 0..<queuedMessages.count {
@@ -121,7 +121,7 @@ class MessageQueueManager: ObservableObject {
 
                 // Remove from queue on success
                 queuedMessages.remove(at: i)
-                Logger.shared.info("Message sent from queue", category: .messaging, metadata: ["messageId": message.id])
+                Logger.shared.info("Message sent from queue - messageId: \(message.id)", category: .messaging)
 
             } catch {
                 // Handle failure
@@ -130,10 +130,7 @@ class MessageQueueManager: ObservableObject {
                 message.lastError = error.localizedDescription
                 queuedMessages[i] = message
 
-                Logger.shared.error("Failed to send queued message", category: .messaging, error: error, metadata: [
-                    "messageId": message.id,
-                    "retryCount": "\(message.retryCount)"
-                ])
+                Logger.shared.error("Failed to send queued message - messageId: \(message.id), retryCount: \(message.retryCount)", category: .messaging, error: error)
             }
         }
 
@@ -219,7 +216,7 @@ class MessageQueueManager: ObservableObject {
             queuedMessages = try decoder.decode([QueuedMessage].self, from: data)
             failedMessageCount = queuedMessages.filter { $0.status == .failed }.count
 
-            Logger.shared.info("Loaded queued messages", category: .messaging, metadata: ["count": "\(queuedMessages.count)"])
+            Logger.shared.info("Loaded queued messages - count: \(queuedMessages.count)", category: .messaging)
         } catch {
             Logger.shared.error("Failed to load queued messages", category: .messaging, error: error)
         }
