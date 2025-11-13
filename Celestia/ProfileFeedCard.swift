@@ -51,33 +51,10 @@ struct ProfileFeedCard: View {
     // MARK: - Components
 
     private var profileImage: some View {
-        AsyncImage(url: URL(string: user.profileImageURL)) { phase in
-            switch phase {
-            case .success(let image):
-                image
-                    .resizable()
-                    .scaledToFill()
-            case .empty, .failure:
-                Rectangle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.purple.opacity(0.6), Color.pink.opacity(0.4)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .overlay(
-                        Image(systemName: "person.fill")
-                            .font(.system(size: 60))
-                            .foregroundColor(.white.opacity(0.7))
-                    )
-            @unknown default:
-                Color.gray.opacity(0.2)
-            }
-        }
-        .frame(height: 400)
-        .clipped()
-        .cornerRadius(16, corners: [.topLeft, .topRight])
+        CachedCardImage(url: URL(string: user.profileImageURL))
+            .frame(height: 400)
+            .clipped()
+            .cornerRadius(16, corners: [.topLeft, .topRight])
     }
 
     private var nameRow: some View {

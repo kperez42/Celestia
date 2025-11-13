@@ -29,33 +29,7 @@ struct UserDetailView: View {
                 TabView {
                     // Filter out empty photo URLs
                     ForEach(validPhotos, id: \.self) { photoURL in
-                        AsyncImage(url: URL(string: photoURL)) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                            case .failure:
-                                // Error state - show retry option
-                                VStack(spacing: 12) {
-                                    Image(systemName: "photo.badge.exclamationmark")
-                                        .font(.system(size: 60))
-                                        .foregroundColor(.gray)
-                                    Text("Failed to load image")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                }
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                .background(Color.gray.opacity(0.2))
-                            case .empty:
-                                // Loading state
-                                ProgressView()
-                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                    .background(Color.gray.opacity(0.2))
-                            @unknown default:
-                                Color.gray.opacity(0.2)
-                            }
-                        }
+                        CachedCardImage(url: URL(string: photoURL))
                     }
                 }
                 .frame(height: 450)

@@ -404,25 +404,15 @@ struct PhotoGalleryView: View {
 
                 if user.photos.isEmpty {
                     // Show profile image if no photos
-                    AsyncImage(url: URL(string: user.profileImageURL)) { image in
-                        image
-                            .resizable()
-                            .scaledToFit()
-                    } placeholder: {
-                        Color.gray
-                    }
+                    CachedCardImage(url: URL(string: user.profileImageURL))
+                        .scaledToFit()
                 } else {
                     // Photo gallery
                     TabView(selection: $selectedPhotoIndex) {
                         ForEach(Array(user.photos.enumerated()), id: \.offset) { index, photoURL in
-                            AsyncImage(url: URL(string: photoURL)) { image in
-                                image
-                                    .resizable()
-                                    .scaledToFit()
-                            } placeholder: {
-                                ProgressView()
-                            }
-                            .tag(index)
+                            CachedCardImage(url: URL(string: photoURL))
+                                .scaledToFit()
+                                .tag(index)
                         }
                     }
                     .tabViewStyle(.page(indexDisplayMode: .always))

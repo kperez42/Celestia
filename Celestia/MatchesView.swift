@@ -693,16 +693,7 @@ struct MatchProfileCard: View {
     private var profileImage: some View {
         Group {
             if let imageURL = URL(string: user.profileImageURL), !user.profileImageURL.isEmpty {
-                AsyncImage(url: imageURL) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    default:
-                        placeholderImage
-                    }
-                }
+                CachedCardImage(url: imageURL)
             } else {
                 placeholderImage
             }

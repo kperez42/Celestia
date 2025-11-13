@@ -315,22 +315,13 @@ struct ProfileView: View {
     private func profileImageView(user: User) -> some View {
         Group {
             if let url = URL(string: user.profileImageURL), !user.profileImageURL.isEmpty {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    default:
-                        placeholderImage(initial: user.fullName.prefix(1))
-                    }
-                }
+                CachedProfileImage(url: url, size: 160)
             } else {
                 placeholderImage(initial: user.fullName.prefix(1))
+                    .frame(width: 160, height: 160)
+                    .clipShape(Circle())
             }
         }
-        .frame(width: 160, height: 160)
-        .clipShape(Circle())
         .overlay(
             Circle()
                 .stroke(
@@ -987,15 +978,10 @@ struct ProfileView: View {
                             showingPhotoViewer = true
                             HapticManager.shared.impact(.light)
                         } label: {
-                            AsyncImage(url: URL(string: photos[index])) { phase in
-                                switch phase {
-                                case .success(let image):
-                                    image
-                                        .resizable()
-                                        .scaledToFill()
-                                default:
-                                    Color.gray.opacity(0.3)
-                                }
+                            CachedAsyncImage(url: URL(string: photos[index])) { image in
+                                image
+                                    .resizable()
+                                    .scaledToFill()
                             }
                             .frame(width: 140, height: 200)
                             .cornerRadius(16)

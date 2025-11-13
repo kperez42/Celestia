@@ -573,22 +573,13 @@ struct ConversationRow: View {
     private var profileImage: some View {
         Group {
             if let imageURL = URL(string: user.profileImageURL), !user.profileImageURL.isEmpty {
-                AsyncImage(url: imageURL) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    default:
-                        placeholderImage
-                    }
-                }
+                CachedProfileImage(url: imageURL, size: 70)
             } else {
                 placeholderImage
+                    .frame(width: 70, height: 70)
+                    .clipShape(Circle())
             }
         }
-        .frame(width: 70, height: 70)
-        .clipShape(Circle())
         .overlay(
             Circle()
                 .stroke(

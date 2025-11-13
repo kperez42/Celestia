@@ -448,24 +448,9 @@ struct UserCardView: View {
                     .shadow(radius: 10)
 
                 // User image with caching
-                AsyncImage(url: URL(string: user.profileImageURL)) { image in
-                    image
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: geometry.size.width, height: geometry.size.height)
-                        .clipped()
-                } placeholder: {
-                    LinearGradient(
-                        colors: [Color.purple.opacity(0.6), Color.pink.opacity(0.5)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .overlay {
-                        ProgressView()
-                            .scaleEffect(1.5)
-                            .tint(.white)
-                    }
-                }
+                CachedCardImage(url: URL(string: user.profileImageURL))
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .clipped()
 
                 // Gradient overlay for better text readability
                 LinearGradient(
