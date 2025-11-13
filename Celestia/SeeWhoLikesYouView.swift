@@ -14,6 +14,8 @@ struct SeeWhoLikesYouView: View {
     @Environment(\.dismiss) var dismiss
 
     @State private var showUpgradeSheet = false
+    @State private var selectedUser: User?
+    @State private var showUserProfile = false
 
     var body: some View {
         NavigationStack {
@@ -61,6 +63,12 @@ struct SeeWhoLikesYouView: View {
             .sheet(isPresented: $showUpgradeSheet) {
                 PremiumUpgradeView()
                     .environmentObject(authService)
+            }
+            .sheet(isPresented: $showUserProfile) {
+                if let user = selectedUser {
+                    UserDetailView(user: user)
+                        .environmentObject(authService)
+                }
             }
         }
     }
@@ -147,7 +155,10 @@ struct SeeWhoLikesYouView: View {
                     isBlurred: !(authService.currentUser?.isPremium ?? false),
                     onTap: {
                         if authService.currentUser?.isPremium ?? false {
-                            // TODO: Navigate to profile or auto-like
+                            // Premium users can view profiles
+                            selectedUser = user
+                            showUserProfile = true
+                            HapticManager.shared.impact(.light)
                         } else {
                             showUpgradeSheet = true
                             HapticManager.shared.impact(.medium)

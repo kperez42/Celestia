@@ -354,10 +354,29 @@ class DiscoverViewModel: ObservableObject {
 
     /// Apply filters
     func applyFilters() {
-        // TODO: Implement filter logic
         currentIndex = 0
+
+        guard let currentUser = AuthService.shared.currentUser else {
+            Logger.shared.warning("Cannot apply filters: No current user", category: .matching)
+            return
+        }
+
+        // Get current user location
+        let currentLocation: (lat: Double, lon: Double)? = {
+            if let lat = currentUser.latitude, let lon = currentUser.longitude {
+                return (lat, lon)
+            }
+            return nil
+        }()
+
+        // Clear current users and reload with filters
         users.removeAll()
-        // Re-load users with filters
+        lastDocument = nil
+
+        // Reload users which will automatically apply filters through loadUsers(currentUser:)
+        loadUsers(currentUser: currentUser)
+
+        Logger.shared.info("Filters applied. Active filters: \(DiscoveryFilters.shared.hasActiveFilters)", category: .matching)
     }
 
     /// Reset filters to default
@@ -387,8 +406,12 @@ class DiscoverViewModel: ObservableObject {
 
     /// Load users (no parameters version for view)
     func loadUsers() async {
-        // TODO: Get current user from AuthService and call loadUsers(currentUser:)
-        // For now, just stub
+        guard let currentUser = AuthService.shared.currentUser else {
+            Logger.shared.warning("Cannot load users: No current user", category: .matching)
+            return
+        }
+
+        loadUsers(currentUser: currentUser)
     }
 
     /// Cleanup method to cancel ongoing tasks
