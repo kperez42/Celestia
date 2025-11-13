@@ -238,20 +238,22 @@ struct ProfileViewerCard: View {
         } label: {
             HStack(spacing: 12) {
                 // Profile image
-                if let imageURL = viewer.user.photos.first, let url = URL(string: imageURL) {
-                    AsyncImage(url: url) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        Color.gray.opacity(0.2)
+                Group {
+                    if let imageURL = viewer.user.photos.first, let url = URL(string: imageURL) {
+                        AsyncImage(url: url) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            Color.gray.opacity(0.2)
+                        }
+                    } else {
+                        LinearGradient(
+                            colors: [.purple.opacity(0.6), .pink.opacity(0.5)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     }
-                } else {
-                    LinearGradient(
-                        colors: [.purple.opacity(0.6), .pink.opacity(0.5)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
                 }
                 .frame(width: 60, height: 60)
                 .clipShape(Circle())
