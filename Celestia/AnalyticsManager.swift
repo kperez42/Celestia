@@ -58,6 +58,21 @@ enum AnalyticsEvent: String {
     case purchasesRestored = "purchases_restored"
     case promoCodeRedeemed = "promo_code_redeemed"
     case validationError = "validation_error"
+
+    // Advanced Analytics Events
+    case profileHeatmapGenerated = "profile_heatmap_generated"
+    case matchQualityCalculated = "match_quality_calculated"
+    case timeToMatchAnalyzed = "time_to_match_analyzed"
+    case userInsightsGenerated = "user_insights_generated"
+    case matchNotificationSent = "match_notification_sent"
+    case messageNotificationSent = "message_notification_sent"
+    case likeNotificationSent = "like_notification_sent"
+    case smartReminderSent = "smart_reminder_sent"
+    case notificationActionTaken = "notification_action_taken"
+    case quickReplySent = "quick_reply_sent"
+    case likeBackFromNotification = "like_back_from_notification"
+    case experimentVariantAssigned = "experiment_variant_assigned"
+    case featureFlagChanged = "feature_flag_changed"
     case fraudDetected = "fraud_detected"
 }
 
