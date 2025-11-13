@@ -22,11 +22,7 @@ class InterestService: ObservableObject {
     private var lastReceivedDocument: DocumentSnapshot?
     private var lastSentDocument: DocumentSnapshot?
 
-    // Dependency injection for better testability and reduced coupling
-    private let matchCreator: MatchCreating
-
-    private init(matchCreator: MatchCreating = MatchService.shared) {
-        self.matchCreator = matchCreator
+    private init() {
     }
     
     // MARK: - Send Interest
@@ -71,7 +67,7 @@ class InterestService: ObservableObject {
         if let mutualInterest = try? await fetchInterest(fromUserId: toUserId, toUserId: fromUserId),
            mutualInterest.status == "pending" {
             // Both users liked each other - create match!
-            await matchCreator.createMatch(user1Id: fromUserId, user2Id: toUserId)
+            await MatchService.shared.createMatch(user1Id: fromUserId, user2Id: toUserId)
 
             // Update both interests to accepted
             try await acceptInterest(interestId: docRef.documentID, fromUserId: fromUserId, toUserId: toUserId)
@@ -190,9 +186,9 @@ class InterestService: ObservableObject {
         ])
 
         // Check if match already exists to avoid duplicates
-        let matchExists = try? await matchCreator.hasMatched(user1Id: fromUserId, user2Id: toUserId)
+        let matchExists = try? await MatchService.shared.hasMatched(user1Id: fromUserId, user2Id: toUserId)
         if matchExists != true {
-            await matchCreator.createMatch(user1Id: fromUserId, user2Id: toUserId)
+            await MatchService.shared.createMatch(user1Id: fromUserId, user2Id: toUserId)
         }
 
         Logger.shared.info("Interest accepted", category: .matching)
