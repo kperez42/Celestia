@@ -229,6 +229,7 @@ struct ViewerStatBox: View {
 
 struct ProfileViewerCard: View {
     let viewer: ViewerInfo
+    @EnvironmentObject var authService: AuthService
     @State private var showUserDetail = false
 
     var body: some View {
