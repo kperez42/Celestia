@@ -589,23 +589,7 @@ struct MatchStatistics {
     let averageMessagesPerMatch: Double
 }
 
-enum AnalyticsEvent: String {
-    case profileHeatmapGenerated = "profile_heatmap_generated"
-    case matchQualityCalculated = "match_quality_calculated"
-    case timeToMatchAnalyzed = "time_to_match_analyzed"
-    case userInsightsGenerated = "user_insights_generated"
-    case notificationsEnabled = "notifications_enabled"
-    case notificationsDenied = "notifications_denied"
-    case matchNotificationSent = "match_notification_sent"
-    case messageNotificationSent = "message_notification_sent"
-    case likeNotificationSent = "like_notification_sent"
-    case smartReminderSent = "smart_reminder_sent"
-    case notificationActionTaken = "notification_action_taken"
-    case quickReplySent = "quick_reply_sent"
-    case likeBackFromNotification = "like_back_from_notification"
-    case experimentVariantAssigned = "experiment_variant_assigned"
-    case featureFlagChanged = "feature_flag_changed"
-}
+// MARK: - Analytics Errors
 
 enum AnalyticsError: LocalizedError {
     case matchNotFound

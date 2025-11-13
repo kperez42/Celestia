@@ -18,7 +18,6 @@ class ABTestingManager: ObservableObject {
     @Published var userVariants: [String: String] = [:] // experimentId -> variantId
 
     private let db = Firestore.firestore()
-    private let featureFlagService = FeatureFlagService.shared
     private let analyticsService = AnalyticsServiceEnhanced.shared
 
     private init() {
@@ -76,10 +75,7 @@ class ABTestingManager: ObservableObject {
                     "variantName": variant.name
                 ])
 
-                Logger.shared.info("User assigned to experiment", category: .general, metadata: [
-                    "experiment": experiment.name,
-                    "variant": variant.name
-                ])
+                Logger.shared.info("User assigned to experiment: \(experiment.name), variant: \(variant.name)", category: .general)
             }
         }
     }
@@ -175,8 +171,8 @@ class ABTestingManager: ObservableObject {
             return overrideValue
         }
 
-        // Fall back to feature flag service
-        return featureFlagService.getValue(forKey: flagKey, defaultValue: defaultValue)
+        // Fall back to default value
+        return defaultValue
     }
 
     // MARK: - Event Tracking
@@ -227,7 +223,7 @@ class ABTestingManager: ObservableObject {
 
         try await db.collection("experiments").document(experiment.id).setData(from: experiment)
 
-        Logger.shared.info("Experiment created", category: .general, metadata: ["name": name])
+        Logger.shared.info("Experiment created: \(name)", category: .general)
 
         return experiment
     }
@@ -239,7 +235,7 @@ class ABTestingManager: ObservableObject {
             "startedAt": FieldValue.serverTimestamp()
         ])
 
-        Logger.shared.info("Experiment started", category: .general, metadata: ["id": experimentId])
+        Logger.shared.info("Experiment started: \(experimentId)", category: .general)
 
         // Reload experiments
         loadActiveExperiments()
@@ -258,10 +254,7 @@ class ABTestingManager: ObservableObject {
 
         try await db.collection("experiments").document(experimentId).updateData(data)
 
-        Logger.shared.info("Experiment stopped", category: .general, metadata: [
-            "id": experimentId,
-            "winner": winner ?? "none"
-        ])
+        Logger.shared.info("Experiment stopped: \(experimentId), winner: \(winner ?? "none")", category: .general)
 
         // Reload experiments
         loadActiveExperiments()
