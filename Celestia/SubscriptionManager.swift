@@ -9,6 +9,7 @@
 import Foundation
 import StoreKit
 import Combine
+import FirebaseFirestore
 
 // MARK: - Subscription Manager
 
@@ -103,7 +104,7 @@ class SubscriptionManager: ObservableObject {
         saveSubscriptionStatus()
 
         // Track analytics
-        await AnalyticsManager.shared.logEvent(.subscriptionActive, parameters: [
+        AnalyticsManager.shared.logEvent(.subscriptionActive, parameters: [
             "tier": tier.rawValue,
             "auto_renew": autoRenewEnabled
         ])
@@ -154,6 +155,12 @@ class SubscriptionManager: ObservableObject {
                     "rewindsRemaining": FieldValue.increment(Int64(amount))
                 ])
                 Logger.shared.info("✅ Added \(amount) Rewinds", category: .general)
+
+            case .spotlight:
+                try await userRef.updateData([
+                    "spotlightsRemaining": FieldValue.increment(Int64(amount))
+                ])
+                Logger.shared.info("✅ Added \(amount) Spotlights", category: .general)
             }
 
             // Refresh user data
