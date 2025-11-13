@@ -339,7 +339,151 @@ class NotificationServiceEnhanced: NSObject, ObservableObject {
             body: "Check out your new matches"
         )
 
+        // Schedule daily like digest (8 PM)
+        scheduleDailyLikeDigest()
+
         Logger.shared.info("Daily reminders scheduled", category: .push)
+    }
+
+    // MARK: - Daily Like Digest
+
+    /// Schedules daily notification summarizing new likes
+    func scheduleDailyLikeDigest() {
+        scheduleDailyReminder(
+            identifier: "daily_like_digest",
+            hour: 20,
+            minute: 0,
+            title: "💕 Daily Likes Summary",
+            body: "See who liked you today!"
+        )
+    }
+
+    /// Sends daily like digest notification with actual count
+    func sendDailyLikeDigest() async {
+        guard let userId = authService.currentUser?.id else { return }
+        guard authService.currentUser?.notificationsEnabled ?? true else { return }
+
+        // Get likes from last 24 hours
+        let yesterday = Date().addingTimeInterval(-24 * 60 * 60)
+        let likesSnapshot = try? await db.collection("likes")
+            .whereField("targetUserId", isEqualTo: userId)
+            .whereField("timestamp", isGreaterThan: yesterday)
+            .getDocuments()
+
+        let likeCount = likesSnapshot?.documents.count ?? 0
+
+        // Only send if there are new likes
+        guard likeCount > 0 else {
+            Logger.shared.info("No new likes for daily digest", category: .push)
+            return
+        }
+
+        let content = UNMutableNotificationContent()
+        content.title = "💕 Daily Likes Summary"
+
+        if likeCount == 1 {
+            content.body = "You received 1 new like today! Tap to see who."
+        } else {
+            content.body = "You received \(likeCount) new likes today! 🎉"
+        }
+
+        content.sound = .default
+        content.categoryIdentifier = "ENGAGEMENT"
+        content.badge = await getUnreadCount() as NSNumber
+
+        content.userInfo = [
+            "type": "daily_like_digest",
+            "likeCount": likeCount
+        ]
+
+        // Send immediately
+        let request = UNNotificationRequest(
+            identifier: "daily_like_digest_\(Date().timeIntervalSince1970)",
+            content: content,
+            trigger: nil
+        )
+
+        try? await notificationCenter.add(request)
+
+        // Track analytics
+        analyticsService.trackEvent(.smartReminderSent, properties: [
+            "type": "daily_like_digest",
+            "likeCount": likeCount
+        ])
+
+        Logger.shared.info("Daily like digest sent - likeCount: \(likeCount)", category: .push)
+    }
+
+    /// Sends personalized like notification with user details
+    func sendPersonalizedLikeDigest() async {
+        guard let userId = authService.currentUser?.id else { return }
+        guard authService.currentUser?.isPremium ?? false else {
+            // Non-premium users get basic digest
+            await sendDailyLikeDigest()
+            return
+        }
+
+        // Get likes from last 24 hours
+        let yesterday = Date().addingTimeInterval(-24 * 60 * 60)
+        let likesSnapshot = try? await db.collection("likes")
+            .whereField("targetUserId", isEqualTo: userId)
+            .whereField("timestamp", isGreaterThan: yesterday)
+            .limit(to: 3)
+            .getDocuments()
+
+        guard let likes = likesSnapshot?.documents, !likes.isEmpty else {
+            Logger.shared.info("No new likes for personalized digest", category: .push)
+            return
+        }
+
+        // Fetch user details for first few likers
+        var likerNames: [String] = []
+        for likeDoc in likes.prefix(3) {
+            if let likerId = likeDoc.data()["userId"] as? String {
+                let userDoc = try? await db.collection("users").document(likerId).getDocument()
+                if let name = userDoc?.data()?["fullName"] as? String {
+                    likerNames.append(name)
+                }
+            }
+        }
+
+        let content = UNMutableNotificationContent()
+        content.title = "💕 People Who Liked You"
+
+        if likerNames.count == 1 {
+            content.body = "\(likerNames[0]) and others liked you today!"
+        } else if likerNames.count == 2 {
+            content.body = "\(likerNames[0]), \(likerNames[1]) and others liked you!"
+        } else if likerNames.count >= 3 {
+            content.body = "\(likerNames[0]), \(likerNames[1]), \(likerNames[2]) liked you!"
+        } else {
+            content.body = "Several people liked you today! 🎉"
+        }
+
+        content.sound = .default
+        content.categoryIdentifier = "ENGAGEMENT"
+        content.badge = await getUnreadCount() as NSNumber
+
+        content.userInfo = [
+            "type": "personalized_like_digest",
+            "likeCount": likes.count
+        ]
+
+        let request = UNNotificationRequest(
+            identifier: "personalized_like_digest_\(Date().timeIntervalSince1970)",
+            content: content,
+            trigger: nil
+        )
+
+        try? await notificationCenter.add(request)
+
+        analyticsService.trackEvent(.smartReminderSent, properties: [
+            "type": "personalized_like_digest",
+            "likeCount": likes.count,
+            "isPremium": true
+        ])
+
+        Logger.shared.info("Personalized like digest sent - likeCount: \(likes.count)", category: .push)
     }
 
     private func scheduleDailyReminder(identifier: String, hour: Int, minute: Int, title: String, body: String) {
