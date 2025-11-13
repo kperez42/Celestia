@@ -139,7 +139,7 @@ struct MessagesView: View {
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Messages")
-                                .font(.system(size: 36, weight: .bold))
+                                .font(.largeTitle.weight(.bold))
                                 .foregroundColor(.white)
                             
                             if !conversations.isEmpty {

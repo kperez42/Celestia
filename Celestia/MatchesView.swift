@@ -166,7 +166,7 @@ struct MatchesView: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Matches")
-                            .font(.system(size: 36, weight: .bold))
+                            .font(.largeTitle.weight(.bold))
                             .foregroundColor(.white)
                         
                         if !matchService.matches.isEmpty {

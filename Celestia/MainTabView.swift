@@ -159,14 +159,14 @@ struct MainTabView: View {
         .padding(.bottom, -20)
         .background(
             ZStack {
-                // Blur effect
-                Color.white
+                // Blur effect - adapts to dark mode
+                Color(.systemBackground)
 
-                // Gradient overlay
+                // Gradient overlay - adapts to dark mode
                 LinearGradient(
                     colors: [
-                        Color.white.opacity(0.95),
-                        Color.white.opacity(0.98)
+                        Color(.systemBackground).opacity(0.95),
+                        Color(.systemBackground).opacity(0.98)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
@@ -218,16 +218,33 @@ struct TabBarButton: View {
     let isSelected: Bool
     let badgeCount: Int
     let action: () -> Void
-    
+
     @State private var isPressed = false
-    
+
+    private var accessibilityHint: String {
+        switch title {
+        case "Discover":
+            return "Browse potential matches"
+        case "Matches":
+            return "View your matches"
+        case "Messages":
+            return "Read and send messages"
+        case "Saved":
+            return "View saved profiles"
+        case "Profile":
+            return "Edit your profile and settings"
+        default:
+            return ""
+        }
+    }
+
     var body: some View {
         Button(action: action) {
             VStack(spacing: 4) {
                 ZStack(alignment: .topTrailing) {
                     // Icon
                     Image(systemName: icon)
-                        .font(.system(size: 20))
+                        .font(.title3)
                         .foregroundStyle(
                             isSelected ?
                             LinearGradient(
@@ -240,11 +257,11 @@ struct TabBarButton: View {
                         .frame(height: 24)
                         .scaleEffect(isPressed ? 0.85 : 1.0)
                         .scaleEffect(isSelected ? 1.05 : 1.0)
-                    
+
                     // Badge
                     if badgeCount > 0 {
                         Text("\(badgeCount)")
-                            .font(.system(size: 11, weight: .bold))
+                            .font(.caption2.weight(.bold))
                             .foregroundColor(.white)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 2)
@@ -265,7 +282,7 @@ struct TabBarButton: View {
 
                 // Title
                 Text(title)
-                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
+                    .font(.caption2.weight(isSelected ? .semibold : .regular))
                     .foregroundColor(isSelected ? .purple : .gray)
             }
             .frame(maxWidth: .infinity)
@@ -282,6 +299,11 @@ struct TabBarButton: View {
                         LinearGradient(colors: [Color.clear], startPoint: .leading, endPoint: .trailing)
                     )
             )
+            // Accessibility
+            .accessibilityLabel("\(title) tab")
+            .accessibilityHint(accessibilityHint)
+            .accessibilityValue(badgeCount > 0 ? "\(badgeCount) unread" : "")
+            .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
         }
         .buttonStyle(PlainButtonStyle())
         .simultaneousGesture(

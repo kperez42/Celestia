@@ -43,10 +43,10 @@ struct UserDetailView: View {
                             HStack(spacing: 10) {
                                 // FIXED: Changed from user.name to user.fullName
                                 Text(user.fullName)
-                                    .font(.system(size: 32, weight: .bold))
-                                
+                                    .font(.largeTitle.weight(.bold))
+
                                 Text("\(user.age)")
-                                    .font(.system(size: 28))
+                                    .font(.title2)
                                     .foregroundColor(.secondary)
                                 
                                 if user.isVerified {
@@ -169,7 +169,9 @@ struct UserDetailView: View {
                         .clipShape(Circle())
                         .shadow(color: Color.black.opacity(0.1), radius: 5)
                 }
-                
+                .accessibilityLabel("Pass")
+                .accessibilityHint("Skip this profile and return to browsing")
+
                 Button {
                     sendInterest()
                 } label: {
@@ -187,6 +189,8 @@ struct UserDetailView: View {
                         .clipShape(Circle())
                         .shadow(color: Color.purple.opacity(0.4), radius: 10)
                 }
+                .accessibilityLabel("Like")
+                .accessibilityHint("Send interest to \(user.fullName)")
             }
             .padding(.bottom, 30)
         }

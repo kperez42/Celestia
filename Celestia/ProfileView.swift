@@ -235,12 +235,14 @@ struct ProfileView: View {
                 } label: {
                     profileImageView(user: user)
                 }
+                .accessibilityLabel("Profile photo")
+                .accessibilityHint("Tap to view full size photo and edit profile picture")
 
                 // Name and badges
                 VStack(spacing: 10) {
                     HStack(spacing: 8) {
                         Text(user.fullName)
-                            .font(.system(size: 32, weight: .bold))
+                            .font(.largeTitle.weight(.bold))
                             .foregroundColor(.white)
 
                         if user.isVerified {
@@ -295,6 +297,8 @@ struct ProfileView: View {
                         .simultaneousGesture(TapGesture().onEnded {
                             HapticManager.shared.impact(.light)
                         })
+                        .accessibilityLabel("Share profile")
+                        .accessibilityHint("Share your Celestia profile with others")
                     }
 
                     Spacer()
@@ -310,6 +314,8 @@ struct ProfileView: View {
                             .background(Color.white.opacity(0.2))
                             .clipShape(Circle())
                     }
+                    .accessibilityLabel("Settings")
+                    .accessibilityHint("Manage your account and app preferences")
                 }
                 .padding(20)
                 .padding(.top, 40)
@@ -379,7 +385,7 @@ struct ProfileView: View {
             )
             
             Text(initial)
-                .font(.system(size: 64, weight: .bold))
+                .font(.custom("System", size: 64, relativeTo: .largeTitle).weight(.bold))
                 .foregroundColor(.white)
         }
     }
@@ -607,6 +613,8 @@ struct ProfileView: View {
             )
             .shadow(color: .purple.opacity(0.15), radius: 15, y: 8)
         }
+        .accessibilityLabel("Profile Insights")
+        .accessibilityHint("View your profile performance analytics and see who viewed your profile")
         .padding(.horizontal, 20)
     }
 
@@ -636,6 +644,8 @@ struct ProfileView: View {
             .cornerRadius(16)
             .shadow(color: .purple.opacity(0.4), radius: 15, y: 8)
         }
+        .accessibilityLabel("Edit Profile")
+        .accessibilityHint("Modify your profile information, photos, and preferences")
         .scaleButton()
         .padding(.horizontal, 20)
     }
@@ -715,6 +725,8 @@ struct ProfileView: View {
             )
             .shadow(color: .blue.opacity(0.15), radius: 15, y: 8)
         }
+        .accessibilityLabel("Get Verified")
+        .accessibilityHint("Complete photo verification to earn the blue checkmark badge and get 3x more matches")
         .padding(.horizontal, 20)
     }
 
@@ -848,9 +860,11 @@ struct ProfileView: View {
             )
             .shadow(color: .yellow.opacity(0.15), radius: 15, y: 8)
         }
+        .accessibilityLabel("Upgrade to Premium")
+        .accessibilityHint("Unlock unlimited likes, see who likes you, and access all premium features")
         .padding(.horizontal, 20)
     }
-    
+
     // MARK: - About Section
     
     private func aboutSection(bio: String) -> some View {
@@ -994,6 +1008,8 @@ struct ProfileView: View {
                             .cornerRadius(16)
                             .clipped()
                         }
+                        .accessibilityLabel("Photo \(index + 1) of \(photos.count)")
+                        .accessibilityHint("Tap to view full size")
                     }
                 }
                 .padding(.horizontal, 20)
@@ -1182,25 +1198,28 @@ struct ProfileView: View {
             actionButton(
                 icon: "questionmark.circle.fill",
                 title: "Help & Support",
-                color: .blue
+                color: .blue,
+                accessibilityHint: "Contact Celestia support team for assistance"
             ) {
                 if let url = URL(string: "mailto:support@celestia.app") {
                     UIApplication.shared.open(url)
                 }
             }
-            
+
             actionButton(
                 icon: "shield.checkered",
                 title: "Privacy & Safety",
-                color: .green
+                color: .green,
+                accessibilityHint: "Manage privacy settings and safety features"
             ) {
                 showingSettings = true
             }
-            
+
             actionButton(
                 icon: "arrow.right.square.fill",
                 title: "Sign Out",
-                color: .red
+                color: .red,
+                accessibilityHint: "Sign out of your Celestia account"
             ) {
                 showingLogoutConfirmation = true
             }
@@ -1209,26 +1228,26 @@ struct ProfileView: View {
         .padding(.bottom, 100)
     }
     
-    private func actionButton(icon: String, title: String, color: Color, action: @escaping () -> Void) -> some View {
+    private func actionButton(icon: String, title: String, color: Color, accessibilityHint: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 14) {
                 ZStack {
                     Circle()
                         .fill(color.opacity(0.15))
                         .frame(width: 44, height: 44)
-                    
+
                     Image(systemName: icon)
                         .font(.body)
                         .foregroundColor(color)
                 }
-                
+
                 Text(title)
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundColor(.primary)
-                
+
                 Spacer()
-                
+
                 Image(systemName: "chevron.right")
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -1238,6 +1257,8 @@ struct ProfileView: View {
             .cornerRadius(16)
             .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
         }
+        .accessibilityLabel(title)
+        .accessibilityHint(accessibilityHint)
     }
     
     // MARK: - Loading View
