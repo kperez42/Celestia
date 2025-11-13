@@ -7,6 +7,7 @@
 
 import Foundation
 import FirebaseMessaging
+import FirebaseFirestore
 import UserNotifications
 import UIKit
 
@@ -19,6 +20,7 @@ class NotificationServiceEnhanced: NSObject, ObservableObject {
 
     private let messaging = Messaging.messaging()
     private let notificationCenter = UNUserNotificationCenter.current()
+    private let db = Firestore.firestore()
 
     // Dependencies
     private let authService = AuthService.shared
@@ -49,13 +51,13 @@ class NotificationServiceEnhanced: NSObject, ObservableObject {
 
             if granted {
                 await UIApplication.shared.registerForRemoteNotifications()
-                Logger.shared.info("Notification permission granted", category: .general)
+                Logger.shared.info("Notification permission granted", category: .push)
 
                 // Track analytics
                 analyticsService.trackEvent(.notificationsEnabled)
             } else {
-                Logger.shared.warning("Notification permission denied", category: .general)
-                analyticsService.trackEvent(.notificationsDenied)
+                Logger.shared.warning("Notification permission denied", category: .push)
+                analyticsService.trackEvent(.notificationsDisabled)
             }
 
             return granted
@@ -151,7 +153,7 @@ class NotificationServiceEnhanced: NSObject, ObservableObject {
             engagementCategory
         ])
 
-        Logger.shared.info("Notification categories registered", category: .general)
+        Logger.shared.info("Notification categories registered", category: .push)
     }
 
     // MARK: - Match Notifications
@@ -202,19 +204,16 @@ class NotificationServiceEnhanced: NSObject, ObservableObject {
             "hasPhoto": !matchedUser.photos.isEmpty
         ])
 
-        Logger.shared.info("Match notification sent", category: .notifications, metadata: [
-            "matchId": match.id ?? "",
-            "userName": matchedUser.fullName
-        ])
+        Logger.shared.info("Match notification sent - matchId: \(match.id ?? ""), userName: \(matchedUser.fullName)", category: .push)
     }
 
     // MARK: - Message Notifications
 
     func sendMessageNotification(message: Message, senderName: String, matchId: String) async {
-        guard let receiverId = message.receiverId else { return }
+        let receiverId = message.receiverId
 
         // Check if user has notifications enabled
-        let receiverDoc = try? await FirestoreService.shared.db.collection("users").document(receiverId).getDocument()
+        let receiverDoc = try? await db.collection("users").document(receiverId).getDocument()
         let notificationsEnabled = receiverDoc?.data()?["notificationsEnabled"] as? Bool ?? true
 
         guard notificationsEnabled else { return }
@@ -265,11 +264,11 @@ class NotificationServiceEnhanced: NSObject, ObservableObject {
 
     func sendLikeNotification(from liker: User, to recipientId: String, isSuperLike: Bool = false) async {
         // Check if recipient is premium
-        let recipientDoc = try? await FirestoreService.shared.db.collection("users").document(recipientId).getDocument()
+        let recipientDoc = try? await db.collection("users").document(recipientId).getDocument()
         let isPremium = recipientDoc?.data()?["isPremium"] as? Bool ?? false
 
         guard isPremium else {
-            Logger.shared.info("Like notification skipped - user not premium", category: .notifications)
+            Logger.shared.info("Like notification skipped - user not premium", category: .push)
             return
         }
 
@@ -316,10 +315,7 @@ class NotificationServiceEnhanced: NSObject, ObservableObject {
             "hasPhoto": !liker.photos.isEmpty
         ])
 
-        Logger.shared.info("Like notification sent", category: .notifications, metadata: [
-            "type": isSuperLike ? "super_like" : "like",
-            "liker": liker.fullName
-        ])
+        Logger.shared.info("Like notification sent - type: \(isSuperLike ? "super_like" : "like"), liker: \(liker.fullName)", category: .push)
     }
 
     // MARK: - Daily Engagement Reminders
@@ -343,7 +339,7 @@ class NotificationServiceEnhanced: NSObject, ObservableObject {
             body: "Check out your new matches"
         )
 
-        Logger.shared.info("Daily reminders scheduled", category: .notifications)
+        Logger.shared.info("Daily reminders scheduled", category: .push)
     }
 
     private func scheduleDailyReminder(identifier: String, hour: Int, minute: Int, title: String, body: String) {
@@ -366,9 +362,9 @@ class NotificationServiceEnhanced: NSObject, ObservableObject {
 
         notificationCenter.add(request) { error in
             if let error = error {
-                Logger.shared.error("Failed to schedule daily reminder", category: .notifications, error: error)
+                Logger.shared.error("Failed to schedule daily reminder", category: .push, error: error)
             } else {
-                Logger.shared.info("Daily reminder scheduled", category: .notifications, metadata: ["identifier": identifier])
+                Logger.shared.info("Daily reminder scheduled - identifier: \(identifier)", category: .push)
             }
         }
     }
@@ -378,7 +374,7 @@ class NotificationServiceEnhanced: NSObject, ObservableObject {
             "morning_reminder",
             "evening_reminder"
         ])
-        Logger.shared.info("Daily reminders cancelled", category: .notifications)
+        Logger.shared.info("Daily reminders cancelled", category: .push)
     }
 
     // MARK: - Smart Notifications
@@ -455,14 +451,11 @@ class NotificationServiceEnhanced: NSObject, ObservableObject {
     ) async {
         // This would call your Cloud Function to send FCM notification
         // For now, we'll use the iOS local notification system
-        Logger.shared.info("FCM notification prepared", category: .notifications, metadata: [
-            "token": token,
-            "title": title
-        ])
+        Logger.shared.info("FCM notification prepared - token: \(token), title: \(title)", category: .push)
     }
 
     private func getFCMToken(for userId: String) async -> String? {
-        let userDoc = try? await FirestoreService.shared.db.collection("users").document(userId).getDocument()
+        let userDoc = try? await db.collection("users").document(userId).getDocument()
         return userDoc?.data()?["fcmToken"] as? String
     }
 
@@ -488,7 +481,7 @@ class NotificationServiceEnhanced: NSObject, ObservableObject {
                 options: [UNNotificationAttachmentOptionsTypeHintKey: "public.jpeg"]
             )
         } catch {
-            Logger.shared.error("Failed to create notification attachment", category: .notifications, error: error)
+            Logger.shared.error("Failed to create notification attachment", category: .push, error: error)
             return nil
         }
     }
@@ -501,7 +494,7 @@ class NotificationServiceEnhanced: NSObject, ObservableObject {
         let yesterday = Date().addingTimeInterval(-24 * 60 * 60)
 
         // Get new matches
-        let matchesSnapshot = try? await FirestoreService.shared.db.collection("matches")
+        let matchesSnapshot = try? await db.collection("matches")
             .whereField("user1Id", isEqualTo: userId)
             .whereField("timestamp", isGreaterThan: yesterday)
             .getDocuments()
@@ -509,7 +502,7 @@ class NotificationServiceEnhanced: NSObject, ObservableObject {
         let newMatches = matchesSnapshot?.documents.count ?? 0
 
         // Get profile views
-        let viewsSnapshot = try? await FirestoreService.shared.db.collection("profile_views")
+        let viewsSnapshot = try? await db.collection("profile_views")
             .whereField("viewedUserId", isEqualTo: userId)
             .whereField("timestamp", isGreaterThan: yesterday)
             .getDocuments()
@@ -517,7 +510,7 @@ class NotificationServiceEnhanced: NSObject, ObservableObject {
         let profileViews = viewsSnapshot?.documents.count ?? 0
 
         // Get new likes
-        let likesSnapshot = try? await FirestoreService.shared.db.collection("likes")
+        let likesSnapshot = try? await db.collection("likes")
             .whereField("targetUserId", isEqualTo: userId)
             .whereField("timestamp", isGreaterThan: yesterday)
             .getDocuments()
@@ -597,8 +590,11 @@ extension NotificationServiceEnhanced: UNUserNotificationCenterDelegate {
 
     private func handleQuickReply(text: String, userInfo: [AnyHashable: Any]) async {
         guard let matchId = userInfo["matchId"] as? String,
-              let senderId = authService.currentUser?.id,
-              let receiverId = userInfo["senderId"] as? String ?? userInfo["userId"] as? String else {
+              let senderId = authService.currentUser?.id else {
+            return
+        }
+
+        guard let receiverId = (userInfo["senderId"] as? String) ?? (userInfo["userId"] as? String) else {
             return
         }
 
@@ -610,10 +606,10 @@ extension NotificationServiceEnhanced: UNUserNotificationCenterDelegate {
                 text: text
             )
 
-            Logger.shared.info("Quick reply sent", category: .notifications)
+            Logger.shared.info("Quick reply sent", category: .push)
             analyticsService.trackEvent(.quickReplySent)
         } catch {
-            Logger.shared.error("Quick reply failed", category: .notifications, error: error)
+            Logger.shared.error("Quick reply failed", category: .push, error: error)
         }
     }
 
@@ -645,15 +641,15 @@ extension NotificationServiceEnhanced: UNUserNotificationCenterDelegate {
 
         // Like back
         do {
-            try await LikeService.shared.likeUser(
+            try await InterestService.shared.sendInterest(
                 fromUserId: currentUserId,
                 toUserId: likerId
             )
 
-            Logger.shared.info("Liked back from notification", category: .notifications)
+            Logger.shared.info("Liked back from notification", category: .push)
             analyticsService.trackEvent(.likeBackFromNotification)
         } catch {
-            Logger.shared.error("Like back failed", category: .notifications, error: error)
+            Logger.shared.error("Like back failed", category: .push, error: error)
         }
     }
 
@@ -670,11 +666,11 @@ extension NotificationServiceEnhanced: MessagingDelegate {
         guard let fcmToken = fcmToken else { return }
 
         Task { @MainActor in
-            Logger.shared.info("FCM token received", category: .notifications, metadata: ["token": fcmToken])
+            Logger.shared.info("FCM token received - token: \(fcmToken)", category: .push)
 
             // Save token to Firestore
             if let userId = authService.currentUser?.id {
-                try? await FirestoreService.shared.db.collection("users").document(userId).updateData([
+                try? await db.collection("users").document(userId).updateData([
                     "fcmToken": fcmToken,
                     "fcmTokenUpdatedAt": Date()
                 ])

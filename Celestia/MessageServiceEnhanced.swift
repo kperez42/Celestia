@@ -198,8 +198,8 @@ class MessageServiceEnhanced: ObservableObject {
         imageURL: String,
         caption: String? = nil
     ) async throws {
-        let messageText = caption?.isEmpty == false ? caption! : "📷 Photo"
-        let lastMessageText = caption?.isEmpty == false ? "📷 \(caption!)" : "📷 Photo"
+        let messageText = (caption != nil && !caption!.isEmpty) ? caption! : "📷 Photo"
+        let lastMessageText = (caption != nil && !caption!.isEmpty) ? "📷 \(caption!)" : "📷 Photo"
 
         // Create optimistic message
         let optimisticId = UUID().uuidString
@@ -474,10 +474,10 @@ struct OptimisticMessage: Identifiable {
             senderId: senderId,
             receiverId: receiverId,
             text: text,
+            imageURL: imageURL,
             timestamp: timestamp,
             isRead: false,
-            isDelivered: status == .sent,
-            imageURL: imageURL
+            isDelivered: status == .sent
         )
     }
 }
