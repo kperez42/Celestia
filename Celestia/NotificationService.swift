@@ -255,14 +255,16 @@ class NotificationService: ObservableObject {
             // Convert data dictionary to JSON-serializable format (all values as strings)
             var stringData: [String: String] = [:]
             for (key, value) in data {
+                guard let stringKey = key as? String else { continue }
+
                 if let stringValue = value as? String {
-                    stringData[key] = stringValue
+                    stringData[stringKey] = stringValue
                 } else if let intValue = value as? Int {
-                    stringData[key] = String(intValue)
+                    stringData[stringKey] = String(intValue)
                 } else if let boolValue = value as? Bool {
-                    stringData[key] = String(boolValue)
+                    stringData[stringKey] = String(boolValue)
                 } else if let doubleValue = value as? Double {
-                    stringData[key] = String(doubleValue)
+                    stringData[stringKey] = String(doubleValue)
                 }
             }
             try container.encode(stringData, forKey: .data)
