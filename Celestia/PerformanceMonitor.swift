@@ -367,7 +367,7 @@ class PerformanceMonitor: ObservableObject {
     /// - Returns: Result of the operation
     func measureAsync<T>(
         _ name: String,
-        category: Logger.Category = .performance,
+        category: LogCategory = .performance,
         operation: () async throws -> T
     ) async rethrows -> T {
         let start = CFAbsoluteTimeGetCurrent()
@@ -390,7 +390,7 @@ class PerformanceMonitor: ObservableObject {
     /// - Returns: Result of the operation
     func measureSync<T>(
         _ name: String,
-        category: Logger.Category = .performance,
+        category: LogCategory = .performance,
         operation: () throws -> T
     ) rethrows -> T {
         let start = CFAbsoluteTimeGetCurrent()
@@ -415,7 +415,7 @@ class PerformanceMonitor: ObservableObject {
 
     /// End a timer and log performance
     /// - Parameter timerId: Timer ID from startTimer
-    func endTimer(_ timerId: UUID, category: Logger.Category = .performance) {
+    func endTimer(_ timerId: UUID, category: LogCategory = .performance) {
         guard let timer = activeTimers.removeValue(forKey: timerId) else {
             Logger.shared.warning("Timer \(timerId) not found", category: .general)
             return
@@ -435,7 +435,7 @@ class PerformanceMonitor: ObservableObject {
 
     private var activeTimers: [UUID: (name: String, start: CFTimeInterval)] = [:]
 
-    private func logPerformance(name: String, duration: Double, category: Logger.Category) {
+    private func logPerformance(name: String, duration: Double, category: LogCategory) {
         let formattedDuration = String(format: "%.2f", duration)
 
         if duration > slowOperationThreshold {
@@ -584,10 +584,7 @@ class PerformanceStatistics {
 }
 
 // MARK: - Integration with Logger
-
-extension Logger.Category {
-    static let performance = Logger.Category.general // Add dedicated performance category if needed
-}
+// Performance category is already defined in LogCategory enum
 
 // MARK: - Performance Monitor View (for debugging)
 

@@ -18,7 +18,7 @@ enum ClipboardSecurityPolicy {
 
 /// Content sensitivity level
 enum ContentSensitivityLevel {
-    case public            // Can be freely copied
+    case `public`          // Can be freely copied
     case `private`         // Should be protected
     case sensitive         // Highly sensitive (messages, personal info)
     case critical          // Never allow copying (passwords, etc.)
