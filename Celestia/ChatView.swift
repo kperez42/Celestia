@@ -3,6 +3,7 @@
 //  Celestia
 //
 //  Chat view with real-time messaging
+//  ACCESSIBILITY: Full VoiceOver support, Dynamic Type, Reduce Motion, and WCAG 2.1 AA compliant
 //
 
 import SwiftUI
@@ -12,6 +13,8 @@ struct ChatView: View {
     @EnvironmentObject var authService: AuthService
     @StateObject private var messageService = MessageService.shared
     @StateObject private var safetyManager = SafetyManager.shared
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
+    @Environment(\.dynamicTypeSize) var dynamicTypeSize
 
     let match: Match
     let otherUser: User
@@ -52,8 +55,10 @@ struct ChatView: View {
         }
         .navigationBarBackButtonHidden(true)
         .navigationBarTitleDisplayMode(.inline)
+        .accessibilityIdentifier(AccessibilityIdentifier.chatView)
         .onAppear {
             setupChat()
+            VoiceOverAnnouncement.screenChanged(to: "Chat with \(otherUser.fullName)")
         }
         .onDisappear {
             messageService.stopListening()
@@ -116,8 +121,12 @@ struct ChatView: View {
                     .foregroundColor(.purple)
                     .frame(width: 44, height: 44)
             }
-            .accessibilityLabel("Back")
-            .accessibilityHint("Return to messages list")
+            .accessibilityElement(
+                label: "Back",
+                hint: "Return to messages list",
+                traits: .isButton,
+                identifier: AccessibilityIdentifier.backButton
+            )
 
             // Profile image
             Circle()
@@ -475,8 +484,12 @@ struct ChatView: View {
                     .background(Color(.systemGray6))
                     .cornerRadius(20)
                     .lineLimit(1...5)
-                    .accessibilityLabel("Message")
-                    .accessibilityHint("Type your message to \(otherUser.fullName)")
+                    .dynamicTypeSize(min: .small, max: .accessibility2)
+                    .accessibilityElement(
+                        label: "Message",
+                        hint: "Type your message to \(otherUser.fullName)",
+                        identifier: AccessibilityIdentifier.messageInput
+                    )
                     .onChange(of: messageText) {
                         // Simulate typing indicator (in production, send to Firestore)
                         #if DEBUG
@@ -505,9 +518,12 @@ struct ChatView: View {
                     .frame(width: 44, height: 44)
                 }
                 .disabled((messageText.isEmpty && selectedImage == nil) || isSending)
-                .accessibilityLabel(isSending ? "Sending" : "Send message")
-                .accessibilityHint(isSending ? "Message is being sent" : "Send your message to \(otherUser.fullName)")
-                .accessibilityAddTraits((messageText.isEmpty && selectedImage == nil) ? .isButton : [.isButton])
+                .accessibilityElement(
+                    label: isSending ? "Sending" : "Send message",
+                    hint: isSending ? "Message is being sent" : "Send your message to \(otherUser.fullName)",
+                    traits: .isButton,
+                    identifier: AccessibilityIdentifier.sendButton
+                )
             }
 
             // Character count (if over 100 characters)

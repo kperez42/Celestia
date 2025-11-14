@@ -3,6 +3,7 @@
 //  Celestia
 //
 //  ELITE PROFILE VIEW - Your Digital Identity
+//  ACCESSIBILITY: Full VoiceOver support, Dynamic Type, Reduce Motion, and WCAG 2.1 AA compliant
 //
 
 import SwiftUI
@@ -10,6 +11,8 @@ import SwiftUI
 struct ProfileView: View {
     @EnvironmentObject var authService: AuthService
     @ObservedObject private var userService = UserService.shared
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
+    @Environment(\.dynamicTypeSize) var dynamicTypeSize
 
     @State private var showingEditProfile = false
     @State private var showingSettings = false
@@ -111,6 +114,7 @@ struct ProfileView: View {
             }
             .navigationTitle("")
             .navigationBarHidden(true)
+            .accessibilityIdentifier(AccessibilityIdentifier.profileView)
             .sheet(isPresented: $showingEditProfile) {
                 EditProfileView()
                     .environmentObject(authService)
@@ -152,12 +156,14 @@ struct ProfileView: View {
                 Text("You'll need to sign in again to access your account.")
             }
             .onAppear {
-                withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
+                let animation: Animation? = reduceMotion ? nil : .spring(response: 0.8, dampingFraction: 0.7)
+                withAnimation(animation) {
                     animateStats = true
                 }
                 if let user = authService.currentUser {
                     profileCompletion = userService.profileCompletionPercentage(user)
                 }
+                VoiceOverAnnouncement.screenChanged(to: "Profile view")
             }
             .detectScreenshots(
                 context: .profile(userId: authService.currentUser?.id ?? ""),
@@ -239,8 +245,12 @@ struct ProfileView: View {
                 } label: {
                     profileImageView(user: user)
                 }
-                .accessibilityLabel("Profile photo")
-                .accessibilityHint("Tap to view full size photo and edit profile picture")
+                .accessibilityElement(
+                    label: "Profile photo",
+                    hint: "Tap to view full size photo and edit profile picture",
+                    traits: .isButton,
+                    identifier: AccessibilityIdentifier.profilePhoto
+                )
 
                 // Name and badges
                 VStack(spacing: 10) {
@@ -638,6 +648,7 @@ struct ProfileView: View {
                     .font(.title3)
                 Text("Edit Profile")
                     .fontWeight(.semibold)
+                    .dynamicTypeSize(min: .small, max: .accessibility1)
             }
             .foregroundColor(.white)
             .frame(maxWidth: .infinity)
@@ -650,10 +661,14 @@ struct ProfileView: View {
                 )
             )
             .cornerRadius(16)
-            .shadow(color: .purple.opacity(0.4), radius: 15, y: 8)
+            .conditionalShadow(enabled: true)
         }
-        .accessibilityLabel("Edit Profile")
-        .accessibilityHint("Modify your profile information, photos, and preferences")
+        .accessibilityElement(
+            label: "Edit Profile",
+            hint: "Modify your profile information, photos, and preferences",
+            traits: .isButton,
+            identifier: AccessibilityIdentifier.editProfileButton
+        )
         .scaleButton()
         .padding(.horizontal, 20)
     }

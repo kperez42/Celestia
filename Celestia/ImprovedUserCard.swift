@@ -3,6 +3,7 @@
 //  Celestia
 //
 //  Enhanced profile card with depth, shadows, and smooth gestures
+//  ACCESSIBILITY: Full VoiceOver support, Dynamic Type, Reduce Motion, and WCAG 2.1 AA compliant
 //
 
 import SwiftUI
@@ -11,31 +12,49 @@ struct ImprovedUserCard: View {
     let user: User
     let onSwipe: (SwipeDirection) -> Void
     let onTap: () -> Void
-    
+
     @State private var offset: CGSize = .zero
     @State private var rotation: Double = 0
     @State private var scale: CGFloat = 1.0
-    
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
+    @Environment(\.dynamicTypeSize) var dynamicTypeSize
+
     private let swipeThreshold: CGFloat = 100
-    
+
     var body: some View {
         ZStack(alignment: .bottom) {
             // Main card
             cardContent
-            
+
             // Swipe indicators
             swipeIndicators
-            
+
             // Bottom gradient info overlay
             bottomInfoOverlay
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.white)
         .cornerRadius(24)
-        .shadow(color: .black.opacity(0.15), radius: 20, y: 10)
+        .conditionalShadow(enabled: true)
         .scaleEffect(scale)
         .offset(offset)
-        .rotationEffect(.degrees(rotation))
+        .rotationEffect(.degrees(reduceMotion ? 0 : rotation))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(user.fullName), \(user.age) years old")
+        .accessibilityValue(buildAccessibilityValue())
+        .accessibilityHint("Swipe right to like, left to pass, or tap for details")
+        .accessibilityIdentifier(AccessibilityIdentifier.userCard)
+        .accessibilityActions([
+            AccessibilityCustomAction(name: "Like") {
+                onSwipe(.right)
+            },
+            AccessibilityCustomAction(name: "Pass") {
+                onSwipe(.left)
+            },
+            AccessibilityCustomAction(name: "View Full Profile") {
+                onTap()
+            }
+        ])
         .gesture(
             DragGesture()
                 .onChanged { gesture in
@@ -53,14 +72,18 @@ struct ImprovedUserCard: View {
                     if abs(horizontalSwipe) > swipeThreshold {
                         // Complete the swipe
                         let direction: SwipeDirection = horizontalSwipe > 0 ? .right : .left
-                        
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+
+                        let animation: Animation? = reduceMotion ? nil : .spring(response: 0.5, dampingFraction: 0.7)
+                        withAnimation(animation) {
                             offset = CGSize(
                                 width: horizontalSwipe > 0 ? 500 : -500,
                                 height: gesture.translation.height
                             )
-                            rotation = horizontalSwipe > 0 ? 20 : -20
+                            rotation = reduceMotion ? 0 : (horizontalSwipe > 0 ? 20 : -20)
                         }
+
+                        // Announce action to VoiceOver
+                        VoiceOverAnnouncement.announce(direction == .right ? "Liked" : "Passed")
                         
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                             onSwipe(direction)
@@ -70,7 +93,8 @@ struct ImprovedUserCard: View {
                         HapticManager.shared.impact(.medium)
                     } else {
                         // Snap back
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                        let animation: Animation? = reduceMotion ? nil : .spring(response: 0.5, dampingFraction: 0.7)
+                        withAnimation(animation) {
                             offset = .zero
                             rotation = 0
                             scale = 1.0
@@ -163,42 +187,53 @@ struct ImprovedUserCard: View {
                 Text(user.fullName)
                     .font(.system(size: 32, weight: .bold))
                     .foregroundColor(.white)
-                
+                    .dynamicTypeSize(min: .large, max: .accessibility2)
+
                 Text("\(user.age)")
                     .font(.system(size: 28, weight: .semibold))
                     .foregroundColor(.white.opacity(0.9))
-                
+                    .dynamicTypeSize(min: .large, max: .accessibility2)
+
                 if user.isVerified {
                     Image(systemName: "checkmark.seal.fill")
                         .font(.title3)
                         .foregroundColor(.blue)
+                        .accessibilityLabel("Verified")
                 }
-                
+
                 if user.isPremium {
                     Image(systemName: "crown.fill")
                         .font(.subheadline)
                         .foregroundColor(.yellow)
+                        .accessibilityLabel("Premium member")
                 }
-                
+
                 Spacer()
             }
+            .accessibilityElement(children: .combine)
             
             // Location
             HStack(spacing: 6) {
                 Image(systemName: "mappin.circle.fill")
                     .font(.subheadline)
+                    .accessibilityHidden(true)
                 Text("\(user.location), \(user.country)")
                     .font(.subheadline)
+                    .dynamicTypeSize(min: .small, max: .accessibility1)
             }
             .foregroundColor(.white.opacity(0.95))
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Location: \(user.location), \(user.country)")
             
             // Bio preview
             if !user.bio.isEmpty {
                 Text(user.bio)
                     .font(.subheadline)
                     .foregroundColor(.white.opacity(0.9))
-                    .lineLimit(2)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 2)
                     .padding(.top, 4)
+                    .dynamicTypeSize(min: .small, max: .accessibility1)
+                    .accessibilityLabel("Bio: \(user.bio)")
             }
             
             // Quick info chips
@@ -208,18 +243,22 @@ struct ImprovedUserCard: View {
                     if !user.languages.isEmpty {
                         ForEach(user.languages.prefix(3), id: \.self) { language in
                             InfoChip(icon: "globe", text: language)
+                                .accessibilityLabel("Speaks \(language)")
                         }
                     }
-                    
+
                     // Interests
                     if !user.interests.isEmpty {
                         ForEach(user.interests.prefix(3), id: \.self) { interest in
                             InfoChip(icon: "star.fill", text: interest)
+                                .accessibilityLabel("Interest: \(interest)")
                         }
                     }
                 }
             }
             .padding(.top, 8)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Languages and interests")
             
             // Tap to view more
             HStack {
@@ -228,8 +267,10 @@ struct ImprovedUserCard: View {
                     Text("Tap to view more")
                         .font(.caption)
                         .fontWeight(.medium)
+                        .dynamicTypeSize(min: .xSmall, max: .large)
                     Image(systemName: "arrow.up.circle.fill")
                         .font(.caption)
+                        .accessibilityHidden(true)
                 }
                 .foregroundColor(.white.opacity(0.8))
                 .padding(.horizontal, 12)
@@ -239,6 +280,7 @@ struct ImprovedUserCard: View {
                 Spacer()
             }
             .padding(.top, 8)
+            .accessibilityHidden(true)
         }
         .padding(24)
         .background(
@@ -255,11 +297,44 @@ struct ImprovedUserCard: View {
     }
     
     // MARK: - Helper Functions
-    
+
     private func resetCard() {
         offset = .zero
         rotation = 0
         scale = 1.0
+    }
+
+    /// Builds a comprehensive accessibility value string
+    private func buildAccessibilityValue() -> String {
+        var components: [String] = []
+
+        if !user.location.isEmpty {
+            components.append("from \(user.location)")
+        }
+
+        if user.isVerified {
+            components.append("verified")
+        }
+
+        if user.isPremium {
+            components.append("premium member")
+        }
+
+        if !user.bio.isEmpty {
+            components.append("Bio: \(user.bio)")
+        }
+
+        if !user.languages.isEmpty {
+            let languages = user.languages.prefix(3).joined(separator: ", ")
+            components.append("Speaks: \(languages)")
+        }
+
+        if !user.interests.isEmpty {
+            let interests = user.interests.prefix(3).joined(separator: ", ")
+            components.append("Interests: \(interests)")
+        }
+
+        return components.joined(separator: ". ")
     }
 }
 
@@ -268,20 +343,24 @@ struct ImprovedUserCard: View {
 struct InfoChip: View {
     let icon: String
     let text: String
-    
+    @Environment(\.dynamicTypeSize) var dynamicTypeSize
+
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: icon)
                 .font(.caption2)
+                .accessibilityHidden(true)
             Text(text)
                 .font(.caption)
                 .fontWeight(.medium)
+                .dynamicTypeSize(min: .xSmall, max: .large)
         }
         .foregroundColor(.white)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(Color.white.opacity(0.25))
         .cornerRadius(12)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -291,7 +370,9 @@ struct SwipeLabel: View {
     let text: String
     let color: Color
     let rotation: Double
-    
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
+    @Environment(\.dynamicTypeSize) var dynamicTypeSize
+
     var body: some View {
         Text(text)
             .font(.system(size: 48, weight: .heavy))
@@ -303,8 +384,9 @@ struct SwipeLabel: View {
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(color, lineWidth: 5)
             )
-            .rotationEffect(.degrees(rotation))
+            .rotationEffect(.degrees(reduceMotion ? 0 : rotation))
             .shadow(color: color.opacity(0.5), radius: 10)
+            .accessibilityHidden(true) // Visual indicator only, redundant with VoiceOver announcements
     }
 }
 

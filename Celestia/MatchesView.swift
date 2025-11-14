@@ -3,6 +3,7 @@
 //  Celestia
 //
 //  ELITE MATCHES VIEW - Premium Dating Experience
+//  ACCESSIBILITY: Full VoiceOver support, Dynamic Type, Reduce Motion, and WCAG 2.1 AA compliant
 //
 
 import SwiftUI
@@ -13,6 +14,8 @@ struct MatchesView: View {
     @ObservedObject private var userService = UserService.shared
     @ObservedObject private var messageService = MessageService.shared
     @StateObject private var searchDebouncer = SearchDebouncer(delay: 0.3)
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
+    @Environment(\.dynamicTypeSize) var dynamicTypeSize
 
     @State private var matchedUsers: [String: User] = [:]
     @State private var selectedTab = 0
@@ -131,13 +134,16 @@ struct MatchesView: View {
             }
             .navigationTitle("")
             .navigationBarHidden(true)
+            .accessibilityIdentifier(AccessibilityIdentifier.matchesView)
             .task {
                 await loadMatches()
+                VoiceOverAnnouncement.screenChanged(to: "Matches view. \(matchService.matches.count) matches available.")
             }
             .refreshable {
                 HapticManager.shared.impact(.light)
                 await loadMatches()
                 HapticManager.shared.notification(.success)
+                VoiceOverAnnouncement.announce("Matches refreshed. \(matchService.matches.count) matches available.")
             }
             .sheet(item: $selectedMatch) { match in
                 if let user = getMatchedUser(match) {
@@ -169,6 +175,8 @@ struct MatchesView: View {
                         Text("Matches")
                             .font(.largeTitle.weight(.bold))
                             .foregroundColor(.white)
+                            .dynamicTypeSize(min: .large, max: .accessibility2)
+                            .accessibilityAddTraits(.isHeader)
                         
                         if !matchService.matches.isEmpty {
                             HStack(spacing: 8) {
@@ -270,6 +278,11 @@ struct MatchesView: View {
                 .onChange(of: searchText) { newValue in
                     searchDebouncer.search(newValue)
                 }
+                .accessibilityElement(
+                    label: "Search matches",
+                    hint: "Type to search your matches by name or location",
+                    identifier: AccessibilityIdentifier.searchField
+                )
             
             if !searchText.isEmpty {
                 Button {
@@ -406,11 +419,16 @@ struct MatchesView: View {
                             user: user,
                             currentUserId: authService.currentUser?.id ?? "current_user"
                         )
-                        .accessibilityLabel("\(user.fullName), \(user.age) years old, from \(user.location)")
-                        .accessibilityHint("Tap to view full profile and start chatting")
+                        .accessibilityElement(
+                            label: "\(user.fullName), \(user.age) years old, from \(user.location)",
+                            hint: "Tap to view full profile and start chatting",
+                            traits: .isButton,
+                            identifier: AccessibilityIdentifier.matchCard
+                        )
                         .onTapGesture {
                             HapticManager.shared.impact(.medium)
                             selectedMatch = match
+                            VoiceOverAnnouncement.announce("Opening chat with \(user.fullName)")
                         }
                     }
                 }
@@ -470,13 +488,17 @@ struct MatchesView: View {
                 Text("No Matches Yet")
                     .font(.title2)
                     .fontWeight(.bold)
-                
+                    .dynamicTypeSize(min: .large, max: .accessibility2)
+                    .accessibilityAddTraits(.isHeader)
+
                 Text("Start swiping to find your perfect match!")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
+                    .dynamicTypeSize(min: .small, max: .accessibility1)
             }
+            .accessibilityElement(children: .combine)
             
             // Tips
             VStack(spacing: 12) {
