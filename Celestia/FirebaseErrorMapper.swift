@@ -182,13 +182,17 @@ enum FirebaseErrorMapper {
             error: error
         )
 
-        AnalyticsManager.shared.logEvent(.errorOccurred, parameters: [
-            "error_domain": error.domain,
-            "error_code": error.code,
-            "error_type": String(describing: mappedError),
-            "context": context,
-            "user_message": mappedError.userMessage
-        ])
+        // Log analytics asynchronously to avoid blocking
+        // Swift 6 concurrency: AnalyticsManager is @MainActor isolated
+        Task { @MainActor in
+            AnalyticsManager.shared.logEvent(.errorOccurred, parameters: [
+                "error_domain": error.domain,
+                "error_code": error.code,
+                "error_type": String(describing: mappedError),
+                "context": context,
+                "user_message": mappedError.userMessage
+            ])
+        }
     }
 
     // MARK: - Helper Methods
