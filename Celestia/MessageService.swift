@@ -13,45 +13,167 @@ import FirebaseFirestore
 class MessageService: ObservableObject {
     @Published var messages: [Message] = []
     @Published var isLoading = false
+    @Published var isLoadingMore = false
+    @Published var hasMoreMessages = true
     @Published var error: Error?
-    
+
     static let shared = MessageService()
     private let db = Firestore.firestore()
     private var listener: ListenerRegistration?
-    
+    private var oldestMessageTimestamp: Date?
+    private let messagesPerPage = 50
+
     private init() {}
 
-    /// Listen to messages in real-time for a specific match
+    /// Listen to messages in real-time for a specific match with pagination
+    /// Loads initial batch of recent messages, then listens for new messages only
     func listenToMessages(matchId: String) {
         listener?.remove()
-        
+        messages = []
+        oldestMessageTimestamp = nil
+        hasMoreMessages = true
+        isLoading = true
+
+        Logger.shared.info("Starting paginated message loading for match: \(matchId)", category: .messaging)
+
+        Task {
+            do {
+                // Step 1: Load initial batch of recent messages (most recent 50)
+                let initialMessages = try await loadInitialMessages(matchId: matchId)
+
+                await MainActor.run {
+                    self.messages = initialMessages.sorted { $0.timestamp < $1.timestamp }
+                    self.oldestMessageTimestamp = initialMessages.first?.timestamp
+                    self.hasMoreMessages = initialMessages.count >= messagesPerPage
+                    self.isLoading = false
+
+                    Logger.shared.info("Loaded \(initialMessages.count) initial messages", category: .messaging)
+                }
+
+                // Step 2: Set up real-time listener for NEW messages only
+                // This prevents loading all historical messages
+                let cutoffTimestamp = initialMessages.last?.timestamp ?? Date()
+                setupNewMessageListener(matchId: matchId, after: cutoffTimestamp)
+
+            } catch {
+                await MainActor.run {
+                    self.error = error
+                    self.isLoading = false
+                    Logger.shared.error("Failed to load initial messages", category: .messaging, error: error)
+                }
+            }
+        }
+    }
+
+    /// Load initial batch of recent messages
+    private func loadInitialMessages(matchId: String) async throws -> [Message] {
+        let snapshot = try await db.collection("messages")
+            .whereField("matchId", isEqualTo: matchId)
+            .order(by: "timestamp", descending: true)
+            .limit(to: messagesPerPage)
+            .getDocuments()
+
+        return snapshot.documents.compactMap { try? $0.data(as: Message.self) }
+    }
+
+    /// Set up listener for NEW messages only (after cutoff timestamp)
+    private func setupNewMessageListener(matchId: String, after cutoffTimestamp: Date) {
         listener = db.collection("messages")
             .whereField("matchId", isEqualTo: matchId)
+            .whereField("timestamp", isGreaterThan: Timestamp(date: cutoffTimestamp))
             .order(by: "timestamp", descending: false)
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self else { return }
 
                 if let error = error {
-                    Logger.shared.error("Error listening to messages", category: .messaging, error: error)
+                    Logger.shared.error("Error listening to new messages", category: .messaging, error: error)
                     Task { @MainActor in
                         self.error = error
                     }
                     return
                 }
-                
+
                 guard let documents = snapshot?.documents else { return }
-                
+
                 Task { @MainActor in
-                    self.messages = documents.compactMap { try? $0.data(as: Message.self) }
+                    let newMessages = documents.compactMap { try? $0.data(as: Message.self) }
+
+                    // Append new messages to existing ones
+                    for message in newMessages {
+                        // Avoid duplicates
+                        if !self.messages.contains(where: { $0.id == message.id }) {
+                            self.messages.append(message)
+                            Logger.shared.debug("New message received: \(message.id ?? "unknown")", category: .messaging)
+                        }
+                    }
+
+                    // Keep messages sorted by timestamp
+                    self.messages.sort { $0.timestamp < $1.timestamp }
                 }
             }
     }
+
+    /// Load older messages (pagination) - call when user scrolls to top
+    func loadOlderMessages(matchId: String) async {
+        guard !isLoadingMore, hasMoreMessages else {
+            Logger.shared.debug("Already loading or no more messages", category: .messaging)
+            return
+        }
+
+        guard let oldestTimestamp = oldestMessageTimestamp else {
+            Logger.shared.warning("No oldest timestamp available for pagination", category: .messaging)
+            return
+        }
+
+        isLoadingMore = true
+        Logger.shared.info("Loading older messages before \(oldestTimestamp)", category: .messaging)
+
+        do {
+            let snapshot = try await db.collection("messages")
+                .whereField("matchId", isEqualTo: matchId)
+                .whereField("timestamp", isLessThan: Timestamp(date: oldestTimestamp))
+                .order(by: "timestamp", descending: true)
+                .limit(to: messagesPerPage)
+                .getDocuments()
+
+            let olderMessages = snapshot.documents.compactMap { try? $0.data(as: Message.self) }
+
+            await MainActor.run {
+                if !olderMessages.isEmpty {
+                    // Prepend older messages to the beginning
+                    self.messages.insert(contentsOf: olderMessages.sorted { $0.timestamp < $1.timestamp }, at: 0)
+                    self.oldestMessageTimestamp = olderMessages.first?.timestamp
+                    Logger.shared.info("Loaded \(olderMessages.count) older messages", category: .messaging)
+                }
+
+                // Check if there are more messages to load
+                self.hasMoreMessages = olderMessages.count >= messagesPerPage
+                self.isLoadingMore = false
+
+                if !hasMoreMessages {
+                    Logger.shared.info("Reached the beginning of conversation", category: .messaging)
+                }
+            }
+
+        } catch {
+            await MainActor.run {
+                self.error = error
+                self.isLoadingMore = false
+                Logger.shared.error("Failed to load older messages", category: .messaging, error: error)
+            }
+        }
+    }
     
-    /// Stop listening to messages
+    /// Stop listening to messages and reset pagination state
     func stopListening() {
         listener?.remove()
         listener = nil
         messages = []
+        oldestMessageTimestamp = nil
+        hasMoreMessages = true
+        isLoading = false
+        isLoadingMore = false
+        Logger.shared.info("Stopped listening to messages and reset state", category: .messaging)
     }
     
     /// Send a text message

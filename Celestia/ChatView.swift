@@ -223,9 +223,53 @@ struct ChatView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 12) {
+                    // Loading indicator for older messages (at top)
+                    if messageService.isLoadingMore {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                                .progressViewStyle(.circular)
+                                .scaleEffect(0.8)
+                            Text("Loading older messages...")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                        }
+                        .padding(.vertical, 12)
+                        .id("loadingTop")
+                    }
+
+                    // Load more trigger (invisible, detects when user scrolls to top)
+                    if messageService.hasMoreMessages && !messageService.messages.isEmpty && !messageService.isLoadingMore {
+                        Color.clear
+                            .frame(height: 1)
+                            .id("loadMoreTrigger")
+                            .onAppear {
+                                // User scrolled to top - load older messages
+                                Task {
+                                    if let matchId = match.id {
+                                        await messageService.loadOlderMessages(matchId: matchId)
+                                    }
+                                }
+                            }
+                    }
+
                     // Show conversation starters if no messages
                     if messageService.messages.isEmpty, let currentUser = authService.currentUser {
-                        conversationStartersView(currentUser: currentUser)
+                        if messageService.isLoading {
+                            // Show loading state
+                            VStack(spacing: 16) {
+                                ProgressView()
+                                    .progressViewStyle(.circular)
+                                Text("Loading messages...")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .padding(.top, 100)
+                        } else {
+                            conversationStartersView(currentUser: currentUser)
+                        }
                     }
 
                     ForEach(groupedMessages(), id: \.0) { section in
@@ -257,7 +301,10 @@ struct ChatView: View {
             .scrollDismissesKeyboard(.interactively)
             .background(Color(.systemGroupedBackground))
             .onChange(of: messageService.messages.count) {
-                scrollToBottom(proxy: proxy)
+                // Only scroll to bottom for new messages (not when loading older)
+                if !messageService.isLoadingMore {
+                    scrollToBottom(proxy: proxy)
+                }
             }
             .onChange(of: isOtherUserTyping) {
                 if isOtherUserTyping {
