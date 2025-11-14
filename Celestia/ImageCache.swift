@@ -27,6 +27,9 @@ class ImageCache {
     private var isUnderMemoryPressure = false
     private var memoryWarningCount = 0
 
+    // MEMORY LEAK FIX: Store observer token for proper cleanup
+    private var memoryWarningObserver: NSObjectProtocol?
+
     private init() {
         // PERFORMANCE: Adaptive cache sizes based on available device memory
         let physicalMemory = ProcessInfo.processInfo.physicalMemory
@@ -59,7 +62,8 @@ class ImageCache {
         try? fileManager.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
 
         // PERFORMANCE: Register for memory warning notifications
-        NotificationCenter.default.addObserver(
+        // MEMORY LEAK FIX: Store observer token for proper cleanup in deinit
+        memoryWarningObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.didReceiveMemoryWarningNotification,
             object: nil,
             queue: .main
@@ -284,6 +288,14 @@ class ImageCache {
             try? fileManager.removeItem(at: file.url)
             currentSize -= file.size
         }
+    }
+
+    // MEMORY LEAK FIX: Cleanup observer to prevent memory accumulation
+    deinit {
+        if let observer = memoryWarningObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        Logger.shared.debug("ImageCache deinitialized and observer removed", category: .storage)
     }
 }
 
