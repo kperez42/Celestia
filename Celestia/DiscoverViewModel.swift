@@ -15,7 +15,6 @@ class DiscoverViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage = ""
     @Published var currentIndex = 0
-    @Published var hasActiveFilters = false
     @Published var matchedUser: User?
     @Published var showingMatchAnimation = false
     @Published var selectedUser: User?
@@ -25,6 +24,11 @@ class DiscoverViewModel: ObservableObject {
     @Published var isProcessingAction = false
     @Published var showingUpgradeSheet = false
     @Published var connectionQuality: PerformanceMonitor.ConnectionQuality = .excellent
+
+    // Computed property that syncs with DiscoveryFilters.shared
+    var hasActiveFilters: Bool {
+        return DiscoveryFilters.shared.hasActiveFilters
+    }
 
     var remainingCount: Int {
         return max(0, users.count - currentIndex)
@@ -46,6 +50,14 @@ class DiscoverViewModel: ObservableObject {
     }
     
     func loadUsers(currentUser: User, limit: Int = 20) {
+        // Validate current user has an ID
+        guard let userId = currentUser.id, !userId.isEmpty else {
+            errorMessage = "Unable to load users: User account not properly initialized"
+            isLoading = false
+            Logger.shared.error("Cannot load users: Current user has no ID", category: .matching)
+            return
+        }
+
         isLoading = true
         errorMessage = ""
 
@@ -59,7 +71,7 @@ class DiscoverViewModel: ObservableObject {
                 let lookingFor = currentUser.lookingFor != "Everyone" ? currentUser.lookingFor : nil
 
                 try await userService.fetchUsers(
-                    excludingUserId: currentUser.id ?? "",
+                    excludingUserId: userId,
                     lookingFor: lookingFor,
                     ageRange: ageRange,
                     country: nil,
@@ -353,7 +365,7 @@ class DiscoverViewModel: ObservableObject {
             return
         }
 
-        // Get current user location
+        // Get current user location for distance filtering
         let currentLocation: (lat: Double, lon: Double)? = {
             if let lat = currentUser.latitude, let lon = currentUser.longitude {
                 return (lat, lon)
@@ -361,19 +373,40 @@ class DiscoverViewModel: ObservableObject {
             return nil
         }()
 
-        // Clear current users and reload with filters
-        users.removeAll()
-        lastDocument = nil
+        // Show loading state while applying filters
+        isLoading = true
 
-        // Reload users which will automatically apply filters through loadUsers(currentUser:)
-        loadUsers(currentUser: currentUser)
+        Task {
+            // Clear current users and reload
+            users.removeAll()
+            lastDocument = nil
 
-        Logger.shared.info("Filters applied. Active filters: \(DiscoveryFilters.shared.hasActiveFilters)", category: .matching)
+            // Reload users from Firestore
+            loadUsers(currentUser: currentUser)
+
+            // Wait for users to load, then filter them locally
+            try? await Task.sleep(nanoseconds: 500_000_000) // Wait 0.5s for load
+
+            await MainActor.run {
+                // Apply filters to loaded users
+                let filters = DiscoveryFilters.shared
+                if filters.hasActiveFilters {
+                    users = users.filter { user in
+                        filters.matchesFilters(user: user, currentUserLocation: currentLocation)
+                    }
+                    Logger.shared.info("Filters applied. \(users.count) users match filters", category: .matching)
+                } else {
+                    Logger.shared.info("No active filters to apply", category: .matching)
+                }
+
+                isLoading = false
+            }
+        }
     }
 
     /// Reset filters to default
     func resetFilters() {
-        hasActiveFilters = false
+        DiscoveryFilters.shared.resetFilters()
         applyFilters()
     }
 

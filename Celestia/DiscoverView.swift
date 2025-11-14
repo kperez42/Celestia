@@ -16,6 +16,7 @@ struct SwipeAction {
 struct DiscoverView: View {
     @EnvironmentObject var authService: AuthService
     @StateObject private var viewModel = DiscoverViewModel()
+    @ObservedObject private var filters = DiscoveryFilters.shared
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
 
@@ -90,7 +91,7 @@ struct DiscoverView: View {
                 PremiumUpgradeView()
                     .environmentObject(authService)
             }
-            .onChange(of: viewModel.hasActiveFilters) { _ in
+            .onChange(of: filters.hasActiveFilters) { _, _ in
                 viewModel.applyFilters()
             }
         }
@@ -185,6 +186,20 @@ struct DiscoverView: View {
                     let cardIndex = index - viewModel.currentIndex
 
                     UserCardView(user: user)
+                        .overlay(alignment: .topLeading) {
+                            // Pass indicator
+                            if cardIndex == 0 && viewModel.dragOffset.width < -50 {
+                                swipeIndicator(icon: "xmark", color: .red, text: "PASS")
+                                    .opacity(min(1.0, abs(Double(viewModel.dragOffset.width)) / 100.0))
+                            }
+                        }
+                        .overlay(alignment: .topTrailing) {
+                            // Like indicator
+                            if cardIndex == 0 && viewModel.dragOffset.width > 50 {
+                                swipeIndicator(icon: "heart.fill", color: .green, text: "LIKE")
+                                    .opacity(min(1.0, Double(viewModel.dragOffset.width) / 100.0))
+                            }
+                        }
                         .padding(.horizontal, 16)
                         .padding(.top, 16)
                         .padding(.bottom, 200) // Space for buttons and tab bar
@@ -222,7 +237,7 @@ struct DiscoverView: View {
                             }
                         }
                         .gesture(
-                            cardIndex == 0 ? DragGesture(minimumDistance: 10)
+                            cardIndex == 0 ? DragGesture(minimumDistance: 20)
                                 .onChanged { value in
                                     viewModel.dragOffset = value.translation
                                 }
@@ -520,7 +535,30 @@ struct DiscoverView: View {
             .padding(40)
         }
     }
-    
+
+    // MARK: - Swipe Indicator Helper
+
+    private func swipeIndicator(icon: String, color: Color, text: String) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 50, weight: .bold))
+                .foregroundColor(color)
+
+            Text(text)
+                .font(.headline)
+                .fontWeight(.black)
+                .foregroundColor(color)
+        }
+        .padding(24)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white)
+                .shadow(color: color.opacity(0.4), radius: 12, y: 4)
+        )
+        .padding(32)
+        .accessibilityHidden(true)
+    }
+
 }
 
 // MARK: - User Card View
