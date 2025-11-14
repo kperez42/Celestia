@@ -15,11 +15,12 @@ class UserService: ObservableObject {
     @Published var isLoading = false
     @Published var error: Error?
     @Published var hasMoreUsers = true
-    
+
     static let shared = UserService()
     private let db = Firestore.firestore()
     private var lastDocument: DocumentSnapshot?
     private var searchTask: Task<Void, Never>?
+    private let userCache = QueryCache<User>(ttl: 300, maxSize: 100) // 5 min cache, 100 users
 
     private init() {}
 
@@ -80,11 +81,27 @@ class UserService: ObservableObject {
         }
     }
     
-    /// Fetch a single user by ID
+    /// Fetch a single user by ID (with caching)
     func fetchUser(userId: String) async throws -> User? {
+        // Check cache first
+        if let cached = await userCache.get(userId) {
+            Logger.shared.debug("Cache hit for user \(userId)", category: .database)
+            return cached
+        }
+
+        // Cache miss - fetch from Firestore
+        Logger.shared.debug("Cache miss for user \(userId), fetching from database", category: .database)
+
         do {
             let doc = try await db.collection("users").document(userId).getDocument()
-            return try? doc.data(as: User.self)
+            guard let user = try? doc.data(as: User.self) else {
+                return nil
+            }
+
+            // Store in cache
+            await userCache.set(userId, value: user)
+
+            return user
         } catch {
             self.error = error
             throw error
@@ -96,9 +113,12 @@ class UserService: ObservableObject {
         guard let userId = user.id else {
             throw NSError(domain: "UserService", code: -1, userInfo: [NSLocalizedDescriptionKey: "User ID is nil"])
         }
-        
+
         do {
             try db.collection("users").document(userId).setData(from: user, merge: true)
+            // Invalidate cache after update
+            await userCache.remove(userId)
+            Logger.shared.debug("User cache invalidated for \(userId)", category: .database)
         } catch {
             self.error = error
             throw error
@@ -109,6 +129,9 @@ class UserService: ObservableObject {
     func updateUserFields(userId: String, fields: [String: Any]) async throws {
         do {
             try await db.collection("users").document(userId).updateData(fields)
+            // Invalidate cache after update
+            await userCache.remove(userId)
+            Logger.shared.debug("User cache invalidated for \(userId)", category: .database)
         } catch {
             self.error = error
             throw error
@@ -353,6 +376,19 @@ class UserService: ObservableObject {
             Logger.shared.error("Error getting remaining super likes", category: .database, error: error)
             return 0
         }
+    }
+
+    // MARK: - Cache Management
+
+    /// Clear user cache (useful on logout)
+    func clearCache() async {
+        await userCache.clear()
+        Logger.shared.info("User cache cleared", category: .database)
+    }
+
+    /// Get cache statistics
+    func getCacheSize() async -> Int {
+        return await userCache.size()
     }
 
     deinit {
