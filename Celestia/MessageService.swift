@@ -23,6 +23,15 @@ class MessageService: ObservableObject {
     private var oldestMessageTimestamp: Date?
     private let messagesPerPage = 50
 
+    // Performance optimization: Message prefetching
+    private var prefetchedMessages: [Message] = []
+    private var isPrefetching = false
+    private let prefetchThreshold = 10 // Prefetch when user is 10 messages from top
+
+    // Performance monitoring
+    private var messageLoadStartTime: Date?
+    private var totalMessagesLoaded = 0
+
     private init() {}
 
     /// Listen to messages in real-time for a specific match with pagination
@@ -30,9 +39,14 @@ class MessageService: ObservableObject {
     func listenToMessages(matchId: String) {
         listener?.remove()
         messages = []
+        prefetchedMessages = []
         oldestMessageTimestamp = nil
         hasMoreMessages = true
         isLoading = true
+        totalMessagesLoaded = 0
+
+        // Performance monitoring: Track load start time
+        messageLoadStartTime = Date()
 
         Logger.shared.info("Starting paginated message loading for match: \(matchId)", category: .messaging)
 
@@ -46,8 +60,28 @@ class MessageService: ObservableObject {
                     self.oldestMessageTimestamp = initialMessages.first?.timestamp
                     self.hasMoreMessages = initialMessages.count >= messagesPerPage
                     self.isLoading = false
+                    self.totalMessagesLoaded = initialMessages.count
+
+                    // Performance monitoring: Log load time
+                    if let startTime = self.messageLoadStartTime {
+                        let loadTime = Date().timeIntervalSince(startTime)
+                        Logger.shared.info("Loaded \(initialMessages.count) initial messages in \(String(format: "%.3f", loadTime))s", category: .messaging)
+
+                        // Track performance metric
+                        AnalyticsManager.shared.logEvent(.performanceMetric, parameters: [
+                            "metric_type": "chat_initial_load",
+                            "load_time_ms": Int(loadTime * 1000),
+                            "message_count": initialMessages.count,
+                            "match_id": matchId
+                        ])
+                    }
 
                     Logger.shared.info("Loaded \(initialMessages.count) initial messages", category: .messaging)
+                }
+
+                // Prefetch next batch for smooth scrolling
+                if initialMessages.count >= messagesPerPage {
+                    await prefetchOlderMessages(matchId: matchId)
                 }
 
                 // Step 2: Set up real-time listener for NEW messages only
@@ -126,7 +160,30 @@ class MessageService: ObservableObject {
         }
 
         isLoadingMore = true
+        let loadStartTime = Date()
         Logger.shared.info("Loading older messages before \(oldestTimestamp)", category: .messaging)
+
+        // Check if we have prefetched messages available
+        if !prefetchedMessages.isEmpty {
+            Logger.shared.debug("Using prefetched messages for instant load", category: .messaging)
+
+            await MainActor.run {
+                // Use prefetched messages for instant load
+                self.messages.insert(contentsOf: prefetchedMessages, at: 0)
+                self.oldestMessageTimestamp = prefetchedMessages.first?.timestamp
+                self.totalMessagesLoaded += prefetchedMessages.count
+
+                let loadTime = Date().timeIntervalSince(loadStartTime)
+                Logger.shared.info("Loaded \(prefetchedMessages.count) prefetched messages in \(String(format: "%.3f", loadTime))s", category: .messaging)
+
+                self.prefetchedMessages = []
+                self.isLoadingMore = false
+            }
+
+            // Prefetch next batch
+            await prefetchOlderMessages(matchId: matchId)
+            return
+        }
 
         do {
             let snapshot = try await db.collection("messages")
@@ -143,7 +200,19 @@ class MessageService: ObservableObject {
                     // Prepend older messages to the beginning
                     self.messages.insert(contentsOf: olderMessages.sorted { $0.timestamp < $1.timestamp }, at: 0)
                     self.oldestMessageTimestamp = olderMessages.first?.timestamp
-                    Logger.shared.info("Loaded \(olderMessages.count) older messages", category: .messaging)
+                    self.totalMessagesLoaded += olderMessages.count
+
+                    let loadTime = Date().timeIntervalSince(loadStartTime)
+                    Logger.shared.info("Loaded \(olderMessages.count) older messages in \(String(format: "%.3f", loadTime))s", category: .messaging)
+
+                    // Track performance metric
+                    AnalyticsManager.shared.logEvent(.performanceMetric, parameters: [
+                        "metric_type": "chat_pagination",
+                        "load_time_ms": Int(loadTime * 1000),
+                        "message_count": olderMessages.count,
+                        "total_loaded": self.totalMessagesLoaded,
+                        "match_id": matchId
+                    ])
                 }
 
                 // Check if there are more messages to load
@@ -155,11 +224,48 @@ class MessageService: ObservableObject {
                 }
             }
 
+            // Prefetch next batch for smooth scrolling
+            if olderMessages.count >= messagesPerPage {
+                await prefetchOlderMessages(matchId: matchId)
+            }
+
         } catch {
             await MainActor.run {
                 self.error = error
                 self.isLoadingMore = false
                 Logger.shared.error("Failed to load older messages", category: .messaging, error: error)
+            }
+        }
+    }
+
+    /// Prefetch older messages in background for smooth scrolling
+    private func prefetchOlderMessages(matchId: String) async {
+        guard !isPrefetching, hasMoreMessages else { return }
+        guard let oldestTimestamp = oldestMessageTimestamp else { return }
+
+        isPrefetching = true
+        Logger.shared.debug("Prefetching next batch of messages", category: .messaging)
+
+        do {
+            let snapshot = try await db.collection("messages")
+                .whereField("matchId", isEqualTo: matchId)
+                .whereField("timestamp", isLessThan: Timestamp(date: oldestTimestamp))
+                .order(by: "timestamp", descending: true)
+                .limit(to: messagesPerPage)
+                .getDocuments()
+
+            let nextBatch = snapshot.documents.compactMap { try? $0.data(as: Message.self) }
+                .sorted { $0.timestamp < $1.timestamp }
+
+            await MainActor.run {
+                self.prefetchedMessages = nextBatch
+                self.isPrefetching = false
+                Logger.shared.debug("Prefetched \(nextBatch.count) messages", category: .messaging)
+            }
+        } catch {
+            await MainActor.run {
+                self.isPrefetching = false
+                Logger.shared.debug("Failed to prefetch messages", category: .messaging)
             }
         }
     }
@@ -169,10 +275,14 @@ class MessageService: ObservableObject {
         listener?.remove()
         listener = nil
         messages = []
+        prefetchedMessages = []
         oldestMessageTimestamp = nil
         hasMoreMessages = true
         isLoading = false
         isLoadingMore = false
+        isPrefetching = false
+        totalMessagesLoaded = 0
+        messageLoadStartTime = nil
         Logger.shared.info("Stopped listening to messages and reset state", category: .messaging)
     }
     

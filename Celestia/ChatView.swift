@@ -35,6 +35,10 @@ struct ChatView: View {
     @State private var showImagePreview = false
     @Environment(\.dismiss) var dismiss
 
+    // Performance optimization: Track scroll position for pagination
+    @State private var previousMessageCount = 0
+    @State private var scrollAnchorID: String?
+
     var body: some View {
         VStack(spacing: 0) {
             // Custom header
@@ -257,6 +261,10 @@ struct ChatView: View {
                                 // User scrolled to top - load older messages
                                 Task {
                                     if let matchId = match.id {
+                                        // Save current first message ID to maintain scroll position
+                                        scrollAnchorID = messageService.messages.first?.id
+                                        previousMessageCount = messageService.messages.count
+
                                         await messageService.loadOlderMessages(matchId: matchId)
                                     }
                                 }
@@ -294,6 +302,7 @@ struct ChatView: View {
                                 message: message,
                                 isFromCurrentUser: message.senderId == authService.currentUser?.id || message.senderId == "current_user"
                             )
+                            .equatable() // Performance: Prevent unnecessary redraws
                             .id(message.id)
                         }
                     }
@@ -310,10 +319,20 @@ struct ChatView: View {
             .scrollDismissesKeyboard(.interactively)
             .background(Color(.systemGroupedBackground))
             .onChange(of: messageService.messages.count) {
+                let currentCount = messageService.messages.count
+
                 // Only scroll to bottom for new messages (not when loading older)
                 if !messageService.isLoadingMore {
                     scrollToBottom(proxy: proxy)
+                } else if let anchorID = scrollAnchorID {
+                    // Restore scroll position after loading older messages
+                    withAnimation(.none) {
+                        proxy.scrollTo(anchorID, anchor: .top)
+                    }
+                    scrollAnchorID = nil
                 }
+
+                previousMessageCount = currentCount
             }
             .onChange(of: isOtherUserTyping) {
                 if isOtherUserTyping {

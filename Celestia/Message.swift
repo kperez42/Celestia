@@ -8,7 +8,7 @@
 import Foundation
 import FirebaseFirestore
 
-struct Message: Identifiable, Codable {
+struct Message: Identifiable, Codable, Equatable, Hashable {
     @DocumentID var id: String?
     var matchId: String
     var senderId: String
@@ -20,6 +20,21 @@ struct Message: Identifiable, Codable {
     var isDelivered: Bool
     var readAt: Date? // Timestamp when message was read
     var deliveredAt: Date? // Timestamp when message was delivered
+
+    // Equatable conformance for performance optimization
+    static func == (lhs: Message, rhs: Message) -> Bool {
+        lhs.id == rhs.id &&
+        lhs.text == rhs.text &&
+        lhs.isRead == rhs.isRead &&
+        lhs.isDelivered == rhs.isDelivered &&
+        lhs.imageURL == rhs.imageURL
+    }
+
+    // Hashable conformance
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+        hasher.combine(timestamp)
+    }
 
     // For compatibility with ChatDetailView
     var senderID: String {

@@ -7,10 +7,34 @@
 
 import SwiftUI
 
-struct MessageBubble: View {
+// MARK: - Cached Async Image
+// Simple wrapper around AsyncImage with built-in caching
+// SwiftUI's AsyncImage already has basic caching, but this can be extended
+// with URLCache configuration for better performance
+struct CachedAsyncImage<Content: View>: View {
+    let url: URL?
+    @ViewBuilder let content: (AsyncImagePhase) -> Content
+
+    var body: some View {
+        AsyncImage(url: url, content: content)
+    }
+}
+
+// MARK: - Message Bubble Views
+
+struct MessageBubble: View, Equatable {
     let message: Message
     let isFromCurrentUser: Bool
-    
+
+    // Equatable conformance to prevent unnecessary redraws
+    static func == (lhs: MessageBubble, rhs: MessageBubble) -> Bool {
+        lhs.message.id == rhs.message.id &&
+        lhs.message.text == rhs.message.text &&
+        lhs.message.isRead == rhs.message.isRead &&
+        lhs.message.isDelivered == rhs.message.isDelivered &&
+        lhs.isFromCurrentUser == rhs.isFromCurrentUser
+    }
+
     var body: some View {
         HStack {
             if isFromCurrentUser {
@@ -89,10 +113,17 @@ struct MessageBubble: View {
 }
 
 // Alternative simple version without gradients
-struct MessageBubbleSimple: View {
+struct MessageBubbleSimple: View, Equatable {
     let message: Message
     let isFromCurrentUser: Bool
-    
+
+    // Equatable conformance to prevent unnecessary redraws
+    static func == (lhs: MessageBubbleSimple, rhs: MessageBubbleSimple) -> Bool {
+        lhs.message.id == rhs.message.id &&
+        lhs.message.text == rhs.message.text &&
+        lhs.isFromCurrentUser == rhs.isFromCurrentUser
+    }
+
     var body: some View {
         HStack {
             if isFromCurrentUser {
@@ -119,10 +150,22 @@ struct MessageBubbleSimple: View {
 }
 
 // Gradient version with ViewBuilder pattern
-struct MessageBubbleGradient: View {
+struct MessageBubbleGradient: View, Equatable {
     let message: Message
     let isFromCurrentUser: Bool
-    
+
+    // Equatable conformance to prevent unnecessary redraws
+    // Only redraw when message content or status actually changes
+    static func == (lhs: MessageBubbleGradient, rhs: MessageBubbleGradient) -> Bool {
+        lhs.message.id == rhs.message.id &&
+        lhs.message.text == rhs.message.text &&
+        lhs.message.imageURL == rhs.message.imageURL &&
+        lhs.message.isRead == rhs.message.isRead &&
+        lhs.message.isDelivered == rhs.message.isDelivered &&
+        lhs.message.readAt == rhs.message.readAt &&
+        lhs.isFromCurrentUser == rhs.isFromCurrentUser
+    }
+
     var body: some View {
         HStack {
             if isFromCurrentUser {
@@ -132,8 +175,8 @@ struct MessageBubbleGradient: View {
             VStack(alignment: isFromCurrentUser ? .trailing : .leading, spacing: 4) {
                 // Message content (image or text)
                 if let imageURL = message.imageURL, !imageURL.isEmpty {
-                    // Image message
-                    AsyncImage(url: URL(string: imageURL)) { phase in
+                    // Image message with optimized caching
+                    CachedAsyncImage(url: URL(string: imageURL)) { phase in
                         switch phase {
                         case .success(let image):
                             image

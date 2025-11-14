@@ -13,14 +13,17 @@ class ChatViewModel: ObservableObject {
     @Published var messages: [Message] = []
     @Published var matches: [Match] = []
     @Published var isLoading = false
-    
+
     private let firestore = Firestore.firestore()
     private var messagesListener: ListenerRegistration?
     private var loadTask: Task<Void, Never>?
 
+    // Use MessageService for optimized pagination
+    private let messageService = MessageService.shared
+
     var currentUserId: String
     var otherUserId: String
-    
+
     init(currentUserId: String = "", otherUserId: String = "") {
         self.currentUserId = currentUserId
         self.otherUserId = otherUserId
@@ -70,27 +73,22 @@ class ChatViewModel: ObservableObject {
     }
     
     func loadMessages(for matchID: String) async {
+        // Clean up old listener
         messagesListener?.remove()
-        
-        await MainActor.run {
-            messagesListener = firestore.collection("messages")
-                .whereField("matchId", isEqualTo: matchID)
-                .order(by: "timestamp", descending: false)
-                .addSnapshotListener { [weak self] snapshot, error in
-                    guard let self = self else { return }
-                    
-                    if let error = error {
-                        Logger.shared.error("Error loading messages", category: .messaging, error: error)
-                        return
-                    }
-                    
-                    guard let documents = snapshot?.documents else { return }
-                    
-                    self.messages = documents.compactMap { doc -> Message? in
-                        try? doc.data(as: Message.self)
-                    }
-                }
-        }
+        messagesListener = nil
+
+        // Use MessageService's optimized paginated loading
+        // This prevents loading all messages at once and supports pagination
+        messageService.listenToMessages(matchId: matchID)
+
+        // NOTE: Messages are now accessed via MessageService.shared.messages
+        // The ChatView should use MessageService directly for better performance
+        Logger.shared.info("Using MessageService for optimized message loading", category: .messaging)
+    }
+
+    /// Load older messages (pagination support)
+    func loadOlderMessages(for matchID: String) async {
+        await messageService.loadOlderMessages(matchId: matchID)
     }
     
     func sendMessage(text: String) {
@@ -127,6 +125,8 @@ class ChatViewModel: ObservableObject {
         messagesListener?.remove()
         messagesListener = nil
         messages = []
+        // Clean up MessageService if needed
+        messageService.stopListening()
     }
 
     deinit {
