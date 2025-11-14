@@ -12,6 +12,7 @@ struct MessagesView: View {
     @ObservedObject private var matchService = MatchService.shared
     @ObservedObject private var userService = UserService.shared
     @ObservedObject private var messageService = MessageService.shared
+    @StateObject private var searchDebouncer = SearchDebouncer(delay: 0.3)
 
     @Binding var selectedTab: Int
 
@@ -29,10 +30,10 @@ struct MessagesView: View {
     }
     
     var filteredConversations: [(Match, User)] {
-        guard !searchText.isEmpty else { return conversations }
+        guard !searchDebouncer.debouncedText.isEmpty else { return conversations }
         return conversations.filter { _, user in
-            user.fullName.localizedCaseInsensitiveContains(searchText) ||
-            user.location.localizedCaseInsensitiveContains(searchText)
+            user.fullName.localizedCaseInsensitiveContains(searchDebouncer.debouncedText) ||
+            user.location.localizedCaseInsensitiveContains(searchDebouncer.debouncedText)
         }
     }
     
@@ -223,15 +224,19 @@ struct MessagesView: View {
         HStack(spacing: 12) {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.gray)
-            
+
             TextField("Search conversations...", text: $searchText)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
-            
+                .onChange(of: searchText) { newValue in
+                    searchDebouncer.search(newValue)
+                }
+
             if !searchText.isEmpty {
                 Button {
                     withAnimation {
                         searchText = ""
+                        searchDebouncer.clear()
                     }
                     HapticManager.shared.impact(.light)
                 } label: {
