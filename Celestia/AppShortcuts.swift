@@ -149,7 +149,7 @@ struct CheckMessagesIntent: AppIntent {
         ])
 
         // Get unread message count
-        let unreadCount = BadgeManager.shared.unreadMessages
+        let unreadCount = BadgeManager.shared.unmatchedMessagesCount
 
         return .result(
             dialog: IntentDialog("You have \(unreadCount) unread message\(unreadCount == 1 ? "" : "s")")
@@ -396,12 +396,12 @@ class AppShortcutSuggestions {
     func updateShortcutSuggestions() {
         Task {
             // Check if user has active matches
-            if BadgeManager.shared.newMatches > 0 {
+            if BadgeManager.shared.newMatchesCount > 0 {
                 await suggestViewMatches()
             }
 
             // Check if user has unread messages
-            if BadgeManager.shared.unreadMessages > 0 {
+            if BadgeManager.shared.unmatchedMessagesCount > 0 {
                 await suggestCheckMessages()
             }
 
@@ -416,16 +416,16 @@ class AppShortcutSuggestions {
     private func suggestViewMatches() async {
         // Donate ViewMatchesIntent to the system
         let intent = ViewMatchesIntent()
-        await intent.donate()
+        try? await intent.donate()
     }
 
     private func suggestCheckMessages() async {
         let intent = CheckMessagesIntent()
-        await intent.donate()
+        try? await intent.donate()
     }
 
     private func suggestStartSwiping() async {
         let intent = StartSwipingIntent()
-        await intent.donate()
+        try? await intent.donate()
     }
 }

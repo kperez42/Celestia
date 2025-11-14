@@ -23,6 +23,29 @@ struct BatchOperationLog: Codable {
     let matchId: String? // For filtering/cleanup
     let userId: String? // For filtering/cleanup
 
+    // Memberwise initializer
+    init(
+        id: String,
+        operationType: String,
+        documentRefs: [String],
+        updateData: [String: [String: Any]]?,
+        timestamp: Date,
+        status: BatchOperationStatus,
+        retryCount: Int,
+        matchId: String?,
+        userId: String?
+    ) {
+        self.id = id
+        self.operationType = operationType
+        self.documentRefs = documentRefs
+        self.updateData = updateData
+        self.timestamp = timestamp
+        self.status = status
+        self.retryCount = retryCount
+        self.matchId = matchId
+        self.userId = userId
+    }
+
     enum CodingKeys: String, CodingKey {
         case id, operationType, documentRefs, timestamp, status, retryCount, matchId, userId
     }
