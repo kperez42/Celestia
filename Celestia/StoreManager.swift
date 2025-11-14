@@ -271,7 +271,7 @@ class StoreManager: ObservableObject {
     // MARK: - Listen for Transactions
 
     private func listenForTransactions() -> Task<Void, Error> {
-        return Task.detached {
+        return Task { @MainActor in
             // Iterate through any transactions that don't come from a direct call to `purchase()`
             for await result in Transaction.updates {
                 do {
