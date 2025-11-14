@@ -18,13 +18,36 @@ class ImageCache {
     private let fileManager = FileManager.default
     private let cacheDirectory: URL
 
-    // Cache settings
-    private let maxMemoryCacheSize = 100 * 1024 * 1024 // 100 MB
-    private let maxDiskCacheSize = 500 * 1024 * 1024 // 500 MB
+    // PERFORMANCE: Adaptive cache settings based on device memory
+    private let maxMemoryCacheSize: Int
+    private let maxDiskCacheSize: Int
     private let maxCacheAge: TimeInterval = 7 * 24 * 60 * 60 // 7 days
 
+    // Memory pressure tracking
+    private var isUnderMemoryPressure = false
+    private var memoryWarningCount = 0
+
     private init() {
-        // Setup memory cache
+        // PERFORMANCE: Adaptive cache sizes based on available device memory
+        let physicalMemory = ProcessInfo.processInfo.physicalMemory
+        let memoryInGB = Double(physicalMemory) / 1_073_741_824.0 // Convert to GB
+
+        // Adjust cache sizes based on device memory
+        if memoryInGB < 2.0 {
+            // Low memory device (e.g., iPhone 6s, SE 1st gen) - 1GB RAM
+            maxMemoryCacheSize = 30 * 1024 * 1024 // 30 MB
+            maxDiskCacheSize = 200 * 1024 * 1024 // 200 MB
+        } else if memoryInGB < 3.0 {
+            // Mid-range device (e.g., iPhone 8, X) - 2GB RAM
+            maxMemoryCacheSize = 50 * 1024 * 1024 // 50 MB
+            maxDiskCacheSize = 300 * 1024 * 1024 // 300 MB
+        } else {
+            // High-end device (e.g., iPhone 11+) - 3GB+ RAM
+            maxMemoryCacheSize = 100 * 1024 * 1024 // 100 MB
+            maxDiskCacheSize = 500 * 1024 * 1024 // 500 MB
+        }
+
+        // Setup memory cache with adaptive limits
         memoryCache.totalCostLimit = maxMemoryCacheSize
         memoryCache.countLimit = 100 // Max 100 images in memory
 
@@ -35,10 +58,26 @@ class ImageCache {
         // Create cache directory if needed
         try? fileManager.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
 
-        // Clean old cache on init
-        Task {
-            await cleanExpiredCache()
+        // PERFORMANCE: Register for memory warning notifications
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didReceiveMemoryWarningNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                await self?.handleMemoryWarning()
+            }
         }
+
+        // Clean old cache on init (in background to not block startup)
+        Task.detached(priority: .utility) {
+            await self.cleanExpiredCache()
+        }
+
+        Logger.shared.info(
+            "ImageCache initialized (Memory: \(maxMemoryCacheSize / 1024 / 1024)MB, Disk: \(maxDiskCacheSize / 1024 / 1024)MB)",
+            category: .storage
+        )
     }
 
     // MARK: - Public Methods
@@ -60,8 +99,10 @@ class ImageCache {
     }
 
     func setImage(_ image: UIImage, for key: String) {
-        // Store in memory
-        memoryCache.setObject(image, forKey: key as NSString)
+        // PERFORMANCE: Skip memory cache if under memory pressure
+        if !isUnderMemoryPressure {
+            memoryCache.setObject(image, forKey: key as NSString)
+        }
 
         // Store on disk asynchronously
         Task {
@@ -98,6 +139,69 @@ class ImageCache {
         }
 
         return totalSize
+    }
+
+    // MARK: - Memory Pressure Management
+
+    /// Handle memory warning by aggressively clearing caches
+    private func handleMemoryWarning() async {
+        memoryWarningCount += 1
+        isUnderMemoryPressure = true
+
+        Logger.shared.warning(
+            "Memory warning received (count: \(memoryWarningCount)) - purging image caches",
+            category: .storage
+        )
+
+        // Immediately clear memory cache
+        memoryCache.removeAllObjects()
+
+        // If multiple warnings, also clear disk cache
+        if memoryWarningCount > 2 {
+            Logger.shared.warning("Multiple memory warnings - clearing disk cache", category: .storage)
+            try? fileManager.removeItem(at: cacheDirectory)
+            try? fileManager.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
+            memoryWarningCount = 0 // Reset counter after disk clear
+        }
+
+        // Reset pressure flag after a delay
+        Task {
+            try? await Task.sleep(nanoseconds: 60_000_000_000) // 60 seconds
+            await MainActor.run {
+                isUnderMemoryPressure = false
+            }
+        }
+    }
+
+    /// Get current cache statistics
+    func getCacheStatistics() async -> CacheStatistics {
+        let diskSize = await getCacheSize()
+        let memoryCount = memoryCache.countLimit
+        let physicalMemory = ProcessInfo.processInfo.physicalMemory
+
+        return CacheStatistics(
+            diskCacheSize: diskSize,
+            maxDiskCacheSize: Int64(maxDiskCacheSize),
+            memoryCacheCount: memoryCount,
+            maxMemoryCacheSize: maxMemoryCacheSize,
+            isUnderMemoryPressure: isUnderMemoryPressure,
+            memoryWarningCount: memoryWarningCount,
+            deviceMemoryGB: Double(physicalMemory) / 1_073_741_824.0
+        )
+    }
+
+    struct CacheStatistics {
+        let diskCacheSize: Int64
+        let maxDiskCacheSize: Int64
+        let memoryCacheCount: Int
+        let maxMemoryCacheSize: Int
+        let isUnderMemoryPressure: Bool
+        let memoryWarningCount: Int
+        let deviceMemoryGB: Double
+
+        var diskUsagePercentage: Double {
+            return Double(diskCacheSize) / Double(maxDiskCacheSize) * 100.0
+        }
     }
 
     // MARK: - Private Methods
