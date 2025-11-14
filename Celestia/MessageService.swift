@@ -125,8 +125,8 @@ class MessageService: ObservableObject {
         ])
 
         // Send notification to receiver
-        let senderSnapshot = try? await db.collection("users").document(senderId).getDocument()
-        if let senderName = senderSnapshot?.data()?["fullName"] as? String {
+        // Use cache to avoid unnecessary Firestore fetch
+        if let senderName = try? await UserDisplayNameCache.shared.getUserName(userId: senderId) {
             await NotificationService.shared.sendMessageNotification(
                 message: message,
                 senderName: senderName,

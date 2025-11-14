@@ -96,9 +96,12 @@ class UserService: ObservableObject {
         guard let userId = user.id else {
             throw NSError(domain: "UserService", code: -1, userInfo: [NSLocalizedDescriptionKey: "User ID is nil"])
         }
-        
+
         do {
             try db.collection("users").document(userId).setData(from: user, merge: true)
+
+            // Invalidate display name cache when user is updated
+            await UserDisplayNameCache.shared.invalidate(userId: userId)
         } catch {
             self.error = error
             throw error
@@ -109,6 +112,11 @@ class UserService: ObservableObject {
     func updateUserFields(userId: String, fields: [String: Any]) async throws {
         do {
             try await db.collection("users").document(userId).updateData(fields)
+
+            // Invalidate display name cache if fullName was updated
+            if fields["fullName"] != nil {
+                await UserDisplayNameCache.shared.invalidate(userId: userId)
+            }
         } catch {
             self.error = error
             throw error

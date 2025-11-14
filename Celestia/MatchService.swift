@@ -100,6 +100,9 @@ class MatchService: ObservableObject {
             // Update match counts for both users
             try await updateMatchCounts(user1Id: user1Id, user2Id: user2Id)
 
+            // PERFORMANCE OPTIMIZATION: Prefetch user names into cache for future use
+            try? await UserDisplayNameCache.shared.prefetchUserNames(userIds: [user1Id, user2Id])
+
             // PERFORMANCE FIX: Batch fetch both users in a single query (prevents N+1 problem)
             let usersSnapshot = try? await db.collection("users")
                 .whereField(FieldPath.documentID(), in: [user1Id, user2Id])
