@@ -345,6 +345,34 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
+          "fieldPath": "showMeInSearch",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fullNameLowercase",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "showMeInSearch",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "countryLowercase",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
           "fieldPath": "email",
           "order": "ASCENDING"
         },

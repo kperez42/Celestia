@@ -241,17 +241,27 @@ class MutualLikesViewModel: ObservableObject {
             // Filter out already matched users
             let unmatchedMutualLikes = mutualLikeIds.subtracting(matchedUserIds)
 
-            // Fetch user details
+            // PERFORMANCE FIX: Batch fetch user details to prevent N+1 queries
+            // Firestore 'in' query has a max of 10 items, so batch in groups of 10
             var users: [User] = []
-            for userId in unmatchedMutualLikes {
-                let userDoc = try await db.collection("users").document(userId).getDocument()
-                if let user = try? userDoc.data(as: User.self) {
-                    users.append(user)
-                }
+            let userIdArray = Array(unmatchedMutualLikes)
+
+            for i in stride(from: 0, to: userIdArray.count, by: 10) {
+                let batchEnd = min(i + 10, userIdArray.count)
+                let batchIds = Array(userIdArray[i..<batchEnd])
+
+                guard !batchIds.isEmpty else { continue }
+
+                let batchSnapshot = try await db.collection("users")
+                    .whereField(FieldPath.documentID(), in: batchIds)
+                    .getDocuments()
+
+                let batchUsers = batchSnapshot.documents.compactMap { try? $0.data(as: User.self) }
+                users.append(contentsOf: batchUsers)
             }
 
             mutualLikes = users
-            Logger.shared.info("Loaded \(users.count) mutual likes", category: .matching)
+            Logger.shared.info("Loaded \(users.count) mutual likes using batch queries", category: .matching)
         } catch {
             Logger.shared.error("Error loading mutual likes", category: .matching, error: error)
         }
