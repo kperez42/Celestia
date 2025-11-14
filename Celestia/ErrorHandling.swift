@@ -33,6 +33,7 @@ enum CelestiaError: LocalizedError, Identifiable {
     case timeout
     case serverError
     case noInternetConnection
+    case serviceTemporarilyUnavailable
 
     // Match Errors
     case alreadyMatched
@@ -106,6 +107,8 @@ enum CelestiaError: LocalizedError, Identifiable {
             return "Server error occurred. Please try again later."
         case .noInternetConnection:
             return "No internet connection. Please check your network settings."
+        case .serviceTemporarilyUnavailable:
+            return "Service temporarily unavailable. Please try again in a few moments."
 
         // Match
         case .alreadyMatched:
@@ -184,7 +187,7 @@ enum CelestiaError: LocalizedError, Identifiable {
             return "Use a stronger password with letters, numbers, and symbols."
         case .networkError, .noInternetConnection:
             return "Check your internet connection and try again."
-        case .serverError, .timeout:
+        case .serverError, .timeout, .serviceTemporarilyUnavailable:
             return "Wait a moment and try again."
         case .premiumRequired:
             return "Upgrade to Premium to unlock this feature."
@@ -205,7 +208,7 @@ enum CelestiaError: LocalizedError, Identifiable {
             return "lock.shield"
         case .networkError, .noInternetConnection, .timeout:
             return "wifi.slash"
-        case .serverError:
+        case .serverError, .serviceTemporarilyUnavailable:
             return "server.rack"
         case .userNotFound, .matchNotFound:
             return "person.slash"
