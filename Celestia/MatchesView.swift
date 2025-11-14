@@ -12,6 +12,7 @@ struct MatchesView: View {
     @ObservedObject private var matchService = MatchService.shared
     @ObservedObject private var userService = UserService.shared
     @ObservedObject private var messageService = MessageService.shared
+    @StateObject private var searchDebouncer = SearchDebouncer(delay: 0.3)
 
     @State private var matchedUsers: [String: User] = [:]
     @State private var selectedTab = 0
@@ -32,13 +33,13 @@ struct MatchesView: View {
     
     var filteredAndSortedMatches: [Match] {
         var matches = matchService.matches
-        
-        // Apply search filter
-        if !searchText.isEmpty {
+
+        // Apply search filter using debounced text
+        if !searchDebouncer.debouncedText.isEmpty {
             matches = matches.filter { match in
                 guard let user = getMatchedUser(match) else { return false }
-                return user.fullName.localizedCaseInsensitiveContains(searchText) ||
-                       user.location.localizedCaseInsensitiveContains(searchText)
+                return user.fullName.localizedCaseInsensitiveContains(searchDebouncer.debouncedText) ||
+                       user.location.localizedCaseInsensitiveContains(searchDebouncer.debouncedText)
             }
         }
         
@@ -266,11 +267,15 @@ struct MatchesView: View {
                     Text("Search matches...")
                         .foregroundColor(.white.opacity(0.6))
                 }
+                .onChange(of: searchText) { newValue in
+                    searchDebouncer.search(newValue)
+                }
             
             if !searchText.isEmpty {
                 Button {
                     withAnimation {
                         searchText = ""
+                        searchDebouncer.clear()
                     }
                     HapticManager.shared.impact(.light)
                 } label: {
@@ -338,6 +343,8 @@ struct MatchesView: View {
                     .background(Color.purple.opacity(0.1))
                     .cornerRadius(20)
                 }
+                .accessibilityLabel("Sort matches by \(sortOption.rawValue)")
+                .accessibilityHint("Choose how to sort your matches")
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
@@ -380,6 +387,8 @@ struct MatchesView: View {
             )
             .cornerRadius(20)
         }
+        .accessibilityLabel("\(title) filter, \(count) matches")
+        .accessibilityHint(isActive ? "Active. Tap to deactivate" : "Tap to activate")
     }
     
     // MARK: - Matches List
@@ -397,6 +406,8 @@ struct MatchesView: View {
                             user: user,
                             currentUserId: authService.currentUser?.id ?? "current_user"
                         )
+                        .accessibilityLabel("\(user.fullName), \(user.age) years old, from \(user.location)")
+                        .accessibilityHint("Tap to view full profile and start chatting")
                         .onTapGesture {
                             HapticManager.shared.impact(.medium)
                             selectedMatch = match

@@ -124,6 +124,8 @@ struct DiscoverView: View {
                     .foregroundColor(.purple)
                     .frame(width: 44, height: 44)
             }
+            .accessibilityLabel("Shuffle users")
+            .accessibilityHint("Randomly reorder the list of potential matches")
             .padding(.trailing, 8)
 
             // Filter button
@@ -145,6 +147,8 @@ struct DiscoverView: View {
                 }
                 .frame(width: 44, height: 44)
             }
+            .accessibilityLabel(viewModel.hasActiveFilters ? "Filters active" : "Filters")
+            .accessibilityHint("Show discovery filters to refine your matches")
         }
         .padding()
         .background(Color.white)
@@ -170,6 +174,8 @@ struct DiscoverView: View {
                         .offset(cardIndex == 0 ? viewModel.dragOffset : .zero)
                         .rotationEffect(.degrees(cardIndex == 0 ? Double(viewModel.dragOffset.width / 20) : 0))
                         .contentShape(Rectangle()) // Define tappable area
+                        .accessibilityLabel(cardIndex == 0 ? "\(user.fullName), \(user.age) years old" : "")
+                        .accessibilityHint(cardIndex == 0 ? "Swipe right to like, left to pass, or tap for full profile" : "")
                         .onTapGesture {
                             if cardIndex == 0 {
                                 viewModel.showUserDetail(user)
@@ -206,6 +212,8 @@ struct DiscoverView: View {
                     ) {
                         Task { await viewModel.handlePass() }
                     }
+                    .accessibilityLabel("Pass")
+                    .accessibilityHint("Skip this profile and move to the next")
                     .disabled(viewModel.isProcessingAction)
 
                     // Super Like button
@@ -220,6 +228,8 @@ struct DiscoverView: View {
                     ) {
                         Task { await viewModel.handleSuperLike() }
                     }
+                    .accessibilityLabel("Super Like")
+                    .accessibilityHint("Send a super like to stand out and increase your chances of matching")
                     .disabled(viewModel.isProcessingAction)
 
                     // Like button
@@ -234,6 +244,8 @@ struct DiscoverView: View {
                     ) {
                         Task { await viewModel.handleLike() }
                     }
+                    .accessibilityLabel("Like")
+                    .accessibilityHint("Like this profile to potentially match")
                     .disabled(viewModel.isProcessingAction)
                 }
                 .padding(.horizontal, 24)
