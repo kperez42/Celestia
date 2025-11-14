@@ -300,7 +300,7 @@ struct SecuritySettingsView: View {
 
                 Button("Clear Clipboard Now") {
                     clipboardSecurity.clearClipboard()
-                    HapticManager.shared.notification(type: .success)
+                    HapticManager.shared.notification(.success)
                 }
                 .foregroundColor(.red)
             }
@@ -512,15 +512,15 @@ struct SecuritySettingsView: View {
         if enabled {
             do {
                 _ = try await biometricAuth.enableBiometricAuth()
-                HapticManager.shared.notification(type: .success)
+                HapticManager.shared.notification(.success)
             } catch {
                 biometricError = error
                 showingBiometricError = true
-                HapticManager.shared.notification(type: .error)
+                HapticManager.shared.notification(.error)
             }
         } else {
             biometricAuth.disableBiometricAuth()
-            HapticManager.shared.notification(type: .success)
+            HapticManager.shared.notification(.success)
         }
 
         await loadSecurityStatus()
