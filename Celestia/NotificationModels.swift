@@ -52,23 +52,168 @@ enum NotificationCategory: String, CaseIterable, Codable {
         switch self {
         case .newMatch:
             return [
-                UNNotificationAction(identifier: "VIEW_MATCH", title: "View Match", options: .foreground),
-                UNNotificationAction(identifier: "OPEN_APP", title: "Open App", options: .foreground)
+                UNTextInputNotificationAction(
+                    identifier: "SEND_MESSAGE",
+                    title: "Send Message",
+                    options: [.authenticationRequired],
+                    textInputButtonTitle: "Send",
+                    textInputPlaceholder: "Say hello..."
+                ),
+                UNNotificationAction(
+                    identifier: "VIEW_MATCH",
+                    title: "View Profile",
+                    options: .foreground
+                ),
+                UNNotificationAction(
+                    identifier: "UNMATCH",
+                    title: "Unmatch",
+                    options: [.destructive, .authenticationRequired]
+                )
             ]
         case .newMessage:
             return [
-                UNTextInputNotificationAction(identifier: "REPLY", title: "Reply", options: .foreground),
-                UNNotificationAction(identifier: "VIEW_PROFILE", title: "View Profile", options: .foreground)
+                UNTextInputNotificationAction(
+                    identifier: "REPLY",
+                    title: "Reply",
+                    options: [.authenticationRequired],
+                    textInputButtonTitle: "Send",
+                    textInputPlaceholder: "Type your reply..."
+                ),
+                UNNotificationAction(
+                    identifier: "VIEW_CONVERSATION",
+                    title: "View Chat",
+                    options: .foreground
+                ),
+                UNNotificationAction(
+                    identifier: "LIKE_MESSAGE",
+                    title: "❤️ Like",
+                    options: .authenticationRequired
+                )
             ]
-        default:
+        case .profileView:
             return [
-                UNNotificationAction(identifier: "OPEN_APP", title: "Open App", options: .foreground)
+                UNNotificationAction(
+                    identifier: "VIEW_PROFILE",
+                    title: "View Profile",
+                    options: .foreground
+                ),
+                UNNotificationAction(
+                    identifier: "LIKE_BACK",
+                    title: "Like Back",
+                    options: [.authenticationRequired]
+                )
+            ]
+        case .superLike:
+            return [
+                UNNotificationAction(
+                    identifier: "VIEW_PROFILE",
+                    title: "View Profile",
+                    options: .foreground
+                ),
+                UNNotificationAction(
+                    identifier: "LIKE_BACK",
+                    title: "Like Back",
+                    options: [.authenticationRequired]
+                ),
+                UNNotificationAction(
+                    identifier: "SUPER_LIKE_BACK",
+                    title: "⭐ Super Like Back",
+                    options: [.authenticationRequired]
+                )
+            ]
+        case .matchReminder:
+            return [
+                UNTextInputNotificationAction(
+                    identifier: "SEND_MESSAGE",
+                    title: "Send Message",
+                    options: [.authenticationRequired],
+                    textInputButtonTitle: "Send",
+                    textInputPlaceholder: "Start the conversation..."
+                ),
+                UNNotificationAction(
+                    identifier: "VIEW_MATCH",
+                    title: "View Profile",
+                    options: .foreground
+                ),
+                UNNotificationAction(
+                    identifier: "SNOOZE",
+                    title: "Remind Later",
+                    options: []
+                )
+            ]
+        case .messageReminder:
+            return [
+                UNTextInputNotificationAction(
+                    identifier: "REPLY",
+                    title: "Reply Now",
+                    options: [.authenticationRequired],
+                    textInputButtonTitle: "Send",
+                    textInputPlaceholder: "Type your reply..."
+                ),
+                UNNotificationAction(
+                    identifier: "VIEW_CONVERSATION",
+                    title: "View Chat",
+                    options: .foreground
+                )
+            ]
+        case .premiumOffer:
+            return [
+                UNNotificationAction(
+                    identifier: "VIEW_OFFER",
+                    title: "View Offer",
+                    options: .foreground
+                ),
+                UNNotificationAction(
+                    identifier: "DISMISS",
+                    title: "Not Now",
+                    options: []
+                )
+            ]
+        case .generalUpdate:
+            return [
+                UNNotificationAction(
+                    identifier: "OPEN_APP",
+                    title: "Open App",
+                    options: .foreground
+                )
             ]
         }
     }
 
     var options: UNNotificationCategoryOptions {
-        return [.customDismissAction]
+        switch self {
+        case .newMessage, .messageReminder:
+            // Allow previews and custom dismiss for messages
+            return [.customDismissAction, .allowInCarPlay]
+        case .newMatch, .superLike, .profileView:
+            // Hide previews for privacy-sensitive notifications
+            return [.customDismissAction, .hiddenPreviewsShowTitle]
+        case .premiumOffer:
+            // No special options for marketing
+            return [.customDismissAction]
+        case .matchReminder, .generalUpdate:
+            return [.customDismissAction]
+        }
+    }
+
+    /// Summary argument for notification grouping
+    var summaryArgument: String {
+        switch self {
+        case .newMatch:
+            return "matches"
+        case .newMessage, .messageReminder:
+            return "messages"
+        case .profileView:
+            return "views"
+        case .superLike:
+            return "likes"
+        case .premiumOffer:
+            return "offers"
+        case .matchReminder:
+            return "reminders"
+        case .generalUpdate:
+            return "updates"
+        }
     }
 }
 

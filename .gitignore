@@ -43,3 +43,8 @@ GoogleService-Info.plist
 .DS_Store
 .AppleDouble
 .LSOverride
+
+# Temporary exploration/analysis files
+CODEBASE_ANALYSIS.md
+EXPLORATION_SUMMARY.txt
+QUICK_REFERENCE.txt
