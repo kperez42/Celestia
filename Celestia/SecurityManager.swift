@@ -121,7 +121,9 @@ class SecurityManager: ObservableObject {
 
         Logger.shared.info("✅ Security features initialized successfully", category: .security)
 
-        AnalyticsManager.shared.logEvent("security_initialized", parameters: [
+        AnalyticsManager.shared.logEvent(.featureUsed, parameters: [
+            "feature": "security",
+            "action": "initialized",
             "level": securityLevel.rawValue
         ])
     }
@@ -135,7 +137,9 @@ class SecurityManager: ObservableObject {
 
         Logger.shared.info("Security level changed to: \(level.rawValue)", category: .security)
 
-        AnalyticsManager.shared.logEvent("security_level_changed", parameters: [
+        AnalyticsManager.shared.logEvent(.featureUsed, parameters: [
+            "feature": "security",
+            "action": "level_changed",
             "level": level.rawValue
         ])
     }
@@ -405,7 +409,9 @@ class SecurityManager: ObservableObject {
     func logSecurityEvent(_ event: SecurityEvent) {
         Logger.shared.warning("Security event: \(event.description)", category: .security)
 
-        AnalyticsManager.shared.logEvent("security_event", parameters: [
+        AnalyticsManager.shared.logEvent(.featureUsed, parameters: [
+            "feature": "security",
+            "action": "event_logged",
             "type": event.type,
             "severity": event.severity.rawValue,
             "description": event.description

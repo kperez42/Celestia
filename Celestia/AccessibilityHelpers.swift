@@ -60,13 +60,11 @@ extension View {
 
     /// Adds VoiceOver custom actions for complex interactions
     func accessibilityActions(_ actions: [AccessibilityCustomAction]) -> some View {
-        var view = self
-        for action in actions {
-            view = view.accessibilityAction(named: action.name) {
+        actions.reduce(AnyView(self)) { view, action in
+            AnyView(view.accessibilityAction(named: action.name) {
                 action.handler()
-            }
+            })
         }
-        return view
     }
 
     /// Makes view accessibility-friendly for buttons with proper sizing
