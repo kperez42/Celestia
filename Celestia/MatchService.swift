@@ -122,27 +122,17 @@ class MatchService: ObservableObject {
                 // Send notifications to both users
                 let notificationService = NotificationService.shared
 
-                // Create temporary user objects for notifications
-                // Validate required fields before creating User objects
-                guard let user1Email = user1Data["email"] as? String, !user1Email.isEmpty,
-                      let user1Age = user1Data["age"] as? Int, user1Age >= AppConstants.Limits.minAge,
-                      let user1Gender = user1Data["gender"] as? String, !user1Gender.isEmpty else {
-                    Logger.shared.error("Invalid user1 data for match notification", category: .matching)
+                // Create temporary user objects for notifications using factory method
+                do {
+                    let user1 = try User.createMinimal(id: user1Id, fullName: user1Name, from: user1Data)
+                    let user2 = try User.createMinimal(id: user2Id, fullName: user2Name, from: user2Data)
+
+                    await notificationService.sendNewMatchNotification(match: matchWithId, otherUser: user2)
+                    await notificationService.sendNewMatchNotification(match: matchWithId, otherUser: user1)
+                } catch {
+                    Logger.shared.error("Failed to create user objects for match notification: \(error.localizedDescription)", category: .matching)
                     return
                 }
-
-                guard let user2Email = user2Data["email"] as? String, !user2Email.isEmpty,
-                      let user2Age = user2Data["age"] as? Int, user2Age >= AppConstants.Limits.minAge,
-                      let user2Gender = user2Data["gender"] as? String, !user2Gender.isEmpty else {
-                    Logger.shared.error("Invalid user2 data for match notification", category: .matching)
-                    return
-                }
-
-                let user1 = User(id: user1Id, email: user1Email, fullName: user1Name, age: user1Age, gender: user1Gender, lookingFor: user1Data["lookingFor"] as? String ?? "", location: user1Data["location"] as? String ?? "", country: user1Data["country"] as? String ?? "")
-                let user2 = User(id: user2Id, email: user2Email, fullName: user2Name, age: user2Age, gender: user2Gender, lookingFor: user2Data["lookingFor"] as? String ?? "", location: user2Data["location"] as? String ?? "", country: user2Data["country"] as? String ?? "")
-
-                await notificationService.sendNewMatchNotification(match: matchWithId, otherUser: user2)
-                await notificationService.sendNewMatchNotification(match: matchWithId, otherUser: user1)
             }
         } catch {
             Logger.shared.error("Error creating match: \(error)", category: .general)

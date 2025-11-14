@@ -296,3 +296,92 @@ struct User: Identifiable, Codable {
         self.maxDistance = maxDistance
     }
 }
+
+// MARK: - User Factory Methods
+
+extension User {
+    /// Factory method to create a minimal User object for notifications
+    /// Validates required fields before creating
+    static func createMinimal(
+        id: String,
+        fullName: String,
+        from data: [String: Any]
+    ) throws -> User {
+        // Validate required fields
+        guard let email = data["email"] as? String, !email.isEmpty else {
+            throw UserCreationError.missingRequiredField("email")
+        }
+
+        guard let age = data["age"] as? Int, age >= AppConstants.Limits.minAge, age <= AppConstants.Limits.maxAge else {
+            throw UserCreationError.invalidField("age", "Must be between \(AppConstants.Limits.minAge) and \(AppConstants.Limits.maxAge)")
+        }
+
+        guard let gender = data["gender"] as? String, !gender.isEmpty else {
+            throw UserCreationError.missingRequiredField("gender")
+        }
+
+        // Create with validated data and safe defaults
+        return User(
+            id: id,
+            email: email,
+            fullName: fullName,
+            age: age,
+            gender: gender,
+            lookingFor: data["lookingFor"] as? String ?? "",
+            location: data["location"] as? String ?? "",
+            country: data["country"] as? String ?? ""
+        )
+    }
+
+    /// Factory method to create User from Firestore data with validation
+    static func fromFirestore(id: String, data: [String: Any]) throws -> User {
+        // Validate all required fields
+        guard let email = data["email"] as? String, !email.isEmpty else {
+            throw UserCreationError.missingRequiredField("email")
+        }
+
+        guard let fullName = data["fullName"] as? String, !fullName.isEmpty else {
+            throw UserCreationError.missingRequiredField("fullName")
+        }
+
+        guard let age = data["age"] as? Int, age >= AppConstants.Limits.minAge, age <= AppConstants.Limits.maxAge else {
+            throw UserCreationError.invalidField("age", "Must be between \(AppConstants.Limits.minAge) and \(AppConstants.Limits.maxAge)")
+        }
+
+        guard let gender = data["gender"] as? String, !gender.isEmpty else {
+            throw UserCreationError.missingRequiredField("gender")
+        }
+
+        guard let lookingFor = data["lookingFor"] as? String, !lookingFor.isEmpty else {
+            throw UserCreationError.missingRequiredField("lookingFor")
+        }
+
+        // Create with validated data
+        return User(
+            id: id,
+            email: email,
+            fullName: fullName,
+            age: age,
+            gender: gender,
+            lookingFor: lookingFor,
+            location: data["location"] as? String ?? "",
+            country: data["country"] as? String ?? ""
+        )
+    }
+}
+
+// MARK: - User Creation Errors
+
+enum UserCreationError: LocalizedError {
+    case missingRequiredField(String)
+    case invalidField(String, String)
+
+    var errorDescription: String? {
+        switch self {
+        case .missingRequiredField(let field):
+            return "Missing required field: \(field)"
+        case .invalidField(let field, let reason):
+            return "Invalid field '\(field)': \(reason)"
+        }
+    }
+}

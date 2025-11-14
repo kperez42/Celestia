@@ -78,41 +78,47 @@ class ReferralManager: ObservableObject {
     func processReferralSignup(newUser: User, referralCode: String) async throws {
         // Validate referral code
         guard !referralCode.isEmpty else { return }
+        guard let newUserId = newUser.id else {
+            throw ReferralError.invalidUser
+        }
 
-        // Find the referrer by code
-        let querySnapshot = try await db.collection("users")
+        // Parallelize all validation queries for better performance
+        async let referrerQuery = db.collection("users")
             .whereField("referralStats.referralCode", isEqualTo: referralCode)
             .limit(to: 1)
             .getDocuments()
 
+        async let existingReferralQuery = db.collection("referrals")
+            .whereField("referredUserId", isEqualTo: newUserId)
+            .whereField("status", isEqualTo: ReferralStatus.completed.rawValue)
+            .limit(to: 1)
+            .getDocuments()
+
+        async let emailCheckQuery = db.collection("users")
+            .whereField("email", isEqualTo: newUser.email)
+            .limit(to: 5)
+            .getDocuments()
+
+        // Wait for all queries to complete
+        let (querySnapshot, existingReferralSnapshot, emailCheckSnapshot) = try await (referrerQuery, existingReferralQuery, emailCheckQuery)
+
+        // Validate referrer exists
         guard let referrerDoc = querySnapshot.documents.first else {
             Logger.shared.warning("Invalid referral code: \(referralCode)", category: .referral)
             throw ReferralError.invalidCode
         }
 
         let referrerId = referrerDoc.documentID
-        guard let newUserId = newUser.id, referrerId != newUserId else {
+        guard referrerId != newUserId else {
             Logger.shared.warning("User attempted to refer themselves", category: .referral)
             throw ReferralError.selfReferral
         }
 
-        // Check if this email has already been referred
-        let existingReferralSnapshot = try await db.collection("referrals")
-            .whereField("referredUserId", isEqualTo: newUserId)
-            .whereField("status", isEqualTo: ReferralStatus.completed.rawValue)
-            .limit(to: 1)
-            .getDocuments()
-
+        // Check if this user has already been referred
         if !existingReferralSnapshot.documents.isEmpty {
             Logger.shared.warning("User has already been referred", category: .referral)
             throw ReferralError.alreadyReferred
         }
-
-        // Fetch users with matching email
-        let emailCheckSnapshot = try await db.collection("users")
-            .whereField("email", isEqualTo: newUser.email)
-            .limit(to: 5)  // Get a few to check
-            .getDocuments()
 
         // Filter for users with referredByCode
         let usersWithReferral = emailCheckSnapshot.documents.filter { doc in
@@ -289,22 +295,28 @@ class ReferralManager: ObservableObject {
             return ReferralStats()
         }
 
-        // Fetch pending referrals count
-        let pendingSnapshot = try await db.collection("referrals")
+        var stats = user.referralStats
+
+        // Parallelize queries for better performance
+        async let pendingQuery = db.collection("referrals")
             .whereField("referrerUserId", isEqualTo: userId)
             .whereField("status", isEqualTo: ReferralStatus.pending.rawValue)
             .getDocuments()
 
-        var stats = user.referralStats
-        stats.pendingReferrals = pendingSnapshot.documents.count
-
-        // Get rank from leaderboard
+        // Only fetch leaderboard if user has referrals
         if stats.totalReferrals > 0 {
-            let leaderboardSnapshot = try await db.collection("users")
+            async let leaderboardQuery = db.collection("users")
                 .whereField("referralStats.totalReferrals", isGreaterThan: stats.totalReferrals)
                 .getDocuments()
 
+            // Wait for both queries
+            let (pendingSnapshot, leaderboardSnapshot) = try await (pendingQuery, leaderboardQuery)
+            stats.pendingReferrals = pendingSnapshot.documents.count
             stats.referralRank = leaderboardSnapshot.documents.count + 1
+        } else {
+            // Only wait for pending query
+            let pendingSnapshot = try await pendingQuery
+            stats.pendingReferrals = pendingSnapshot.documents.count
         }
 
         return stats

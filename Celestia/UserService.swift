@@ -255,6 +255,106 @@ class UserService: ObservableObject {
         searchTask = nil
     }
 
+    // MARK: - Daily Like Limit Management
+
+    /// Check if user has daily likes remaining
+    func checkDailyLikeLimit(userId: String) async -> Bool {
+        do {
+            let document = try await db.collection("users").document(userId).getDocument()
+            guard let data = document.data() else { return false }
+
+            let lastResetDate = (data["lastLikeResetDate"] as? Timestamp)?.dateValue() ?? Date()
+            let likesRemaining = data["likesRemainingToday"] as? Int ?? 50
+
+            // Check if we need to reset (new day)
+            if !Calendar.current.isDate(lastResetDate, inSameDayAs: Date()) {
+                // Reset to 50 likes for new day
+                try await resetDailyLikes(userId: userId)
+                return true
+            }
+
+            return likesRemaining > 0
+        } catch {
+            Logger.shared.error("Error checking daily like limit", category: .database, error: error)
+            return true // Allow on error to not block user
+        }
+    }
+
+    /// Reset daily like count to default (50)
+    func resetDailyLikes(userId: String) async throws {
+        try await db.collection("users").document(userId).updateData([
+            "likesRemainingToday": 50,
+            "lastLikeResetDate": Timestamp(date: Date())
+        ])
+    }
+
+    /// Decrement daily like count
+    func decrementDailyLikes(userId: String) async {
+        do {
+            let document = try await db.collection("users").document(userId).getDocument()
+            guard let data = document.data() else { return }
+
+            var likesRemaining = data["likesRemainingToday"] as? Int ?? 50
+
+            if likesRemaining > 0 {
+                likesRemaining -= 1
+                try await db.collection("users").document(userId).updateData([
+                    "likesRemainingToday": likesRemaining
+                ])
+
+                Logger.shared.info("Likes remaining today: \(likesRemaining)", category: .user)
+            }
+        } catch {
+            Logger.shared.error("Error decrementing daily likes", category: .database, error: error)
+        }
+    }
+
+    /// Get remaining daily likes count
+    func getRemainingDailyLikes(userId: String) async -> Int {
+        do {
+            let document = try await db.collection("users").document(userId).getDocument()
+            guard let data = document.data() else { return 50 }
+
+            let lastResetDate = (data["lastLikeResetDate"] as? Timestamp)?.dateValue() ?? Date()
+
+            // Check if needs reset
+            if !Calendar.current.isDate(lastResetDate, inSameDayAs: Date()) {
+                return 50 // Will be reset on next check
+            }
+
+            return data["likesRemainingToday"] as? Int ?? 50
+        } catch {
+            Logger.shared.error("Error getting remaining daily likes", category: .database, error: error)
+            return 50
+        }
+    }
+
+    // MARK: - Super Likes Management
+
+    /// Decrement super like count
+    func decrementSuperLikes(userId: String) async {
+        do {
+            try await db.collection("users").document(userId).updateData([
+                "superLikesRemaining": FieldValue.increment(Int64(-1))
+            ])
+            Logger.shared.info("Super Like used", category: .user)
+        } catch {
+            Logger.shared.error("Error decrementing super likes", category: .database, error: error)
+        }
+    }
+
+    /// Get remaining super likes count
+    func getRemainingSuperLikes(userId: String) async -> Int {
+        do {
+            let document = try await db.collection("users").document(userId).getDocument()
+            guard let data = document.data() else { return 0 }
+            return data["superLikesRemaining"] as? Int ?? 0
+        } catch {
+            Logger.shared.error("Error getting remaining super likes", category: .database, error: error)
+            return 0
+        }
+    }
+
     deinit {
         searchTask?.cancel()
     }

@@ -195,53 +195,26 @@ class DiscoverViewModel: ObservableObject {
         isProcessingAction = false
     }
 
-    /// Check if user has daily likes remaining
+    /// Check if user has daily likes remaining (delegates to UserService)
     private func checkDailyLikeLimit() async -> Bool {
         guard let userId = AuthService.shared.currentUser?.id else { return false }
 
-        let db = Firestore.firestore()
-        let userRef = db.collection("users").document(userId)
+        let hasLikes = await UserService.shared.checkDailyLikeLimit(userId: userId)
 
-        do {
-            let document = try await userRef.getDocument()
-            guard let data = document.data() else { return false }
-
-            let lastResetDate = (data["lastLikeResetDate"] as? Timestamp)?.dateValue() ?? Date()
-            var likesRemaining = data["likesRemainingToday"] as? Int ?? 50
-
-            // Check if we need to reset (new day)
-            if !Calendar.current.isDate(lastResetDate, inSameDayAs: Date()) {
-                // Reset to 50 likes
-                try await userRef.updateData([
-                    "likesRemainingToday": 50,
-                    "lastLikeResetDate": Timestamp(date: Date())
-                ])
-                await AuthService.shared.fetchUser()
-                return true
-            }
-
-            return likesRemaining > 0
-        } catch {
-            Logger.shared.error("Error checking daily like limit", category: .database, error: error)
-            return true // Allow on error
+        // Refresh current user if limits were reset
+        if hasLikes {
+            await AuthService.shared.fetchUser()
         }
+
+        return hasLikes
     }
 
-    /// Decrement daily like count
+    /// Decrement daily like count (delegates to UserService)
     private func decrementDailyLikes() async {
         guard let userId = AuthService.shared.currentUser?.id else { return }
 
-        let db = Firestore.firestore()
-        let userRef = db.collection("users").document(userId)
-
-        do {
-            try await userRef.updateData([
-                "likesRemainingToday": FieldValue.increment(Int64(-1))
-            ])
-            await AuthService.shared.fetchUser()
-        } catch {
-            Logger.shared.error("Error decrementing daily likes", category: .database, error: error)
-        }
+        await UserService.shared.decrementDailyLikes(userId: userId)
+        await AuthService.shared.fetchUser()
     }
 
     /// Handle pass action
@@ -334,22 +307,13 @@ class DiscoverViewModel: ObservableObject {
         isProcessingAction = false
     }
 
-    /// Decrement super like count
+    /// Decrement super like count (delegates to UserService)
     private func decrementSuperLikes() async {
         guard let userId = AuthService.shared.currentUser?.id else { return }
 
-        let db = Firestore.firestore()
-        let userRef = db.collection("users").document(userId)
-
-        do {
-            try await userRef.updateData([
-                "superLikesRemaining": FieldValue.increment(Int64(-1))
-            ])
-            await AuthService.shared.fetchUser()
-            Logger.shared.info("Super Like used. Remaining: \(AuthService.shared.currentUser?.superLikesRemaining ?? 0)", category: .matching)
-        } catch {
-            Logger.shared.error("Error decrementing super likes", category: .database, error: error)
-        }
+        await UserService.shared.decrementSuperLikes(userId: userId)
+        await AuthService.shared.fetchUser()
+        Logger.shared.info("Super Like used. Remaining: \(AuthService.shared.currentUser?.superLikesRemaining ?? 0)", category: .matching)
     }
 
     /// Apply filters
