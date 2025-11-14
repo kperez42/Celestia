@@ -79,18 +79,9 @@ extension Date {
 // MARK: - String Extensions
 
 extension String {
-    /// Validate email format
-    /// REFACTORED: Now uses ValidationHelper instead of duplicate regex
-    func isValidEmail() -> Bool {
-        return ValidationHelper.isValidEmail(self)
-    }
+    /// NOTE: Email and password validation methods moved to ValidationHelper.swift
+    /// Use the computed properties: .isValidEmail and .isValidPassword instead
 
-    /// Check if string is valid password (8+ chars, has number and letter)
-    /// REFACTORED: Now uses ValidationHelper instead of duplicate validation logic
-    func isValidPassword() -> Bool {
-        return ValidationHelper.isValidPassword(self)
-    }
-    
     /// Truncate string to specified length
     func truncated(to length: Int, trailing: String = "...") -> String {
         if self.count > length {
