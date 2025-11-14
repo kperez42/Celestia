@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Firebase
+import FirebaseFirestore
 
 @main
 struct CelestiaApp: App {
@@ -15,6 +16,14 @@ struct CelestiaApp: App {
 
     init() {
         FirebaseApp.configure()
+
+        // Enable Firestore offline persistence for better offline support
+        let settings = FirestoreSettings()
+        settings.isPersistenceEnabled = true
+        settings.cacheSizeBytes = FirestoreCacheSizeUnlimited // Unlimited cache for full offline support
+        Firestore.firestore().settings = settings
+
+        Logger.shared.info("Firestore offline persistence enabled", category: .database)
     }
 
     var body: some Scene {

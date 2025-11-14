@@ -150,6 +150,11 @@ class NetworkMonitor: ObservableObject {
                     "is_expensive": isExpensive,
                     "offline_duration": timeSinceLastChange
                 ])
+
+                // Process pending offline operations when connection is restored
+                Task {
+                    await OfflineOperationQueue.shared.processPendingOperations()
+                }
             } else {
                 Logger.shared.warning("Network disconnected", category: .networking)
 
