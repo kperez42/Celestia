@@ -143,8 +143,8 @@ class MessageService: ObservableObject {
         imageURL: String,
         caption: String? = nil
     ) async throws {
-        let messageText = caption?.isEmpty == false ? caption! : "📷 Photo"
-        let lastMessageText = caption?.isEmpty == false ? "📷 \(caption!)" : "📷 Photo"
+        let messageText = caption.flatMap { !$0.isEmpty ? $0 : nil } ?? "📷 Photo"
+        let lastMessageText = caption.flatMap { !$0.isEmpty ? "📷 \($0)" : nil } ?? "📷 Photo"
 
         let message = Message(
             matchId: matchId,

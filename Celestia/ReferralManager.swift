@@ -30,7 +30,11 @@ class ReferralManager: ObservableObject {
 
         // Try up to 5 times to generate a unique code
         for attempt in 1...5 {
-            let code = String((0..<8).map { _ in characters.randomElement()! })
+            let code = String((0..<8).compactMap { _ in characters.randomElement() })
+            guard code.count == 8 else {
+                Logger.shared.error("Failed to generate 8-character code", category: .referral)
+                continue
+            }
             let fullCode = "CEL-\(code)"
 
             // Check if code already exists

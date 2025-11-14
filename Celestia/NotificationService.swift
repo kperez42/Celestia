@@ -252,14 +252,20 @@ class NotificationService: ObservableObject {
             try container.encodeIfPresent(imageURL, forKey: .imageURL)
             try container.encode(category, forKey: .category)
 
-            // Convert data dictionary to JSON-serializable format
-            let jsonData = data.compactMapValues { value -> Any? in
-                if value is String || value is Int || value is Bool || value is Double {
-                    return value
+            // Convert data dictionary to JSON-serializable format (all values as strings)
+            let stringData = data.compactMapValues { value -> String? in
+                if let stringValue = value as? String {
+                    return stringValue
+                } else if let intValue = value as? Int {
+                    return String(intValue)
+                } else if let boolValue = value as? Bool {
+                    return String(boolValue)
+                } else if let doubleValue = value as? Double {
+                    return String(doubleValue)
                 }
                 return nil
             }
-            try container.encode(jsonData as! [String: String], forKey: .data)
+            try container.encode(stringData, forKey: .data)
         }
     }
 
