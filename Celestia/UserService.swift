@@ -208,10 +208,14 @@ class UserService: ObservableObject {
         // PERFORMANCE: Check cache first (5-minute TTL)
         if let cached = searchCache[cacheKey], !cached.isExpired {
             Logger.shared.debug("Search cache HIT for query: '\(searchQuery)'", category: .performance)
-            AnalyticsManager.shared.logEvent(.searchCacheHit, parameters: [
-                "query": searchQuery,
-                "cache_age_seconds": Date().timeIntervalSince(cached.timestamp)
-            ])
+            let cacheAge = Date().timeIntervalSince(cached.timestamp)
+            Task { @MainActor in
+                AnalyticsManager.shared.logEvent(.performance, parameters: [
+                    "type": "search_cache_hit",
+                    "query": searchQuery,
+                    "cache_age_seconds": cacheAge
+                ])
+            }
             return cached.results
         }
 
@@ -320,11 +324,16 @@ class UserService: ObservableObject {
             results.append(contentsOf: fallbackResults)
 
             // Log performance metrics
-            AnalyticsManager.shared.logEvent(.searchFallbackUsed, parameters: [
-                "query": searchQuery,
-                "scanned_documents": fallbackSnapshot.documents.count,
-                "matched_results": fallbackResults.count
-            ])
+            let scannedCount = fallbackSnapshot.documents.count
+            let matchedCount = fallbackResults.count
+            Task { @MainActor in
+                AnalyticsManager.shared.logEvent(.performance, parameters: [
+                    "type": "search_fallback_used",
+                    "query": searchQuery,
+                    "scanned_documents": scannedCount,
+                    "matched_results": matchedCount
+                ])
+            }
         }
 
         // Limit final results
@@ -336,11 +345,15 @@ class UserService: ObservableObject {
         cacheSearchResults(cacheKey: cacheKey, results: finalResults)
 
         // Track search analytics
-        AnalyticsManager.shared.logEvent(.userSearch, parameters: [
-            "query": searchQuery,
-            "results_count": finalResults.count,
-            "cache_used": false
-        ])
+        let resultsCount = finalResults.count
+        Task { @MainActor in
+            AnalyticsManager.shared.logEvent(.featureUsed, parameters: [
+                "feature": "user_search",
+                "query": searchQuery,
+                "results_count": resultsCount,
+                "cache_used": false
+            ])
+        }
 
         return finalResults
     }

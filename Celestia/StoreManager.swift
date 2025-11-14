@@ -293,7 +293,8 @@ class StoreManager: ObservableObject {
                         Logger.shared.error("Transaction verification failed: \(error.localizedDescription)", category: .general)
 
                         // Track verification failures
-                        AnalyticsManager.shared.logEvent(.transactionVerificationFailed, parameters: [
+                        AnalyticsManager.shared.logEvent(.validationError, parameters: [
+                            "type": "transaction_verification",
                             "error": error.localizedDescription
                         ])
                     }
@@ -336,7 +337,9 @@ class StoreManager: ObservableObject {
 
                 // Track successful processing after retries
                 if attempt > 0 {
-                    AnalyticsManager.shared.logEvent(.transactionRetrySucceeded, parameters: [
+                    AnalyticsManager.shared.logEvent(.featureUsed, parameters: [
+                        "feature": "transaction_retry",
+                        "action": "succeeded",
                         "transaction_id": String(transactionId),
                         "product_id": transaction.productID,
                         "attempts": attempt + 1
@@ -379,7 +382,8 @@ class StoreManager: ObservableObject {
             Logger.shared.error("Transaction \(transactionId) failed after \(attempt) attempts: \(lastError?.localizedDescription ?? "unknown error")", category: .general)
 
             // Track final failure
-            AnalyticsManager.shared.logEvent(.transactionProcessingFailed, parameters: [
+            AnalyticsManager.shared.logEvent(.purchaseFailed, parameters: [
+                "type": "transaction_processing",
                 "transaction_id": String(transactionId),
                 "product_id": transaction.productID,
                 "attempts": attempt,
