@@ -369,10 +369,12 @@ class AppShortcutDeepLinkHandler {
 
     func handle(_ deepLink: DeepLink) {
         // Track analytics
-        AnalyticsManager.shared.logEvent(.deepLinkOpened, parameters: [
-            "source": "app_shortcut",
-            "destination": String(describing: deepLink)
-        ])
+        Task { @MainActor in
+            AnalyticsManager.shared.logEvent(.deepLinkOpened, parameters: [
+                "source": "app_shortcut",
+                "destination": String(describing: deepLink)
+            ])
+        }
 
         // Post notification to navigate in the app
         NotificationCenter.default.post(
@@ -394,7 +396,7 @@ class AppShortcutSuggestions {
 
     /// Update shortcuts based on user activity
     func updateShortcutSuggestions() {
-        Task {
+        Task { @MainActor in
             // Check if user has active matches
             if BadgeManager.shared.newMatchesCount > 0 {
                 await suggestViewMatches()
