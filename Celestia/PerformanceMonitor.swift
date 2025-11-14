@@ -428,7 +428,9 @@ class PerformanceMonitor: ObservableObject {
     // MARK: - Cleanup
 
     deinit {
-        stopMonitoring()
+        Task { @MainActor in
+            stopMonitoring()
+        }
     }
 
     // MARK: - Private
@@ -453,7 +455,8 @@ class PerformanceMonitor: ObservableObject {
     }
 
     private func sendToAnalytics(name: String, duration: Double) {
-        AnalyticsManager.shared.logEvent("slow_operation", parameters: [
+        AnalyticsManager.shared.logEvent(.performance, parameters: [
+            "type": "slow_operation",
             "operation_name": name,
             "duration_ms": duration,
             "threshold_ms": analyticsThreshold

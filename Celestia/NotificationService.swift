@@ -253,17 +253,17 @@ class NotificationService: ObservableObject {
             try container.encode(category, forKey: .category)
 
             // Convert data dictionary to JSON-serializable format (all values as strings)
-            let stringData = data.compactMapValues { value -> String? in
+            var stringData: [String: String] = [:]
+            for (key, value) in data {
                 if let stringValue = value as? String {
-                    return stringValue
+                    stringData[key] = stringValue
                 } else if let intValue = value as? Int {
-                    return String(intValue)
+                    stringData[key] = String(intValue)
                 } else if let boolValue = value as? Bool {
-                    return String(boolValue)
+                    stringData[key] = String(boolValue)
                 } else if let doubleValue = value as? Double {
-                    return String(doubleValue)
+                    stringData[key] = String(doubleValue)
                 }
-                return nil
             }
             try container.encode(stringData, forKey: .data)
         }
