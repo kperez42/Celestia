@@ -138,6 +138,12 @@ enum AnalyticsEvent: String {
     case weeklyActiveUser = "weekly_active_user"
     case monthlyActiveUser = "monthly_active_user"
 
+    // Activation Metrics
+    case userSignup = "user_signup"
+    case profileCompleted = "profile_completed"
+    case firstMatch = "first_match"
+    case milestoneAchieved = "milestone_achieved"
+
     // Error Tracking & Recovery
     case userFriendlyErrorShown = "user_friendly_error_shown"
     case errorRecovered = "error_recovered"

@@ -197,7 +197,7 @@ class ActivationMetrics: ObservableObject {
         saveMetrics()
 
         // Track in analytics
-        AnalyticsService.shared.trackEvent("user_signup", parameters: [
+        AnalyticsServiceEnhanced.shared.trackEvent(.userSignup, properties: [
             "user_id": userId,
             "signup_date": ISO8601DateFormatter().string(from: Date())
         ])
@@ -224,7 +224,7 @@ class ActivationMetrics: ObservableObject {
             checkMilestone(.profileComplete)
 
             // Track analytics
-            AnalyticsService.shared.trackEvent("profile_completed", parameters: [
+            AnalyticsServiceEnhanced.shared.trackEvent(.profileCompleted, properties: [
                 "user_id": metrics.userId,
                 "completion_percentage": metrics.profileCompletionPercentage,
                 "time_to_complete": metrics.timeToProfileCompletion ?? 0
@@ -270,7 +270,7 @@ class ActivationMetrics: ObservableObject {
 
             // Track time to first match
             if let timeToMatch = metrics.timeToFirstMatch {
-                AnalyticsService.shared.trackEvent("first_match", parameters: [
+                AnalyticsServiceEnhanced.shared.trackEvent(.firstMatch, properties: [
                     "user_id": metrics.userId,
                     "time_to_match_seconds": timeToMatch,
                     "time_to_match_hours": timeToMatch / 3600
@@ -355,7 +355,7 @@ class ActivationMetrics: ObservableObject {
         saveMilestones()
 
         // Track in analytics
-        AnalyticsService.shared.trackEvent("milestone_achieved", parameters: [
+        AnalyticsServiceEnhanced.shared.trackEvent(.milestoneAchieved, properties: [
             "milestone_id": milestone.rawValue,
             "milestone_title": newMilestone.title,
             "reward_points": newMilestone.rewardPoints
