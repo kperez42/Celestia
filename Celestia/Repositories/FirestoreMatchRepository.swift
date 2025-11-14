@@ -68,6 +68,11 @@ class FirestoreMatchRepository: MatchRepository {
         ])
     }
 
+    func deleteMatch(matchId: String) async throws {
+        try await db.collection("matches").document(matchId).delete()
+        Logger.shared.info("Match deleted: \(matchId)", category: .matching)
+    }
+
     // MARK: - Additional Helper Methods
 
     func incrementUnreadCount(matchId: String, userId: String) async throws {

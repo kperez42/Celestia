@@ -136,7 +136,7 @@ class UserService: ObservableObject, UserServiceProtocol {
     /// Set user offline
     func setUserOffline(userId: String) async {
         do {
-            try await db.collection("users").document(userId).updateData([
+            try await repository.updateUserFields(userId: userId, fields: [
                 "isOnline": false,
                 "lastActive": FieldValue.serverTimestamp()
             ])

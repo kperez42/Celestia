@@ -137,6 +137,64 @@ class FirestoreUserRepository: UserRepository {
         }
     }
 
+    // MARK: - Consumables and Boosts
+
+    func updateDailySwiperUsage(userId: String) async throws {
+        do {
+            try await db.collection("users").document(userId).updateData([
+                "usedDailySwipers": FieldValue.increment(Int64(1))
+            ])
+        } catch {
+            Logger.shared.error("Error updating daily swiper usage", category: .database, error: error)
+            throw error
+        }
+    }
+
+    func updateRewindUsage(userId: String) async throws {
+        do {
+            try await db.collection("users").document(userId).updateData([
+                "rewinds": FieldValue.increment(Int64(-1))
+            ])
+        } catch {
+            Logger.shared.error("Error updating rewind usage", category: .database, error: error)
+            throw error
+        }
+    }
+
+    func updateBoostUsage(userId: String) async throws {
+        do {
+            try await db.collection("users").document(userId).updateData([
+                "boosts": FieldValue.increment(Int64(-1)),
+                "lastBoostDate": FieldValue.serverTimestamp()
+            ])
+        } catch {
+            Logger.shared.error("Error updating boost usage", category: .database, error: error)
+            throw error
+        }
+    }
+
+    func updateSuperLikeUsage(userId: String) async throws {
+        do {
+            try await db.collection("users").document(userId).updateData([
+                "superLikes": FieldValue.increment(Int64(-1))
+            ])
+        } catch {
+            Logger.shared.error("Error updating super like usage", category: .database, error: error)
+            throw error
+        }
+    }
+
+    func getDailySwiperCount(userId: String) async throws -> Int {
+        let document = try await db.collection("users").document(userId).getDocument()
+
+        guard let data = document.data(),
+              let count = data["usedDailySwipers"] as? Int else {
+            return 0
+        }
+
+        return count
+    }
+
     // MARK: - Additional Helper Methods
 
     func clearCache() async {
