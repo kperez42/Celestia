@@ -24,6 +24,7 @@ struct MatchesView: View {
     @State private var showingSortMenu = false
     @State private var showOnlyUnread = false
     @State private var selectedMatch: Match?
+    @State private var selectedUserForProfile: User?
     @State private var showMatchDetail = false
     @State private var errorMessage: String = ""
 
@@ -147,9 +148,13 @@ struct MatchesView: View {
             }
             .sheet(item: $selectedMatch) { match in
                 if let user = getMatchedUser(match) {
-                    UserDetailView(user: user)
+                    ChatView(match: match, matchedUser: user)
                         .environmentObject(authService)
                 }
+            }
+            .sheet(item: $selectedUserForProfile) { user in
+                UserDetailView(user: user)
+                    .environmentObject(authService)
             }
         }
     }
@@ -275,7 +280,7 @@ struct MatchesView: View {
                     Text("Search matches...")
                         .foregroundColor(.white.opacity(0.6))
                 }
-                .onChange(of: searchText) { newValue in
+                .onChange(of: searchText) { _, newValue in
                     searchDebouncer.search(newValue)
                 }
                 .accessibilityElement(
@@ -417,11 +422,14 @@ struct MatchesView: View {
                         MatchProfileCard(
                             match: match,
                             user: user,
-                            currentUserId: authService.currentUser?.id ?? "current_user"
+                            currentUserId: authService.currentUser?.id ?? "current_user",
+                            onInfoTap: {
+                                selectedUserForProfile = user
+                            }
                         )
                         .accessibilityElement(
                             label: "\(user.fullName), \(user.age) years old, from \(user.location)",
-                            hint: "Tap to view full profile and start chatting",
+                            hint: "Tap to open chat and send a message",
                             traits: .isButton,
                             identifier: AccessibilityIdentifier.matchCard
                         )
@@ -491,7 +499,7 @@ struct MatchesView: View {
                     .dynamicTypeSize(min: .large, max: .accessibility2)
                     .accessibilityAddTraits(.isHeader)
 
-                Text("Start swiping to find your perfect match!")
+                Text("Head to the Discover tab to start swiping and finding your perfect match!")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -499,7 +507,34 @@ struct MatchesView: View {
                     .dynamicTypeSize(min: .small, max: .accessibility1)
             }
             .accessibilityElement(children: .combine)
-            
+
+            // CTA to encourage discovery
+            VStack(spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .font(.body)
+                    Text("Go to Discover Tab")
+                        .font(.headline)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .foregroundColor(.white)
+                .background(
+                    LinearGradient(
+                        colors: [.purple, .pink],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(16)
+                .contentShape(RoundedRectangle(cornerRadius: 16))
+
+                Text("Tap the first tab to start swiping")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 40)
+
             // Tips
             VStack(spacing: 12) {
                 tipRow(icon: "photo.fill", text: "Add more photos to your profile")
@@ -510,7 +545,7 @@ struct MatchesView: View {
             .background(Color.white)
             .cornerRadius(16)
             .padding(.horizontal, 30)
-            
+
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -616,17 +651,7 @@ struct MatchesView: View {
             return
         }
 
-        #if DEBUG
-        // Use test data in debug mode even with authenticated user
-        await MainActor.run {
-            matchService.matches = TestData.testMatches.map { $0.match }
-            for (user, match) in TestData.testMatches {
-                let otherUserId = match.user2Id
-                matchedUsers[otherUserId] = user
-            }
-        }
-        return
-        #endif
+        // Removed test data blocking - use production code in debug builds with authenticated users
 
         do {
             try await matchService.fetchMatches(userId: userId)
@@ -676,6 +701,7 @@ struct MatchProfileCard: View {
     let match: Match
     let user: User
     let currentUserId: String
+    var onInfoTap: (() -> Void)? = nil
 
     private var isNewMatch: Bool {
         match.lastMessage == nil
@@ -790,6 +816,32 @@ struct MatchProfileCard: View {
                     lineWidth: 2
                 )
         )
+        .overlay(alignment: .bottomTrailing) {
+            // Info button to view full profile
+            if let onInfoTap = onInfoTap {
+                Button {
+                    HapticManager.shared.impact(.light)
+                    onInfoTap()
+                } label: {
+                    Image(systemName: "info.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 36, height: 36)
+                        .background(Color.white)
+                        .clipShape(Circle())
+                        .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+                }
+                .padding(12)
+                .accessibilityLabel("View \(user.fullName)'s profile")
+                .accessibilityHint("Opens full profile details")
+            }
+        }
     }
     
     private var profileImage: some View {
