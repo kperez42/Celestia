@@ -66,6 +66,9 @@ class SwipeService: ObservableObject {
             .document("\(fromUserId)_\(toUserId)")
             .setData(likeData)
 
+        // Track swipe for ML learning
+        await trackSwipe(fromUserId: fromUserId, toUserId: toUserId, action: "like", isSuperLike: isSuperLike)
+
         Logger.shared.debug("Like created: \(fromUserId) -> \(toUserId)", category: .matching)
 
         // Check if the other user has also liked this user (mutual like)
@@ -129,6 +132,9 @@ class SwipeService: ObservableObject {
             .document("\(fromUserId)_\(toUserId)")
             .setData(passData)
 
+        // Track swipe for ML learning
+        await trackSwipe(fromUserId: fromUserId, toUserId: toUserId, action: "pass", isSuperLike: false)
+
         Logger.shared.debug("Pass created: \(fromUserId) -> \(toUserId)", category: .matching)
     }
 
@@ -156,5 +162,104 @@ class SwipeService: ObservableObject {
             .getDocuments()
 
         return snapshot.documents.compactMap { $0.data()["fromUserId"] as? String }
+    }
+
+    // MARK: - ML Swipe Tracking
+
+    /// Track swipe data for machine learning
+    /// This data is used to learn user preferences and improve recommendations
+    private func trackSwipe(fromUserId: String, toUserId: String, action: String, isSuperLike: Bool) async {
+        do {
+            // Fetch the target user's profile data for ML learning
+            let targetUserDoc = try await db.collection("users").document(toUserId).getDocument()
+
+            guard let targetUserData = targetUserDoc.data() else { return }
+
+            // Extract key features for ML
+            let swipeFeatures: [String: Any] = [
+                "fromUserId": fromUserId,
+                "toUserId": toUserId,
+                "action": action, // "like" or "pass"
+                "isSuperLike": isSuperLike,
+                "timestamp": Timestamp(date: Date()),
+
+                // Target user features (for pattern learning)
+                "targetAge": targetUserData["age"] ?? 0,
+                "targetGender": targetUserData["gender"] ?? "",
+                "targetInterests": targetUserData["interests"] ?? [],
+                "targetLanguages": targetUserData["languages"] ?? [],
+                "targetLocation": targetUserData["location"] ?? "",
+                "targetIsPremium": targetUserData["isPremium"] ?? false,
+                "targetEducationLevel": targetUserData["educationLevel"] as? String ?? "",
+                "targetRelationshipGoal": targetUserData["relationshipGoal"] as? String ?? "",
+                "targetHeight": targetUserData["height"] as? Int ?? 0,
+                "targetExercise": targetUserData["exercise"] as? String ?? "",
+                "targetDiet": targetUserData["diet"] as? String ?? ""
+            ]
+
+            // Store in swipe_history collection for ML analysis
+            try await db.collection("swipe_history")
+                .document("\(fromUserId)_\(toUserId)_\(Date().timeIntervalSince1970)")
+                .setData(swipeFeatures)
+
+            // Track analytics event
+            AnalyticsManager.shared.logEvent(.customEvent("swipe_tracked"), parameters: [
+                "action": action,
+                "is_super_like": isSuperLike,
+                "user_id": fromUserId
+            ])
+
+            Logger.shared.debug("Swipe tracked for ML: \(action)", category: .matching)
+
+        } catch {
+            Logger.shared.error("Error tracking swipe for ML", category: .matching, error: error)
+            // Don't throw - tracking failure shouldn't block the swipe
+        }
+    }
+
+    /// Get swipe statistics for a user (for analytics dashboard)
+    func getSwipeStatistics(userId: String) async -> SwipeStatistics {
+        var stats = SwipeStatistics()
+
+        do {
+            // Get like count
+            let likesSnapshot = try await db.collection("likes")
+                .whereField("fromUserId", isEqualTo: userId)
+                .whereField("isActive", isEqualTo: true)
+                .getDocuments()
+
+            stats.totalLikes = likesSnapshot.documents.count
+            stats.superLikes = likesSnapshot.documents.filter { ($0.data()["isSuperLike"] as? Bool) == true }.count
+
+            // Get pass count
+            let passesSnapshot = try await db.collection("passes")
+                .whereField("fromUserId", isEqualTo: userId)
+                .whereField("isActive", isEqualTo: true)
+                .getDocuments()
+
+            stats.totalPasses = passesSnapshot.documents.count
+
+            // Calculate swipe rate (likes / total swipes)
+            let totalSwipes = stats.totalLikes + stats.totalPasses
+            stats.likeRate = totalSwipes > 0 ? Double(stats.totalLikes) / Double(totalSwipes) : 0.0
+
+        } catch {
+            Logger.shared.error("Error fetching swipe statistics", category: .matching, error: error)
+        }
+
+        return stats
+    }
+}
+
+// MARK: - Swipe Statistics
+
+struct SwipeStatistics {
+    var totalLikes: Int = 0
+    var totalPasses: Int = 0
+    var superLikes: Int = 0
+    var likeRate: Double = 0.0 // Percentage of likes vs total swipes
+
+    var totalSwipes: Int {
+        return totalLikes + totalPasses
     }
 }

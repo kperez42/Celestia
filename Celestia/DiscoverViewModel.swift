@@ -34,6 +34,10 @@ class DiscoverViewModel: ObservableObject {
     private var lastDocument: DocumentSnapshot?
     private var interestTask: Task<Void, Never>?
     private let performanceMonitor = PerformanceMonitor.shared
+
+    // ML-powered recommendation engine
+    private let recommendationEngine = RecommendationEngine.shared
+    private var enableNewMatchAlgorithm = true // Feature flag for intelligent matching
     
     func loadUsers(currentUser: User, limit: Int = 20) {
         isLoading = true
@@ -83,7 +87,7 @@ class DiscoverViewModel: ObservableObject {
 
                 self.lastDocument = documents.last
 
-                let fetchedUsers = documents.compactMap { doc -> User? in
+                var fetchedUsers = documents.compactMap { doc -> User? in
                     let data = doc.data()
                     var user = User(dictionary: data)
                     user.id = doc.documentID
@@ -94,6 +98,27 @@ class DiscoverViewModel: ObservableObject {
                     }
 
                     return user
+                }
+
+                // Apply ML-powered ranking if enabled
+                if self.enableNewMatchAlgorithm && !fetchedUsers.isEmpty {
+                    let rankingStart = Date()
+
+                    // Rank users using recommendation engine
+                    let rankedUsers = await self.recommendationEngine.rankUsers(fetchedUsers, currentUser: currentUser)
+
+                    // Extract ranked users (discarding scores for now)
+                    fetchedUsers = rankedUsers.map { $0.user }
+
+                    let rankingDuration = Date().timeIntervalSince(rankingStart) * 1000
+                    Logger.shared.info("Ranked \(fetchedUsers.count) users in \(String(format: "%.0f", rankingDuration))ms", category: .matching)
+
+                    // Track ranking performance
+                    AnalyticsManager.shared.logEvent(.performanceMetric, parameters: [
+                        "metric_type": "user_ranking",
+                        "duration_ms": Int(rankingDuration),
+                        "user_count": fetchedUsers.count
+                    ])
                 }
 
                 self.users.append(contentsOf: fetchedUsers)
