@@ -31,8 +31,8 @@ actor DailyLikeLimitCache {
     private var memoryCache: [String: DailyLikeLimitData] = [:]
 
     private init() {
-        // Load existing data from UserDefaults on initialization
-        loadFromUserDefaults()
+        // Note: Cache loads lazily on first access for Swift 6 concurrency compatibility
+        // Preloading from UserDefaults removed to avoid actor isolation issues in init
     }
 
     // MARK: - Public API
@@ -159,30 +159,6 @@ actor DailyLikeLimitCache {
         defaults.removeObject(forKey: cacheKey(userId: userId))
     }
 
-    private func loadFromUserDefaults() {
-        // Load all cached data from UserDefaults into memory on initialization
-        let keys = defaults.dictionaryRepresentation().keys.filter { $0.hasPrefix(cacheKeyPrefix) }
-
-        for key in keys {
-            guard let data = defaults.data(forKey: key),
-                  let decoded = try? JSONDecoder().decode(DailyLikeLimitData.self, from: data) else {
-                continue
-            }
-
-            // Extract userId from key
-            let userId = String(key.dropFirst(cacheKeyPrefix.count))
-
-            // Only load if not expired
-            if !decoded.needsReset {
-                memoryCache[userId] = decoded
-            } else {
-                // Remove stale data
-                defaults.removeObject(forKey: key)
-            }
-        }
-
-        Logger.shared.debug("Loaded \(memoryCache.count) daily like limits from UserDefaults", category: .performance)
-    }
 }
 
 // MARK: - Usage Example

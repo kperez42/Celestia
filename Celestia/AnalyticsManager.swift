@@ -146,6 +146,7 @@ enum AnalyticsEvent: String {
 
     // Error Tracking & Recovery
     case userFriendlyErrorShown = "user_friendly_error_shown"
+    case errorOccurred = "error_occurred"
     case errorRecovered = "error_recovered"
     case errorReportSent = "error_report_sent"
     case retryActionSucceeded = "retry_action_succeeded"
