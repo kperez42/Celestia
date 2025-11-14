@@ -12,6 +12,7 @@ import FirebaseFirestore
 
 enum ReferralError: LocalizedError {
     case invalidCode
+    case invalidUser
     case selfReferral
     case alreadyReferred
     case emailAlreadyReferred
@@ -22,6 +23,8 @@ enum ReferralError: LocalizedError {
         switch self {
         case .invalidCode:
             return "This referral code doesn't exist. Please check and try again."
+        case .invalidUser:
+            return "Invalid user account."
         case .selfReferral:
             return "You cannot use your own referral code."
         case .alreadyReferred:

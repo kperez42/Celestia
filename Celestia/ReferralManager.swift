@@ -68,9 +68,10 @@ class ReferralManager: ObservableObject {
 
         // Update in Firestore
         guard let userId = user.id else { return }
-        try await db.collection("users").document(userId).updateData([
+        let updateData: [String: Any] = [
             "referralStats.referralCode": code
-        ])
+        ]
+        try await db.collection("users").document(userId).updateData(updateData)
     }
 
     // MARK: - Process Referral on Signup
@@ -187,19 +188,21 @@ class ReferralManager: ObservableObject {
         expiryDate = calendar.date(byAdding: .day, value: days, to: expiryDate) ?? expiryDate
 
         // Update user
-        try await userRef.updateData([
+        let userUpdateData: [String: Any] = [
             "isPremium": true,
             "subscriptionExpiryDate": Timestamp(date: expiryDate)
-        ])
+        ]
+        try await userRef.updateData(userUpdateData)
 
         // Log the reward
-        try await db.collection("referralRewards").addDocument(data: [
+        let rewardData: [String: Any] = [
             "userId": userId,
             "days": days,
             "reason": reason,
             "awardedAt": Timestamp(date: Date()),
             "expiryDate": Timestamp(date: expiryDate)
-        ])
+        ]
+        try await db.collection("referralRewards").addDocument(data: rewardData)
 
         Logger.shared.info("Awarded \(days) premium days to user \(userId) for \(reason)", category: .referral)
     }
@@ -217,10 +220,11 @@ class ReferralManager: ObservableObject {
         let premiumDaysEarned = ReferralRewards.calculateTotalDays(referrals: totalReferrals)
 
         // Update user stats
-        try await db.collection("users").document(userId).updateData([
+        let statsUpdateData: [String: Any] = [
             "referralStats.totalReferrals": totalReferrals,
             "referralStats.premiumDaysEarned": premiumDaysEarned
-        ])
+        ]
+        try await db.collection("users").document(userId).updateData(statsUpdateData)
     }
 
     // MARK: - Fetch User Referrals
@@ -295,7 +299,8 @@ class ReferralManager: ObservableObject {
             return ReferralStats()
         }
 
-        var stats = user.referralStats
+        let baseStats = user.referralStats
+        let totalReferrals = baseStats.totalReferrals
 
         // Parallelize queries for better performance
         async let pendingQuery = db.collection("referrals")
@@ -304,22 +309,26 @@ class ReferralManager: ObservableObject {
             .getDocuments()
 
         // Only fetch leaderboard if user has referrals
-        if stats.totalReferrals > 0 {
+        if totalReferrals > 0 {
             async let leaderboardQuery = db.collection("users")
-                .whereField("referralStats.totalReferrals", isGreaterThan: stats.totalReferrals)
+                .whereField("referralStats.totalReferrals", isGreaterThan: totalReferrals)
                 .getDocuments()
 
             // Wait for both queries
             let (pendingSnapshot, leaderboardSnapshot) = try await (pendingQuery, leaderboardQuery)
+
+            var stats = baseStats
             stats.pendingReferrals = pendingSnapshot.documents.count
             stats.referralRank = leaderboardSnapshot.documents.count + 1
+            return stats
         } else {
             // Only wait for pending query
             let pendingSnapshot = try await pendingQuery
-            stats.pendingReferrals = pendingSnapshot.documents.count
-        }
 
-        return stats
+            var stats = baseStats
+            stats.pendingReferrals = pendingSnapshot.documents.count
+            return stats
+        }
     }
 
     // MARK: - Share Methods
@@ -342,13 +351,14 @@ class ReferralManager: ObservableObject {
 
     func trackShare(userId: String, code: String, shareMethod: String = "generic") async {
         do {
-            try await db.collection("referralShares").addDocument(data: [
+            let shareData: [String: Any] = [
                 "userId": userId,
                 "referralCode": code,
                 "shareMethod": shareMethod,
                 "timestamp": Timestamp(date: Date()),
                 "platform": "iOS"
-            ])
+            ]
+            try await db.collection("referralShares").addDocument(data: shareData)
             Logger.shared.info("Tracked share for code: \(code) via \(shareMethod)", category: .analytics)
         } catch {
             Logger.shared.error("Failed to track share", category: .analytics, error: error)
