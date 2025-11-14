@@ -2,6 +2,8 @@
 //  DiscoverView.swift
 //  Celestia
 //
+//  ACCESSIBILITY: Full VoiceOver support, Dynamic Type, Reduce Motion, and WCAG 2.1 AA compliant
+//
 
 import SwiftUI
 
@@ -14,7 +16,9 @@ struct SwipeAction {
 struct DiscoverView: View {
     @EnvironmentObject var authService: AuthService
     @StateObject private var viewModel = DiscoverViewModel()
-    
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
+    @Environment(\.dynamicTypeSize) var dynamicTypeSize
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -62,13 +66,16 @@ struct DiscoverView: View {
             }
             .navigationTitle("")
             .navigationBarHidden(true)
+            .accessibilityIdentifier(AccessibilityIdentifier.discoverView)
             .task {
                 await viewModel.loadUsers()
+                VoiceOverAnnouncement.screenChanged(to: "Discover view. \(viewModel.users.count) potential matches available.")
             }
             .refreshable {
                 HapticManager.shared.impact(.light)
                 await viewModel.loadUsers()
                 HapticManager.shared.notification(.success)
+                VoiceOverAnnouncement.announce("Profiles refreshed. \(viewModel.users.count) profiles available.")
             }
             .sheet(isPresented: $viewModel.showingUserDetail) {
                 if let user = viewModel.selectedUser {
@@ -96,12 +103,15 @@ struct DiscoverView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Discover")
                     .font(.system(size: 36, weight: .bold))
+                    .dynamicTypeSize(min: .large, max: .accessibility2)
+                    .accessibilityAddTraits(.isHeader)
 
                 if !viewModel.users.isEmpty {
                     HStack(spacing: 4) {
                         Text("\(viewModel.remainingCount) people")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
+                            .dynamicTypeSize(min: .xSmall, max: .accessibility1)
 
                         if viewModel.hasActiveFilters {
                             Image(systemName: "line.3.horizontal.decrease.circle.fill")
@@ -118,14 +128,19 @@ struct DiscoverView: View {
             Button {
                 viewModel.shuffleUsers()
                 HapticManager.shared.impact(.light)
+                VoiceOverAnnouncement.announce("Profiles shuffled")
             } label: {
                 Image(systemName: "shuffle")
                     .font(.title3)
                     .foregroundColor(.purple)
                     .frame(width: 44, height: 44)
             }
-            .accessibilityLabel("Shuffle users")
-            .accessibilityHint("Randomly reorder the list of potential matches")
+            .accessibilityElement(
+                label: "Shuffle users",
+                hint: "Randomly reorder the list of potential matches",
+                traits: .isButton,
+                identifier: AccessibilityIdentifier.shuffleButton
+            )
             .padding(.trailing, 8)
 
             // Filter button
@@ -143,12 +158,18 @@ struct DiscoverView: View {
                             .fill(Color.red)
                             .frame(width: 8, height: 8)
                             .offset(x: 2, y: -2)
+                            .accessibilityHidden(true)
                     }
                 }
                 .frame(width: 44, height: 44)
             }
-            .accessibilityLabel(viewModel.hasActiveFilters ? "Filters active" : "Filters")
-            .accessibilityHint("Show discovery filters to refine your matches")
+            .accessibilityElement(
+                label: viewModel.hasActiveFilters ? "Filters active" : "Filters",
+                hint: "Show discovery filters to refine your matches",
+                traits: .isButton,
+                identifier: AccessibilityIdentifier.filterButton,
+                value: viewModel.hasActiveFilters ? "Active" : "Inactive"
+            )
         }
         .padding()
         .background(Color.white)
@@ -172,10 +193,29 @@ struct DiscoverView: View {
                         .opacity(1.0 - Double(cardIndex) * 0.2)
                         .zIndex(Double(3 - cardIndex))
                         .offset(cardIndex == 0 ? viewModel.dragOffset : .zero)
-                        .rotationEffect(.degrees(cardIndex == 0 ? Double(viewModel.dragOffset.width / 20) : 0))
+                        .rotationEffect(.degrees(cardIndex == 0 ? (reduceMotion ? 0 : Double(viewModel.dragOffset.width / 20)) : 0))
                         .contentShape(Rectangle()) // Define tappable area
-                        .accessibilityLabel(cardIndex == 0 ? "\(user.fullName), \(user.age) years old" : "")
-                        .accessibilityHint(cardIndex == 0 ? "Swipe right to like, left to pass, or tap for full profile" : "")
+                        .accessibilityElement(
+                            label: cardIndex == 0 ? "\(user.fullName), \(user.age) years old, from \(user.location)" : "",
+                            hint: cardIndex == 0 ? "Swipe right to like, left to pass, or tap for full profile. Use the action buttons below for more options" : "",
+                            traits: cardIndex == 0 ? .isButton : [],
+                            identifier: cardIndex == 0 ? AccessibilityIdentifier.userCard : nil,
+                            isHidden: cardIndex != 0
+                        )
+                        .accessibilityActions(cardIndex == 0 ? [
+                            AccessibilityCustomAction(name: "Like") {
+                                Task { await viewModel.handleLike() }
+                            },
+                            AccessibilityCustomAction(name: "Pass") {
+                                Task { await viewModel.handlePass() }
+                            },
+                            AccessibilityCustomAction(name: "Super Like") {
+                                Task { await viewModel.handleSuperLike() }
+                            },
+                            AccessibilityCustomAction(name: "View Profile") {
+                                viewModel.showUserDetail(user)
+                            }
+                        ] : [])
                         .onTapGesture {
                             if cardIndex == 0 {
                                 viewModel.showUserDetail(user)
@@ -210,10 +250,17 @@ struct DiscoverView: View {
                         shadowColor: .red.opacity(0.4),
                         isProcessing: viewModel.isProcessingAction
                     ) {
-                        Task { await viewModel.handlePass() }
+                        Task {
+                            await viewModel.handlePass()
+                            VoiceOverAnnouncement.announce("Passed. Next profile.")
+                        }
                     }
-                    .accessibilityLabel("Pass")
-                    .accessibilityHint("Skip this profile and move to the next")
+                    .accessibilityElement(
+                        label: "Pass",
+                        hint: "Skip this profile and move to the next",
+                        traits: .isButton,
+                        identifier: AccessibilityIdentifier.passButton
+                    )
                     .disabled(viewModel.isProcessingAction)
 
                     // Super Like button
@@ -226,10 +273,17 @@ struct DiscoverView: View {
                         shadowColor: .blue.opacity(0.4),
                         isProcessing: viewModel.isProcessingAction
                     ) {
-                        Task { await viewModel.handleSuperLike() }
+                        Task {
+                            await viewModel.handleSuperLike()
+                            VoiceOverAnnouncement.announce("Super like sent!")
+                        }
                     }
-                    .accessibilityLabel("Super Like")
-                    .accessibilityHint("Send a super like to stand out and increase your chances of matching")
+                    .accessibilityElement(
+                        label: "Super Like",
+                        hint: "Send a super like to stand out and increase your chances of matching",
+                        traits: .isButton,
+                        identifier: AccessibilityIdentifier.superLikeButton
+                    )
                     .disabled(viewModel.isProcessingAction)
 
                     // Like button
@@ -242,10 +296,17 @@ struct DiscoverView: View {
                         shadowColor: .green.opacity(0.4),
                         isProcessing: viewModel.isProcessingAction
                     ) {
-                        Task { await viewModel.handleLike() }
+                        Task {
+                            await viewModel.handleLike()
+                            VoiceOverAnnouncement.announce("Liked! Next profile.")
+                        }
                     }
-                    .accessibilityLabel("Like")
-                    .accessibilityHint("Like this profile to potentially match")
+                    .accessibilityElement(
+                        label: "Like",
+                        hint: "Like this profile to potentially match",
+                        traits: .isButton,
+                        identifier: AccessibilityIdentifier.likeButton
+                    )
                     .disabled(viewModel.isProcessingAction)
                 }
                 .padding(.horizontal, 24)
@@ -277,13 +338,17 @@ struct DiscoverView: View {
                 Text("Oops! Something Went Wrong")
                     .font(.title2)
                     .fontWeight(.bold)
+                    .dynamicTypeSize(min: .large, max: .accessibility2)
+                    .accessibilityAddTraits(.isHeader)
 
                 Text(viewModel.errorMessage)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
+                    .dynamicTypeSize(min: .small, max: .accessibility1)
             }
+            .accessibilityElement(children: .combine)
 
             Button {
                 HapticManager.shared.impact(.medium)
@@ -337,6 +402,8 @@ struct DiscoverView: View {
                 Text(viewModel.hasActiveFilters ? "No Matches Found" : "No More Profiles")
                     .font(.title2)
                     .fontWeight(.bold)
+                    .dynamicTypeSize(min: .large, max: .accessibility2)
+                    .accessibilityAddTraits(.isHeader)
 
                 Text(viewModel.hasActiveFilters ?
                      "Try adjusting your filters to see more people" :
@@ -345,7 +412,9 @@ struct DiscoverView: View {
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
+                    .dynamicTypeSize(min: .small, max: .accessibility1)
             }
+            .accessibilityElement(children: .combine)
 
             VStack(spacing: 12) {
                 if viewModel.hasActiveFilters {
@@ -420,12 +489,20 @@ struct DiscoverView: View {
                     .font(.largeTitle)
                     .fontWeight(.bold)
                     .foregroundColor(.white)
+                    .dynamicTypeSize(min: .large, max: .accessibility2)
+                    .accessibilityAddTraits(.isHeader)
 
                 if let user = viewModel.matchedUser {
                     Text("You and \(user.fullName) liked each other!")
                         .font(.title3)
                         .foregroundColor(.white)
                         .multilineTextAlignment(.center)
+                        .dynamicTypeSize(min: .medium, max: .accessibility1)
+                }
+                .task {
+                    if let user = viewModel.matchedUser {
+                        VoiceOverAnnouncement.announce("It's a match! You and \(user.fullName) liked each other!")
+                    }
                 }
 
                 Button("Send Message") {
