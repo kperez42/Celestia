@@ -48,6 +48,7 @@ enum CelestiaError: LocalizedError, Identifiable {
     case messageTooLong
     case inappropriateContent
     case inappropriateContentWithReasons([String])
+    case batchOperationFailed(operationId: String, underlyingError: Error)
 
     // Rate Limiting
     case rateLimitExceeded
@@ -129,6 +130,8 @@ enum CelestiaError: LocalizedError, Identifiable {
             return "Message contains inappropriate content."
         case .inappropriateContentWithReasons(let reasons):
             return "Content violation: " + reasons.joined(separator: ", ")
+        case .batchOperationFailed(let operationId, let underlyingError):
+            return "Operation \(operationId) failed after multiple retries: \(underlyingError.localizedDescription)"
 
         // Rate Limiting
         case .rateLimitExceeded:
@@ -189,6 +192,8 @@ enum CelestiaError: LocalizedError, Identifiable {
             return "Reduce image size or quality before uploading."
         case .profileIncomplete:
             return "Complete your profile in Settings."
+        case .batchOperationFailed:
+            return "The operation will be retried automatically. If the problem persists, contact support."
         default:
             return "If the problem persists, contact support."
         }
@@ -208,7 +213,7 @@ enum CelestiaError: LocalizedError, Identifiable {
             return "crown"
         case .imageUploadFailed, .imageTooBig, .invalidImageFormat:
             return "photo"
-        case .messageNotSent:
+        case .messageNotSent, .batchOperationFailed:
             return "message.badge.exclamationmark"
         case .userBlocked:
             return "hand.raised"

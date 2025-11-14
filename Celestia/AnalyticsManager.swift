@@ -75,6 +75,11 @@ enum AnalyticsEvent: String {
     case featureFlagChanged = "feature_flag_changed"
     case fraudDetected = "fraud_detected"
 
+    // Batch Operations
+    case batchOperationFailed = "batch_operation_failed"
+    case batchOperationRetried = "batch_operation_retried"
+    case batchOperationRecovered = "batch_operation_recovered"
+
     // Saved Profiles
     case profileSaved = "profile_saved"
     case profileUnsaved = "profile_unsaved"

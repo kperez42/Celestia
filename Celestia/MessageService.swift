@@ -163,7 +163,7 @@ class MessageService: ObservableObject {
         ])
     }
     
-    /// Mark messages as read
+    /// Mark messages as read (with transaction logging and retry)
     func markMessagesAsRead(matchId: String, userId: String) async {
         do {
             let snapshot = try await db.collection("messages")
@@ -171,28 +171,23 @@ class MessageService: ObservableObject {
                 .whereField("receiverId", isEqualTo: userId)
                 .whereField("isRead", isEqualTo: false)
                 .getDocuments()
-            
-            guard !snapshot.documents.isEmpty else { return }
-            
-            // Batch update
-            let batch = db.batch()
-            for doc in snapshot.documents {
-                batch.updateData(["isRead": true, "isDelivered": true], forDocument: doc.reference)
-            }
-            try await batch.commit()
-            
-            // Reset unread count in match
-            try await db.collection("matches").document(matchId).updateData([
-                "unreadCount.\(userId)": 0
-            ])
 
-            Logger.shared.info("Messages marked as read", category: .messaging)
+            guard !snapshot.documents.isEmpty else { return }
+
+            // Use BatchOperationManager for robust execution with retry and idempotency
+            try await BatchOperationManager.shared.markMessagesAsRead(
+                matchId: matchId,
+                userId: userId,
+                messageDocuments: snapshot.documents
+            )
+
+            Logger.shared.info("Messages marked as read successfully", category: .messaging)
         } catch {
             Logger.shared.error("Error marking messages as read", category: .messaging, error: error)
         }
     }
     
-    /// Mark messages as delivered
+    /// Mark messages as delivered (with transaction logging and retry)
     func markMessagesAsDelivered(matchId: String, userId: String) async {
         do {
             let snapshot = try await db.collection("messages")
@@ -200,14 +195,17 @@ class MessageService: ObservableObject {
                 .whereField("receiverId", isEqualTo: userId)
                 .whereField("isDelivered", isEqualTo: false)
                 .getDocuments()
-            
+
             guard !snapshot.documents.isEmpty else { return }
-            
-            let batch = db.batch()
-            for doc in snapshot.documents {
-                batch.updateData(["isDelivered": true], forDocument: doc.reference)
-            }
-            try await batch.commit()
+
+            // Use BatchOperationManager for robust execution with retry and idempotency
+            try await BatchOperationManager.shared.markMessagesAsDelivered(
+                matchId: matchId,
+                userId: userId,
+                messageDocuments: snapshot.documents
+            )
+
+            Logger.shared.info("Messages marked as delivered successfully", category: .messaging)
         } catch {
             Logger.shared.error("Error marking messages as delivered", category: .messaging, error: error)
         }
@@ -262,17 +260,21 @@ class MessageService: ObservableObject {
         }
     }
     
-    /// Delete all messages in a match
+    /// Delete all messages in a match (with transaction logging and retry)
     func deleteAllMessages(matchId: String) async throws {
         let snapshot = try await db.collection("messages")
             .whereField("matchId", isEqualTo: matchId)
             .getDocuments()
-        
-        let batch = db.batch()
-        for doc in snapshot.documents {
-            batch.deleteDocument(doc.reference)
-        }
-        try await batch.commit()
+
+        guard !snapshot.documents.isEmpty else { return }
+
+        // Use BatchOperationManager for robust execution with retry and idempotency
+        try await BatchOperationManager.shared.deleteMessages(
+            matchId: matchId,
+            messageDocuments: snapshot.documents
+        )
+
+        Logger.shared.info("All messages deleted successfully for match: \(matchId)", category: .messaging)
     }
     
     deinit {
