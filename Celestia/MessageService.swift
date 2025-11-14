@@ -256,7 +256,8 @@ class MessageService: ObservableObject {
             Logger.shared.error("Server-side validation unavailable - blocking message send", category: .moderation)
 
             // Log for monitoring and alerting
-            AnalyticsManager.shared.logEvent("validation_service_unavailable", parameters: [
+            AnalyticsManager.shared.logEvent(.validationError, parameters: [
+                "type": "validation_service_unavailable",
                 "error": error.localizedDescription,
                 "action": "blocked_message_send"
             ])
