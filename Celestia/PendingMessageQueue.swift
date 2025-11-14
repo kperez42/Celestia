@@ -301,7 +301,7 @@ class PendingMessageQueue: ObservableObject {
     }
 
     /// Stop background processing (for cleanup)
-    nonisolated func stopBackgroundProcessing() {
+    func stopBackgroundProcessing() {
         processingTimer?.invalidate()
         processingTimer = nil
         Logger.shared.info("Background message queue processing stopped", category: .messaging)
@@ -339,7 +339,10 @@ class PendingMessageQueue: ObservableObject {
     }
 
     deinit {
-        stopBackgroundProcessing()
+        // Swift 6 concurrency: Access main actor isolated properties in deinit
+        MainActor.assumeIsolated {
+            stopBackgroundProcessing()
+        }
     }
 }
 
