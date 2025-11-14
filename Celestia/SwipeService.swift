@@ -18,6 +18,41 @@ class SwipeService: ObservableObject {
 
     /// Record a like from user1 to user2 and check for mutual match
     func likeUser(fromUserId: String, toUserId: String, isSuperLike: Bool = false) async throws -> Bool {
+        // SECURITY: Backend rate limit validation for swipes
+        do {
+            let action: RateLimitAction = isSuperLike ? .sendSuperLike : .swipe
+            let rateLimitResponse = try await BackendAPIService.shared.checkRateLimit(
+                userId: fromUserId,
+                action: action
+            )
+
+            if !rateLimitResponse.allowed {
+                Logger.shared.warning("Backend rate limit exceeded for swipes", category: .matching)
+
+                if let retryAfter = rateLimitResponse.retryAfter {
+                    throw CelestiaError.rateLimitExceededWithTime(retryAfter)
+                }
+
+                throw CelestiaError.rateLimitExceeded
+            }
+
+            Logger.shared.debug("✅ Backend rate limit check passed for swipe (remaining: \(rateLimitResponse.remaining))", category: .matching)
+
+        } catch let error as BackendAPIError {
+            // Backend rate limit service unavailable - use client-side fallback
+            Logger.shared.error("Backend rate limit check failed for swipe - using client-side fallback", category: .matching)
+
+            // Client-side rate limiting fallback
+            if !isSuperLike {
+                guard RateLimiter.shared.canSendLike() else {
+                    throw CelestiaError.rateLimitExceeded
+                }
+            }
+        } catch {
+            // Re-throw rate limit errors
+            throw error
+        }
+
         let likeData: [String: Any] = [
             "fromUserId": fromUserId,
             "toUserId": toUserId,
@@ -50,6 +85,38 @@ class SwipeService: ObservableObject {
 
     /// Record a pass (swipe left)
     func passUser(fromUserId: String, toUserId: String) async throws {
+        // SECURITY: Backend rate limit validation for passes/swipes
+        do {
+            let rateLimitResponse = try await BackendAPIService.shared.checkRateLimit(
+                userId: fromUserId,
+                action: .swipe
+            )
+
+            if !rateLimitResponse.allowed {
+                Logger.shared.warning("Backend rate limit exceeded for passes", category: .matching)
+
+                if let retryAfter = rateLimitResponse.retryAfter {
+                    throw CelestiaError.rateLimitExceededWithTime(retryAfter)
+                }
+
+                throw CelestiaError.rateLimitExceeded
+            }
+
+            Logger.shared.debug("✅ Backend rate limit check passed for pass (remaining: \(rateLimitResponse.remaining))", category: .matching)
+
+        } catch let error as BackendAPIError {
+            // Backend rate limit service unavailable - use client-side fallback
+            Logger.shared.error("Backend rate limit check failed for pass - using client-side fallback", category: .matching)
+
+            // Client-side rate limiting fallback
+            guard RateLimiter.shared.canSendLike() else {
+                throw CelestiaError.rateLimitExceeded
+            }
+        } catch {
+            // Re-throw rate limit errors
+            throw error
+        }
+
         let passData: [String: Any] = [
             "fromUserId": fromUserId,
             "toUserId": toUserId,
