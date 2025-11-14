@@ -89,10 +89,24 @@ struct User: Identifiable, Codable {
     var referralStats: ReferralStats = ReferralStats()
     var referredByCode: String?  // Code used during signup
 
+    // PERFORMANCE: Lowercase fields for efficient Firestore prefix matching
+    // These should be updated whenever fullName/country changes
+    // See: UserService.searchUsers() for usage
+    var fullNameLowercase: String = ""
+    var countryLowercase: String = ""
+    var locationLowercase: String = ""
+
     // Helper computed property for backward compatibility
     var name: String {
         get { fullName }
         set { fullName = newValue }
+    }
+
+    // Update lowercase fields when main fields change
+    mutating func updateSearchFields() {
+        fullNameLowercase = fullName.lowercased()
+        countryLowercase = country.lowercased()
+        locationLowercase = location.lowercased()
     }
 
     // Custom encoding to handle nil values properly for Firebase
@@ -143,6 +157,11 @@ struct User: Identifiable, Codable {
         try container.encode(prompts, forKey: .prompts)
         try container.encode(referralStats, forKey: .referralStats)
         try container.encodeIfPresent(referredByCode, forKey: .referredByCode)
+
+        // Encode lowercase search fields
+        try container.encode(fullNameLowercase, forKey: .fullNameLowercase)
+        try container.encode(countryLowercase, forKey: .countryLowercase)
+        try container.encode(locationLowercase, forKey: .locationLowercase)
     }
 
     enum CodingKeys: String, CodingKey {
@@ -159,6 +178,8 @@ struct User: Identifiable, Codable {
         case smoking, drinking, pets, exercise, diet
         case prompts
         case referralStats, referredByCode
+        // Performance: Lowercase search fields
+        case fullNameLowercase, countryLowercase, locationLowercase
     }
     
     // Initialize from dictionary (for legacy code)
@@ -245,6 +266,11 @@ struct User: Identifiable, Codable {
             self.referralStats = ReferralStats()
         }
         self.referredByCode = dictionary["referredByCode"] as? String
+
+        // Initialize lowercase search fields (for backward compatibility with old data)
+        self.fullNameLowercase = (dictionary["fullNameLowercase"] as? String) ?? fullName.lowercased()
+        self.countryLowercase = (dictionary["countryLowercase"] as? String) ?? country.lowercased()
+        self.locationLowercase = (dictionary["locationLowercase"] as? String) ?? location.lowercased()
     }
     
     // Standard initializer
@@ -294,6 +320,11 @@ struct User: Identifiable, Codable {
         self.ageRangeMin = ageRangeMin
         self.ageRangeMax = ageRangeMax
         self.maxDistance = maxDistance
+
+        // Initialize lowercase search fields
+        self.fullNameLowercase = fullName.lowercased()
+        self.countryLowercase = country.lowercased()
+        self.locationLowercase = location.lowercased()
     }
 }
 

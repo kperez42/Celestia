@@ -30,6 +30,14 @@ class StoreManager: ObservableObject {
 
     private var updateListenerTask: Task<Void, Error>?
 
+    // Retry configuration
+    private let maxRetryAttempts = 5
+    private let initialRetryDelay: TimeInterval = 2.0 // 2 seconds
+    private let maxRetryDelay: TimeInterval = 60.0 // 60 seconds
+
+    // Track failed transactions for retry
+    private var failedTransactions: Set<UInt64> = []
+
     // MARK: - Initialization
 
     private init() {
@@ -277,21 +285,177 @@ class StoreManager: ObservableObject {
                 do {
                     let transaction = try await self.checkVerified(result)
 
-                    // Deliver content
-                    await self.deliverContent(for: transaction)
-
-                    // Finish the transaction
-                    await transaction.finish()
-
-                    // Update purchased products
-                    await self.updatePurchasedProducts()
+                    // Process transaction with retry logic
+                    await self.processTransactionWithRetry(transaction)
 
                 } catch {
                     await MainActor.run {
-                        Logger.shared.error("Transaction update failed: \(error.localizedDescription)", category: .general)
+                        Logger.shared.error("Transaction verification failed: \(error.localizedDescription)", category: .general)
+
+                        // Track verification failures
+                        AnalyticsManager.shared.logEvent(.transactionVerificationFailed, parameters: [
+                            "error": error.localizedDescription
+                        ])
                     }
                 }
             }
+        }
+    }
+
+    // MARK: - Transaction Processing with Retry
+
+    /// Process a transaction with exponential backoff retry mechanism
+    private func processTransactionWithRetry(_ transaction: Transaction) async {
+        let transactionId = transaction.id
+
+        // Check if we've already tried processing this transaction too many times
+        if failedTransactions.contains(transactionId) {
+            Logger.shared.warning("Transaction \(transactionId) exceeded max retry attempts - skipping", category: .general)
+            return
+        }
+
+        var lastError: Error?
+        var attempt = 0
+
+        // Retry loop with exponential backoff
+        while attempt < maxRetryAttempts {
+            do {
+                // Deliver content
+                await self.deliverContent(for: transaction)
+
+                // Finish the transaction
+                await transaction.finish()
+
+                // Update purchased products
+                await self.updatePurchasedProducts()
+
+                // Success! Remove from failed transactions if it was there
+                failedTransactions.remove(transactionId)
+
+                Logger.shared.info("Transaction \(transactionId) processed successfully (attempt \(attempt + 1))", category: .general)
+
+                // Track successful processing after retries
+                if attempt > 0 {
+                    AnalyticsManager.shared.logEvent(.transactionRetrySucceeded, parameters: [
+                        "transaction_id": String(transactionId),
+                        "product_id": transaction.productID,
+                        "attempts": attempt + 1
+                    ])
+                }
+
+                return // Success - exit retry loop
+
+            } catch {
+                lastError = error
+                attempt += 1
+
+                Logger.shared.warning("Transaction \(transactionId) processing failed (attempt \(attempt)/\(maxRetryAttempts)): \(error.localizedDescription)", category: .general)
+
+                // Check if error is retryable
+                guard isRetryableError(error) && attempt < maxRetryAttempts else {
+                    break // Non-retryable error or max attempts reached
+                }
+
+                // Calculate exponential backoff delay: 2s, 4s, 8s, 16s, 32s (capped at 60s)
+                let delay = min(initialRetryDelay * pow(2.0, Double(attempt - 1)), maxRetryDelay)
+
+                Logger.shared.info("Retrying transaction \(transactionId) in \(delay) seconds...", category: .general)
+
+                // Wait before retry
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+
+                // Check if task was cancelled during sleep
+                if Task.isCancelled {
+                    Logger.shared.info("Transaction processing cancelled during retry", category: .general)
+                    return
+                }
+            }
+        }
+
+        // All retry attempts failed
+        failedTransactions.insert(transactionId)
+
+        await MainActor.run {
+            Logger.shared.error("Transaction \(transactionId) failed after \(attempt) attempts: \(lastError?.localizedDescription ?? "unknown error")", category: .general)
+
+            // Track final failure
+            AnalyticsManager.shared.logEvent(.transactionProcessingFailed, parameters: [
+                "transaction_id": String(transactionId),
+                "product_id": transaction.productID,
+                "attempts": attempt,
+                "error": lastError?.localizedDescription ?? "unknown"
+            ])
+
+            // CRITICAL: Alert monitoring system about potential revenue loss
+            // In production, this should trigger an alert to the operations team
+            Logger.shared.critical("REVENUE ALERT: Failed to process transaction \(transactionId) for product \(transaction.productID) after \(attempt) attempts", category: .general)
+        }
+    }
+
+    // MARK: - Error Classification
+
+    /// Determine if an error is transient and retryable
+    private func isRetryableError(_ error: Error) -> Bool {
+        // Network errors are retryable
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .notConnectedToInternet,
+                 .networkConnectionLost,
+                 .timedOut,
+                 .cannotConnectToHost,
+                 .cannotFindHost,
+                 .dnsLookupFailed,
+                 .resourceUnavailable,
+                 .dataNotAllowed:
+                return true
+            default:
+                return false
+            }
+        }
+
+        // Store errors
+        if let storeError = error as? StoreError {
+            switch storeError {
+            case .networkError:
+                return true
+            case .verificationFailed, .receiptValidationFailed:
+                // These might be transient issues with Apple's servers
+                return true
+            case .productNotFound, .invalidPromoCode, .subscriptionNotFound:
+                // These are permanent errors
+                return false
+            default:
+                // Be conservative - retry other store errors
+                return true
+            }
+        }
+
+        // Check error domain for common transient errors
+        let nsError = error as NSError
+        switch nsError.domain {
+        case NSURLErrorDomain:
+            return true
+        case "SKErrorDomain":
+            // StoreKit errors - some are retryable
+            switch nsError.code {
+            case 0: // SKError.unknown
+                return true
+            case 1: // SKError.clientInvalid
+                return false
+            case 2: // SKError.paymentCancelled
+                return false
+            case 3: // SKError.paymentInvalid
+                return true
+            case 4: // SKError.paymentNotAllowed
+                return false
+            case 5: // SKError.storeProductNotAvailable
+                return true
+            default:
+                return true // Be conservative
+            }
+        default:
+            // Unknown error - attempt retry to be safe
+            return true
         }
     }
 
