@@ -10,16 +10,24 @@ import Firebase
 import FirebaseFirestore
 
 @MainActor
-class MatchService: ObservableObject {
+class MatchService: ObservableObject, MatchServiceProtocol {
     @Published var matches: [Match] = []
     @Published var isLoading = false
     @Published var error: Error?
-    
-    static let shared = MatchService()
+
+    // Dependency injection: Repository for data access
+    private let repository: MatchRepository
+
+    // Singleton for backward compatibility (uses default repository)
+    static let shared = MatchService(repository: FirestoreMatchRepository())
+
     private let db = Firestore.firestore()
     private var listener: ListenerRegistration?
-    
-    private init() {}
+
+    // Dependency injection initializer
+    init(repository: MatchRepository) {
+        self.repository = repository
+    }
     
     /// Fetch all matches for a user
     func fetchMatches(userId: String) async throws {
@@ -27,18 +35,7 @@ class MatchService: ObservableObject {
         defer { isLoading = false }
 
         do {
-            // Use OR filter for optimized single query
-            let snapshot = try await db.collection("matches")
-                .whereFilter(Filter.orFilter([
-                    Filter.whereField("user1Id", isEqualTo: userId),
-                    Filter.whereField("user2Id", isEqualTo: userId)
-                ]))
-                .whereField("isActive", isEqualTo: true)
-                .getDocuments()
-
-            matches = snapshot.documents
-                .compactMap { try? $0.data(as: Match.self) }
-                .sorted { ($0.lastMessageTimestamp ?? $0.timestamp) > ($1.lastMessageTimestamp ?? $1.timestamp) }
+            matches = try await repository.fetchMatches(userId: userId)
         } catch {
             self.error = error
             throw error
@@ -85,18 +82,19 @@ class MatchService: ObservableObject {
     func createMatch(user1Id: String, user2Id: String) async {
         // Check if match already exists
         if let existingMatch = try? await fetchMatch(user1Id: user1Id, user2Id: user2Id) {
-            Logger.shared.info("Match already exists: \(existingMatch.id ?? "unknown")", category: .general)
+            Logger.shared.info("Match already exists: \(existingMatch.id ?? "unknown")", category: .matching)
             return
         }
 
         let match = Match(user1Id: user1Id, user2Id: user2Id)
 
         do {
-            let docRef = try db.collection("matches").addDocument(from: match)
-            Logger.shared.info("Match created: \(docRef.documentID)", category: .general)
+            let matchId = try await repository.createMatch(match: match)
 
             // Update match counts for both users
-            try await updateMatchCounts(user1Id: user1Id, user2Id: user2Id)
+            if let firestoreRepo = repository as? FirestoreMatchRepository {
+                try await firestoreRepo.updateMatchCounts(user1Id: user1Id, user2Id: user2Id)
+            }
 
             // PERFORMANCE FIX: Batch fetch both users in a single query (prevents N+1 problem)
             let usersSnapshot = try? await db.collection("users")
@@ -117,7 +115,7 @@ class MatchService: ObservableObject {
 
                 // Create match object with ID for notifications
                 var matchWithId = match
-                matchWithId.id = docRef.documentID
+                matchWithId.id = matchId
 
                 // Send notifications to both users
                 let notificationService = NotificationService.shared
@@ -142,68 +140,39 @@ class MatchService: ObservableObject {
     
     /// Fetch a specific match between two users
     func fetchMatch(user1Id: String, user2Id: String) async throws -> Match? {
-        // Use OR filter for optimized single query
-        let snapshot = try await db.collection("matches")
-            .whereFilter(Filter.orFilter([
-                Filter.andFilter([
-                    Filter.whereField("user1Id", isEqualTo: user1Id),
-                    Filter.whereField("user2Id", isEqualTo: user2Id)
-                ]),
-                Filter.andFilter([
-                    Filter.whereField("user1Id", isEqualTo: user2Id),
-                    Filter.whereField("user2Id", isEqualTo: user1Id)
-                ])
-            ]))
-            .whereField("isActive", isEqualTo: true)
-            .limit(to: 1)
-            .getDocuments()
-
-        return snapshot.documents.first.flatMap { try? $0.data(as: Match.self) }
+        return try await repository.fetchMatch(user1Id: user1Id, user2Id: user2Id)
     }
     
     /// Update match with last message info
     func updateMatchLastMessage(matchId: String, message: String, timestamp: Date) async throws {
-        try await db.collection("matches").document(matchId).updateData([
-            "lastMessage": message,
-            "lastMessageTimestamp": timestamp
-        ])
+        try await repository.updateMatchLastMessage(matchId: matchId, message: message, timestamp: timestamp)
     }
     
     /// Increment unread count for a user
     func incrementUnreadCount(matchId: String, userId: String) async throws {
-        try await db.collection("matches").document(matchId).updateData([
-            "unreadCount.\(userId)": FieldValue.increment(Int64(1))
-        ])
+        if let firestoreRepo = repository as? FirestoreMatchRepository {
+            try await firestoreRepo.incrementUnreadCount(matchId: matchId, userId: userId)
+        }
     }
-    
+
     /// Reset unread count for a user
     func resetUnreadCount(matchId: String, userId: String) async throws {
-        try await db.collection("matches").document(matchId).updateData([
-            "unreadCount.\(userId)": 0
-        ])
+        if let firestoreRepo = repository as? FirestoreMatchRepository {
+            try await firestoreRepo.resetUnreadCount(matchId: matchId, userId: userId)
+        }
     }
-    
+
     /// Unmatch - Deactivate match and clean up related data
     func unmatch(matchId: String, userId: String) async throws {
-        // Deactivate the match
-        try await db.collection("matches").document(matchId).updateData([
-            "isActive": false,
-            "unmatchedBy": userId,
-            "unmatchedAt": FieldValue.serverTimestamp()
-        ])
-
-        // Optionally delete all messages (for privacy)
-        // Uncomment if you want to delete messages on unmatch
-        // try await MessageService.shared.deleteAllMessages(matchId: matchId)
-
-        Logger.shared.info("Unmatched successfully", category: .general)
+        if let firestoreRepo = repository as? FirestoreMatchRepository {
+            try await firestoreRepo.unmatch(matchId: matchId, userId: userId)
+        }
+        Logger.shared.info("Unmatched successfully", category: .matching)
     }
 
     /// Deactivate a match (soft delete)
     func deactivateMatch(matchId: String) async throws {
-        try await db.collection("matches").document(matchId).updateData([
-            "isActive": false
-        ])
+        try await repository.deactivateMatch(matchId: matchId)
     }
 
     /// Delete a match permanently (use with caution)
@@ -226,16 +195,6 @@ class MatchService: ObservableObject {
         return match != nil
     }
     
-    /// Update match counts for both users
-    private func updateMatchCounts(user1Id: String, user2Id: String) async throws {
-        try await db.collection("users").document(user1Id).updateData([
-            "matchCount": FieldValue.increment(Int64(1))
-        ])
-        
-        try await db.collection("users").document(user2Id).updateData([
-            "matchCount": FieldValue.increment(Int64(1))
-        ])
-    }
     
     deinit {
         listener?.remove()

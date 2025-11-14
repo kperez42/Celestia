@@ -10,24 +10,31 @@ import Firebase
 import FirebaseFirestore
 
 @MainActor
-class UserService: ObservableObject {
+class UserService: ObservableObject, UserServiceProtocol {
     @Published var users: [User] = []
     @Published var isLoading = false
     @Published var error: Error?
     @Published var hasMoreUsers = true
 
-    static let shared = UserService()
+    // Dependency injection: Repository for data access
+    private let repository: UserRepository
+
+    // Singleton for backward compatibility (uses default repository)
+    static let shared = UserService(repository: FirestoreUserRepository())
+
     private let db = Firestore.firestore()
     private var lastDocument: DocumentSnapshot?
     private var searchTask: Task<Void, Never>?
-    private let userCache = QueryCache<User>(ttl: 300, maxSize: 100) // 5 min cache, 100 users
 
     // PERFORMANCE: Search result caching to reduce database queries
     private var searchCache: [String: CachedSearchResult] = [:]
     private let searchCacheDuration: TimeInterval = 300 // 5 minutes
     private let maxSearchCacheSize = 50 // Limit cache size to prevent memory bloat
 
-    private init() {}
+    // Dependency injection initializer
+    init(repository: UserRepository) {
+        self.repository = repository
+    }
 
     /// Fetch users with filters and pagination support
     func fetchUsers(
@@ -88,25 +95,8 @@ class UserService: ObservableObject {
     
     /// Fetch a single user by ID (with caching)
     func fetchUser(userId: String) async throws -> User? {
-        // Check cache first
-        if let cached = await userCache.get(userId) {
-            Logger.shared.debug("Cache hit for user \(userId)", category: .database)
-            return cached
-        }
-
-        // Cache miss - fetch from Firestore
-        Logger.shared.debug("Cache miss for user \(userId), fetching from database", category: .database)
-
         do {
-            let doc = try await db.collection("users").document(userId).getDocument()
-            guard let user = try? doc.data(as: User.self) else {
-                return nil
-            }
-
-            // Store in cache
-            await userCache.set(userId, value: user)
-
-            return user
+            return try await repository.fetchUser(id: userId)
         } catch {
             self.error = error
             throw error
@@ -115,15 +105,8 @@ class UserService: ObservableObject {
     
     /// Update user profile
     func updateUser(_ user: User) async throws {
-        guard let userId = user.id else {
-            throw NSError(domain: "UserService", code: -1, userInfo: [NSLocalizedDescriptionKey: "User ID is nil"])
-        }
-
         do {
-            try db.collection("users").document(userId).setData(from: user, merge: true)
-            // Invalidate cache after update
-            await userCache.remove(userId)
-            Logger.shared.debug("User cache invalidated for \(userId)", category: .database)
+            try await repository.updateUser(user)
         } catch {
             self.error = error
             throw error
@@ -133,10 +116,7 @@ class UserService: ObservableObject {
     /// Update specific fields
     func updateUserFields(userId: String, fields: [String: Any]) async throws {
         do {
-            try await db.collection("users").document(userId).updateData(fields)
-            // Invalidate cache after update
-            await userCache.remove(userId)
-            Logger.shared.debug("User cache invalidated for \(userId)", category: .database)
+            try await repository.updateUserFields(userId: userId, fields: fields)
         } catch {
             self.error = error
             throw error
@@ -144,26 +124,13 @@ class UserService: ObservableObject {
     }
     
     /// Increment profile view count
-    func incrementProfileViews(userId: String) async {
-        do {
-            try await db.collection("users").document(userId).updateData([
-                "profileViews": FieldValue.increment(Int64(1))
-            ])
-        } catch {
-            Logger.shared.error("Error incrementing profile views", category: .database, error: error)
-        }
+    func incrementProfileViews(userId: String) async throws {
+        await repository.incrementProfileViews(userId: userId)
     }
     
     /// Update user's last active timestamp
     func updateLastActive(userId: String) async {
-        do {
-            try await db.collection("users").document(userId).updateData([
-                "lastActive": FieldValue.serverTimestamp(),
-                "isOnline": true
-            ])
-        } catch {
-            Logger.shared.error("Error updating last active", category: .database, error: error)
-        }
+        await repository.updateLastActive(userId: userId)
     }
     
     /// Set user offline
@@ -219,133 +186,21 @@ class UserService: ObservableObject {
             return cached.results
         }
 
-        Logger.shared.debug("Search cache MISS for query: '\(searchQuery)' - querying database", category: .performance)
+        Logger.shared.debug("Search cache MISS for query: '\(searchQuery)' - querying repository", category: .performance)
 
-        // CRITICAL OPTIMIZATION: Limit the number of documents fetched from Firestore
-        // Previous implementation fetched ALL users - this is catastrophic at scale
-        //
-        // Strategy: Use prefix matching for name searches (Firestore-supported)
-        // For location searches, fetch a limited set and filter client-side as fallback
-        //
-        // This is a temporary solution - production should use Algolia/Elasticsearch
-
-        var results: [User] = []
-
-        // Approach 1: Try prefix matching on fullName (most common search pattern)
-        // Firestore supports: where("field", ">=", prefix) AND where("field", "<", prefixEnd)
-        let prefixEnd = searchQuery + "\u{f8ff}" // Unicode max character for range query
-
-        do {
-            // Query 1: Search by name prefix (most efficient)
-            let nameQuery = db.collection("users")
-                .whereField("showMeInSearch", isEqualTo: true)
-                .whereField("fullNameLowercase", isGreaterThanOrEqualTo: searchQuery)
-                .whereField("fullNameLowercase", isLessThan: prefixEnd)
-                .limit(to: limit)
-
-            let nameSnapshot = try await nameQuery.getDocuments()
-            let nameResults = nameSnapshot.documents
-                .compactMap { try? $0.data(as: User.self) }
-                .filter { $0.id != currentUserId }
-
-            results.append(contentsOf: nameResults)
-
-            // If we have enough results from name search, return early
-            if results.count >= limit {
-                Logger.shared.info("Search completed with \(results.count) name-based results", category: .performance)
-                cacheSearchResults(cacheKey: cacheKey, results: Array(results.prefix(limit)))
-                return Array(results.prefix(limit))
-            }
-
-        } catch {
-            // Firestore might not have the index yet - log warning and fallback
-            Logger.shared.warning("Name prefix query failed (index may not exist): \(error.localizedDescription)", category: .database)
-            Logger.shared.info("To fix: Create Firestore composite index on [showMeInSearch, fullNameLowercase]", category: .database)
-        }
-
-        // Approach 2: If name search didn't yield enough results, try country prefix match
-        // This handles location-based searches
-        do {
-            let remainingLimit = limit - results.count
-            if remainingLimit > 0 {
-                let countryQuery = db.collection("users")
-                    .whereField("showMeInSearch", isEqualTo: true)
-                    .whereField("countryLowercase", isGreaterThanOrEqualTo: searchQuery)
-                    .whereField("countryLowercase", isLessThan: prefixEnd)
-                    .limit(to: remainingLimit)
-
-                let countrySnapshot = try await countryQuery.getDocuments()
-                let countryResults = countrySnapshot.documents
-                    .compactMap { try? $0.data(as: User.self) }
-                    .filter { user in
-                        user.id != currentUserId &&
-                        !results.contains(where: { $0.id == user.id }) // Avoid duplicates
-                    }
-
-                results.append(contentsOf: countryResults)
-            }
-
-        } catch {
-            Logger.shared.warning("Country prefix query failed (index may not exist): \(error.localizedDescription)", category: .database)
-            Logger.shared.info("To fix: Create Firestore composite index on [showMeInSearch, countryLowercase]", category: .database)
-        }
-
-        // Approach 3: Fallback - fetch limited set and filter client-side (last resort)
-        // ONLY if we still don't have enough results
-        if results.count < limit / 2 {
-            Logger.shared.warning("Insufficient results from indexed queries - falling back to limited client-side filtering", category: .performance)
-
-            // Fetch a SMALL limited set (NOT all users)
-            let fallbackLimit = min(100, limit * 5) // Fetch at most 100 users
-
-            var fallbackQuery = db.collection("users")
-                .whereField("showMeInSearch", isEqualTo: true)
-                .order(by: "lastActive", descending: true) // Get most active users
-                .limit(to: fallbackLimit)
-
-            if let offset = offset {
-                fallbackQuery = fallbackQuery.start(afterDocument: offset)
-            }
-
-            let fallbackSnapshot = try await fallbackQuery.getDocuments()
-
-            let fallbackResults = fallbackSnapshot.documents
-                .compactMap { try? $0.data(as: User.self) }
-                .filter { user in
-                    guard user.id != currentUserId else { return false }
-                    guard !results.contains(where: { $0.id == user.id }) else { return false }
-
-                    // Client-side filtering (limited scope)
-                    return user.fullName.lowercased().contains(searchQuery) ||
-                           user.location.lowercased().contains(searchQuery) ||
-                           user.country.lowercased().contains(searchQuery)
-                }
-
-            results.append(contentsOf: fallbackResults)
-
-            // Log performance metrics
-            let scannedCount = fallbackSnapshot.documents.count
-            let matchedCount = fallbackResults.count
-            Task { @MainActor in
-                AnalyticsManager.shared.logEvent(.performance, parameters: [
-                    "type": "search_fallback_used",
-                    "query": searchQuery,
-                    "scanned_documents": scannedCount,
-                    "matched_results": matchedCount
-                ])
-            }
-        }
-
-        // Limit final results
-        let finalResults = Array(results.prefix(limit))
-
-        Logger.shared.info("Search completed: query='\(searchQuery)', results=\(finalResults.count), total_scanned=\(results.count)", category: .performance)
+        // Delegate to repository
+        let results = try await repository.searchUsers(
+            query: searchQuery,
+            currentUserId: currentUserId,
+            limit: limit,
+            offset: offset
+        )
 
         // Cache results (with TTL)
-        cacheSearchResults(cacheKey: cacheKey, results: finalResults)
+        cacheSearchResults(cacheKey: cacheKey, results: results)
 
         // Track search analytics
-        let resultsCount = finalResults.count
+        let resultsCount = results.count
         Task { @MainActor in
             AnalyticsManager.shared.logEvent(.featureUsed, parameters: [
                 "feature": "user_search",
@@ -355,7 +210,7 @@ class UserService: ObservableObject {
             ])
         }
 
-        return finalResults
+        return results
     }
 
     // MARK: - Search Cache Management
@@ -575,13 +430,19 @@ class UserService: ObservableObject {
 
     /// Clear user cache (useful on logout)
     func clearCache() async {
-        await userCache.clear()
+        if let firestoreRepo = repository as? FirestoreUserRepository {
+            await firestoreRepo.clearCache()
+        }
+        searchCache.removeAll()
         Logger.shared.info("User cache cleared", category: .database)
     }
 
     /// Get cache statistics
     func getCacheSize() async -> Int {
-        return await userCache.size()
+        if let firestoreRepo = repository as? FirestoreUserRepository {
+            return await firestoreRepo.getCacheSize()
+        }
+        return 0
     }
 
     deinit {
