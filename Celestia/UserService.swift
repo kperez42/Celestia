@@ -13,8 +13,12 @@ import FirebaseFirestore
 class UserService: ObservableObject {
     @Published var users: [User] = []
     @Published var isLoading = false
-    @Published var error: Error?
     @Published var hasMoreUsers = true
+
+    // REMOVED: @Published var error: Error?
+    // ERROR HANDLING STRATEGY: This service now uses `throws` for error propagation
+    // ViewModels should wrap calls in try/catch and use OperationState<T> for UI reactivity
+    // See ERROR_HANDLING_GUIDE.md for details
 
     static let shared = UserService()
     private let db = Firestore.firestore()
@@ -79,44 +83,80 @@ class UserService: ObservableObject {
 
             users.append(contentsOf: newUsers)
             hasMoreUsers = newUsers.count >= limit
+
+            Logger.shared.debug("Fetched \(newUsers.count) users", category: .database)
+
         } catch {
-            self.error = error
-            throw error
+            Logger.shared.error("Failed to fetch users", category: .database, error: error)
+            // Convert to CelestiaError and throw
+            throw CelestiaError.from(error)
         }
     }
     
     /// Fetch a single user by ID
-    func fetchUser(userId: String) async throws -> User? {
+    /// - Throws: CelestiaError.userNotFound if user doesn't exist
+    /// - Throws: CelestiaError.databaseError on database failure
+    func fetchUser(userId: String) async throws -> User {
+        Logger.shared.debug("Fetching user: \(userId)", category: .database)
+
         do {
             let doc = try await db.collection("users").document(userId).getDocument()
-            return try? doc.data(as: User.self)
-        } catch {
-            self.error = error
+
+            guard doc.exists else {
+                Logger.shared.warning("User not found: \(userId)", category: .database)
+                throw CelestiaError.userNotFound
+            }
+
+            guard let user = try? doc.data(as: User.self) else {
+                Logger.shared.error("Failed to decode user: \(userId)", category: .database)
+                throw CelestiaError.invalidUserData("Unable to decode user data")
+            }
+
+            return user
+
+        } catch let error as CelestiaError {
+            // Already a CelestiaError, just rethrow
             throw error
+        } catch {
+            Logger.shared.error("Failed to fetch user", category: .database, error: error)
+            throw CelestiaError.from(error)
         }
     }
     
     /// Update user profile
+    /// - Throws: CelestiaError.userNotAuthenticated if user ID is nil
+    /// - Throws: CelestiaError.databaseError on database failure
     func updateUser(_ user: User) async throws {
         guard let userId = user.id else {
-            throw NSError(domain: "UserService", code: -1, userInfo: [NSLocalizedDescriptionKey: "User ID is nil"])
+            Logger.shared.error("Cannot update user: ID is nil", category: .database)
+            throw CelestiaError.userNotAuthenticated
         }
-        
+
+        Logger.shared.debug("Updating user: \(userId)", category: .database)
+
+        var updatedUser = user
+        updatedUser.updateSearchFields() // Update lowercase search fields
+
         do {
-            try db.collection("users").document(userId).setData(from: user, merge: true)
+            try db.collection("users").document(userId).setData(from: updatedUser, merge: true)
+            Logger.shared.info("User updated successfully: \(userId)", category: .database)
         } catch {
-            self.error = error
-            throw error
+            Logger.shared.error("Failed to update user", category: .database, error: error)
+            throw CelestiaError.from(error)
         }
     }
     
     /// Update specific fields
+    /// - Throws: CelestiaError.databaseError on database failure
     func updateUserFields(userId: String, fields: [String: Any]) async throws {
+        Logger.shared.debug("Updating user fields: \(userId)", category: .database)
+
         do {
             try await db.collection("users").document(userId).updateData(fields)
+            Logger.shared.debug("User fields updated: \(userId)", category: .database)
         } catch {
-            self.error = error
-            throw error
+            Logger.shared.error("Failed to update user fields", category: .database, error: error)
+            throw CelestiaError.from(error)
         }
     }
     
