@@ -24,12 +24,17 @@ class PerformanceMonitor: ObservableObject {
     @Published var averageImageLoadTimeMs: Double = 0.0
     @Published var connectionQuality: ConnectionQuality = .excellent
     @Published var isMonitoring: Bool = false
+    @Published var isUnderMemoryPressure: Bool = false
 
     /// Threshold for logging slow operations (milliseconds)
     private let slowOperationThreshold: Double = 1000 // 1 second
 
     /// Threshold for sending to analytics (milliseconds)
     private let analyticsThreshold: Double = 2000 // 2 seconds
+
+    /// Memory warning tracking
+    private var memoryWarningCount = 0
+    private var lastMemoryWarning: Date?
 
     // MARK: - Connection Quality
 
@@ -85,7 +90,72 @@ class PerformanceMonitor: ObservableObject {
     private var monitoringTimer: Timer?
 
     private init() {
+        // PERFORMANCE: Register for memory warning notifications
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didReceiveMemoryWarningNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.handleMemoryWarning()
+            }
+        }
+
         Logger.shared.info("PerformanceMonitor initialized", category: .performance)
+    }
+
+    // MARK: - Memory Pressure Management
+
+    /// Handle system memory warning
+    private func handleMemoryWarning() {
+        memoryWarningCount += 1
+        lastMemoryWarning = Date()
+        isUnderMemoryPressure = true
+
+        Logger.shared.warning(
+            "Memory warning \(memoryWarningCount) detected - Memory usage: \(String(format: "%.1f", memoryUsageMB))MB",
+            category: .performance
+        )
+
+        // Send critical memory warning to analytics
+        AnalyticsManager.shared.logEvent(.performance, parameters: [
+            "type": "memory_warning",
+            "count": memoryWarningCount,
+            "memory_mb": memoryUsageMB,
+            "connection_quality": connectionQuality.rawValue
+        ])
+
+        // Reset pressure flag after 2 minutes
+        Task {
+            try? await Task.sleep(nanoseconds: 120_000_000_000) // 2 minutes
+            await MainActor.run {
+                isUnderMemoryPressure = false
+            }
+        }
+    }
+
+    /// Get memory pressure statistics
+    func getMemoryPressureStats() -> MemoryPressureStats {
+        return MemoryPressureStats(
+            isUnderPressure: isUnderMemoryPressure,
+            warningCount: memoryWarningCount,
+            lastWarning: lastMemoryWarning,
+            currentMemoryMB: memoryUsageMB,
+            availableMemoryGB: Double(ProcessInfo.processInfo.physicalMemory) / 1_073_741_824.0
+        )
+    }
+
+    struct MemoryPressureStats {
+        let isUnderPressure: Bool
+        let warningCount: Int
+        let lastWarning: Date?
+        let currentMemoryMB: Double
+        let availableMemoryGB: Double
+
+        var timeSinceLastWarning: TimeInterval? {
+            guard let lastWarning = lastWarning else { return nil }
+            return Date().timeIntervalSince(lastWarning)
+        }
     }
 
     // MARK: - Start/Stop Monitoring
@@ -336,8 +406,10 @@ class PerformanceMonitor: ObservableObject {
             recommendations.append("Low FPS detected. Consider reducing UI complexity or animations.")
         }
 
-        if memoryUsageMB > 500 {
-            recommendations.append("High memory usage. Consider clearing caches or reducing loaded data.")
+        if isUnderMemoryPressure || memoryWarningCount > 0 {
+            recommendations.append("Memory pressure detected (\(memoryWarningCount) warnings). System has purged caches.")
+        } else if memoryUsageMB > 500 {
+            recommendations.append("High memory usage (\(String(format: "%.0f", memoryUsageMB))MB). Consider clearing caches or reducing loaded data.")
         }
 
         if connectionQuality == .poor || connectionQuality == .offline {

@@ -163,20 +163,62 @@ typealias StatsCache = QueryCache<[String: Any]>
 
 // MARK: - Cache Manager
 
-/// Centralized cache management
+/// Centralized cache management with memory pressure monitoring
 @MainActor
 class CacheManager {
     static let shared = CacheManager()
 
-    let users = UserCache(ttl: 300, maxSize: 100) // 5 min, 100 users
-    let matches = MatchCache(ttl: 180, maxSize: 50) // 3 min, 50 matches
-    let stats = StatsCache(ttl: 60, maxSize: 20) // 1 min, 20 stat objects
+    let users: UserCache
+    let matches: MatchCache
+    let stats: StatsCache
+
+    // Memory pressure tracking
+    private var isUnderMemoryPressure = false
+    private var memoryWarningCount = 0
 
     private init() {
+        // PERFORMANCE: Adaptive cache sizes based on device memory
+        let physicalMemory = ProcessInfo.processInfo.physicalMemory
+        let memoryInGB = Double(physicalMemory) / 1_073_741_824.0 // Convert to GB
+
+        // Adjust cache sizes for lower-end devices
+        if memoryInGB < 2.0 {
+            // Low memory device (e.g., iPhone 6s, SE 1st gen)
+            users = UserCache(ttl: 300, maxSize: 50) // 5 min, 50 users
+            matches = MatchCache(ttl: 180, maxSize: 25) // 3 min, 25 matches
+            stats = StatsCache(ttl: 60, maxSize: 10) // 1 min, 10 stat objects
+        } else if memoryInGB < 3.0 {
+            // Mid-range device (e.g., iPhone 8, X)
+            users = UserCache(ttl: 300, maxSize: 75) // 5 min, 75 users
+            matches = MatchCache(ttl: 180, maxSize: 40) // 3 min, 40 matches
+            stats = StatsCache(ttl: 60, maxSize: 15) // 1 min, 15 stat objects
+        } else {
+            // High-end device (e.g., iPhone 11+)
+            users = UserCache(ttl: 300, maxSize: 100) // 5 min, 100 users
+            matches = MatchCache(ttl: 180, maxSize: 50) // 3 min, 50 matches
+            stats = StatsCache(ttl: 60, maxSize: 20) // 1 min, 20 stat objects
+        }
+
+        // PERFORMANCE: Register for memory warning notifications
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didReceiveMemoryWarningNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                await self?.handleMemoryWarning()
+            }
+        }
+
         // Start periodic cleanup task
         Task {
             await startPeriodicCleanup()
         }
+
+        Logger.shared.info(
+            "CacheManager initialized (Device memory: \(String(format: "%.1f", memoryInGB))GB)",
+            category: .database
+        )
     }
 
     /// Clear all caches
@@ -194,6 +236,59 @@ class CacheManager {
             "matches": await matches.size(),
             "stats": await stats.size()
         ]
+    }
+
+    /// Get detailed memory statistics
+    func getMemoryStatistics() async -> MemoryStatistics {
+        let physicalMemory = ProcessInfo.processInfo.physicalMemory
+        return MemoryStatistics(
+            usersCount: await users.size(),
+            matchesCount: await matches.size(),
+            statsCount: await stats.size(),
+            isUnderMemoryPressure: isUnderMemoryPressure,
+            memoryWarningCount: memoryWarningCount,
+            deviceMemoryGB: Double(physicalMemory) / 1_073_741_824.0
+        )
+    }
+
+    struct MemoryStatistics {
+        let usersCount: Int
+        let matchesCount: Int
+        let statsCount: Int
+        let isUnderMemoryPressure: Bool
+        let memoryWarningCount: Int
+        let deviceMemoryGB: Double
+    }
+
+    // MARK: - Memory Pressure Management
+
+    /// Handle memory warning by clearing all query caches
+    private func handleMemoryWarning() async {
+        memoryWarningCount += 1
+        isUnderMemoryPressure = true
+
+        Logger.shared.warning(
+            "Memory warning received (count: \(memoryWarningCount)) - purging query caches",
+            category: .database
+        )
+
+        // Clear all caches immediately
+        await clearAll()
+
+        // Log current memory usage for debugging
+        let stats = await getMemoryStatistics()
+        Logger.shared.info(
+            "Cache cleared - Device memory: \(String(format: "%.1f", stats.deviceMemoryGB))GB",
+            category: .database
+        )
+
+        // Reset pressure flag after a delay
+        Task {
+            try? await Task.sleep(nanoseconds: 60_000_000_000) // 60 seconds
+            await MainActor.run {
+                isUnderMemoryPressure = false
+            }
+        }
     }
 
     // MARK: - Private

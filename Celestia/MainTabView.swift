@@ -62,6 +62,9 @@ struct MainTabView: View {
             HapticManager.shared.selection()
         }
         .task {
+            // PERFORMANCE: Defer badge loading to not block initial render
+            // Allow the UI to render first, then load badges in background
+            try? await Task.sleep(nanoseconds: 500_000_000) // 500ms delay
             await loadBadgeCounts()
         }
         .onDisappear {
