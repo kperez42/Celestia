@@ -422,7 +422,9 @@ extension NotificationService {
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self else { return }
 
-                Task { @MainActor in
+                Task { [weak self] @MainActor in
+                    guard let self = self else { return }
+
                     if let error = error {
                         Logger.shared.error("Error listening to notifications", category: .general, error: error)
                         return

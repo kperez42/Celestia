@@ -95,8 +95,9 @@ class BlockReportService: ObservableObject {
                     doc.data()["blockedUserId"] as? String
                 })
 
-                Task { @MainActor in
-                    self?.blockedUserIds = blockedIds
+                Task { [weak self] @MainActor in
+                    guard let self = self else { return }
+                    self.blockedUserIds = blockedIds
                 }
             }
     }

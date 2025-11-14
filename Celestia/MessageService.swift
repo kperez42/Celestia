@@ -33,15 +33,17 @@ class MessageService: ObservableObject {
 
                 if let error = error {
                     Logger.shared.error("Error listening to messages", category: .messaging, error: error)
-                    Task { @MainActor in
+                    Task { [weak self] @MainActor in
+                        guard let self = self else { return }
                         self.error = error
                     }
                     return
                 }
-                
+
                 guard let documents = snapshot?.documents else { return }
-                
-                Task { @MainActor in
+
+                Task { [weak self] @MainActor in
+                    guard let self = self else { return }
                     self.messages = documents.compactMap { try? $0.data(as: Message.self) }
                 }
             }
