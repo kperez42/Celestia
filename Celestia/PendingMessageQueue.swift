@@ -301,7 +301,7 @@ class PendingMessageQueue: ObservableObject {
     }
 
     /// Stop background processing (for cleanup)
-    func stopBackgroundProcessing() {
+    nonisolated func stopBackgroundProcessing() {
         processingTimer?.invalidate()
         processingTimer = nil
         Logger.shared.info("Background message queue processing stopped", category: .messaging)

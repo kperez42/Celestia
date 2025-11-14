@@ -17,6 +17,9 @@ enum AnalyticsEvent: String {
     case match = "match"
     case superLike = "super_like"
     case messageReceived = "message_received"
+    case queuedMessage = "queued_message"
+    case messageSentFromQueue = "message_sent_from_queue"
+    case messageRejected = "message_rejected"
 
     // Safety & Verification
     case backgroundCheckCompleted = "background_check_completed"
