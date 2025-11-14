@@ -73,7 +73,7 @@ struct AnalyticsDashboardView: View {
 
         Task {
             do {
-                try await analyticsService.generateUserInsights(userId: userId)
+                _ = try await analyticsService.generateUserInsights(userId: userId)
             } catch {
                 Logger.shared.error("Failed to load analytics", category: .general, error: error)
             }
