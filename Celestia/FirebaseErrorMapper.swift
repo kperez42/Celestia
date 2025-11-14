@@ -61,7 +61,7 @@ enum FirebaseErrorMapper {
         case 17011: // AuthErrorCode.userNotFound
             return .userNotFound
 
-        case 17010: // AuthErrorCode.userDisabled
+        case 17010: // AuthErrorCode.userDisabled / tooManyRequests (Firebase uses same code)
             return .accountDisabled
 
         case 17007: // AuthErrorCode.emailAlreadyInUse
@@ -74,8 +74,8 @@ enum FirebaseErrorMapper {
         case 17020: // AuthErrorCode.networkError
             return .networkError
 
-        // Too many requests
-        case 17010: // AuthErrorCode.tooManyRequests
+        // Too many requests (17046 is actual code for tooManyRequests)
+        case 17046: // AuthErrorCode.tooManyRequests
             return .tooManyRequests
 
         // Operation not allowed

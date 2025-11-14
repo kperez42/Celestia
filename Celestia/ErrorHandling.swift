@@ -17,10 +17,22 @@ enum CelestiaError: LocalizedError, Identifiable {
     // Authentication Errors
     case notAuthenticated
     case invalidCredentials
+    case invalidEmail
+    case wrongPassword
     case emailAlreadyExists
+    case emailAlreadyInUse  // Alias for emailAlreadyExists
     case weakPassword
     case emailNotVerified
     case accountDisabled
+    case sessionExpired
+    case requiresRecentLogin
+    case authenticationFailed(String)
+    case tooManyRequests
+    case authOperationNotAllowed
+
+    // Authorization Errors
+    case unauthorized
+    case unauthenticated
 
     // User Errors
     case userNotFound
@@ -32,6 +44,7 @@ enum CelestiaError: LocalizedError, Identifiable {
     // Network Errors
     case networkError
     case timeout
+    case requestTimeout
     case serverError
     case noInternetConnection
     case serviceTemporarilyUnavailable
@@ -58,9 +71,11 @@ enum CelestiaError: LocalizedError, Identifiable {
 
     // Media Errors
     case imageUploadFailed
+    case uploadFailed(String)
     case imageTooBig
     case invalidImageFormat
     case tooManyImages
+    case storageQuotaExceeded
 
     // Premium Errors
     case premiumRequired
@@ -68,8 +83,17 @@ enum CelestiaError: LocalizedError, Identifiable {
     case purchaseFailed
     case restoreFailed
 
+    // Database Errors
+    case documentNotFound
+    case duplicateEntry
+    case databaseError(String)
+
+    // Operation Errors
+    case operationCancelled
+    case configurationError(String)
+
     // General Errors
-    case unknown
+    case unknown(String)
     case invalidData
     case permissionDenied
 
@@ -80,7 +104,11 @@ enum CelestiaError: LocalizedError, Identifiable {
             return "You need to be signed in to perform this action."
         case .invalidCredentials:
             return "Invalid email or password. Please try again."
-        case .emailAlreadyExists:
+        case .invalidEmail:
+            return "Please enter a valid email address."
+        case .wrongPassword:
+            return "Incorrect password. Please try again."
+        case .emailAlreadyExists, .emailAlreadyInUse:
             return "This email is already registered. Please sign in instead."
         case .weakPassword:
             return "Password must be at least 8 characters long."
@@ -88,6 +116,22 @@ enum CelestiaError: LocalizedError, Identifiable {
             return "Please verify your email address before continuing."
         case .accountDisabled:
             return "Your account has been disabled. Contact support for help."
+        case .sessionExpired:
+            return "Your session has expired. Please sign in again."
+        case .requiresRecentLogin:
+            return "For security, please sign in again to continue."
+        case .authenticationFailed(let message):
+            return "Authentication failed: \(message)"
+        case .tooManyRequests:
+            return "Too many attempts. Please try again later."
+        case .authOperationNotAllowed:
+            return "This operation is not allowed. Please contact support."
+
+        // Authorization
+        case .unauthorized:
+            return "You are not authorized for this action."
+        case .unauthenticated:
+            return "Please sign in to continue."
 
         // User
         case .userNotFound:
@@ -104,7 +148,7 @@ enum CelestiaError: LocalizedError, Identifiable {
         // Network
         case .networkError:
             return "Network error occurred. Please check your connection."
-        case .timeout:
+        case .timeout, .requestTimeout:
             return "Request timed out. Please try again."
         case .serverError:
             return "Server error occurred. Please try again later."
@@ -151,12 +195,16 @@ enum CelestiaError: LocalizedError, Identifiable {
         // Media
         case .imageUploadFailed:
             return "Failed to upload image. Please try again."
+        case .uploadFailed(let message):
+            return "Upload failed: \(message)"
         case .imageTooBig:
             return "Image is too large. Please choose a smaller image."
         case .invalidImageFormat:
             return "Invalid image format. Please use JPEG or PNG."
         case .tooManyImages:
             return "You've reached the maximum number of photos (6)."
+        case .storageQuotaExceeded:
+            return "Storage quota exceeded. Please contact support."
 
         // Premium
         case .premiumRequired:
@@ -168,9 +216,23 @@ enum CelestiaError: LocalizedError, Identifiable {
         case .restoreFailed:
             return "Failed to restore purchases. Please try again."
 
+        // Database
+        case .documentNotFound:
+            return "Requested data not found."
+        case .duplicateEntry:
+            return "This entry already exists."
+        case .databaseError(let message):
+            return "Database error: \(message)"
+
+        // Operations
+        case .operationCancelled:
+            return "Operation was cancelled."
+        case .configurationError(let message):
+            return "Configuration error: \(message)"
+
         // General
-        case .unknown:
-            return "An unexpected error occurred. Please try again."
+        case .unknown(let message):
+            return message.isEmpty ? "An unexpected error occurred. Please try again." : message
         case .invalidData:
             return "Invalid data received. Please try again."
         case .permissionDenied:
@@ -180,18 +242,20 @@ enum CelestiaError: LocalizedError, Identifiable {
 
     var recoverySuggestion: String? {
         switch self {
-        case .notAuthenticated:
+        case .notAuthenticated, .unauthenticated:
             return "Please sign in to your account."
-        case .invalidCredentials:
+        case .invalidCredentials, .invalidEmail, .wrongPassword:
             return "Double-check your email and password."
-        case .emailAlreadyExists:
+        case .emailAlreadyExists, .emailAlreadyInUse:
             return "Use the sign in page instead."
         case .weakPassword:
             return "Use a stronger password with letters, numbers, and symbols."
         case .networkError, .noInternetConnection:
             return "Check your internet connection and try again."
-        case .serverError, .timeout, .serviceTemporarilyUnavailable:
+        case .serverError, .timeout, .requestTimeout, .serviceTemporarilyUnavailable:
             return "Wait a moment and try again."
+        case .sessionExpired, .requiresRecentLogin:
+            return "Please sign in again."
         case .premiumRequired:
             return "Upgrade to Premium to unlock this feature."
         case .imageTooBig:
@@ -200,6 +264,10 @@ enum CelestiaError: LocalizedError, Identifiable {
             return "Complete your profile in Settings."
         case .batchOperationFailed:
             return "The operation will be retried automatically. If the problem persists, contact support."
+        case .tooManyRequests, .rateLimitExceeded, .rateLimitExceededWithTime:
+            return "Please wait a moment before trying again."
+        case .unauthorized, .permissionDenied:
+            return "Contact support if you believe this is an error."
         default:
             return "If the problem persists, contact support."
         }
@@ -207,17 +275,19 @@ enum CelestiaError: LocalizedError, Identifiable {
 
     var icon: String {
         switch self {
-        case .notAuthenticated, .invalidCredentials:
+        case .notAuthenticated, .invalidCredentials, .invalidEmail, .wrongPassword,
+             .sessionExpired, .requiresRecentLogin, .authenticationFailed,
+             .unauthenticated, .unauthorized:
             return "lock.shield"
-        case .networkError, .noInternetConnection, .timeout:
+        case .networkError, .noInternetConnection, .timeout, .requestTimeout:
             return "wifi.slash"
         case .serverError, .serviceTemporarilyUnavailable:
             return "server.rack"
-        case .userNotFound, .matchNotFound:
+        case .userNotFound, .matchNotFound, .documentNotFound:
             return "person.slash"
         case .premiumRequired, .subscriptionExpired:
             return "crown"
-        case .imageUploadFailed, .imageTooBig, .invalidImageFormat:
+        case .imageUploadFailed, .uploadFailed, .imageTooBig, .invalidImageFormat, .storageQuotaExceeded:
             return "photo"
         case .messageNotSent, .batchOperationFailed:
             return "message.badge.exclamationmark"
@@ -225,8 +295,12 @@ enum CelestiaError: LocalizedError, Identifiable {
             return "hand.raised"
         case .inappropriateContent, .inappropriateContentWithReasons:
             return "exclamationmark.triangle.fill"
-        case .rateLimitExceeded, .rateLimitExceededWithTime:
+        case .rateLimitExceeded, .rateLimitExceededWithTime, .tooManyRequests:
             return "clock.fill"
+        case .operationCancelled:
+            return "xmark.circle"
+        case .configurationError, .databaseError:
+            return "gearshape.fill"
         default:
             return "exclamationmark.triangle"
         }
@@ -245,29 +319,35 @@ enum CelestiaError: LocalizedError, Identifiable {
             case NSURLErrorNotConnectedToInternet:
                 return .noInternetConnection
             case NSURLErrorTimedOut:
-                return .timeout
+                return .requestTimeout
             default:
                 return .networkError
             }
         }
 
-        // Firebase errors
+        // Firebase errors - delegate to FirebaseErrorMapper if available
         if nsError.domain == "FIRAuthErrorDomain" {
             switch nsError.code {
             case 17007: // Email already in use
-                return .emailAlreadyExists
-            case 17008, 17009: // Invalid credentials
-                return .invalidCredentials
+                return .emailAlreadyInUse
+            case 17008: // Invalid email
+                return .invalidEmail
+            case 17009: // Wrong password
+                return .wrongPassword
             case 17011: // User not found
                 return .userNotFound
             case 17026: // Weak password
                 return .weakPassword
+            case 17010: // User disabled
+                return .accountDisabled
+            case 17020: // Network error
+                return .networkError
             default:
-                return .unknown
+                return .unknown(nsError.localizedDescription)
             }
         }
 
-        return .unknown
+        return .unknown(nsError.localizedDescription)
     }
 }
 
