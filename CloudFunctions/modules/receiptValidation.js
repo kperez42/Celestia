@@ -10,6 +10,7 @@ const admin = require('firebase-admin');
 const jwt = require('jsonwebtoken');
 const jwksClient = require('jwks-rsa');
 const crypto = require('crypto');
+const fraudDetection = require('./fraudDetection');
 
 // App Store endpoints
 const PRODUCTION_URL = 'https://buy.itunes.apple.com/verifyReceipt';
@@ -63,13 +64,13 @@ async function validateAppleReceipt(receiptData, userId = null) {
 
       // Track failed validation attempts for fraud detection
       if (userId) {
-        await trackValidationFailure(userId, status, 'receipt_validation_failed');
+        await fraudDetection.trackValidationFailure(userId, status, 'receipt_validation_failed');
       }
 
       return {
         isValid: false,
         error: getErrorMessage(status),
-        fraudScore: await calculateFraudScore(userId, { validationFailed: true })
+        fraudScore: await fraudDetection.calculateFraudScore(userId, { validationFailed: true })
       };
     }
 
@@ -82,14 +83,14 @@ async function validateAppleReceipt(receiptData, userId = null) {
 
     // SECURITY: Check for receipt reuse
     if (userId) {
-      const isDuplicate = await checkReceiptDuplicate(latestTransaction.transaction_id, userId);
+      const isDuplicate = await fraudDetection.checkReceiptDuplicate(latestTransaction.transaction_id, userId);
       if (isDuplicate) {
         functions.logger.error('FRAUD ALERT: Duplicate receipt detected', {
           userId,
           transactionId: latestTransaction.transaction_id
         });
 
-        await trackFraudAttempt(userId, 'duplicate_receipt', {
+        await fraudDetection.trackFraudAttempt(userId, 'duplicate_receipt', {
           transactionId: latestTransaction.transaction_id,
           productId: latestTransaction.product_id
         });
@@ -112,11 +113,11 @@ async function validateAppleReceipt(receiptData, userId = null) {
 
       // Validate promotional code hasn't been abused
       if (userId) {
-        const promoAbuse = await checkPromotionalCodeAbuse(userId, promotionalOfferId);
+        const promoAbuse = await fraudDetection.checkPromotionalCodeAbuse(userId, promotionalOfferId);
         if (promoAbuse) {
           functions.logger.error('FRAUD ALERT: Promotional code abuse detected', { userId, promotionalOfferId });
 
-          await trackFraudAttempt(userId, 'promo_code_abuse', {
+          await fraudDetection.trackFraudAttempt(userId, 'promo_code_abuse', {
             promotionalOfferId,
             productId: latestTransaction.product_id
           });
@@ -131,7 +132,7 @@ async function validateAppleReceipt(receiptData, userId = null) {
     }
 
     // SECURITY: Check for jailbreak indicators
-    const jailbreakRisk = detectJailbreakIndicators(receipt);
+    const jailbreakRisk = fraudDetection.detectJailbreakIndicators(receipt);
     if (jailbreakRisk > 0.7 && userId) {
       functions.logger.warn('SECURITY WARNING: Jailbreak indicators detected', {
         userId,
@@ -142,7 +143,7 @@ async function validateAppleReceipt(receiptData, userId = null) {
     }
 
     // Calculate fraud score for this transaction
-    const fraudScore = userId ? await calculateFraudScore(userId, {
+    const fraudScore = userId ? await fraudDetection.calculateFraudScore(userId, {
       isPromotional: isPromotionalPurchase,
       jailbreakRisk,
       transactionId: latestTransaction.transaction_id,
@@ -150,14 +151,14 @@ async function validateAppleReceipt(receiptData, userId = null) {
     }) : 0;
 
     // SECURITY: Flag high-risk transactions
-    if (fraudScore > 50) {
+    if (fraudScore > fraudDetection.FRAUD_THRESHOLDS.FRAUD_SCORE_MEDIUM) {
       functions.logger.warn('HIGH FRAUD RISK TRANSACTION', {
         userId,
         fraudScore,
         transactionId: latestTransaction.transaction_id
       });
 
-      await flagTransactionForReview(userId, latestTransaction, fraudScore);
+      await fraudDetection.flagTransactionForReview(userId, latestTransaction, fraudScore);
     }
 
     return {
@@ -188,7 +189,7 @@ async function validateAppleReceipt(receiptData, userId = null) {
     functions.logger.error('Receipt validation error', { error: error.message, userId });
 
     if (userId) {
-      await trackValidationFailure(userId, null, 'validation_exception', error.message);
+      await fraudDetection.trackValidationFailure(userId, null, 'validation_exception', error.message);
     }
 
     throw new Error(`Failed to validate receipt: ${error.message}`);
@@ -264,299 +265,6 @@ async function verifyWebhookSignature(request) {
 }
 
 /**
- * FRAUD DETECTION: Check if receipt has been used before
- * @param {string} transactionId - Transaction ID
- * @param {string} userId - User ID
- * @returns {boolean} True if duplicate
- */
-async function checkReceiptDuplicate(transactionId, userId) {
-  const db = admin.firestore();
-
-  try {
-    const existingPurchase = await db.collection('purchases')
-      .where('transactionId', '==', transactionId)
-      .get();
-
-    if (!existingPurchase.empty) {
-      const existingUserId = existingPurchase.docs[0].data().userId;
-
-      // Same user re-validating is OK, different user is fraud
-      if (existingUserId !== userId) {
-        functions.logger.error('FRAUD: Receipt used by different user', {
-          transactionId,
-          originalUser: existingUserId,
-          fraudUser: userId
-        });
-        return true;
-      }
-    }
-
-    return false;
-  } catch (error) {
-    functions.logger.error('Error checking receipt duplicate', { error: error.message });
-    return false;
-  }
-}
-
-/**
- * FRAUD DETECTION: Check for promotional code abuse
- * @param {string} userId - User ID
- * @param {string} promoCode - Promotional code
- * @returns {boolean} True if abuse detected
- */
-async function checkPromotionalCodeAbuse(userId, promoCode) {
-  const db = admin.firestore();
-
-  try {
-    // Check how many times this user has used promotional codes
-    const promoUsage = await db.collection('purchases')
-      .where('userId', '==', userId)
-      .where('isPromotional', '==', true)
-      .get();
-
-    // Flag if user has used more than 3 promotional codes
-    if (promoUsage.size > 3) {
-      return true;
-    }
-
-    // Check if the same promo code was used multiple times (shouldn't happen)
-    const samePromoUsage = await db.collection('purchases')
-      .where('userId', '==', userId)
-      .where('promotionalOfferId', '==', promoCode)
-      .get();
-
-    if (samePromoUsage.size > 1) {
-      return true;
-    }
-
-    // Check rapid promotional purchases (within 24 hours)
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const recentPromoUsage = promoUsage.docs.filter(doc => {
-      const purchaseDate = doc.data().purchaseDate?.toDate();
-      return purchaseDate && purchaseDate > oneDayAgo;
-    });
-
-    if (recentPromoUsage.length > 2) {
-      return true;
-    }
-
-    return false;
-  } catch (error) {
-    functions.logger.error('Error checking promo code abuse', { error: error.message });
-    return false;
-  }
-}
-
-/**
- * SECURITY: Detect jailbreak indicators in receipt
- * @param {object} receipt - Receipt data
- * @returns {number} Risk score 0-1
- */
-function detectJailbreakIndicators(receipt) {
-  let riskScore = 0;
-
-  // Check for suspicious bundle ID patterns
-  const bundleId = receipt?.bundle_id || '';
-  const suspiciousPatterns = ['cracked', 'hacked', 'pirate', 'modded'];
-
-  if (suspiciousPatterns.some(pattern => bundleId.toLowerCase().includes(pattern))) {
-    riskScore += 0.5;
-  }
-
-  // Check for environment mismatches (production receipt in sandbox, etc.)
-  const environment = receipt?.environment;
-  if (environment === 'Sandbox' && process.env.NODE_ENV === 'production') {
-    riskScore += 0.3;
-  }
-
-  // Additional checks can be added here
-  // - Receipt age anomalies
-  // - Unusual transaction patterns
-  // - etc.
-
-  return Math.min(riskScore, 1.0);
-}
-
-/**
- * FRAUD DETECTION: Calculate fraud score for user/transaction
- * @param {string} userId - User ID
- * @param {object} context - Transaction context
- * @returns {number} Fraud score 0-100
- */
-async function calculateFraudScore(userId, context = {}) {
-  const db = admin.firestore();
-  let score = 0;
-
-  try {
-    // Check refund history
-    const refundCount = await getRefundCount(userId);
-    if (refundCount > 2) score += 30;
-    else if (refundCount > 0) score += 15;
-
-    // Check validation failure history
-    const validationFailures = await getValidationFailureCount(userId);
-    if (validationFailures > 5) score += 20;
-    else if (validationFailures > 2) score += 10;
-
-    // Check account age (new accounts are higher risk)
-    const userDoc = await db.collection('users').doc(userId).get();
-    if (userDoc.exists) {
-      const accountAge = Date.now() - userDoc.data().timestamp?.toDate().getTime();
-      const daysSinceCreation = accountAge / (1000 * 60 * 60 * 24);
-
-      if (daysSinceCreation < 1) score += 15;
-      else if (daysSinceCreation < 7) score += 10;
-    }
-
-    // Check jailbreak risk
-    if (context.jailbreakRisk > 0.7) score += 25;
-    else if (context.jailbreakRisk > 0.4) score += 15;
-
-    // Check promotional abuse
-    if (context.isPromotional) {
-      const promoCount = await getPromotionalPurchaseCount(userId);
-      if (promoCount > 3) score += 20;
-    }
-
-    // Check rapid purchase/refund cycles
-    const rapidCycleDetected = await detectRapidPurchaseRefundCycle(userId);
-    if (rapidCycleDetected) score += 30;
-
-    // Previous fraud attempts
-    const fraudAttempts = await getFraudAttemptCount(userId);
-    if (fraudAttempts > 0) score += 25 * fraudAttempts;
-
-    return Math.min(score, 100);
-  } catch (error) {
-    functions.logger.error('Error calculating fraud score', { error: error.message, userId });
-    return 0;
-  }
-}
-
-/**
- * Get refund count for user
- */
-async function getRefundCount(userId) {
-  const db = admin.firestore();
-  const refunds = await db.collection('purchases')
-    .where('userId', '==', userId)
-    .where('refunded', '==', true)
-    .get();
-  return refunds.size;
-}
-
-/**
- * Get validation failure count for user
- */
-async function getValidationFailureCount(userId) {
-  const db = admin.firestore();
-  const failures = await db.collection('fraud_logs')
-    .where('userId', '==', userId)
-    .where('eventType', '==', 'validation_failure')
-    .get();
-  return failures.size;
-}
-
-/**
- * Get promotional purchase count for user
- */
-async function getPromotionalPurchaseCount(userId) {
-  const db = admin.firestore();
-  const promos = await db.collection('purchases')
-    .where('userId', '==', userId)
-    .where('isPromotional', '==', true)
-    .get();
-  return promos.size;
-}
-
-/**
- * Get fraud attempt count for user
- */
-async function getFraudAttemptCount(userId) {
-  const db = admin.firestore();
-  const attempts = await db.collection('fraud_logs')
-    .where('userId', '==', userId)
-    .where('eventType', '==', 'fraud_attempt')
-    .get();
-  return attempts.size;
-}
-
-/**
- * Detect rapid purchase/refund cycles (fraud pattern)
- */
-async function detectRapidPurchaseRefundCycle(userId) {
-  const db = admin.firestore();
-
-  try {
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-
-    const recentPurchases = await db.collection('purchases')
-      .where('userId', '==', userId)
-      .where('purchaseDate', '>', thirtyDaysAgo)
-      .get();
-
-    const refundedPurchases = recentPurchases.docs.filter(doc => doc.data().refunded === true);
-
-    // Flag if more than 50% of purchases were refunded
-    if (recentPurchases.size >= 3 && refundedPurchases.length / recentPurchases.size > 0.5) {
-      return true;
-    }
-
-    return false;
-  } catch (error) {
-    functions.logger.error('Error detecting rapid cycles', { error: error.message });
-    return false;
-  }
-}
-
-/**
- * Track validation failures for fraud detection
- */
-async function trackValidationFailure(userId, statusCode, reason, details = null) {
-  const db = admin.firestore();
-
-  try {
-    await db.collection('fraud_logs').add({
-      userId,
-      eventType: 'validation_failure',
-      statusCode,
-      reason,
-      details,
-      timestamp: admin.firestore.FieldValue.serverTimestamp()
-    });
-  } catch (error) {
-    functions.logger.error('Error tracking validation failure', { error: error.message });
-  }
-}
-
-/**
- * Track fraud attempts
- */
-async function trackFraudAttempt(userId, fraudType, details) {
-  const db = admin.firestore();
-
-  try {
-    await db.collection('fraud_logs').add({
-      userId,
-      eventType: 'fraud_attempt',
-      fraudType,
-      details,
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      severity: 'high'
-    });
-
-    // Alert admins for immediate attention
-    await createAdminAlert('fraud_detected', {
-      userId,
-      fraudType,
-      details
-    });
-  } catch (error) {
-    functions.logger.error('Error tracking fraud attempt', { error: error.message });
-  }
-}
-
-/**
  * Track security events
  */
 async function trackSecurityEvent(userId, eventType, details) {
@@ -571,56 +279,6 @@ async function trackSecurityEvent(userId, eventType, details) {
     });
   } catch (error) {
     functions.logger.error('Error tracking security event', { error: error.message });
-  }
-}
-
-/**
- * Flag transaction for manual review
- */
-async function flagTransactionForReview(userId, transaction, fraudScore) {
-  const db = admin.firestore();
-
-  try {
-    await db.collection('flagged_transactions').add({
-      userId,
-      transactionId: transaction.transaction_id,
-      productId: transaction.product_id,
-      fraudScore,
-      details: transaction,
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      reviewed: false,
-      status: 'pending'
-    });
-
-    // Alert admins
-    if (fraudScore > 70) {
-      await createAdminAlert('high_risk_transaction', {
-        userId,
-        transactionId: transaction.transaction_id,
-        fraudScore
-      });
-    }
-  } catch (error) {
-    functions.logger.error('Error flagging transaction', { error: error.message });
-  }
-}
-
-/**
- * Create admin alert
- */
-async function createAdminAlert(alertType, details) {
-  const db = admin.firestore();
-
-  try {
-    await db.collection('admin_alerts').add({
-      alertType,
-      details,
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      acknowledged: false,
-      priority: alertType === 'fraud_detected' ? 'critical' : 'high'
-    });
-  } catch (error) {
-    functions.logger.error('Error creating admin alert', { error: error.message });
   }
 }
 
@@ -681,9 +339,5 @@ async function validateGooglePlayPurchase(packageName, productId, purchaseToken)
 module.exports = {
   validateAppleReceipt,
   verifyWebhookSignature,
-  validateGooglePlayPurchase,
-  calculateFraudScore,
-  checkReceiptDuplicate,
-  checkPromotionalCodeAbuse,
-  detectJailbreakIndicators
+  validateGooglePlayPurchase
 };

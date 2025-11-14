@@ -588,6 +588,132 @@ class StoreManager: ObservableObject {
     var hasActiveSubscription: Bool {
         return SubscriptionManager.shared.subscriptionStatus?.isActive ?? false
     }
+
+    // MARK: - Device Fingerprinting & Security
+
+    /// Generate device fingerprint for fraud detection
+    /// This helps identify suspicious patterns like multiple accounts from same device
+    func generateDeviceFingerprint() -> [String: Any] {
+        var deviceInfo: [String: Any] = [:]
+
+        // Device model
+        deviceInfo["deviceModel"] = UIDevice.current.model
+
+        // OS version
+        deviceInfo["osVersion"] = UIDevice.current.systemVersion
+
+        // App version
+        if let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
+            deviceInfo["appVersion"] = appVersion
+        }
+
+        // Locale
+        deviceInfo["locale"] = Locale.current.identifier
+
+        // Timezone
+        deviceInfo["timezone"] = TimeZone.current.identifier
+
+        // Vendor ID (stays same across app installs for same vendor)
+        if let vendorId = UIDevice.current.identifierForVendor?.uuidString {
+            deviceInfo["vendorId"] = vendorId
+        }
+
+        // Screen size (helps identify device spoofing)
+        let screenBounds = UIScreen.main.bounds
+        deviceInfo["screenWidth"] = Int(screenBounds.width)
+        deviceInfo["screenHeight"] = Int(screenBounds.height)
+
+        // Device name hash (privacy-preserving)
+        let deviceName = UIDevice.current.name
+        if let hash = deviceName.data(using: .utf8)?.base64EncodedString() {
+            deviceInfo["deviceNameHash"] = String(hash.prefix(16)) // Truncated for privacy
+        }
+
+        return deviceInfo
+    }
+
+    /// Detect potential jailbreak indicators (basic detection)
+    /// Note: Advanced jailbreak detection is done server-side
+    func detectJailbreakIndicators() -> [String: Any] {
+        var indicators: [String: Any] = [:]
+        var suspiciousPaths: [String] = []
+        var riskFlags: [String] = []
+
+        // Check for common jailbreak files/paths
+        let jailbreakPaths = [
+            "/Applications/Cydia.app",
+            "/Library/MobileSubstrate/MobileSubstrate.dylib",
+            "/bin/bash",
+            "/usr/sbin/sshd",
+            "/etc/apt",
+            "/private/var/lib/apt/",
+            "/Applications/Sileo.app",
+            "/usr/bin/ssh",
+            "/usr/libexec/sftp-server"
+        ]
+
+        for path in jailbreakPaths {
+            if FileManager.default.fileExists(atPath: path) {
+                suspiciousPaths.append(path)
+            }
+        }
+
+        // Check if can write to system directories (jailbreak indicator)
+        let testPath = "/private/jailbreak_test.txt"
+        do {
+            try "test".write(toFile: testPath, atomically: true, encoding: .utf8)
+            try FileManager.default.removeItem(atPath: testPath)
+            riskFlags.append("can_write_to_system")
+        } catch {
+            // Good - cannot write (not jailbroken)
+        }
+
+        // Check if Cydia URL scheme can be opened
+        if let cydiaURL = URL(string: "cydia://") {
+            if UIApplication.shared.canOpenURL(cydiaURL) {
+                riskFlags.append("can_open_cydia")
+            }
+        }
+
+        // Check for suspicious URL schemes
+        let suspiciousSchemes = ["cydia://", "sileo://", "zbra://", "installer://"]
+        var openableSchemes: [String] = []
+
+        for scheme in suspiciousSchemes {
+            if let url = URL(string: scheme), UIApplication.shared.canOpenURL(url) {
+                openableSchemes.append(scheme)
+            }
+        }
+
+        // Check if running on simulator (not jailbreak, but useful info)
+        #if targetEnvironment(simulator)
+        riskFlags.append("simulator")
+        #endif
+
+        // Compile results
+        indicators["suspiciousPaths"] = suspiciousPaths
+        indicators["riskFlags"] = riskFlags
+        indicators["openableSchemes"] = openableSchemes
+        indicators["isJailbroken"] = !suspiciousPaths.isEmpty || !riskFlags.isEmpty
+
+        return indicators
+    }
+
+    /// Get comprehensive device security info for backend validation
+    func getDeviceSecurityInfo() -> [String: Any] {
+        var securityInfo: [String: Any] = [:]
+
+        // Device fingerprint
+        securityInfo["fingerprint"] = generateDeviceFingerprint()
+
+        // Jailbreak detection
+        securityInfo["jailbreakIndicators"] = detectJailbreakIndicators()
+
+        // Additional security metadata
+        securityInfo["timestamp"] = Date().timeIntervalSince1970
+
+        return securityInfo
+    }
 }
 
 // MARK: - PurchaseError
