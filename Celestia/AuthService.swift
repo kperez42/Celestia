@@ -11,7 +11,7 @@ import FirebaseAuth
 import FirebaseFirestore
 
 @MainActor
-class AuthService: ObservableObject {
+class AuthService: ObservableObject, AuthServiceProtocol {
     @Published var userSession: FirebaseAuth.User?
     @Published var currentUser: User?
     @Published var isLoading = false
@@ -21,9 +21,11 @@ class AuthService: ObservableObject {
     @Published var referralErrorMessage: String?
     @Published var isInitialized = false
 
+    // Singleton for backward compatibility
     static let shared = AuthService()
 
-    private init() {
+    // Public initializer for dependency injection (used in testing and ViewModels)
+    init() {
         self.userSession = Auth.auth().currentUser
         self.isEmailVerified = Auth.auth().currentUser?.isEmailVerified ?? false
         Logger.shared.auth("AuthService initialized", level: .info)

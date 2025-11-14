@@ -13,17 +13,28 @@ class ChatViewModel: ObservableObject {
     @Published var messages: [Message] = []
     @Published var matches: [Match] = []
     @Published var isLoading = false
-    
-    private let firestore = Firestore.firestore()
+
+    // Dependency injection: Services
+    private let matchService: any MatchServiceProtocol
+    private let messageService: any MessageServiceProtocol
+
     private var messagesListener: ListenerRegistration?
     private var loadTask: Task<Void, Never>?
 
     var currentUserId: String
     var otherUserId: String
-    
-    init(currentUserId: String = "", otherUserId: String = "") {
+
+    // Dependency injection initializer
+    init(
+        currentUserId: String = "",
+        otherUserId: String = "",
+        matchService: any MatchServiceProtocol = MatchService.shared,
+        messageService: any MessageServiceProtocol = MessageService.shared
+    ) {
         self.currentUserId = currentUserId
         self.otherUserId = otherUserId
+        self.matchService = matchService
+        self.messageService = messageService
     }
     
     func updateCurrentUserId(_ userId: String) {
@@ -35,18 +46,9 @@ class ChatViewModel: ObservableObject {
         defer { isLoading = false }
 
         do {
-            // Use OR filter for optimized single query
-            let snapshot = try await firestore.collection("matches")
-                .whereFilter(Filter.orFilter([
-                    Filter.whereField("user1Id", isEqualTo: userID),
-                    Filter.whereField("user2Id", isEqualTo: userID)
-                ]))
-                .whereField("isActive", isEqualTo: true)
-                .getDocuments()
-
-            matches = snapshot.documents
-                .compactMap { try? $0.data(as: Match.self) }
-                .sorted { ($0.lastMessageTimestamp ?? $0.timestamp) > ($1.lastMessageTimestamp ?? $1.timestamp) }
+            // Use MatchService instead of direct Firestore access
+            try await matchService.fetchMatches(userId: userID)
+            matches = matchService.matches
         } catch {
             Logger.shared.error("Error loading matches", category: .messaging, error: error)
         }

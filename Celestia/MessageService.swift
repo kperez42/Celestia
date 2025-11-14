@@ -10,20 +10,28 @@ import Firebase
 import FirebaseFirestore
 
 @MainActor
-class MessageService: ObservableObject {
+class MessageService: ObservableObject, MessageServiceProtocol {
     @Published var messages: [Message] = []
     @Published var isLoading = false
     @Published var isLoadingMore = false
     @Published var hasMoreMessages = true
     @Published var error: Error?
 
-    static let shared = MessageService()
+    // Dependency injection: Repository for data access
+    private let repository: MessageRepository
+
+    // Singleton for backward compatibility (uses default repository)
+    static let shared = MessageService(repository: FirestoreMessageRepository())
+
     private let db = Firestore.firestore()
     private var listener: ListenerRegistration?
     private var oldestMessageTimestamp: Date?
     private let messagesPerPage = 50
 
-    private init() {}
+    // Dependency injection initializer
+    init(repository: MessageRepository) {
+        self.repository = repository
+    }
 
     /// Listen to messages in real-time for a specific match with pagination
     /// Loads initial batch of recent messages, then listens for new messages only
@@ -67,13 +75,10 @@ class MessageService: ObservableObject {
 
     /// Load initial batch of recent messages
     private func loadInitialMessages(matchId: String) async throws -> [Message] {
-        let snapshot = try await db.collection("messages")
-            .whereField("matchId", isEqualTo: matchId)
-            .order(by: "timestamp", descending: true)
-            .limit(to: messagesPerPage)
-            .getDocuments()
-
-        return snapshot.documents.compactMap { try? $0.data(as: Message.self) }
+        if let firestoreRepo = repository as? FirestoreMessageRepository {
+            return try await firestoreRepo.loadInitialMessages(matchId: matchId, limit: messagesPerPage)
+        }
+        return []
     }
 
     /// Set up listener for NEW messages only (after cutoff timestamp)
@@ -129,14 +134,16 @@ class MessageService: ObservableObject {
         Logger.shared.info("Loading older messages before \(oldestTimestamp)", category: .messaging)
 
         do {
-            let snapshot = try await db.collection("messages")
-                .whereField("matchId", isEqualTo: matchId)
-                .whereField("timestamp", isLessThan: Timestamp(date: oldestTimestamp))
-                .order(by: "timestamp", descending: true)
-                .limit(to: messagesPerPage)
-                .getDocuments()
-
-            let olderMessages = snapshot.documents.compactMap { try? $0.data(as: Message.self) }
+            let olderMessages: [Message]
+            if let firestoreRepo = repository as? FirestoreMessageRepository {
+                olderMessages = try await firestoreRepo.loadOlderMessages(
+                    matchId: matchId,
+                    beforeTimestamp: oldestTimestamp,
+                    limit: messagesPerPage
+                )
+            } else {
+                olderMessages = []
+            }
 
             await MainActor.run {
                 if !olderMessages.isEmpty {
@@ -337,22 +344,7 @@ class MessageService: ObservableObject {
     /// Mark messages as read (with transaction logging and retry)
     func markMessagesAsRead(matchId: String, userId: String) async {
         do {
-            let snapshot = try await db.collection("messages")
-                .whereField("matchId", isEqualTo: matchId)
-                .whereField("receiverId", isEqualTo: userId)
-                .whereField("isRead", isEqualTo: false)
-                .getDocuments()
-
-            guard !snapshot.documents.isEmpty else { return }
-
-            // Use BatchOperationManager for robust execution with retry and idempotency
-            try await BatchOperationManager.shared.markMessagesAsRead(
-                matchId: matchId,
-                userId: userId,
-                messageDocuments: snapshot.documents
-            )
-
-            Logger.shared.info("Messages marked as read successfully", category: .messaging)
+            try await repository.markMessagesAsRead(matchId: matchId, userId: userId)
         } catch {
             Logger.shared.error("Error marking messages as read", category: .messaging, error: error)
         }
@@ -388,22 +380,12 @@ class MessageService: ObservableObject {
         limit: Int = 50,
         before: Date? = nil
     ) async throws -> [Message] {
-        var query = db.collection("messages")
-            .whereField("matchId", isEqualTo: matchId)
-            .order(by: "timestamp", descending: true)
-            .limit(to: limit)
-        
-        if let beforeDate = before {
-            query = query.whereField("timestamp", isLessThan: beforeDate)
-        }
-        
-        let snapshot = try await query.getDocuments()
-        return snapshot.documents.compactMap { try? $0.data(as: Message.self) }.reversed()
+        return try await repository.fetchMessages(matchId: matchId, limit: limit, before: before)
     }
     
     /// Delete a message
     func deleteMessage(messageId: String) async throws {
-        try await db.collection("messages").document(messageId).delete()
+        try await repository.deleteMessage(messageId: messageId)
     }
     
     /// Get unread message count for a specific match

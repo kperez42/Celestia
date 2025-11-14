@@ -1,0 +1,150 @@
+//
+//  FirestoreUserRepository.swift
+//  Celestia
+//
+//  Concrete implementation of UserRepository using Firestore
+//  Separates data access logic from business logic
+//
+
+import Foundation
+import FirebaseFirestore
+
+class FirestoreUserRepository: UserRepository {
+    private let db = Firestore.firestore()
+    private let userCache = QueryCache<User>(ttl: 300, maxSize: 100) // 5 min cache, 100 users
+
+    // MARK: - UserRepository Protocol Implementation
+
+    func fetchUser(id: String) async throws -> User? {
+        // Check cache first
+        if let cached = await userCache.get(id) {
+            Logger.shared.debug("Cache hit for user \(id)", category: .database)
+            return cached
+        }
+
+        // Cache miss - fetch from Firestore
+        Logger.shared.debug("Cache miss for user \(id), fetching from database", category: .database)
+
+        let doc = try await db.collection("users").document(id).getDocument()
+        guard let user = try? doc.data(as: User.self) else {
+            return nil
+        }
+
+        // Store in cache
+        await userCache.set(id, value: user)
+
+        return user
+    }
+
+    func updateUser(_ user: User) async throws {
+        guard let userId = user.id else {
+            throw NSError(domain: "FirestoreUserRepository", code: -1, userInfo: [NSLocalizedDescriptionKey: "User ID is nil"])
+        }
+
+        try db.collection("users").document(userId).setData(from: user, merge: true)
+
+        // Invalidate cache after update
+        await userCache.remove(userId)
+        Logger.shared.debug("User cache invalidated for \(userId)", category: .database)
+    }
+
+    func updateUserFields(userId: String, fields: [String: Any]) async throws {
+        try await db.collection("users").document(userId).updateData(fields)
+
+        // Invalidate cache after update
+        await userCache.remove(userId)
+        Logger.shared.debug("User cache invalidated for \(userId)", category: .database)
+    }
+
+    func searchUsers(query: String, currentUserId: String, limit: Int, offset: DocumentSnapshot?) async throws -> [User] {
+        // Sanitize search query using centralized utility
+        let sanitizedQuery = InputSanitizer.standard(query)
+        guard !sanitizedQuery.isEmpty else { return [] }
+
+        let searchQuery = sanitizedQuery.lowercased()
+        let prefixEnd = searchQuery + "\u{f8ff}" // Unicode max character for range query
+
+        var results: [User] = []
+
+        // Approach 1: Try prefix matching on fullName
+        do {
+            let nameQuery = db.collection("users")
+                .whereField("showMeInSearch", isEqualTo: true)
+                .whereField("fullNameLowercase", isGreaterThanOrEqualTo: searchQuery)
+                .whereField("fullNameLowercase", isLessThan: prefixEnd)
+                .limit(to: limit)
+
+            let nameSnapshot = try await nameQuery.getDocuments()
+            let nameResults = nameSnapshot.documents
+                .compactMap { try? $0.data(as: User.self) }
+                .filter { $0.id != currentUserId }
+
+            results.append(contentsOf: nameResults)
+
+            // If we have enough results, return early
+            if results.count >= limit {
+                return Array(results.prefix(limit))
+            }
+        } catch {
+            Logger.shared.warning("Name prefix query failed: \(error.localizedDescription)", category: .database)
+        }
+
+        // Approach 2: Try country prefix match
+        do {
+            let remainingLimit = limit - results.count
+            if remainingLimit > 0 {
+                let countryQuery = db.collection("users")
+                    .whereField("showMeInSearch", isEqualTo: true)
+                    .whereField("countryLowercase", isGreaterThanOrEqualTo: searchQuery)
+                    .whereField("countryLowercase", isLessThan: prefixEnd)
+                    .limit(to: remainingLimit)
+
+                let countrySnapshot = try await countryQuery.getDocuments()
+                let countryResults = countrySnapshot.documents
+                    .compactMap { try? $0.data(as: User.self) }
+                    .filter { user in
+                        user.id != currentUserId &&
+                        !results.contains(where: { $0.id == user.id })
+                    }
+
+                results.append(contentsOf: countryResults)
+            }
+        } catch {
+            Logger.shared.warning("Country prefix query failed: \(error.localizedDescription)", category: .database)
+        }
+
+        return Array(results.prefix(limit))
+    }
+
+    func incrementProfileViews(userId: String) async {
+        do {
+            try await db.collection("users").document(userId).updateData([
+                "profileViews": FieldValue.increment(Int64(1))
+            ])
+        } catch {
+            Logger.shared.error("Error incrementing profile views", category: .database, error: error)
+        }
+    }
+
+    func updateLastActive(userId: String) async {
+        do {
+            try await db.collection("users").document(userId).updateData([
+                "lastActive": FieldValue.serverTimestamp(),
+                "isOnline": true
+            ])
+        } catch {
+            Logger.shared.error("Error updating last active", category: .database, error: error)
+        }
+    }
+
+    // MARK: - Additional Helper Methods
+
+    func clearCache() async {
+        await userCache.clear()
+        Logger.shared.info("User cache cleared", category: .database)
+    }
+
+    func getCacheSize() async -> Int {
+        return await userCache.size()
+    }
+}

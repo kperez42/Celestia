@@ -12,11 +12,16 @@ import FirebaseStorage
 
 @MainActor
 class ProfileEditViewModel: ObservableObject {
-    private let db = Firestore.firestore()
-    private let storage = Storage.storage()
-    
+    // Dependency injection: Services
+    private let userService: any UserServiceProtocol
+
     @Published var isLoading = false
     @Published var errorMessage: String?
+
+    // Dependency injection initializer
+    init(userService: any UserServiceProtocol = UserService.shared) {
+        self.userService = userService
+    }
     
     func uploadProfileImage(_ image: UIImage, userId: String) async throws -> String {
         guard let imageData = image.jpegData(compressionQuality: 0.5) else {
@@ -56,8 +61,9 @@ class ProfileEditViewModel: ObservableObject {
             "profileImageURL": profileImageURL,
             "lastActive": Timestamp(date: Date())
         ]
-        
-        try await db.collection("users").document(userId).updateData(userData)
+
+        // Use UserService instead of direct Firestore access
+        try await userService.updateUserFields(userId: userId, fields: userData)
     }
     
     func uploadAdditionalPhotos(_ images: [UIImage], userId: String) async throws -> [String] {

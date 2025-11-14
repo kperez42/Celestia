@@ -30,10 +30,17 @@ class DiscoverViewModel: ObservableObject {
         return max(0, users.count - currentIndex)
     }
 
-    private let firestore = Firestore.firestore()
+    // Dependency injection: Services
+    private let userService: any UserServiceProtocol
+
     private var lastDocument: DocumentSnapshot?
     private var interestTask: Task<Void, Never>?
     private let performanceMonitor = PerformanceMonitor.shared
+
+    // Dependency injection initializer
+    init(userService: any UserServiceProtocol = UserService.shared) {
+        self.userService = userService
+    }
     
     func loadUsers(currentUser: User, limit: Int = 20) {
         isLoading = true
@@ -42,67 +49,41 @@ class DiscoverViewModel: ObservableObject {
         // Track query performance
         let queryStart = Date()
 
-        var query = firestore.collection("users")
-            .whereField("age", isGreaterThanOrEqualTo: currentUser.ageRangeMin)
-            .whereField("age", isLessThanOrEqualTo: currentUser.ageRangeMax)
-            .limit(to: limit)
+        Task {
+            do {
+                // Use UserService instead of direct Firestore access
+                let ageRange = currentUser.ageRangeMin...currentUser.ageRangeMax
+                let lookingFor = currentUser.lookingFor != "Everyone" ? currentUser.lookingFor : nil
 
-        // Filter by gender preference
-        if currentUser.lookingFor != "Everyone" {
-            query = query.whereField("gender", isEqualTo: currentUser.lookingFor)
-        }
+                try await userService.fetchUsers(
+                    excludingUserId: currentUser.id ?? "",
+                    lookingFor: lookingFor,
+                    ageRange: ageRange,
+                    country: nil,
+                    limit: limit,
+                    reset: users.isEmpty
+                )
 
-        // Start after last document for pagination
-        if let lastDoc = lastDocument {
-            query = query.start(afterDocument: lastDoc)
-        }
-
-        query.getDocuments { [weak self] snapshot, error in
-            guard let self = self else { return }
-
-            Task { @MainActor in
                 // Track network latency
                 let queryDuration = Date().timeIntervalSince(queryStart) * 1000
-                await self.performanceMonitor.trackQuery(duration: queryDuration)
-                await self.performanceMonitor.trackNetworkLatency(latency: queryDuration)
+                await performanceMonitor.trackQuery(duration: queryDuration)
+                await performanceMonitor.trackNetworkLatency(latency: queryDuration)
 
                 // Update connection quality
-                self.connectionQuality = await self.performanceMonitor.connectionQuality
+                connectionQuality = await performanceMonitor.connectionQuality
 
-                if let error = error {
-                    self.errorMessage = error.localizedDescription
-                    self.isLoading = false
-                    Logger.shared.error("Error loading users", category: .matching, error: error)
-                    return
-                }
-
-                guard let documents = snapshot?.documents else {
-                    self.isLoading = false
-                    return
-                }
-
-                self.lastDocument = documents.last
-
-                let fetchedUsers = documents.compactMap { doc -> User? in
-                    let data = doc.data()
-                    var user = User(dictionary: data)
-                    user.id = doc.documentID
-
-                    // Don't show current user
-                    if user.id == currentUser.id {
-                        return nil
-                    }
-
-                    return user
-                }
-
-                self.users.append(contentsOf: fetchedUsers)
-                self.isLoading = false
+                // Update local users array from service
+                users = userService.users
+                isLoading = false
 
                 // Preload images for next 2 users
                 await self.preloadUpcomingImages()
 
-                Logger.shared.info("Loaded \(fetchedUsers.count) users in \(String(format: "%.0f", queryDuration))ms", category: .matching)
+                Logger.shared.info("Loaded \(users.count) users in \(String(format: "%.0f", queryDuration))ms", category: .matching)
+            } catch {
+                errorMessage = error.localizedDescription
+                isLoading = false
+                Logger.shared.error("Error loading users", category: .matching, error: error)
             }
         }
     }
