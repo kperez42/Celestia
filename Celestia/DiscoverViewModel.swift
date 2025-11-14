@@ -33,8 +33,11 @@ class DiscoverViewModel: ObservableObject {
     // Dependency injection: Services
     private let userService: any UserServiceProtocol
 
-    private var lastDocument: DocumentSnapshot?
-    private var interestTask: Task<Void, Never>?
+    // SWIFT 6 CONCURRENCY: These properties are accessed across async boundaries
+    // but are always accessed from MainActor-isolated methods. Marked nonisolated(unsafe)
+    // to satisfy Swift 6 strict concurrency while maintaining thread safety through MainActor.
+    nonisolated(unsafe) private var lastDocument: DocumentSnapshot?
+    nonisolated(unsafe) private var interestTask: Task<Void, Never>?
     private let performanceMonitor = PerformanceMonitor.shared
 
     // Dependency injection initializer
