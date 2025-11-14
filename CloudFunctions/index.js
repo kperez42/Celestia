@@ -37,6 +37,7 @@ app.use(express.json());
 /**
  * Validates App Store receipts for in-app purchases
  * Prevents fraud by verifying transactions server-side
+ * SECURITY: Enhanced with fraud detection and duplicate prevention
  */
 exports.validateReceipt = functions.https.onCall(async (data, context) => {
   // Authenticate user
@@ -48,11 +49,17 @@ exports.validateReceipt = functions.https.onCall(async (data, context) => {
   const userId = context.auth.uid;
 
   try {
-    // Validate the receipt with Apple
-    const validationResult = await receiptValidation.validateAppleReceipt(receiptData);
+    // Validate the receipt with Apple (includes fraud detection)
+    const validationResult = await receiptValidation.validateAppleReceipt(receiptData, userId);
 
     if (!validationResult.isValid) {
-      throw new functions.https.HttpsError('invalid-argument', 'Invalid receipt');
+      functions.logger.warn('Receipt validation failed', {
+        userId,
+        error: validationResult.error,
+        fraudScore: validationResult.fraudScore
+      });
+
+      throw new functions.https.HttpsError('invalid-argument', validationResult.error || 'Invalid receipt');
     }
 
     // Check if receipt matches the product
@@ -60,80 +67,158 @@ exports.validateReceipt = functions.https.onCall(async (data, context) => {
       throw new functions.https.HttpsError('invalid-argument', 'Product ID mismatch');
     }
 
-    // Check for receipt reuse
-    const existingPurchase = await db.collection('purchases')
-      .where('transactionId', '==', validationResult.transactionId)
-      .get();
+    // SECURITY: Fraud score check - reject high-risk transactions
+    if (validationResult.fraudScore > 75) {
+      functions.logger.error('CRITICAL: High fraud score - transaction rejected', {
+        userId,
+        fraudScore: validationResult.fraudScore,
+        transactionId: validationResult.transactionId
+      });
 
-    if (!existingPurchase.empty) {
-      throw new functions.https.HttpsError('already-exists', 'Receipt already used');
+      throw new functions.https.HttpsError('permission-denied', 'Transaction flagged for security review');
     }
 
-    // Record the purchase
+    // Record the purchase with fraud metadata
     const purchaseRef = await db.collection('purchases').add({
       userId,
       productId,
       transactionId: validationResult.transactionId,
+      originalTransactionId: validationResult.originalTransactionId,
       purchaseDate: admin.firestore.FieldValue.serverTimestamp(),
       expiryDate: validationResult.expiryDate || null,
+      isSubscription: validationResult.isSubscription,
+      isPromotional: validationResult.isPromotional || false,
+      promotionalOfferId: validationResult.promotionalOfferId || null,
+      isTrialPeriod: validationResult.isTrialPeriod || false,
+      isInIntroOfferPeriod: validationResult.isInIntroOfferPeriod || false,
+      autoRenewStatus: validationResult.autoRenewStatus,
       receiptData: validationResult.receipt,
-      validated: true
+      validated: true,
+      refunded: false,
+      fraudScore: validationResult.fraudScore,
+      jailbreakRisk: validationResult.jailbreakRisk
     });
 
     // Update user's subscription status
     await updateUserSubscription(userId, productId, validationResult);
 
-    functions.logger.info(`Receipt validated for user ${userId}`, { productId, transactionId: validationResult.transactionId });
+    functions.logger.info(`✅ Receipt validated for user ${userId}`, {
+      productId,
+      transactionId: validationResult.transactionId,
+      fraudScore: validationResult.fraudScore
+    });
 
     return {
       success: true,
+      isValid: true,
       purchaseId: purchaseRef.id,
-      expiryDate: validationResult.expiryDate
+      expiryDate: validationResult.expiryDate,
+      fraudScore: validationResult.fraudScore
     };
 
   } catch (error) {
     functions.logger.error('Receipt validation error', { userId, error: error.message });
+
+    // Re-throw HttpsError as-is, wrap other errors
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
     throw new functions.https.HttpsError('internal', error.message);
   }
 });
 
 /**
- * Webhook for App Store Server Notifications
+ * Webhook for App Store Server Notifications V2
  * Handles subscription renewals, cancellations, refunds
+ * SECURITY: Implements signature verification to prevent spoofing
  */
 exports.appleWebhook = functions.https.onRequest(async (req, res) => {
   try {
-    const notification = req.body;
+    functions.logger.info('Apple webhook received', {
+      ip: req.ip,
+      headers: req.headers['x-forwarded-for'] || 'unknown'
+    });
 
-    functions.logger.info('Apple webhook received', { notification });
+    // SECURITY: Verify webhook signature (CRITICAL for production)
+    const verifiedPayload = await receiptValidation.verifyWebhookSignature(req);
 
-    // Verify webhook signature (implement in production)
-    // const isValid = await receiptValidation.verifyWebhookSignature(req);
-    // if (!isValid) {
-    //   return res.status(401).send('Invalid signature');
-    // }
+    if (!verifiedPayload) {
+      functions.logger.error('⛔ Webhook signature verification failed - potential spoofing attempt', {
+        ip: req.ip
+      });
+      return res.status(401).send('Invalid signature');
+    }
 
-    // Handle different notification types
-    switch (notification.notification_type) {
+    functions.logger.info('✅ Webhook signature verified');
+
+    // Extract notification data from verified payload
+    const notificationType = verifiedPayload.notificationType;
+    const subtype = verifiedPayload.subtype;
+    const data = verifiedPayload.data;
+
+    functions.logger.info('Processing webhook notification', {
+      notificationType,
+      subtype
+    });
+
+    // Handle different notification types (V2 format)
+    switch (notificationType) {
+      case 'SUBSCRIBED':
+        await handleSubscriptionStart(data);
+        break;
+
       case 'DID_RENEW':
-        await handleSubscriptionRenewal(notification);
+        await handleSubscriptionRenewal(data);
         break;
+
       case 'DID_FAIL_TO_RENEW':
-        await handleSubscriptionFailure(notification);
+        await handleSubscriptionFailure(data);
         break;
-      case 'CANCEL':
-        await handleSubscriptionCancellation(notification);
+
+      case 'DID_CHANGE_RENEWAL_STATUS':
+        await handleRenewalStatusChange(data, subtype);
         break;
+
+      case 'EXPIRED':
+        await handleSubscriptionExpired(data);
+        break;
+
+      case 'GRACE_PERIOD_EXPIRED':
+        await handleGracePeriodExpired(data);
+        break;
+
+      case 'REVOKE':
       case 'REFUND':
-        await handleRefund(notification);
+        // CRITICAL: Handle refunds with fraud detection
+        await handleRefundEnhanced(data, notificationType);
         break;
+
+      case 'CONSUMPTION_REQUEST':
+        await handleConsumptionRequest(data);
+        break;
+
+      case 'RENEWAL_EXTENDED':
+        await handleRenewalExtended(data);
+        break;
+
+      case 'PRICE_INCREASE':
+        await handlePriceIncrease(data);
+        break;
+
+      case 'REFUND_DECLINED':
+        await handleRefundDeclined(data);
+        break;
+
       default:
-        functions.logger.warn('Unknown notification type', { type: notification.notification_type });
+        functions.logger.warn('Unknown notification type', { notificationType, subtype });
     }
 
     res.status(200).send('OK');
   } catch (error) {
-    functions.logger.error('Apple webhook error', { error: error.message });
+    functions.logger.error('Apple webhook error', {
+      error: error.message,
+      stack: error.stack
+    });
     res.status(500).send('Error processing webhook');
   }
 });
@@ -389,6 +474,72 @@ app.post('/admin/moderate-content', async (req, res) => {
   }
 });
 
+// NEW ENDPOINTS FOR SUBSCRIPTION MONITORING & FRAUD DETECTION
+
+app.get('/admin/subscription-analytics', async (req, res) => {
+  try {
+    const isAdmin = await verifyAdminToken(req.headers.authorization);
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const period = parseInt(req.query.period) || 30;
+    const analytics = await adminDashboard.getSubscriptionAnalytics({ period });
+    res.json(analytics);
+  } catch (error) {
+    functions.logger.error('Admin subscription analytics error', { error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/admin/fraud-dashboard', async (req, res) => {
+  try {
+    const isAdmin = await verifyAdminToken(req.headers.authorization);
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const fraudData = await adminDashboard.getFraudDashboard();
+    res.json(fraudData);
+  } catch (error) {
+    functions.logger.error('Admin fraud dashboard error', { error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/admin/refund-tracking', async (req, res) => {
+  try {
+    const isAdmin = await verifyAdminToken(req.headers.authorization);
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const limit = parseInt(req.query.limit) || 50;
+    const period = parseInt(req.query.period) || 30;
+    const refunds = await adminDashboard.getRefundTracking({ limit, period });
+    res.json(refunds);
+  } catch (error) {
+    functions.logger.error('Admin refund tracking error', { error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/admin/review-transaction', async (req, res) => {
+  try {
+    const isAdmin = await verifyAdminToken(req.headers.authorization);
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const { transactionId, decision, adminNote } = req.body;
+    await adminDashboard.reviewFlaggedTransaction(transactionId, decision, adminNote);
+    res.json({ success: true });
+  } catch (error) {
+    functions.logger.error('Admin review transaction error', { error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 exports.adminApi = functions.https.onRequest(app);
 
 // ============================================================================
@@ -409,6 +560,224 @@ async function updateUserSubscription(userId, productId, validationResult) {
   // Grant consumables based on tier
   const consumables = getConsumablesForTier(subscriptionTier);
   await db.collection('users').doc(userId).update(consumables);
+}
+
+/**
+ * Handle subscription start (new subscription)
+ */
+async function handleSubscriptionStart(data) {
+  try {
+    const jwt = require('jsonwebtoken');
+    const transactionInfo = jwt.decode(data?.signedTransactionInfo);
+
+    if (!transactionInfo) {
+      functions.logger.error('No transaction info in subscription start');
+      return;
+    }
+
+    const transactionId = transactionInfo.transactionId;
+    const userId = await getUserIdFromTransaction(transactionId);
+
+    if (userId) {
+      functions.logger.info('✅ New subscription started', { userId, transactionId });
+    }
+  } catch (error) {
+    functions.logger.error('Error handling subscription start', { error: error.message });
+  }
+}
+
+/**
+ * Handle renewal status change
+ */
+async function handleRenewalStatusChange(data, subtype) {
+  try {
+    const jwt = require('jsonwebtoken');
+    const transactionInfo = jwt.decode(data?.signedTransactionInfo);
+
+    if (!transactionInfo) {
+      return;
+    }
+
+    const transactionId = transactionInfo.transactionId;
+    const userId = await getUserIdFromTransaction(transactionId);
+
+    if (userId) {
+      const autoRenewEnabled = subtype === 'AUTO_RENEW_ENABLED';
+
+      functions.logger.info('Renewal status changed', {
+        userId,
+        transactionId,
+        autoRenewEnabled
+      });
+
+      // Update user record
+      await db.collection('users').doc(userId).update({
+        autoRenewEnabled,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+    }
+  } catch (error) {
+    functions.logger.error('Error handling renewal status change', { error: error.message });
+  }
+}
+
+/**
+ * Handle subscription expired
+ */
+async function handleSubscriptionExpired(data) {
+  try {
+    const jwt = require('jsonwebtoken');
+    const transactionInfo = jwt.decode(data?.signedTransactionInfo);
+
+    if (!transactionInfo) {
+      return;
+    }
+
+    const transactionId = transactionInfo.transactionId;
+    const userId = await getUserIdFromTransaction(transactionId);
+
+    if (userId) {
+      await db.collection('users').doc(userId).update({
+        isPremium: false,
+        premiumTier: null,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      functions.logger.info('Subscription expired', { userId, transactionId });
+    }
+  } catch (error) {
+    functions.logger.error('Error handling subscription expiration', { error: error.message });
+  }
+}
+
+/**
+ * Handle grace period expired
+ */
+async function handleGracePeriodExpired(data) {
+  try {
+    const jwt = require('jsonwebtoken');
+    const transactionInfo = jwt.decode(data?.signedTransactionInfo);
+
+    if (!transactionInfo) {
+      return;
+    }
+
+    const transactionId = transactionInfo.transactionId;
+    const userId = await getUserIdFromTransaction(transactionId);
+
+    if (userId) {
+      await db.collection('users').doc(userId).update({
+        isPremium: false,
+        premiumTier: null,
+        inGracePeriod: false,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      functions.logger.warn('Grace period expired - access revoked', { userId, transactionId });
+    }
+  } catch (error) {
+    functions.logger.error('Error handling grace period expiration', { error: error.message });
+  }
+}
+
+/**
+ * Handle consumption request (for consumable products)
+ */
+async function handleConsumptionRequest(data) {
+  try {
+    const jwt = require('jsonwebtoken');
+    const transactionInfo = jwt.decode(data?.signedTransactionInfo);
+
+    if (!transactionInfo) {
+      return;
+    }
+
+    functions.logger.info('Consumption request received', {
+      transactionId: transactionInfo.transactionId,
+      productId: transactionInfo.productId
+    });
+  } catch (error) {
+    functions.logger.error('Error handling consumption request', { error: error.message });
+  }
+}
+
+/**
+ * Handle renewal extended
+ */
+async function handleRenewalExtended(data) {
+  try {
+    const jwt = require('jsonwebtoken');
+    const transactionInfo = jwt.decode(data?.signedTransactionInfo);
+
+    if (!transactionInfo) {
+      return;
+    }
+
+    const transactionId = transactionInfo.transactionId;
+    const userId = await getUserIdFromTransaction(transactionId);
+
+    if (userId) {
+      functions.logger.info('Subscription renewal extended', { userId, transactionId });
+    }
+  } catch (error) {
+    functions.logger.error('Error handling renewal extended', { error: error.message });
+  }
+}
+
+/**
+ * Handle price increase consent
+ */
+async function handlePriceIncrease(data) {
+  try {
+    const jwt = require('jsonwebtoken');
+    const transactionInfo = jwt.decode(data?.signedTransactionInfo);
+
+    if (!transactionInfo) {
+      return;
+    }
+
+    const transactionId = transactionInfo.transactionId;
+    const userId = await getUserIdFromTransaction(transactionId);
+
+    if (userId) {
+      functions.logger.info('Price increase notification', { userId, transactionId });
+
+      // Send notification to user
+      await db.collection('notifications').add({
+        userId,
+        type: 'price_increase',
+        title: 'Subscription Price Update',
+        message: 'The price of your subscription will increase on your next renewal.',
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        read: false
+      });
+    }
+  } catch (error) {
+    functions.logger.error('Error handling price increase', { error: error.message });
+  }
+}
+
+/**
+ * Handle refund declined
+ */
+async function handleRefundDeclined(data) {
+  try {
+    const jwt = require('jsonwebtoken');
+    const transactionInfo = jwt.decode(data?.signedTransactionInfo);
+
+    if (!transactionInfo) {
+      return;
+    }
+
+    const transactionId = transactionInfo.transactionId;
+    const userId = await getUserIdFromTransaction(transactionId);
+
+    if (userId) {
+      functions.logger.info('Refund request declined', { userId, transactionId });
+    }
+  } catch (error) {
+    functions.logger.error('Error handling refund declined', { error: error.message });
+  }
 }
 
 async function handleSubscriptionRenewal(notification) {
@@ -457,30 +826,190 @@ async function handleSubscriptionCancellation(notification) {
   }
 }
 
-async function handleRefund(notification) {
-  const transactionId = notification.latest_receipt_info.transaction_id;
+/**
+ * Enhanced refund handler with fraud detection
+ * SECURITY: Tracks refund patterns and revokes access immediately
+ */
+async function handleRefundEnhanced(data, notificationType) {
+  try {
+    // Extract transaction info from App Store Server Notification V2 format
+    const transactionInfo = data?.signedTransactionInfo;
 
-  // Mark purchase as refunded
-  const purchaseQuery = await db.collection('purchases')
-    .where('transactionId', '==', transactionId)
+    if (!transactionInfo) {
+      functions.logger.error('No transaction info in refund notification');
+      return;
+    }
+
+    // Decode the signed transaction (it's a JWT)
+    const jwt = require('jsonwebtoken');
+    const decodedTransaction = jwt.decode(transactionInfo);
+
+    const transactionId = decodedTransaction?.transactionId;
+    const originalTransactionId = decodedTransaction?.originalTransactionId;
+    const productId = decodedTransaction?.productId;
+
+    if (!transactionId) {
+      functions.logger.error('No transaction ID in refund notification');
+      return;
+    }
+
+    functions.logger.warn('🚨 REFUND NOTIFICATION RECEIVED', {
+      transactionId,
+      originalTransactionId,
+      productId,
+      notificationType
+    });
+
+    // Find the purchase record
+    const purchaseQuery = await db.collection('purchases')
+      .where('transactionId', '==', transactionId)
+      .get();
+
+    if (purchaseQuery.empty) {
+      // Try with original transaction ID
+      const originalQuery = await db.collection('purchases')
+        .where('originalTransactionId', '==', originalTransactionId)
+        .get();
+
+      if (originalQuery.empty) {
+        functions.logger.error('Purchase not found for refund', { transactionId, originalTransactionId });
+        return;
+      }
+
+      const purchaseDoc = originalQuery.docs[0];
+      await processRefund(purchaseDoc, transactionId, notificationType);
+    } else {
+      const purchaseDoc = purchaseQuery.docs[0];
+      await processRefund(purchaseDoc, transactionId, notificationType);
+    }
+
+  } catch (error) {
+    functions.logger.error('Error handling refund', { error: error.message });
+  }
+}
+
+/**
+ * Process refund and revoke access
+ */
+async function processRefund(purchaseDoc, transactionId, notificationType) {
+  const purchaseData = purchaseDoc.data();
+  const userId = purchaseData.userId;
+  const productId = purchaseData.productId;
+
+  // Update purchase record
+  await purchaseDoc.ref.update({
+    refunded: true,
+    refundDate: admin.firestore.FieldValue.serverTimestamp(),
+    refundType: notificationType
+  });
+
+  // IMMEDIATELY revoke user's premium access
+  await db.collection('users').doc(userId).update({
+    isPremium: false,
+    premiumTier: null,
+    subscriptionExpiryDate: null,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+
+  functions.logger.warn('⚠️ Premium access revoked due to refund', { userId, transactionId });
+
+  // FRAUD DETECTION: Track refund patterns
+  await trackRefundForFraudDetection(userId, transactionId, productId);
+
+  // Check if user has suspicious refund patterns
+  const refundCount = await getRefundCount(userId);
+
+  if (refundCount > 2) {
+    functions.logger.error('🚨 FRAUD ALERT: Multiple refunds detected', {
+      userId,
+      refundCount
+    });
+
+    // Flag user for review
+    await db.collection('fraud_logs').add({
+      userId,
+      eventType: 'multiple_refunds',
+      refundCount,
+      details: {
+        latestTransactionId: transactionId,
+        productId
+      },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      severity: 'critical'
+    });
+
+    // Create admin alert
+    await db.collection('admin_alerts').add({
+      alertType: 'refund_abuse_detected',
+      details: {
+        userId,
+        refundCount,
+        transactionId
+      },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      acknowledged: false,
+      priority: 'critical'
+    });
+
+    // Auto-suspend if refund count exceeds threshold
+    if (refundCount > 3) {
+      await db.collection('users').doc(userId).update({
+        suspended: true,
+        suspensionReason: 'Multiple refund abuse - automatic suspension',
+        suspendedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      functions.logger.error('⛔ User auto-suspended for refund abuse', {
+        userId,
+        refundCount
+      });
+    }
+  }
+
+  // Send notification to user about access revocation
+  await sendRefundNotification(userId, productId);
+}
+
+/**
+ * Track refund for fraud detection
+ */
+async function trackRefundForFraudDetection(userId, transactionId, productId) {
+  await db.collection('refund_history').add({
+    userId,
+    transactionId,
+    productId,
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    flaggedForReview: false
+  });
+}
+
+/**
+ * Get refund count for user
+ */
+async function getRefundCount(userId) {
+  const refunds = await db.collection('purchases')
+    .where('userId', '==', userId)
+    .where('refunded', '==', true)
     .get();
+  return refunds.size;
+}
 
-  if (!purchaseQuery.empty) {
-    const purchaseDoc = purchaseQuery.docs[0];
-    await purchaseDoc.ref.update({
-      refunded: true,
-      refundDate: admin.firestore.FieldValue.serverTimestamp()
+/**
+ * Send notification to user about refund
+ */
+async function sendRefundNotification(userId, productId) {
+  try {
+    await db.collection('notifications').add({
+      userId,
+      type: 'refund_processed',
+      title: 'Subscription Refunded',
+      message: 'Your subscription has been refunded and premium access has been revoked.',
+      productId,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      read: false
     });
-
-    // Revoke user's benefits
-    const userId = purchaseDoc.data().userId;
-    await db.collection('users').doc(userId).update({
-      isPremium: false,
-      premiumTier: null,
-      subscriptionExpiryDate: null
-    });
-
-    functions.logger.warn('Purchase refunded', { userId, transactionId });
+  } catch (error) {
+    functions.logger.error('Error sending refund notification', { error: error.message });
   }
 }
 

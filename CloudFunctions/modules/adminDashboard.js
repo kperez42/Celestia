@@ -54,6 +54,26 @@ async function getStats() {
     const purchases = purchasesSnapshot.docs.map(doc => doc.data());
     const revenue = calculateRevenue(purchases);
 
+    // Get refund stats
+    const refundedPurchases = purchases.filter(p => p.refunded === true);
+    const refundCount = refundedPurchases.length;
+    const refundRate = purchases.length > 0 ? (refundCount / purchases.length * 100).toFixed(2) : 0;
+
+    // Get fraud stats
+    const fraudLogsSnapshot = await db.collection('fraud_logs')
+      .where('timestamp', '>', thirtyDaysAgo)
+      .where('eventType', '==', 'fraud_attempt')
+      .get();
+
+    const fraudAttempts = fraudLogsSnapshot.size;
+
+    // Get high-risk transactions
+    const flaggedTransactionsSnapshot = await db.collection('flagged_transactions')
+      .where('reviewed', '==', false)
+      .get();
+
+    const pendingFraudReviews = flaggedTransactionsSnapshot.size;
+
     // Get moderation stats
     const flaggedContentSnapshot = await db.collection('flagged_content')
       .where('reviewed', '==', false)
@@ -96,7 +116,16 @@ async function getStats() {
         last30Days: revenue.total,
         subscriptions: revenue.subscriptions,
         consumables: revenue.consumables,
-        averageRevenuePerUser: totalUsers > 0 ? (revenue.total / totalUsers).toFixed(2) : 0
+        averageRevenuePerUser: totalUsers > 0 ? (revenue.total / totalUsers).toFixed(2) : 0,
+        totalPurchases: purchases.length,
+        refundCount,
+        refundRate: parseFloat(refundRate),
+        refundedRevenue: calculateRefundedRevenue(refundedPurchases)
+      },
+      security: {
+        fraudAttempts,
+        pendingFraudReviews,
+        highRiskTransactions: pendingFraudReviews
       },
       moderation: {
         pendingReviews,
@@ -393,6 +422,11 @@ function calculateRevenue(purchases) {
   let consumables = 0;
 
   purchases.forEach(purchase => {
+    // Skip refunded purchases
+    if (purchase.refunded) {
+      return;
+    }
+
     const price = pricing[purchase.productId] || 0;
     total += price;
 
@@ -408,6 +442,30 @@ function calculateRevenue(purchases) {
     subscriptions: parseFloat(subscriptions.toFixed(2)),
     consumables: parseFloat(consumables.toFixed(2))
   };
+}
+
+function calculateRefundedRevenue(refundedPurchases) {
+  const pricing = {
+    'basic_monthly': 9.99,
+    'basic_yearly': 99.99,
+    'plus_monthly': 19.99,
+    'plus_yearly': 199.99,
+    'premium_monthly': 29.99,
+    'premium_yearly': 299.99,
+    'premium_lifetime': 499.99,
+    'super_like_pack': 4.99,
+    'boost_pack': 9.99,
+    'rewind_pack': 2.99
+  };
+
+  let total = 0;
+
+  refundedPurchases.forEach(purchase => {
+    const price = pricing[purchase.productId] || 0;
+    total += price;
+  });
+
+  return parseFloat(total.toFixed(2));
 }
 
 async function getUserWarningCount(userId) {
@@ -441,11 +499,328 @@ async function checkAndSuspendUser(userId) {
   }
 }
 
+/**
+ * Gets subscription analytics and monitoring data
+ * @param {object} options - Query options
+ * @returns {object} Subscription analytics
+ */
+async function getSubscriptionAnalytics(options = {}) {
+  const db = admin.firestore();
+  const {
+    period = 30 // days
+  } = options;
+
+  try {
+    const periodStart = new Date(Date.now() - period * 24 * 60 * 60 * 1000);
+
+    // Get all purchases in period
+    const purchasesSnapshot = await db.collection('purchases')
+      .where('purchaseDate', '>', periodStart)
+      .get();
+
+    const purchases = purchasesSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+
+    // Analyze subscriptions
+    const subscriptionPurchases = purchases.filter(p => p.isSubscription);
+    const newSubscriptions = subscriptionPurchases.filter(p => !p.isPromotional);
+    const promotionalSubscriptions = subscriptionPurchases.filter(p => p.isPromotional);
+    const trialSubscriptions = subscriptionPurchases.filter(p => p.isTrialPeriod);
+
+    // Churn analysis
+    const cancelledSubscriptions = purchases.filter(p => p.cancelled);
+    const refundedSubscriptions = purchases.filter(p => p.refunded);
+
+    // Fraud analysis
+    const highRiskPurchases = purchases.filter(p => p.fraudScore > 50);
+    const flaggedPurchases = purchases.filter(p => p.fraudScore > 75);
+
+    // Revenue breakdown
+    const subscriptionRevenue = calculateRevenue(subscriptionPurchases);
+    const refundedRevenue = calculateRefundedRevenue(refundedSubscriptions);
+
+    // Calculate metrics
+    const churnRate = subscriptionPurchases.length > 0
+      ? (cancelledSubscriptions.length / subscriptionPurchases.length * 100).toFixed(2)
+      : 0;
+
+    const refundRate = purchases.length > 0
+      ? (refundedSubscriptions.length / purchases.length * 100).toFixed(2)
+      : 0;
+
+    const fraudRate = purchases.length > 0
+      ? (flaggedPurchases.length / purchases.length * 100).toFixed(2)
+      : 0;
+
+    return {
+      period,
+      totalPurchases: purchases.length,
+      subscriptions: {
+        total: subscriptionPurchases.length,
+        new: newSubscriptions.length,
+        promotional: promotionalSubscriptions.length,
+        trial: trialSubscriptions.length,
+        cancelled: cancelledSubscriptions.length,
+        refunded: refundedSubscriptions.length
+      },
+      metrics: {
+        churnRate: parseFloat(churnRate),
+        refundRate: parseFloat(refundRate),
+        fraudRate: parseFloat(fraudRate)
+      },
+      revenue: {
+        total: subscriptionRevenue.total,
+        refunded: refundedRevenue,
+        net: parseFloat((subscriptionRevenue.total - refundedRevenue).toFixed(2))
+      },
+      risk: {
+        highRiskPurchases: highRiskPurchases.length,
+        flaggedPurchases: flaggedPurchases.length,
+        averageFraudScore: purchases.length > 0
+          ? parseFloat((purchases.reduce((sum, p) => sum + (p.fraudScore || 0), 0) / purchases.length).toFixed(2))
+          : 0
+      },
+      timestamp: new Date().toISOString()
+    };
+
+  } catch (error) {
+    functions.logger.error('Get subscription analytics error', { error: error.message });
+    throw error;
+  }
+}
+
+/**
+ * Gets fraud detection dashboard data
+ * @returns {object} Fraud detection data
+ */
+async function getFraudDashboard() {
+  const db = admin.firestore();
+
+  try {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    // Get fraud logs
+    const fraudLogsSnapshot = await db.collection('fraud_logs')
+      .where('timestamp', '>', thirtyDaysAgo)
+      .orderBy('timestamp', 'desc')
+      .limit(100)
+      .get();
+
+    const fraudLogs = fraudLogsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      timestamp: doc.data().timestamp?.toDate().toISOString()
+    }));
+
+    // Get flagged transactions
+    const flaggedTransactionsSnapshot = await db.collection('flagged_transactions')
+      .where('reviewed', '==', false)
+      .orderBy('fraudScore', 'desc')
+      .limit(50)
+      .get();
+
+    const flaggedTransactions = await Promise.all(flaggedTransactionsSnapshot.docs.map(async (doc) => {
+      const data = doc.data();
+
+      // Get user info
+      const userDoc = await db.collection('users').doc(data.userId).get();
+      const userData = userDoc.exists ? userDoc.data() : {};
+
+      return {
+        id: doc.id,
+        ...data,
+        user: {
+          id: data.userId,
+          fullName: userData.fullName || 'Unknown',
+          email: userData.email || 'Unknown'
+        },
+        timestamp: data.timestamp?.toDate().toISOString()
+      };
+    }));
+
+    // Get refund abuse cases
+    const refundHistorySnapshot = await db.collection('refund_history')
+      .where('timestamp', '>', thirtyDaysAgo)
+      .get();
+
+    const refundHistory = refundHistorySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      timestamp: doc.data().timestamp?.toDate().toISOString()
+    }));
+
+    // Identify users with multiple refunds
+    const userRefundCounts = {};
+    refundHistory.forEach(refund => {
+      userRefundCounts[refund.userId] = (userRefundCounts[refund.userId] || 0) + 1;
+    });
+
+    const refundAbusers = Object.entries(userRefundCounts)
+      .filter(([_, count]) => count > 2)
+      .map(([userId, count]) => ({ userId, refundCount: count }));
+
+    // Get admin alerts
+    const adminAlertsSnapshot = await db.collection('admin_alerts')
+      .where('acknowledged', '==', false)
+      .orderBy('timestamp', 'desc')
+      .limit(20)
+      .get();
+
+    const adminAlerts = adminAlertsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      timestamp: doc.data().timestamp?.toDate().toISOString()
+    }));
+
+    // Calculate fraud statistics
+    const fraudAttemptsByType = {};
+    fraudLogs.forEach(log => {
+      const type = log.fraudType || 'unknown';
+      fraudAttemptsByType[type] = (fraudAttemptsByType[type] || 0) + 1;
+    });
+
+    return {
+      fraudLogs: fraudLogs.slice(0, 20), // Latest 20
+      flaggedTransactions,
+      refundAbusers,
+      adminAlerts,
+      statistics: {
+        totalFraudAttempts: fraudLogs.length,
+        totalFlaggedTransactions: flaggedTransactions.length,
+        totalRefundAbusers: refundAbusers.length,
+        pendingAlerts: adminAlerts.length,
+        fraudAttemptsByType
+      },
+      timestamp: new Date().toISOString()
+    };
+
+  } catch (error) {
+    functions.logger.error('Get fraud dashboard error', { error: error.message });
+    throw error;
+  }
+}
+
+/**
+ * Gets refund tracking data
+ * @param {object} options - Query options
+ * @returns {array} Refund data
+ */
+async function getRefundTracking(options = {}) {
+  const db = admin.firestore();
+  const {
+    limit = 50,
+    period = 30 // days
+  } = options;
+
+  try {
+    const periodStart = new Date(Date.now() - period * 24 * 60 * 60 * 1000);
+
+    const refundsSnapshot = await db.collection('purchases')
+      .where('refunded', '==', true)
+      .where('refundDate', '>', periodStart)
+      .orderBy('refundDate', 'desc')
+      .limit(limit)
+      .get();
+
+    const refunds = await Promise.all(refundsSnapshot.docs.map(async (doc) => {
+      const data = doc.data();
+
+      // Get user info
+      const userDoc = await db.collection('users').doc(data.userId).get();
+      const userData = userDoc.exists ? userDoc.data() : {};
+
+      // Check if user has multiple refunds
+      const userRefundsSnapshot = await db.collection('purchases')
+        .where('userId', '==', data.userId)
+        .where('refunded', '==', true)
+        .get();
+
+      const userRefundCount = userRefundsSnapshot.size;
+
+      return {
+        id: doc.id,
+        ...data,
+        user: {
+          id: data.userId,
+          fullName: userData.fullName || 'Unknown',
+          email: userData.email || 'Unknown',
+          totalRefunds: userRefundCount,
+          suspended: userData.suspended || false
+        },
+        refundDate: data.refundDate?.toDate().toISOString(),
+        purchaseDate: data.purchaseDate?.toDate().toISOString()
+      };
+    }));
+
+    return refunds;
+
+  } catch (error) {
+    functions.logger.error('Get refund tracking error', { error: error.message });
+    throw error;
+  }
+}
+
+/**
+ * Review and approve/reject flagged transaction
+ * @param {string} transactionId - Flagged transaction ID
+ * @param {string} decision - 'approve' or 'reject'
+ * @param {string} adminNote - Admin's note
+ */
+async function reviewFlaggedTransaction(transactionId, decision, adminNote = '') {
+  const db = admin.firestore();
+
+  try {
+    const transactionRef = db.collection('flagged_transactions').doc(transactionId);
+    const transactionDoc = await transactionRef.get();
+
+    if (!transactionDoc.exists) {
+      throw new Error('Flagged transaction not found');
+    }
+
+    await transactionRef.update({
+      reviewed: true,
+      reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+      decision,
+      adminNote
+    });
+
+    if (decision === 'reject') {
+      const data = transactionDoc.data();
+
+      // Revoke access and suspend user
+      await db.collection('users').doc(data.userId).update({
+        isPremium: false,
+        premiumTier: null,
+        suspended: true,
+        suspensionReason: `Fraudulent transaction: ${adminNote}`,
+        suspendedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      functions.logger.warn('Fraudulent transaction confirmed - user suspended', {
+        transactionId,
+        userId: data.userId
+      });
+    }
+
+    return { success: true };
+
+  } catch (error) {
+    functions.logger.error('Review flagged transaction error', { transactionId, error: error.message });
+    throw error;
+  }
+}
+
 module.exports = {
   getStats,
   getFlaggedContent,
   moderateContent,
   getUserDetails,
   suspendUser,
-  unsuspendUser
+  unsuspendUser,
+  getSubscriptionAnalytics,
+  getFraudDashboard,
+  getRefundTracking,
+  reviewFlaggedTransaction
 };

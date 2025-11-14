@@ -20,7 +20,10 @@
     "cors": "^2.8.5",
     "rate-limiter-flexible": "^3.0.0",
     "axios": "^1.6.0",
-    "sharp": "^0.33.0"
+    "sharp": "^0.33.0",
+    "jsonwebtoken": "^9.0.2",
+    "jwks-rsa": "^3.1.0",
+    "crypto": "^1.0.1"
   },
   "devDependencies": {
     "firebase-functions-test": "^3.1.0",
