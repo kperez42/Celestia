@@ -222,7 +222,9 @@ class CircuitBreaker: ObservableObject {
 
                 Logger.shared.info("Circuit breaker closed for \(serviceName) - service recovered", category: .networking)
 
-                AnalyticsManager.shared.logEvent("circuit_breaker_closed", parameters: [
+                AnalyticsManager.shared.logEvent(.featureUsed, parameters: [
+                    "feature": "circuit_breaker",
+                    "action": "closed",
                     "service": serviceName,
                     "success_count": successCount
                 ])
@@ -272,7 +274,9 @@ class CircuitBreaker: ObservableObject {
 
         Logger.shared.error("Circuit breaker OPENED for \(serviceName) - service unavailable", category: .networking)
 
-        AnalyticsManager.shared.logEvent("circuit_breaker_opened", parameters: [
+        AnalyticsManager.shared.logEvent(.featureUsed, parameters: [
+            "feature": "circuit_breaker",
+            "action": "opened",
             "service": serviceName,
             "failure_count": failureTimestamps.count
         ])

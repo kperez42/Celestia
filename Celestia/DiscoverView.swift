@@ -499,11 +499,6 @@ struct DiscoverView: View {
                         .multilineTextAlignment(.center)
                         .dynamicTypeSize(min: .medium, max: .accessibility1)
                 }
-                .task {
-                    if let user = viewModel.matchedUser {
-                        VoiceOverAnnouncement.announce("It's a match! You and \(user.fullName) liked each other!")
-                    }
-                }
 
                 Button("Send Message") {
                     viewModel.dismissMatchAnimation()
@@ -516,6 +511,11 @@ struct DiscoverView: View {
                     viewModel.dismissMatchAnimation()
                 }
                 .foregroundColor(.white)
+            }
+            .task {
+                if let user = viewModel.matchedUser {
+                    VoiceOverAnnouncement.announce("It's a match! You and \(user.fullName) liked each other!")
+                }
             }
             .padding(40)
         }
