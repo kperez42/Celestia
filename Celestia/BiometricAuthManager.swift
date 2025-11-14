@@ -87,7 +87,7 @@ class BiometricAuthManager: ObservableObject {
 
         var error: NSError?
         guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
-            Logger.shared.error("Biometric auth not available: \(error?.localizedDescription ?? "Unknown")", category: .auth)
+            Logger.shared.error("Biometric auth not available: \(error?.localizedDescription ?? "Unknown")", category: .authentication)
             throw BiometricError.notAvailable
         }
 
@@ -98,13 +98,13 @@ class BiometricAuthManager: ObservableObject {
             )
 
             if success {
-                Logger.shared.info("Biometric authentication succeeded", category: .auth)
+                Logger.shared.info("Biometric authentication succeeded", category: .authentication)
                 recordSuccessfulAuth()
             }
 
             return success
         } catch let error as LAError {
-            Logger.shared.warning("Biometric auth failed: \(error.localizedDescription)", category: .auth)
+            Logger.shared.warning("Biometric auth failed: \(error.localizedDescription)", category: .authentication)
             throw BiometricError.from(laError: error)
         }
     }
@@ -123,13 +123,13 @@ class BiometricAuthManager: ObservableObject {
             )
 
             if success {
-                Logger.shared.info("Authentication succeeded (biometric or passcode)", category: .auth)
+                Logger.shared.info("Authentication succeeded (biometric or passcode)", category: .authentication)
                 recordSuccessfulAuth()
             }
 
             return success
         } catch let error as LAError {
-            Logger.shared.warning("Authentication failed: \(error.localizedDescription)", category: .auth)
+            Logger.shared.warning("Authentication failed: \(error.localizedDescription)", category: .authentication)
             throw BiometricError.from(laError: error)
         }
     }
@@ -146,8 +146,10 @@ class BiometricAuthManager: ObservableObject {
 
         if success {
             isEnabled = true
-            Logger.shared.info("Biometric auth enabled", category: .auth)
-            AnalyticsManager.shared.logEvent("biometric_auth_enabled", parameters: [
+            Logger.shared.info("Biometric auth enabled", category: .authentication)
+            AnalyticsManager.shared.logEvent(.featureUsed, parameters: [
+                "feature": "biometric_auth",
+                "action": "enabled",
                 "type": biometricTypeString
             ])
         }
@@ -159,8 +161,11 @@ class BiometricAuthManager: ObservableObject {
     func disableBiometricAuth() {
         isEnabled = false
         requireOnLaunch = false
-        Logger.shared.info("Biometric auth disabled", category: .auth)
-        AnalyticsManager.shared.logEvent("biometric_auth_disabled")
+        Logger.shared.info("Biometric auth disabled", category: .authentication)
+        AnalyticsManager.shared.logEvent(.featureUsed, parameters: [
+            "feature": "biometric_auth",
+            "action": "disabled"
+        ])
     }
 
     /// Check if should authenticate on app launch
@@ -173,7 +178,9 @@ class BiometricAuthManager: ObservableObject {
 
     private func recordSuccessfulAuth() {
         UserDefaults.standard.set(Date(), forKey: "last_biometric_auth_date")
-        AnalyticsManager.shared.logEvent("biometric_auth_success", parameters: [
+        AnalyticsManager.shared.logEvent(.featureUsed, parameters: [
+            "feature": "biometric_auth",
+            "action": "success",
             "type": biometricTypeString
         ])
     }

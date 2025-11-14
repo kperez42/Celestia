@@ -27,6 +27,7 @@ enum CelestiaError: LocalizedError, Identifiable {
     case profileIncomplete
     case invalidProfileData
     case ageRestriction
+    case validationError(field: String, reason: String)
 
     // Network Errors
     case networkError
@@ -97,6 +98,8 @@ enum CelestiaError: LocalizedError, Identifiable {
             return "Some profile information is invalid. Please check and try again."
         case .ageRestriction:
             return "You must be 18 or older to use Celestia."
+        case .validationError(let field, let reason):
+            return "Validation error for \(field): \(reason)"
 
         // Network
         case .networkError:
