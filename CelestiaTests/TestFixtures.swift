@@ -269,6 +269,96 @@ extension Date {
     }
 }
 
+// MARK: - Swipe & Like Fixtures
+
+extension TestFixtures {
+
+    static func createTestSwipe(
+        fromUserId: String = "user1",
+        toUserId: String = "user2",
+        isSuperLike: Bool = false,
+        timestamp: Date = Date()
+    ) -> (fromUserId: String, toUserId: String, isSuperLike: Bool, timestamp: Date) {
+        return (fromUserId, toUserId, isSuperLike, timestamp)
+    }
+
+    static func createBatchSwipes(count: Int, fromUserId: String) -> [(fromUserId: String, toUserId: String, isSuperLike: Bool)] {
+        return (0..<count).map { index in
+            (fromUserId, "target_user_\(index)", index % 5 == 0) // Every 5th is super like
+        }
+    }
+}
+
+// MARK: - Referral Fixtures
+
+extension TestFixtures {
+
+    static func createTestReferral(
+        referrerId: String = "referrer_id",
+        referredId: String = "referred_id",
+        code: String = "REF123",
+        timestamp: Date = Date()
+    ) -> (referrerId: String, referredId: String, code: String, timestamp: Date) {
+        return (referrerId, referredId, code, timestamp)
+    }
+
+    static func generateReferralCode() -> String {
+        let letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        return String((0..<6).map { _ in letters.randomElement()! })
+    }
+}
+
+// MARK: - Premium/Subscription Fixtures
+
+extension TestFixtures {
+
+    static func createSubscription(
+        userId: String,
+        tier: String = "gold",
+        startDate: Date = Date(),
+        expiryDate: Date? = nil
+    ) -> (userId: String, tier: String, startDate: Date, expiryDate: Date?) {
+        let expiry = expiryDate ?? Calendar.current.date(byAdding: .month, value: 1, to: startDate)
+        return (userId, tier, startDate, expiry)
+    }
+
+    static func createExpiredSubscription(userId: String) -> (userId: String, tier: String, startDate: Date, expiryDate: Date?) {
+        let startDate = Date.daysAgo(40)
+        let expiryDate = Date.daysAgo(10)
+        return (userId, "gold", startDate, expiryDate)
+    }
+}
+
+// MARK: - Notification Fixtures
+
+extension TestFixtures {
+
+    static func createTestNotification(
+        type: String = "match",
+        userId: String = "user_id",
+        title: String = "New Match!",
+        body: String = "You have a new match",
+        data: [String: String] = [:]
+    ) -> (type: String, userId: String, title: String, body: String, data: [String: String]) {
+        return (type, userId, title, body, data)
+    }
+}
+
+// MARK: - Profile Photo Fixtures
+
+extension TestFixtures {
+
+    static func createPhotoURLs(count: Int = 6) -> [String] {
+        return (1...count).map { "https://example.com/photo\($0).jpg" }
+    }
+
+    static func createPhotoUploadData() -> Data {
+        // Create minimal valid image data (1x1 PNG)
+        let pngHeader: [UInt8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
+        return Data(pngHeader)
+    }
+}
+
 // MARK: - Assertion Helpers
 
 struct TestAssertions {
@@ -281,5 +371,68 @@ struct TestAssertions {
     /// Assert array contains exactly the expected items in any order
     static func assertArrayContainsExactly<T: Equatable>(_ array: [T], _ expected: [T]) -> Bool {
         return array.count == expected.count && Set(array) == Set(expected)
+    }
+
+    /// Assert user has expected premium features
+    static func assertUserIsPremium(_ user: User) -> Bool {
+        return user.isPremium &&
+               user.superLikesRemaining > 0 &&
+               user.premiumTier != nil
+    }
+
+    /// Assert match is valid
+    static func assertValidMatch(_ match: Match) -> Bool {
+        return match.id != nil &&
+               !match.user1Id.isEmpty &&
+               !match.user2Id.isEmpty &&
+               match.isActive
+    }
+
+    /// Assert message is valid
+    static func assertValidMessage(_ message: Message) -> Bool {
+        return message.id != nil &&
+               !message.matchId.isEmpty &&
+               !message.senderId.isEmpty &&
+               !message.receiverId.isEmpty &&
+               !message.text.isEmpty
+    }
+}
+
+// MARK: - Performance Test Helpers
+
+extension TestFixtures {
+
+    /// Create large dataset for performance testing
+    static func createLargeUserDataset(count: Int = 1000) -> [User] {
+        return (0..<count).map { index in
+            createTestUser(
+                id: "perf_user_\(index)",
+                fullName: String.randomName(),
+                age: Int.random(in: 18...55),
+                gender: ["Male", "Female", "Non-binary"].randomElement()!,
+                location: ["New York", "Los Angeles", "Chicago", "Miami", "Seattle", "Boston", "Austin", "Portland"].randomElement()!
+            )
+        }
+    }
+
+    /// Create conversation with many messages for pagination testing
+    static func createLargeConversation(
+        matchId: String,
+        user1Id: String,
+        user2Id: String,
+        messageCount: Int = 100
+    ) -> [Message] {
+        return (0..<messageCount).map { index in
+            let isFromUser1 = index % 2 == 0
+            return createTestMessage(
+                id: "msg_\(index)",
+                matchId: matchId,
+                senderId: isFromUser1 ? user1Id : user2Id,
+                receiverId: isFromUser1 ? user2Id : user1Id,
+                text: "Performance test message \(index + 1)",
+                timestamp: Date().addingTimeInterval(TimeInterval(index)),
+                isRead: index < messageCount - 10
+            )
+        }
     }
 }
