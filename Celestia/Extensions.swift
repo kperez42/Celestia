@@ -80,18 +80,15 @@ extension Date {
 
 extension String {
     /// Validate email format
+    /// REFACTORED: Now uses ValidationHelper instead of duplicate regex
     func isValidEmail() -> Bool {
-        let emailRegex = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
-        let predicate = NSPredicate(format: "SELF MATCHES %@", emailRegex)
-        return predicate.evaluate(with: self)
+        return ValidationHelper.isValidEmail(self)
     }
-    
+
     /// Check if string is valid password (8+ chars, has number and letter)
+    /// REFACTORED: Now uses ValidationHelper instead of duplicate validation logic
     func isValidPassword() -> Bool {
-        guard self.count >= 8 else { return false }
-        let hasNumber = self.rangeOfCharacter(from: .decimalDigits) != nil
-        let hasLetter = self.rangeOfCharacter(from: .letters) != nil
-        return hasNumber && hasLetter
+        return ValidationHelper.isValidPassword(self)
     }
     
     /// Truncate string to specified length

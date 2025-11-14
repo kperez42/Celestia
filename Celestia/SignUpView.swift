@@ -42,10 +42,9 @@ struct SignUpView: View {
         !password.isEmpty && !confirmPassword.isEmpty && password == confirmPassword
     }
 
+    // REFACTORED: Now uses ValidationHelper instead of duplicate email regex
     private var isValidEmail: Bool {
-        let emailRegex = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
-        let emailPredicate = NSPredicate(format:"SELF MATCHES %@", emailRegex)
-        return emailPredicate.evaluate(with: email)
+        return ValidationHelper.isValidEmail(email)
     }
 
     var body: some View {

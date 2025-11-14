@@ -239,10 +239,13 @@ class ClipboardSecurityManager: ObservableObject {
     private func detectSensitiveContent(_ text: String) -> Bool {
         // Check for patterns that indicate sensitive data
 
-        // Email addresses
-        let emailRegex = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
-        if text.range(of: emailRegex, options: .regularExpression) != nil {
-            return true
+        // Email addresses - REFACTORED: Use ValidationHelper for consistency
+        // Check if text contains any email-like pattern
+        let words = text.components(separatedBy: .whitespacesAndNewlines)
+        for word in words {
+            if ValidationHelper.isValidEmail(word) {
+                return true
+            }
         }
 
         // Phone numbers
