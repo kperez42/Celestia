@@ -18,8 +18,8 @@ struct BatchOperationLog: Codable {
     let documentRefs: [String] // Document paths
     let updateData: [String: [String: Any]]? // Document ID -> update data
     let timestamp: Date
-    let status: BatchOperationStatus
-    let retryCount: Int
+    var status: BatchOperationStatus
+    var retryCount: Int
     let matchId: String? // For filtering/cleanup
     let userId: String? // For filtering/cleanup
 
@@ -38,6 +38,22 @@ struct BatchOperationLog: Codable {
         try container.encode(retryCount, forKey: .retryCount)
         try container.encodeIfPresent(matchId, forKey: .matchId)
         try container.encodeIfPresent(userId, forKey: .userId)
+    }
+
+    // Custom decoding to handle [String: Any]
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        operationType = try container.decode(String.self, forKey: .operationType)
+        documentRefs = try container.decode([String].self, forKey: .documentRefs)
+        timestamp = try container.decode(Date.self, forKey: .timestamp)
+        let statusString = try container.decode(String.self, forKey: .status)
+        status = BatchOperationStatus(rawValue: statusString) ?? .pending
+        retryCount = try container.decode(Int.self, forKey: .retryCount)
+        matchId = try container.decodeIfPresent(String.self, forKey: .matchId)
+        userId = try container.decodeIfPresent(String.self, forKey: .userId)
+        // updateData is not persisted, so we set it to nil
+        updateData = nil
     }
 }
 

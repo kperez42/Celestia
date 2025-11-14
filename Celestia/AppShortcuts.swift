@@ -238,7 +238,7 @@ struct AddEmergencyContactIntent: AppIntent {
     var phoneNumber: String?
 
     @Parameter(title: "Relationship")
-    var relationship: ContactRelationship?
+    var relationship: EmergencyContactRelationship?
 
     static var parameterSummary: some ParameterSummary {
         Summary("Add \(\.$contactName) as emergency contact")
@@ -301,10 +301,10 @@ struct CheckInIntent: AppIntent {
     }
 }
 
-// MARK: - Contact Relationship Enum
+// MARK: - Contact Relationship Enum for App Intents
 
 @available(iOS 16.0, *)
-enum ContactRelationship: String, AppEnum {
+enum EmergencyContactRelationship: String, AppEnum {
     case friend = "Friend"
     case family = "Family"
     case partner = "Partner"
@@ -314,7 +314,7 @@ enum ContactRelationship: String, AppEnum {
 
     static var typeDisplayRepresentation: TypeDisplayRepresentation = "Relationship"
 
-    static var caseDisplayRepresentations: [ContactRelationship: DisplayRepresentation] {
+    static var caseDisplayRepresentations: [EmergencyContactRelationship: DisplayRepresentation] {
         [
             .friend: "Friend",
             .family: "Family Member",

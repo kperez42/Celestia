@@ -207,7 +207,7 @@ struct OfflineBadge: View {
                     .foregroundColor(.secondary)
             }
             .padding(.horizontal, 8)
-            .padding(.vertical: 4)
+            .padding(.vertical, 4)
             .background(Color.red.opacity(0.1))
             .cornerRadius(12)
         }

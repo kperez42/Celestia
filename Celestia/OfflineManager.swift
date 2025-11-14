@@ -555,7 +555,7 @@ class SyncEngine {
 
 // MARK: - SwiftUI Integration
 
-struct OfflineIndicator: View {
+struct SimpleOfflineStatusView: View {
     @ObservedObject private var offlineManager = OfflineManager.shared
 
     var body: some View {
