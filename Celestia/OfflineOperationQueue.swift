@@ -174,17 +174,17 @@ class OfflineOperationQueue: ObservableObject {
               let likedUserId = operation.data["likedUserId"] else {
             throw NSError(domain: "OfflineQueue", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid like data"])
         }
-        
-        try await MatchService.shared.likeUser(userId: userId, likedUserId: likedUserId)
+
+        _ = try await SwipeService.shared.likeUser(fromUserId: userId, toUserId: likedUserId, isSuperLike: false)
     }
-    
+
     private func processSuperLikeOperation(_ operation: PendingOperation) async throws {
         guard let userId = operation.data["userId"],
               let likedUserId = operation.data["likedUserId"] else {
             throw NSError(domain: "OfflineQueue", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid super like data"])
         }
-        
-        try await MatchService.shared.superLikeUser(userId: userId, likedUserId: likedUserId)
+
+        _ = try await SwipeService.shared.likeUser(fromUserId: userId, toUserId: likedUserId, isSuperLike: true)
     }
     
     private func processProfileUpdateOperation(_ operation: PendingOperation) async throws {

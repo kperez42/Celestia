@@ -71,6 +71,7 @@ enum LogCategory: String {
     case security = "Security"
     case performance = "Performance"
     case user = "User"
+    case offline = "Offline"
     case general = "General"
 
     var subsystem: String {
@@ -310,7 +311,7 @@ extension LogCategory: CaseIterable {
         return [
             .authentication, .networking, .database, .ui, .storage,
             .messaging, .matching, .payment, .analytics, .push,
-            .referral, .moderation, .security, .performance, .user, .general
+            .referral, .moderation, .security, .performance, .user, .offline, .general
         ]
     }
 }
