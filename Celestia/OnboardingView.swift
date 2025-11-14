@@ -11,36 +11,44 @@ import PhotosUI
 struct OnboardingView: View {
     @EnvironmentObject var authService: AuthService
     @Environment(\.dismiss) var dismiss
-    
+
     private let imageUploadService = ImageUploadService.shared
-    
+
+    @StateObject private var viewModel = OnboardingViewModel()
+    @StateObject private var personalizedManager = PersonalizedOnboardingManager.shared
+    @StateObject private var profileScorer = ProfileQualityScorer.shared
+
     @State private var currentStep = 0
     @State private var progress: CGFloat = 0
-    
+    @State private var showGoalSelection = true
+    @State private var showTutorial = false
+    @State private var showCompletionCelebration = false
+
     // Step 1: Basics
     @State private var fullName = ""
     @State private var birthday = Calendar.current.date(byAdding: .year, value: -25, to: Date()) ?? Date()
     @State private var gender = "Male"
-    
+
     // Step 2: Location & About
     @State private var bio = ""
     @State private var location = ""
     @State private var country = ""
-    
+
     // Step 3: Photos
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var photoImages: [UIImage] = []
     @State private var isUploadingPhotos = false
-    
+
     // Step 4: Preferences
     @State private var lookingFor = "Everyone"
     @State private var selectedInterests: [String] = []
     @State private var selectedLanguages: [String] = []
-    
+
     @State private var isLoading = false
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var animateContent = false
+    @State private var onboardingStartTime = Date()
     
     let genderOptions = ["Male", "Female", "Non-binary", "Other"]
     let lookingForOptions = ["Men", "Women", "Everyone"]
@@ -124,12 +132,69 @@ struct OnboardingView: View {
                 Text(errorMessage)
             }
             .onAppear {
+                onboardingStartTime = Date()
                 withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
                     animateContent = true
                     progress = CGFloat(currentStep + 1) / CGFloat(totalSteps)
                 }
             }
+            .onChange(of: currentStep) { _, newStep in
+                viewModel.trackStepCompletion(newStep)
+                updateProfileQuality()
+            }
+            .sheet(isPresented: $showGoalSelection) {
+                OnboardingGoalSelectionView { goal in
+                    showGoalSelection = false
+                    // Show tutorial if A/B test says so
+                    if viewModel.showTutorialIfNeeded() {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            showTutorial = true
+                        }
+                    }
+                }
+                .interactiveDismissDisabled()
+            }
+            .sheet(isPresented: $showTutorial) {
+                let tutorials = personalizedManager.getPrioritizedTutorials().compactMap { tutorialId in
+                    TutorialManager.getOnboardingTutorials().first { $0.id == tutorialId }
+                }
+                TutorialView(tutorials: tutorials.isEmpty ? TutorialManager.getOnboardingTutorials() : tutorials) {
+                    showTutorial = false
+                }
+            }
+            .sheet(isPresented: $showCompletionCelebration) {
+                CompletionCelebrationView(
+                    incentive: viewModel.completionIncentive,
+                    profileScore: profileScorer.currentScore
+                ) {
+                    showCompletionCelebration = false
+                    dismiss()
+                }
+            }
+            .overlay {
+                if viewModel.showMilestoneCelebration, let milestone = viewModel.currentMilestone {
+                    MilestoneCelebrationView(milestone: milestone) {
+                        viewModel.showMilestoneCelebration = false
+                    }
+                }
+            }
         }
+    }
+
+    // MARK: - Profile Quality Update
+
+    private func updateProfileQuality() {
+        guard var user = authService.currentUser else { return }
+
+        // Create temporary user with current onboarding data
+        user.fullName = fullName
+        user.age = calculateAge(from: birthday)
+        user.bio = bio
+        user.location = location
+        user.interests = selectedInterests
+        user.languages = selectedLanguages
+
+        viewModel.updateProfileQuality(for: user)
     }
     
     // MARK: - Progress Bar
@@ -351,16 +416,21 @@ struct OnboardingView: View {
     }
     
     // MARK: - Step 2: About & Location
-    
+
     private var step2View: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 30) {
+                // Incentive Banner (if offered)
+                if let incentive = viewModel.completionIncentive {
+                    IncentiveBanner(incentive: incentive)
+                }
+
                 // Icon
                 ZStack {
                     Circle()
                         .fill(Color.purple.opacity(0.15))
                         .frame(width: 100, height: 100)
-                    
+
                     Image(systemName: "text.bubble.fill")
                         .font(.system(size: 50))
                         .foregroundStyle(
@@ -371,18 +441,23 @@ struct OnboardingView: View {
                             )
                         )
                 }
-                
+
                 VStack(spacing: 8) {
                     Text("About You")
                         .font(.title)
                         .fontWeight(.bold)
-                    
+
                     Text("Share a bit about yourself and where you're from")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                 }
-                
+
+                // Profile Quality Tips (if enabled)
+                if viewModel.shouldShowProfileTips, let tip = profileScorer.getPriorityTip() {
+                    ProfileQualityTipCard(tip: tip)
+                }
+
                 VStack(spacing: 20) {
                     // Bio
                     VStack(alignment: .leading, spacing: 8) {
@@ -917,19 +992,19 @@ struct OnboardingView: View {
     
     private func completeOnboarding() {
         isLoading = true
-        
+
         Task {
             do {
                 guard var user = authService.currentUser else { return }
                 guard let userId = user.id else { return }
-                
+
                 // Upload photos
                 var photoURLs: [String] = []
                 for image in photoImages {
                     let url = try await imageUploadService.uploadProfileImage(image, userId: userId)
                     photoURLs.append(url)
                 }
-                
+
                 // Update user
                 user.fullName = fullName
                 user.age = calculateAge(from: birthday)
@@ -942,13 +1017,26 @@ struct OnboardingView: View {
                 user.profileImageURL = photoURLs.first ?? ""
                 user.interests = selectedInterests
                 user.languages = selectedLanguages
-                
+
                 try await authService.updateUser(user)
-                
+
+                // Track onboarding completion analytics
+                let timeSpent = Date().timeIntervalSince(onboardingStartTime)
                 await MainActor.run {
+                    viewModel.trackOnboardingCompleted(timeSpent: timeSpent)
+
+                    // Update activation metrics
+                    ActivationMetrics.shared.trackProfileUpdate(user: user)
+
                     isLoading = false
                     HapticManager.shared.notification(.success)
-                    dismiss()
+
+                    // Show completion celebration if profile quality is good
+                    if profileScorer.currentScore >= 70 {
+                        showCompletionCelebration = true
+                    } else {
+                        dismiss()
+                    }
                 }
             } catch {
                 await MainActor.run {
@@ -961,7 +1049,240 @@ struct OnboardingView: View {
     }
 }
 
+// MARK: - Supporting Views
+
+struct IncentiveBanner: View {
+    let incentive: OnboardingViewModel.CompletionIncentive
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: incentive.icon)
+                .font(.title2)
+                .foregroundColor(.yellow)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Complete your profile!")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+
+                Text(incentive.description)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+        }
+        .padding()
+        .background(
+            LinearGradient(
+                colors: [Color.yellow.opacity(0.1), Color.orange.opacity(0.05)],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        )
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.yellow.opacity(0.3), lineWidth: 1)
+        )
+    }
+}
+
+struct ProfileQualityTipCard: View {
+    let tip: ProfileQualityScorer.ProfileQualityTip
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: tip.impact.icon)
+                .font(.title3)
+                .foregroundColor(tip.impact.color)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(tip.title)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+
+                Text(tip.message)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+
+            Text("+\(tip.points)")
+                .font(.caption)
+                .fontWeight(.bold)
+                .foregroundColor(.green)
+        }
+        .padding()
+        .background(tip.impact.color.opacity(0.05))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(tip.impact.color.opacity(0.2), lineWidth: 1)
+        )
+    }
+}
+
+struct CompletionCelebrationView: View {
+    let incentive: OnboardingViewModel.CompletionIncentive?
+    let profileScore: Int
+    let onDismiss: () -> Void
+
+    @State private var scale: CGFloat = 0.5
+    @State private var opacity: Double = 0
+    @State private var confettiCounter = 0
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.4)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    onDismiss()
+                }
+
+            VStack(spacing: 32) {
+                // Celebration Icon
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [.purple.opacity(0.2), .pink.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 120, height: 120)
+
+                    Text("🎉")
+                        .font(.system(size: 60))
+                }
+                .scaleEffect(scale)
+                .opacity(opacity)
+
+                VStack(spacing: 12) {
+                    Text("Profile Complete!")
+                        .font(.title)
+                        .fontWeight(.bold)
+                        .multilineTextAlignment(.center)
+
+                    Text("Your profile is looking great!")
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+
+                    // Profile Score
+                    HStack(spacing: 8) {
+                        ZStack {
+                            Circle()
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 4)
+                                .frame(width: 60, height: 60)
+
+                            Circle()
+                                .trim(from: 0, to: CGFloat(profileScore) / 100)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [.purple, .pink],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    ),
+                                    style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                                )
+                                .frame(width: 60, height: 60)
+                                .rotationEffect(.degrees(-90))
+
+                            Text("\(profileScore)")
+                                .font(.headline)
+                                .fontWeight(.bold)
+                        }
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Profile Quality")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+
+                            Text("Excellent!")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.green)
+                        }
+                    }
+                }
+                .opacity(opacity)
+
+                // Incentive Reward (if any)
+                if let incentive = incentive {
+                    VStack(spacing: 12) {
+                        Divider()
+
+                        HStack(spacing: 12) {
+                            Image(systemName: incentive.icon)
+                                .font(.title2)
+                                .foregroundColor(.yellow)
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Reward Unlocked!")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+
+                                Text("\(incentive.amount) \(incentive.type.displayName)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+
+                            Spacer()
+                        }
+                        .padding()
+                        .background(Color.yellow.opacity(0.1))
+                        .cornerRadius(12)
+                    }
+                    .opacity(opacity)
+                }
+
+                Button {
+                    onDismiss()
+                } label: {
+                    Text("Start Exploring!")
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .cornerRadius(16)
+                }
+                .opacity(opacity)
+            }
+            .padding(32)
+            .background(Color.white)
+            .cornerRadius(24)
+            .shadow(color: .black.opacity(0.2), radius: 20)
+            .padding(40)
+            .scaleEffect(scale)
+        }
+        .onAppear {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                scale = 1.0
+                opacity = 1.0
+            }
+
+            // Trigger confetti animation
+            for i in 0..<20 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.1) {
+                    confettiCounter += 1
+                }
+            }
+        }
+    }
+}
+
 #Preview {
     OnboardingView()
         .environmentObject(AuthService.shared)
 }
+
