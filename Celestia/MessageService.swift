@@ -258,26 +258,36 @@ class MessageService: ObservableObject, MessageServiceProtocol {
             Logger.shared.debug("Content validated server-side ✅", category: .moderation)
 
         } catch let error as BackendAPIError {
-            // SECURITY FIX: Do NOT fallback to client-side validation (can be bypassed)
-            // Block sending when backend is unavailable to prevent abuse
-            Logger.shared.error("Server-side validation unavailable - blocking message send", category: .moderation)
+            // SECURITY FIX: Queue message for deferred validation instead of blocking
+            // This prevents client-side bypass while maintaining good UX
+            Logger.shared.warning("Server-side validation unavailable - queueing message for deferred validation", category: .moderation)
 
             // Log for monitoring and alerting
             AnalyticsManager.shared.logEvent(.validationError, parameters: [
                 "type": "validation_service_unavailable",
                 "error": error.localizedDescription,
-                "action": "blocked_message_send"
+                "action": "queued_for_validation"
             ])
 
-            // Return user-friendly error
-            throw CelestiaError.serviceTemporarilyUnavailable
+            // Create pending message
+            let pendingMessage = PendingMessage(
+                matchId: matchId,
+                senderId: senderId,
+                receiverId: receiverId,
+                text: text,
+                sanitizedText: sanitizedText
+            )
 
-            // TODO: Future enhancement - implement message queue for delayed validation:
-            // 1. Store message in local queue with "pending_validation" status
-            // 2. Show user that message is queued for validation
-            // 3. Background task periodically retries validation
-            // 4. Send message once validated, or reject if inappropriate
-            // This provides better UX while maintaining security
+            // Add to queue for background processing
+            PendingMessageQueue.shared.enqueue(pendingMessage)
+
+            Logger.shared.info("Message queued for validation: \(pendingMessage.id)", category: .moderation)
+
+            // Inform user that message is queued (don't throw error)
+            // The UI should show the message as "pending" or "sending..."
+            // It will be sent once validated, or rejected if inappropriate
+            return
+
         } catch {
             // Re-throw other validation errors (content violations, etc.)
             throw error

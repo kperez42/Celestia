@@ -23,12 +23,14 @@ class FirebaseManager: ObservableObject {
     @Published var isAuthenticated = false
     
     private init() {
-        FirebaseApp.configure()
-        
+        // NOTE: Firebase is already configured in CelestiaApp.init()
+        // Do NOT call FirebaseApp.configure() here to avoid dual initialization
+        // and potential race conditions
+
         self.auth = Auth.auth()
         self.firestore = Firestore.firestore()
         self.storage = Storage.storage()
-        
+
         // Check if user is already logged in
         if let firebaseUser = auth.currentUser {
             self.isAuthenticated = true

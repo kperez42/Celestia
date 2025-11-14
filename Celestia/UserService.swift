@@ -23,8 +23,12 @@ class UserService: ObservableObject, UserServiceProtocol {
     static let shared = UserService(repository: FirestoreUserRepository())
 
     private let db = Firestore.firestore()
-    private var lastDocument: DocumentSnapshot?
-    private var searchTask: Task<Void, Never>?
+
+    // SWIFT 6 CONCURRENCY: These properties are accessed across async boundaries
+    // but are always accessed from MainActor-isolated methods. Marked nonisolated(unsafe)
+    // to satisfy Swift 6 strict concurrency while maintaining thread safety through MainActor.
+    nonisolated(unsafe) private var lastDocument: DocumentSnapshot?
+    nonisolated(unsafe) private var searchTask: Task<Void, Never>?
 
     // PERFORMANCE: Search result caching to reduce database queries
     private var searchCache: [String: CachedSearchResult] = [:]
@@ -136,7 +140,7 @@ class UserService: ObservableObject, UserServiceProtocol {
     /// Set user offline
     func setUserOffline(userId: String) async {
         do {
-            try await db.collection("users").document(userId).updateData([
+            try await repository.updateUserFields(userId: userId, fields: [
                 "isOnline": false,
                 "lastActive": FieldValue.serverTimestamp()
             ])

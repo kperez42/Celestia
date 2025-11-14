@@ -59,31 +59,8 @@ class AuthService: ObservableObject, AuthServiceProtocol {
     }
 
     // MARK: - Validation
-
-    /// Validate email format
-    private func isValidEmail(_ email: String) -> Bool {
-        let emailRegex = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
-        let emailPredicate = NSPredicate(format: "SELF MATCHES %@", emailRegex)
-        return emailPredicate.evaluate(with: email)
-    }
-
-    /// Validate password strength
-    private func isValidPassword(_ password: String) -> Bool {
-        // At least 8 characters
-        guard password.count >= AppConstants.Limits.minPasswordLength else { return false }
-
-        // Contains at least one letter
-        let letterRegex = ".*[A-Za-z]+.*"
-        let letterPredicate = NSPredicate(format: "SELF MATCHES %@", letterRegex)
-        guard letterPredicate.evaluate(with: password) else { return false }
-
-        // Contains at least one number
-        let numberRegex = ".*[0-9]+.*"
-        let numberPredicate = NSPredicate(format: "SELF MATCHES %@", numberRegex)
-        guard numberPredicate.evaluate(with: password) else { return false }
-
-        return true
-    }
+    // NOTE: Validation logic moved to ValidationHelper utility (see ValidationHelper.swift)
+    // This eliminates code duplication across AuthService, SignUpView, Extensions, etc.
 
     func signIn(withEmail email: String, password: String) async throws {
         isLoading = true
@@ -93,10 +70,11 @@ class AuthService: ObservableObject, AuthServiceProtocol {
         let sanitizedEmail = InputSanitizer.email(email)
         let sanitizedPassword = InputSanitizer.basic(password)
 
-        // Validate email format
-        guard isValidEmail(sanitizedEmail) else {
+        // Validate email format using ValidationHelper
+        let emailValidation = ValidationHelper.validateEmail(sanitizedEmail)
+        guard emailValidation.isValid else {
             isLoading = false
-            errorMessage = AppConstants.ErrorMessages.invalidEmail
+            errorMessage = emailValidation.errorMessage ?? AppConstants.ErrorMessages.invalidEmail
             throw CelestiaError.invalidCredentials
         }
 
@@ -129,26 +107,10 @@ class AuthService: ObservableObject, AuthServiceProtocol {
         } catch let error as NSError {
             isLoading = false
 
-            Logger.shared.auth("Sign in error - Domain: \(error.domain), Code: \(error.code)", level: .error)
+            // REFACTORED: Use FirebaseErrorMapper for consistent error handling
+            FirebaseErrorMapper.logError(error, context: "Sign In")
+            errorMessage = FirebaseErrorMapper.getUserFriendlyMessage(for: error)
 
-            // User-friendly error messages
-            if error.domain == "FIRAuthErrorDomain" {
-                switch error.code {
-                case 17008: // Invalid email
-                    errorMessage = "Please enter a valid email address."
-                case 17009: // Wrong password
-                    errorMessage = "Incorrect password. Please try again."
-                case 17011: // User not found
-                    errorMessage = "No account found with this email."
-                case 17010: // User disabled
-                    errorMessage = "This account has been disabled."
-                default:
-                    errorMessage = "Login failed: \(error.localizedDescription)"
-                }
-            } else {
-                errorMessage = error.localizedDescription
-            }
-            
             throw error
         }
     }
@@ -158,9 +120,10 @@ class AuthService: ObservableObject, AuthServiceProtocol {
         // Sanitize email input using centralized utility
         let sanitizedEmail = InputSanitizer.email(email)
 
-        // Validate email format
-        guard isValidEmail(sanitizedEmail) else {
-            errorMessage = AppConstants.ErrorMessages.invalidEmail
+        // Validate email format using ValidationHelper
+        let emailValidation = ValidationHelper.validateEmail(sanitizedEmail)
+        guard emailValidation.isValid else {
+            errorMessage = emailValidation.errorMessage ?? AppConstants.ErrorMessages.invalidEmail
             throw CelestiaError.invalidCredentials
         }
 
@@ -168,22 +131,9 @@ class AuthService: ObservableObject, AuthServiceProtocol {
             try await Auth.auth().sendPasswordReset(withEmail: sanitizedEmail)
             Logger.shared.auth("Password reset email sent to: \(sanitizedEmail)", level: .info)
         } catch let error as NSError {
-            Logger.shared.auth("Password reset error", level: .error)
-            Logger.shared.error("Password reset failed", category: .authentication, error: error)
-
-            // User-friendly error messages
-            if error.domain == "FIRAuthErrorDomain" {
-                switch error.code {
-                case 17008: // Invalid email
-                    errorMessage = "Please enter a valid email address."
-                case 17011: // User not found
-                    errorMessage = "No account found with this email."
-                default:
-                    errorMessage = "Failed to send password reset email: \(error.localizedDescription)"
-                }
-            } else {
-                errorMessage = error.localizedDescription
-            }
+            // REFACTORED: Use FirebaseErrorMapper for consistent error handling
+            FirebaseErrorMapper.logError(error, context: "Password Reset")
+            errorMessage = FirebaseErrorMapper.getUserFriendlyMessage(for: error)
 
             throw error
         }
@@ -199,37 +149,33 @@ class AuthService: ObservableObject, AuthServiceProtocol {
         let sanitizedPassword = InputSanitizer.basic(password)
         let sanitizedFullName = InputSanitizer.strict(fullName)
 
-        // Validate email format
-        guard isValidEmail(sanitizedEmail) else {
-            isLoading = false
-            errorMessage = AppConstants.ErrorMessages.invalidEmail
-            throw CelestiaError.invalidCredentials
-        }
+        // REFACTORED: Use ValidationHelper for comprehensive sign-up validation
+        let signUpValidation = ValidationHelper.validateSignUp(
+            email: sanitizedEmail,
+            password: sanitizedPassword,
+            name: sanitizedFullName,
+            age: age
+        )
 
-        // Validate password strength
-        guard isValidPassword(sanitizedPassword) else {
+        guard signUpValidation.isValid else {
             isLoading = false
-            errorMessage = AppConstants.ErrorMessages.weakPassword
-            throw CelestiaError.weakPassword
-        }
+            errorMessage = signUpValidation.errorMessage ?? "Invalid sign up information."
 
-        // Validate name is not empty
-        guard !sanitizedFullName.isEmpty else {
-            isLoading = false
-            errorMessage = "Name cannot be empty."
-            throw CelestiaError.invalidProfileData
-        }
-
-        // Validate age restriction (must be between minAge and maxAge)
-        guard age >= AppConstants.Limits.minAge && age <= AppConstants.Limits.maxAge else {
-            isLoading = false
-            if age < AppConstants.Limits.minAge {
-                errorMessage = AppConstants.ErrorMessages.invalidAge
-                throw CelestiaError.ageRestriction
-            } else {
-                errorMessage = "Age must be between \(AppConstants.Limits.minAge) and \(AppConstants.Limits.maxAge)"
-                throw CelestiaError.validationError(field: "age", reason: "Age must be \(AppConstants.Limits.maxAge) or below")
+            // Map validation errors to appropriate CelestiaError types
+            if let errorMsg = signUpValidation.errorMessage {
+                if errorMsg.contains("email") {
+                    throw CelestiaError.invalidCredentials
+                } else if errorMsg.contains("password") || errorMsg.contains("Password") {
+                    throw CelestiaError.weakPassword
+                } else if errorMsg.contains("18") {
+                    throw CelestiaError.ageRestriction
+                } else if errorMsg.contains("Name") || errorMsg.contains("name") {
+                    throw CelestiaError.invalidProfileData
+                } else {
+                    throw CelestiaError.validationError(field: "signup", reason: errorMsg)
+                }
             }
+            throw CelestiaError.validationError(field: "signup", reason: "Invalid sign up information")
         }
 
         Logger.shared.auth("Creating user with email: \(sanitizedEmail)", level: .info)
@@ -343,28 +289,10 @@ class AuthService: ObservableObject, AuthServiceProtocol {
         } catch let error as NSError {
             isLoading = false
 
-            // Detailed error logging
-            Logger.shared.auth("Error creating user", level: .error)
-            Logger.shared.error("User creation failed - Domain: \(error.domain), Code: \(error.code)", category: .authentication, error: error)
-            
-            // User-friendly error messages
-            if error.domain == "FIRAuthErrorDomain" {
-                switch error.code {
-                case 17007: // Email already in use
-                    errorMessage = "This email is already registered. Please sign in instead."
-                case 17008: // Invalid email
-                    errorMessage = "Please enter a valid email address."
-                case 17026: // Weak password
-                    errorMessage = "Password should be at least 6 characters."
-                default:
-                    errorMessage = "Authentication error: \(error.localizedDescription)"
-                }
-            } else if error.domain == "FIRFirestoreErrorDomain" {
-                errorMessage = "Error saving user data. Please check your internet connection."
-            } else {
-                errorMessage = error.localizedDescription
-            }
-            
+            // REFACTORED: Use FirebaseErrorMapper for consistent error handling
+            FirebaseErrorMapper.logError(error, context: "Create User")
+            errorMessage = FirebaseErrorMapper.getUserFriendlyMessage(for: error)
+
             throw error
         }
     }

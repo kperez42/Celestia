@@ -177,7 +177,7 @@ class MatchService: ObservableObject, MatchServiceProtocol {
 
     /// Delete a match permanently (use with caution)
     func deleteMatch(matchId: String) async throws {
-        try await db.collection("matches").document(matchId).delete()
+        try await repository.deleteMatch(matchId: matchId)
     }
     
     /// Get total unread messages count for user

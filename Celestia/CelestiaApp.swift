@@ -16,6 +16,8 @@ struct CelestiaApp: App {
 
     init() {
         // Configure Firebase first (must be on main thread)
+        // NOTE: This is the SINGLE initialization point for Firebase
+        // Do NOT call FirebaseApp.configure() anywhere else in the app
         FirebaseApp.configure()
 
         // PERFORMANCE: Move Firestore persistence initialization to background thread

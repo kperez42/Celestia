@@ -283,16 +283,19 @@ class ScammerDetector {
     }
 
     private func containsContactInfo(_ message: String) -> Bool {
-        // Phone number pattern
-        let phonePattern = #"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b"#
-        if message.range(of: phonePattern, options: .regularExpression) != nil {
-            return true
-        }
+        // Phone number pattern - Check with ValidationHelper
+        let words = message.components(separatedBy: .whitespacesAndNewlines)
+        for word in words {
+            // Check for phone numbers
+            let cleanedWord = word.trimmingCharacters(in: .punctuationCharacters)
+            if ValidationHelper.isValidPhoneNumber(cleanedWord) {
+                return true
+            }
 
-        // Email pattern
-        let emailPattern = #"[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,64}"#
-        if message.range(of: emailPattern, options: .regularExpression) != nil {
-            return true
+            // Email pattern - REFACTORED: Use ValidationHelper for consistency
+            if ValidationHelper.isValidEmail(word) {
+                return true
+            }
         }
 
         // Social media handles

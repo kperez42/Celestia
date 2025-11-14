@@ -18,6 +18,13 @@ protocol UserRepository {
     func searchUsers(query: String, currentUserId: String, limit: Int, offset: DocumentSnapshot?) async throws -> [User]
     func incrementProfileViews(userId: String) async
     func updateLastActive(userId: String) async
+
+    // Consumables and boosts
+    func updateDailySwiperUsage(userId: String) async throws
+    func updateRewindUsage(userId: String) async throws
+    func updateBoostUsage(userId: String) async throws
+    func updateSuperLikeUsage(userId: String) async throws
+    func getDailySwiperCount(userId: String) async throws -> Int
 }
 
 // MARK: - Match Repository Protocol
@@ -28,6 +35,7 @@ protocol MatchRepository {
     func createMatch(match: Match) async throws -> String
     func updateMatchLastMessage(matchId: String, message: String, timestamp: Date) async throws
     func deactivateMatch(matchId: String) async throws
+    func deleteMatch(matchId: String) async throws
 }
 
 // MARK: - Message Repository Protocol
@@ -37,6 +45,16 @@ protocol MessageRepository {
     func sendMessage(_ message: Message) async throws
     func markMessagesAsRead(matchId: String, userId: String) async throws
     func deleteMessage(messageId: String) async throws
+}
+
+// MARK: - Swipe Repository Protocol
+
+protocol SwipeRepository {
+    func createLike(fromUserId: String, toUserId: String, isSuperLike: Bool) async throws
+    func createPass(fromUserId: String, toUserId: String) async throws
+    func checkMutualLike(fromUserId: String, toUserId: String) async throws -> Bool
+    func hasSwipedOn(fromUserId: String, toUserId: String) async throws -> (liked: Bool, passed: Bool)
+    func getLikesReceived(userId: String) async throws -> [String]
 }
 
 // MARK: - Interest Repository Protocol
