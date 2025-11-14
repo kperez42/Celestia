@@ -274,28 +274,33 @@ struct SavedProfileCard: View {
 
                     // User info
                     VStack(alignment: .leading, spacing: 6) {
-                        HStack {
+                        HStack(spacing: 4) {
                             Text(savedProfile.user.fullName)
                                 .font(.headline)
                                 .lineLimit(1)
+                                .truncationMode(.tail)
+                                .fixedSize(horizontal: false, vertical: true)
 
                             Text("\(savedProfile.user.age)")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
-
-                            Spacer()
+                                .fixedSize()
                         }
 
                         Text(savedProfile.user.location)
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .lineLimit(1)
+                            .truncationMode(.tail)
 
                         Text("Saved \(savedProfile.savedAt.timeAgo())")
                             .font(.caption)
                             .foregroundColor(.purple)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                     }
                     .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 // Unsave button

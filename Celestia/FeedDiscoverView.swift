@@ -159,10 +159,12 @@ struct FeedDiscoverView: View {
             }
             .sheet(isPresented: $showFilters) {
                 DiscoverFiltersView()
+                    .environmentObject(authService)
             }
             .sheet(isPresented: $showUserDetail) {
                 if let user = selectedUser {
                     UserDetailView(user: user)
+                        .environmentObject(authService)
                 }
             }
             .sheet(isPresented: $showPhotoGallery) {
@@ -344,6 +346,8 @@ struct FeedDiscoverView: View {
                         .font(.title3)
                         .foregroundColor(.white)
                         .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .truncationMode(.tail)
                 }
 
                 Button("Send Message") {
@@ -512,8 +516,9 @@ struct FeedDiscoverView: View {
                 } else {
                     // Show toast for regular like (no match)
                     await MainActor.run {
+                        let truncatedName = user.fullName.count > 20 ? String(user.fullName.prefix(20)) + "..." : user.fullName
                         showToast(
-                            message: "Liked \(user.fullName)!",
+                            message: "Liked \(truncatedName)!",
                             icon: "heart.fill",
                             color: .pink
                         )
@@ -546,8 +551,9 @@ struct FeedDiscoverView: View {
             )
         } else {
             favorites.insert(userId)
+            let truncatedName = user.fullName.count > 20 ? String(user.fullName.prefix(20)) + "..." : user.fullName
             showToast(
-                message: "Saved \(user.fullName)",
+                message: "Saved \(truncatedName)",
                 icon: "star.fill",
                 color: .orange
             )

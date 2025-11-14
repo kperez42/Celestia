@@ -1143,6 +1143,22 @@ struct EditProfileView: View {
             photos.remove(at: index)
         }
         HapticManager.shared.impact(.medium)
+
+        // Immediately save to Firestore so deletion persists
+        Task {
+            guard var user = authService.currentUser else { return }
+            user.photos = photos
+            do {
+                try await authService.updateUser(user)
+                Logger.shared.log("Photo deleted from profile successfully", category: .general, level: .info)
+            } catch {
+                Logger.shared.error("Failed to delete photo from profile", category: .general, error: error)
+                await MainActor.run {
+                    errorMessage = "Failed to delete photo. Please try again."
+                    showErrorAlert = true
+                }
+            }
+        }
     }
 
     private func movePhoto(from source: Int, to destination: Int) {
@@ -1151,10 +1167,23 @@ struct EditProfileView: View {
             photos.insert(photo, at: destination)
         }
         HapticManager.shared.impact(.light)
+
+        // Immediately save to Firestore so reordering persists
+        Task {
+            guard var user = authService.currentUser else { return }
+            user.photos = photos
+            do {
+                try await authService.updateUser(user)
+                Logger.shared.log("Photo order updated successfully", category: .general, level: .info)
+            } catch {
+                Logger.shared.error("Failed to update photo order", category: .general, error: error)
+            }
+        }
     }
 
     private func uploadNewPhotos(_ items: [PhotosPickerItem]) async {
         guard !items.isEmpty else { return }
+        guard var user = authService.currentUser else { return }
 
         await MainActor.run {
             isUploadingPhotos = true
@@ -1182,6 +1211,12 @@ struct EditProfileView: View {
                         await MainActor.run {
                             photos.append(photoURL)
                         }
+
+                        // Immediately save to Firestore so photos persist
+                        user.photos = photos
+                        try await authService.updateUser(user)
+
+                        Logger.shared.log("Photo saved to profile successfully", category: .general, level: .info)
                     }
                 }
             } catch {

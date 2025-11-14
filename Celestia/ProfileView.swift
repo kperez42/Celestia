@@ -113,12 +113,15 @@ struct ProfileView: View {
             .navigationBarHidden(true)
             .sheet(isPresented: $showingEditProfile) {
                 EditProfileView()
+                    .environmentObject(authService)
             }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
+                    .environmentObject(authService)
             }
             .fullScreenCover(isPresented: $showingPremiumUpgrade) {
                 PremiumUpgradeView()
+                    .environmentObject(authService)
             }
             .fullScreenCover(isPresented: $showingPhotoViewer) {
                 if let user = authService.currentUser {
@@ -135,6 +138,7 @@ struct ProfileView: View {
             }
             .sheet(isPresented: $showingInsights) {
                 ProfileInsightsView()
+                    .environmentObject(authService)
             }
             .confirmationDialog("Are you sure you want to sign out?", isPresented: $showingLogoutConfirmation, titleVisibility: .visible) {
                 Button("Sign Out", role: .destructive) {
@@ -244,6 +248,8 @@ struct ProfileView: View {
                         Text(user.fullName)
                             .font(.largeTitle.weight(.bold))
                             .foregroundColor(.white)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
 
                         if user.isVerified {
                             Image(systemName: "checkmark.seal.fill")
@@ -267,6 +273,8 @@ struct ProfileView: View {
                                 .font(.caption)
                             Text("\(user.location), \(user.country)")
                                 .font(.subheadline)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
                         }
 
                         Text("•")
@@ -1225,7 +1233,7 @@ struct ProfileView: View {
             }
         }
         .padding(.horizontal, 20)
-        .padding(.bottom, 100)
+        .padding(.bottom, 40)
     }
     
     private func actionButton(icon: String, title: String, color: Color, accessibilityHint: String, action: @escaping () -> Void) -> some View {
