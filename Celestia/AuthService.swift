@@ -10,6 +10,7 @@ import Firebase
 import FirebaseAuth
 import FirebaseFirestore
 
+@MainActor
 class AuthService: ObservableObject {
     @Published var userSession: FirebaseAuth.User?
     @Published var currentUser: User?
@@ -18,17 +19,40 @@ class AuthService: ObservableObject {
     @Published var isEmailVerified = false
     @Published var referralBonusMessage: String?
     @Published var referralErrorMessage: String?
+    @Published var isInitialized = false
 
     static let shared = AuthService()
-    
+
     private init() {
         self.userSession = Auth.auth().currentUser
         self.isEmailVerified = Auth.auth().currentUser?.isEmailVerified ?? false
         Logger.shared.auth("AuthService initialized", level: .info)
         Logger.shared.auth("Current user session: \(Auth.auth().currentUser?.uid ?? "none")", level: .debug)
         Logger.shared.auth("Email verified: \(isEmailVerified)", level: .info)
-        Task {
+
+        // FIXED: Initialize on MainActor and track completion
+        Task { @MainActor in
             await fetchUser()
+            self.isInitialized = true
+            Logger.shared.auth("AuthService initialization complete", level: .info)
+        }
+    }
+
+    /// Wait for initial user fetch to complete
+    /// Use this in views that need to ensure currentUser is loaded before proceeding
+    func waitForInitialization() async {
+        // If already initialized, return immediately
+        guard !isInitialized else { return }
+
+        // Poll until initialized (with timeout)
+        var attempts = 0
+        while !isInitialized && attempts < 50 { // 5 seconds max (50 * 100ms)
+            try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            attempts += 1
+        }
+
+        if !isInitialized {
+            Logger.shared.warning("AuthService initialization timeout", category: .authentication)
         }
     }
 
@@ -59,7 +83,6 @@ class AuthService: ObservableObject {
         return true
     }
 
-    @MainActor
     func signIn(withEmail email: String, password: String) async throws {
         isLoading = true
         errorMessage = nil
@@ -92,13 +115,14 @@ class AuthService: ObservableObject {
             Logger.shared.auth("Email verified: \(isEmailVerified)", level: .info)
 
             await fetchUser()
+            self.isInitialized = true
 
             if currentUser != nil {
                 Logger.shared.auth("User data fetched successfully", level: .info)
             } else {
                 Logger.shared.auth("User session exists but no user data in Firestore", level: .warning)
             }
-            
+
             isLoading = false
         } catch let error as NSError {
             isLoading = false
@@ -310,6 +334,7 @@ class AuthService: ObservableObject {
 
             // Step 6: Fetch user data
             await fetchUser()
+            self.isInitialized = true
             isLoading = false
 
             Logger.shared.auth("Account creation completed - Please verify your email", level: .info)
@@ -349,7 +374,13 @@ class AuthService: ObservableObject {
             self.userSession = nil
             self.currentUser = nil
             self.isEmailVerified = false
+            self.isInitialized = false // FIXED: Reset initialization state
             Logger.shared.auth("User signed out successfully", level: .info)
+
+            // Clear user cache on logout
+            Task {
+                await UserService.shared.clearCache()
+            }
         } catch {
             Logger.shared.error("Error signing out", category: .authentication, error: error)
         }
