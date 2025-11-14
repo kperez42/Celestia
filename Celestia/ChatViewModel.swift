@@ -28,13 +28,13 @@ class ChatViewModel: ObservableObject {
     init(
         currentUserId: String = "",
         otherUserId: String = "",
-        matchService: any MatchServiceProtocol = MatchService.shared,
-        messageService: any MessageServiceProtocol = MessageService.shared
+        matchService: (any MatchServiceProtocol)? = nil,
+        messageService: (any MessageServiceProtocol)? = nil
     ) {
         self.currentUserId = currentUserId
         self.otherUserId = otherUserId
-        self.matchService = matchService
-        self.messageService = messageService
+        self.matchService = matchService ?? MatchService.shared
+        self.messageService = messageService ?? MessageService.shared
     }
     
     func updateCurrentUserId(_ userId: String) {
@@ -73,21 +73,21 @@ class ChatViewModel: ObservableObject {
     
     func loadMessages(for matchID: String) async {
         messagesListener?.remove()
-        
+
         await MainActor.run {
-            messagesListener = firestore.collection("messages")
+            messagesListener = Firestore.firestore().collection("messages")
                 .whereField("matchId", isEqualTo: matchID)
                 .order(by: "timestamp", descending: false)
-                .addSnapshotListener { [weak self] snapshot, error in
+                .addSnapshotListener { [weak self] (snapshot: QuerySnapshot?, error: Error?) in
                     guard let self = self else { return }
-                    
+
                     if let error = error {
                         Logger.shared.error("Error loading messages", category: .messaging, error: error)
                         return
                     }
-                    
+
                     guard let documents = snapshot?.documents else { return }
-                    
+
                     self.messages = documents.compactMap { doc -> Message? in
                         try? doc.data(as: Message.self)
                     }
