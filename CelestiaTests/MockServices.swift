@@ -322,3 +322,166 @@ class MockNotificationService: NotificationServiceProtocol {
         sendNotificationCalled = true
     }
 }
+
+// MARK: - Mock Interest Service
+
+@MainActor
+class MockInterestService {
+    var sendInterestCalled = false
+    var fetchInterestCalled = false
+    var shouldFail = false
+    var mockInterest: Interest?
+    var sentInterestFromUserId: String?
+    var sentInterestToUserId: String?
+
+    func sendInterest(fromUserId: String, toUserId: String, message: String? = nil) async throws {
+        sendInterestCalled = true
+        sentInterestFromUserId = fromUserId
+        sentInterestToUserId = toUserId
+
+        if shouldFail {
+            throw CelestiaError.networkError
+        }
+    }
+
+    func fetchInterest(fromUserId: String, toUserId: String) async throws -> Interest? {
+        fetchInterestCalled = true
+        return mockInterest
+    }
+
+    func hasLiked(fromUserId: String, toUserId: String) async -> Bool {
+        return mockInterest != nil
+    }
+}
+
+// MARK: - Mock Haptic Manager
+
+@MainActor
+class MockHapticManager {
+    var notificationCalled = false
+    var notificationType: UINotificationFeedbackGenerator.FeedbackType?
+    var impactCalled = false
+    var selectionCalled = false
+
+    func notification(_ type: UINotificationFeedbackGenerator.FeedbackType) {
+        notificationCalled = true
+        notificationType = type
+    }
+
+    func impact(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .medium) {
+        impactCalled = true
+    }
+
+    func selection() {
+        selectionCalled = true
+    }
+
+    func success() {
+        notification(.success)
+    }
+
+    func warning() {
+        notification(.warning)
+    }
+
+    func error() {
+        notification(.error)
+    }
+}
+
+// MARK: - Mock Logger
+
+class MockLogger {
+    var infoCalled = false
+    var warningCalled = false
+    var errorCalled = false
+    var debugCalled = false
+
+    var lastInfoMessage: String?
+    var lastWarningMessage: String?
+    var lastErrorMessage: String?
+    var lastCategory: LogCategory?
+
+    func info(_ message: String, category: LogCategory, metadata: [String: Any]? = nil) {
+        infoCalled = true
+        lastInfoMessage = message
+        lastCategory = category
+    }
+
+    func warning(_ message: String, category: LogCategory, metadata: [String: Any]? = nil) {
+        warningCalled = true
+        lastWarningMessage = message
+        lastCategory = category
+    }
+
+    func error(_ message: String, category: LogCategory, error: Error? = nil, metadata: [String: Any]? = nil) {
+        errorCalled = true
+        lastErrorMessage = message
+        lastCategory = category
+    }
+
+    func debug(_ message: String, category: LogCategory, metadata: [String: Any]? = nil) {
+        debugCalled = true
+        lastCategory = category
+    }
+}
+
+// MARK: - Mock Analytics Service
+
+@MainActor
+class MockAnalyticsService {
+    var trackEventCalled = false
+    var setUserPropertyCalled = false
+    var lastEventName: String?
+    var lastEventParameters: [String: Any]?
+    var lastPropertyName: String?
+    var lastPropertyValue: String?
+
+    func trackEvent(_ name: String, parameters: [String: Any]? = nil) {
+        trackEventCalled = true
+        lastEventName = name
+        lastEventParameters = parameters
+    }
+
+    func setUserProperty(_ name: String, value: String?) {
+        setUserPropertyCalled = true
+        lastPropertyName = name
+        lastPropertyValue = value
+    }
+
+    func logScreenView(_ screenName: String, screenClass: String? = nil) {
+        trackEvent("screen_view", parameters: ["screen_name": screenName])
+    }
+}
+
+// MARK: - Mock User Service Extended
+
+extension MockUserService {
+    var checkDailyLikeLimitCalled = false
+    var decrementDailyLikesCalled = false
+    var decrementSuperLikesCalled = false
+    var hasLikesRemaining = true
+
+    func checkDailyLikeLimit(userId: String) async -> Bool {
+        checkDailyLikeLimitCalled = true
+        return hasLikesRemaining
+    }
+
+    func decrementDailyLikes(userId: String) async {
+        decrementDailyLikesCalled = true
+    }
+
+    func decrementSuperLikes(userId: String) async {
+        decrementSuperLikesCalled = true
+    }
+}
+
+// MARK: - Mock Message Service Extended
+
+extension MockMessageService {
+    var markMessagesAsReadCalled = false
+
+    func markMessagesAsRead(matchId: String, userId: String) async {
+        markMessagesAsReadCalled = true
+    }
+}
