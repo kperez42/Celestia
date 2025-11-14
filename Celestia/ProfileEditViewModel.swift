@@ -19,16 +19,16 @@ class ProfileEditViewModel: ObservableObject {
     @Published var errorMessage: String?
 
     // Dependency injection initializer
-    init(userService: any UserServiceProtocol = UserService.shared) {
-        self.userService = userService
+    init(userService: (any UserServiceProtocol)? = nil) {
+        self.userService = userService ?? UserService.shared
     }
     
     func uploadProfileImage(_ image: UIImage, userId: String) async throws -> String {
         guard let imageData = image.jpegData(compressionQuality: 0.5) else {
             throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to convert image"])
         }
-        
-        let storageRef = storage.reference().child("profile_images/\(userId).jpg")
+
+        let storageRef = Storage.storage().reference().child("profile_images/\(userId).jpg")
         
         let metadata = StorageMetadata()
         metadata.contentType = "image/jpeg"
@@ -68,11 +68,11 @@ class ProfileEditViewModel: ObservableObject {
     
     func uploadAdditionalPhotos(_ images: [UIImage], userId: String) async throws -> [String] {
         var photoURLs: [String] = []
-        
+
         for (index, image) in images.enumerated() {
             guard let imageData = image.jpegData(compressionQuality: 0.7) else { continue }
-            
-            let storageRef = storage.reference().child("user_photos/\(userId)/photo_\(index)_\(UUID().uuidString).jpg")
+
+            let storageRef = Storage.storage().reference().child("user_photos/\(userId)/photo_\(index)_\(UUID().uuidString).jpg")
             
             let metadata = StorageMetadata()
             metadata.contentType = "image/jpeg"
