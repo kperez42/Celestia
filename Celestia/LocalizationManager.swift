@@ -11,6 +11,7 @@ import SwiftUI
 
 // MARK: - Localization Manager
 
+@MainActor
 class LocalizationManager: ObservableObject {
 
     // MARK: - Singleton

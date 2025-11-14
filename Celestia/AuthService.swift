@@ -194,11 +194,16 @@ class AuthService: ObservableObject {
             throw CelestiaError.invalidProfileData
         }
 
-        // Validate age restriction
-        guard age >= AppConstants.Limits.minAge else {
+        // Validate age restriction (must be between minAge and maxAge)
+        guard age >= AppConstants.Limits.minAge && age <= AppConstants.Limits.maxAge else {
             isLoading = false
-            errorMessage = AppConstants.ErrorMessages.invalidAge
-            throw CelestiaError.ageRestriction
+            if age < AppConstants.Limits.minAge {
+                errorMessage = AppConstants.ErrorMessages.invalidAge
+                throw CelestiaError.ageRestriction
+            } else {
+                errorMessage = "Age must be between \(AppConstants.Limits.minAge) and \(AppConstants.Limits.maxAge)"
+                throw CelestiaError.validationError(field: "age", reason: "Age must be \(AppConstants.Limits.maxAge) or below")
+            }
         }
 
         Logger.shared.auth("Creating user with email: \(sanitizedEmail)", level: .info)
@@ -444,7 +449,7 @@ class AuthService: ObservableObject {
     @MainActor
     func deleteAccount() async throws {
         guard let user = Auth.auth().currentUser else { return }
-        guard let uid = user.uid as String? else { return }
+        let uid = user.uid
 
         Logger.shared.auth("Deleting account: \(uid)", level: .info)
 

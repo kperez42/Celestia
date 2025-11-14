@@ -11,6 +11,7 @@ import FirebaseAuth
 import FirebaseFirestore
 import FirebaseStorage
 
+@MainActor
 class FirebaseManager: ObservableObject {
     static let shared = FirebaseManager()
     
@@ -36,9 +37,13 @@ class FirebaseManager: ObservableObject {
     }
     
     func loadCurrentUser(uid: String) {
-        firestore.collection("users").document(uid).getDocument { snapshot, error in
-            if let data = snapshot?.data() {
-                self.currentUser = User(dictionary: data)
+        firestore.collection("users").document(uid).getDocument { [weak self] snapshot, error in
+            guard let self = self else { return }
+
+            Task { @MainActor in
+                if let data = snapshot?.data() {
+                    self.currentUser = User(dictionary: data)
+                }
             }
         }
     }

@@ -122,12 +122,17 @@ class MatchService: ObservableObject {
                 // Send notifications to both users
                 let notificationService = NotificationService.shared
 
-                // Create temporary user objects for notifications
-                let user1 = User(id: user1Id, email: user1Data["email"] as? String ?? "", fullName: user1Name, age: user1Data["age"] as? Int ?? 0, gender: user1Data["gender"] as? String ?? "", lookingFor: user1Data["lookingFor"] as? String ?? "", location: user1Data["location"] as? String ?? "", country: user1Data["country"] as? String ?? "")
-                let user2 = User(id: user2Id, email: user2Data["email"] as? String ?? "", fullName: user2Name, age: user2Data["age"] as? Int ?? 0, gender: user2Data["gender"] as? String ?? "", lookingFor: user2Data["lookingFor"] as? String ?? "", location: user2Data["location"] as? String ?? "", country: user2Data["country"] as? String ?? "")
+                // Create temporary user objects for notifications using factory method
+                do {
+                    let user1 = try User.createMinimal(id: user1Id, fullName: user1Name, from: user1Data)
+                    let user2 = try User.createMinimal(id: user2Id, fullName: user2Name, from: user2Data)
 
-                await notificationService.sendNewMatchNotification(match: matchWithId, otherUser: user2)
-                await notificationService.sendNewMatchNotification(match: matchWithId, otherUser: user1)
+                    await notificationService.sendNewMatchNotification(match: matchWithId, otherUser: user2)
+                    await notificationService.sendNewMatchNotification(match: matchWithId, otherUser: user1)
+                } catch {
+                    Logger.shared.error("Failed to create user objects for match notification: \(error.localizedDescription)", category: .matching)
+                    return
+                }
             }
         } catch {
             Logger.shared.error("Error creating match: \(error)", category: .general)
