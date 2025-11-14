@@ -178,7 +178,7 @@ class Logger {
 
     // MARK: - Core Logging
 
-    private func log(_ message: String, level: LogLevel, category: LogCategory, file: String, function: String, line: Int) {
+    fileprivate func log(_ message: String, level: LogLevel, category: LogCategory, file: String, function: String, line: Int) {
         // Check if logging is enabled for this level and category
         guard level >= minimumLogLevel else { return }
         guard enabledCategories.contains(category) else { return }
