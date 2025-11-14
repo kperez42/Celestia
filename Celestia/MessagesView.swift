@@ -367,6 +367,9 @@ struct MessagesView: View {
     // MARK: - Helper Functions
     
     private func loadData() async {
+        // Track performance for messages loading
+        let loadStart = Date()
+
         // Check if we should use test data (no user ID or DEBUG mode)
         guard let userId = authService.currentUser?.id else {
             // Load test data when no authenticated user
@@ -397,17 +400,36 @@ struct MessagesView: View {
         do {
             try await matchService.fetchMatches(userId: userId)
 
-            // Load users for all matches
-            for match in matchService.matches {
-                let otherUserId = match.user1Id == userId ? match.user2Id : match.user1Id
-                if matchedUsers[otherUserId] == nil {
-                    if let user = try? await userService.fetchUser(userId: otherUserId) {
+            // Load users for all matches in parallel (performance optimization)
+            await withTaskGroup(of: (String, User?).self) { group in
+                for match in matchService.matches {
+                    let otherUserId = match.user1Id == userId ? match.user2Id : match.user1Id
+
+                    // Skip if already cached
+                    if matchedUsers[otherUserId] != nil {
+                        continue
+                    }
+
+                    group.addTask {
+                        let user = try? await self.userService.fetchUser(userId: otherUserId)
+                        return (otherUserId, user)
+                    }
+                }
+
+                // Collect results
+                for await (userId, user) in group {
+                    if let user = user {
                         await MainActor.run {
-                            matchedUsers[otherUserId] = user
+                            matchedUsers[userId] = user
                         }
                     }
                 }
             }
+
+            let duration = Date().timeIntervalSince(loadStart) * 1000
+            await PerformanceMonitor.shared.trackQuery(duration: duration)
+
+            Logger.shared.info("Loaded \(matchService.matches.count) matches in \(String(format: "%.0f", duration))ms", category: .messaging)
         } catch {
             Logger.shared.error("Error loading messages", category: .messaging, error: error)
         }

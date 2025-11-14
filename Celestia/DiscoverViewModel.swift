@@ -24,6 +24,7 @@ class DiscoverViewModel: ObservableObject {
     @Published var dragOffset: CGSize = .zero
     @Published var isProcessingAction = false
     @Published var showingUpgradeSheet = false
+    @Published var connectionQuality: PerformanceMonitor.ConnectionQuality = .excellent
 
     var remainingCount: Int {
         return max(0, users.count - currentIndex)
@@ -32,33 +33,46 @@ class DiscoverViewModel: ObservableObject {
     private let firestore = Firestore.firestore()
     private var lastDocument: DocumentSnapshot?
     private var interestTask: Task<Void, Never>?
+    private let performanceMonitor = PerformanceMonitor.shared
     
     func loadUsers(currentUser: User, limit: Int = 20) {
         isLoading = true
         errorMessage = ""
-        
+
+        // Track query performance
+        let queryStart = Date()
+
         var query = firestore.collection("users")
             .whereField("age", isGreaterThanOrEqualTo: currentUser.ageRangeMin)
             .whereField("age", isLessThanOrEqualTo: currentUser.ageRangeMax)
             .limit(to: limit)
-        
+
         // Filter by gender preference
         if currentUser.lookingFor != "Everyone" {
             query = query.whereField("gender", isEqualTo: currentUser.lookingFor)
         }
-        
+
         // Start after last document for pagination
         if let lastDoc = lastDocument {
             query = query.start(afterDocument: lastDoc)
         }
-        
+
         query.getDocuments { [weak self] snapshot, error in
             guard let self = self else { return }
 
             Task { @MainActor in
+                // Track network latency
+                let queryDuration = Date().timeIntervalSince(queryStart) * 1000
+                await self.performanceMonitor.trackQuery(duration: queryDuration)
+                await self.performanceMonitor.trackNetworkLatency(latency: queryDuration)
+
+                // Update connection quality
+                self.connectionQuality = await self.performanceMonitor.connectionQuality
+
                 if let error = error {
                     self.errorMessage = error.localizedDescription
                     self.isLoading = false
+                    Logger.shared.error("Error loading users", category: .matching, error: error)
                     return
                 }
 
@@ -84,8 +98,29 @@ class DiscoverViewModel: ObservableObject {
 
                 self.users.append(contentsOf: fetchedUsers)
                 self.isLoading = false
+
+                // Preload images for next 2 users
+                await self.preloadUpcomingImages()
+
+                Logger.shared.info("Loaded \(fetchedUsers.count) users in \(String(format: "%.0f", queryDuration))ms", category: .matching)
             }
         }
+    }
+
+    /// Preload images for upcoming users to improve performance
+    private func preloadUpcomingImages() async {
+        guard currentIndex < users.count else { return }
+
+        let upcomingUsers = users.dropFirst(currentIndex).prefix(2)
+        let imageURLs = upcomingUsers.compactMap { user -> String? in
+            guard !user.profileImageURL.isEmpty else { return nil }
+            return user.profileImageURL
+        }
+
+        guard !imageURLs.isEmpty else { return }
+
+        // Use PerformanceMonitor to preload images
+        await performanceMonitor.preloadImages(imageURLs)
     }
     
     func sendInterest(from currentUserID: String, to targetUserID: String, completion: @escaping (Bool) -> Void) {
@@ -163,6 +198,9 @@ class DiscoverViewModel: ObservableObject {
             dragOffset = .zero
         }
 
+        // Preload images for next users
+        await preloadUpcomingImages()
+
         // Send like to backend
         do {
             let isMatch = try await SwipeService.shared.likeUser(
@@ -235,6 +273,9 @@ class DiscoverViewModel: ObservableObject {
             dragOffset = .zero
         }
 
+        // Preload images for next users
+        await preloadUpcomingImages()
+
         // Record pass in backend
         do {
             try await SwipeService.shared.passUser(
@@ -276,6 +317,9 @@ class DiscoverViewModel: ObservableObject {
             currentIndex += 1
             dragOffset = .zero
         }
+
+        // Preload images for next users
+        await preloadUpcomingImages()
 
         // Send super like to backend
         do {
