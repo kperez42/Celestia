@@ -71,6 +71,7 @@ enum LogCategory: String {
     case security = "Security"
     case performance = "Performance"
     case user = "User"
+    case onboarding = "Onboarding"
     case offline = "Offline"
     case general = "General"
 
