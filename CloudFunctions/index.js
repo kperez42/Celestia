@@ -19,6 +19,7 @@ const receiptValidation = require('./modules/receiptValidation');
 const contentModeration = require('./modules/contentModeration');
 const rateLimiting = require('./modules/rateLimiting');
 const adminDashboard = require('./modules/adminDashboard');
+const moderationQueue = require('./modules/moderationQueue');
 const notifications = require('./modules/notifications');
 
 // ============================================================================
@@ -537,6 +538,238 @@ app.post('/admin/review-transaction', async (req, res) => {
   } catch (error) {
     functions.logger.error('Admin review transaction error', { error: error.message });
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// NEW ENHANCED ADMIN ENDPOINTS
+
+// Bulk User Operations
+app.post('/admin/bulk-operation', async (req, res) => {
+  try {
+    const isAdmin = await verifyAdminToken(req.headers.authorization);
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const { operation, userIds, options } = req.body;
+    const adminId = req.adminId || 'unknown'; // Set by verifyAdminToken
+
+    const results = await adminDashboard.bulkUserOperation(operation, userIds, options, adminId);
+    res.json(results);
+  } catch (error) {
+    functions.logger.error('Admin bulk operation error', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// User Timeline
+app.get('/admin/user-timeline/:userId', async (req, res) => {
+  try {
+    const isAdmin = await verifyAdminToken(req.headers.authorization);
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const { userId } = req.params;
+    const limit = parseInt(req.query.limit) || 100;
+
+    const timeline = await adminDashboard.getUserTimeline(userId, { limit });
+    res.json(timeline);
+  } catch (error) {
+    functions.logger.error('Admin user timeline error', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Fraud Pattern Detection
+app.get('/admin/fraud-patterns', async (req, res) => {
+  try {
+    const isAdmin = await verifyAdminToken(req.headers.authorization);
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const period = parseInt(req.query.period) || 30;
+    const patterns = await adminDashboard.detectFraudPatterns({ period });
+    res.json(patterns);
+  } catch (error) {
+    functions.logger.error('Admin fraud patterns error', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin Audit Logs
+app.get('/admin/audit-logs', async (req, res) => {
+  try {
+    const isAdmin = await verifyAdminToken(req.headers.authorization);
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const options = {
+      limit: parseInt(req.query.limit) || 50,
+      adminId: req.query.adminId || null,
+      action: req.query.action || null
+    };
+
+    const logs = await adminDashboard.getAdminAuditLogs(options);
+    res.json(logs);
+  } catch (error) {
+    functions.logger.error('Admin audit logs error', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Cache Management
+app.post('/admin/clear-cache', async (req, res) => {
+  try {
+    const isAdmin = await verifyAdminToken(req.headers.authorization);
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const { pattern } = req.body;
+
+    if (pattern) {
+      adminDashboard.invalidateCache(pattern);
+    } else {
+      adminDashboard.clearCache();
+    }
+
+    res.json({ success: true, message: 'Cache cleared' });
+  } catch (error) {
+    functions.logger.error('Admin clear cache error', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// MODERATION QUEUE API
+// ============================================================================
+
+// Get Moderation Queue
+app.get('/admin/moderation-queue', async (req, res) => {
+  try {
+    const isAdmin = await verifyAdminToken(req.headers.authorization);
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const options = {
+      limit: parseInt(req.query.limit) || 50,
+      status: req.query.status || 'pending',
+      assignedTo: req.query.assignedTo || null,
+      priorityLevel: req.query.priorityLevel || null
+    };
+
+    const queue = await moderationQueue.getQueue(options);
+    res.json(queue);
+  } catch (error) {
+    functions.logger.error('Get moderation queue error', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Add to Moderation Queue
+app.post('/admin/moderation-queue', async (req, res) => {
+  try {
+    const isAdmin = await verifyAdminToken(req.headers.authorization);
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const queueItemId = await moderationQueue.addToQueue(req.body);
+    res.json({ success: true, queueItemId });
+  } catch (error) {
+    functions.logger.error('Add to moderation queue error', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Assign Queue Item
+app.post('/admin/moderation-queue/:itemId/assign', async (req, res) => {
+  try {
+    const isAdmin = await verifyAdminToken(req.headers.authorization);
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const { itemId } = req.params;
+    const { moderatorId } = req.body;
+
+    const result = await moderationQueue.assignToModerator(itemId, moderatorId);
+    res.json(result);
+  } catch (error) {
+    functions.logger.error('Assign queue item error', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Auto-Assign Items
+app.post('/admin/moderation-queue/auto-assign', async (req, res) => {
+  try {
+    const isAdmin = await verifyAdminToken(req.headers.authorization);
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const results = await moderationQueue.autoAssignItems();
+    res.json(results);
+  } catch (error) {
+    functions.logger.error('Auto-assign queue items error', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Complete Moderation
+app.post('/admin/moderation-queue/:itemId/complete', async (req, res) => {
+  try {
+    const isAdmin = await verifyAdminToken(req.headers.authorization);
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const { itemId } = req.params;
+    const { decision, moderatorNote } = req.body;
+    const moderatorId = req.adminId || 'unknown';
+
+    const result = await moderationQueue.completeModeration(itemId, decision, moderatorNote, moderatorId);
+    res.json(result);
+  } catch (error) {
+    functions.logger.error('Complete moderation error', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get Queue Statistics
+app.get('/admin/moderation-queue/stats', async (req, res) => {
+  try {
+    const isAdmin = await verifyAdminToken(req.headers.authorization);
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const stats = await moderationQueue.getQueueStats();
+    res.json(stats);
+  } catch (error) {
+    functions.logger.error('Get queue stats error', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Escalate Stale Items
+app.post('/admin/moderation-queue/escalate', async (req, res) => {
+  try {
+    const isAdmin = await verifyAdminToken(req.headers.authorization);
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const results = await moderationQueue.escalateStaleItems();
+    res.json(results);
+  } catch (error) {
+    functions.logger.error('Escalate stale items error', { error: error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 

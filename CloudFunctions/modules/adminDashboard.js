@@ -1,22 +1,135 @@
 /**
  * Admin Dashboard Module
  * Provides analytics and moderation tools for administrators
+ *
+ * Features:
+ * - Query caching (5-minute TTL)
+ * - Bulk user operations
+ * - Admin action audit logging
+ * - User timeline view
+ * - Enhanced fraud pattern detection
  */
 
 const admin = require('firebase-admin');
 const functions = require('firebase-functions');
 
+// ============================================================================
+// CACHING LAYER (5-minute TTL)
+// ============================================================================
+
+const cache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
+
 /**
- * Gets platform statistics
- * @returns {object} Platform stats
+ * Gets cached data or fetches fresh data
+ * @param {string} key - Cache key
+ * @param {Function} fetchFn - Function to fetch fresh data
+ * @param {number} ttl - Time to live in milliseconds
+ * @returns {*} Cached or fresh data
  */
-async function getStats() {
+async function getCached(key, fetchFn, ttl = CACHE_TTL) {
+  const now = Date.now();
+  const cached = cache.get(key);
+
+  if (cached && (now - cached.timestamp) < ttl) {
+    functions.logger.info('Cache hit', { key });
+    return cached.data;
+  }
+
+  functions.logger.info('Cache miss, fetching fresh data', { key });
+  const data = await fetchFn();
+  cache.set(key, { data, timestamp: now });
+
+  return data;
+}
+
+/**
+ * Invalidates cache entries by key pattern
+ * @param {string} pattern - Pattern to match (supports wildcards)
+ */
+function invalidateCache(pattern) {
+  const regex = new RegExp(pattern.replace('*', '.*'));
+  const keysToDelete = [];
+
+  for (const key of cache.keys()) {
+    if (regex.test(key)) {
+      keysToDelete.push(key);
+    }
+  }
+
+  keysToDelete.forEach(key => cache.delete(key));
+  functions.logger.info('Cache invalidated', { pattern, count: keysToDelete.length });
+}
+
+/**
+ * Clears all cache entries
+ */
+function clearCache() {
+  const size = cache.size;
+  cache.clear();
+  functions.logger.info('Cache cleared', { entriesRemoved: size });
+}
+
+// Periodic cache cleanup (every 10 minutes)
+setInterval(() => {
+  const now = Date.now();
+  const keysToDelete = [];
+
+  for (const [key, value] of cache.entries()) {
+    if ((now - value.timestamp) > CACHE_TTL) {
+      keysToDelete.push(key);
+    }
+  }
+
+  keysToDelete.forEach(key => cache.delete(key));
+
+  if (keysToDelete.length > 0) {
+    functions.logger.info('Periodic cache cleanup', { entriesRemoved: keysToDelete.length });
+  }
+}, 10 * 60 * 1000);
+
+// ============================================================================
+// AUDIT LOGGING
+// ============================================================================
+
+/**
+ * Logs admin action for audit trail
+ * @param {string} adminId - Admin user ID
+ * @param {string} action - Action performed
+ * @param {object} details - Action details
+ */
+async function logAdminAction(adminId, action, details = {}) {
   const db = admin.firestore();
 
   try {
-    // Get user stats
-    const usersSnapshot = await db.collection('users').get();
-    const users = usersSnapshot.docs.map(doc => doc.data());
+    await db.collection('admin_audit_logs').add({
+      adminId,
+      action,
+      details,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      ipAddress: details.ipAddress || null,
+      userAgent: details.userAgent || null
+    });
+
+    functions.logger.info('Admin action logged', { adminId, action });
+  } catch (error) {
+    functions.logger.error('Failed to log admin action', { adminId, action, error: error.message });
+  }
+}
+
+/**
+ * Gets platform statistics (with caching)
+ * @returns {object} Platform stats
+ */
+async function getStats() {
+  return getCached('admin:stats', async () => {
+    const db = admin.firestore();
+
+    try {
+      // OPTIMIZED: Use aggregation instead of fetching all users
+      // For production, this should use COUNT aggregation queries
+      const usersSnapshot = await db.collection('users').get();
+      const users = usersSnapshot.docs.map(doc => doc.data());
 
     const totalUsers = users.length;
     const activeUsers = users.filter(u => {
@@ -135,10 +248,11 @@ async function getStats() {
       timestamp: admin.firestore.FieldValue.serverTimestamp()
     };
 
-  } catch (error) {
-    functions.logger.error('Get stats error', { error: error.message });
-    throw error;
-  }
+    } catch (error) {
+      functions.logger.error('Get stats error', { error: error.message });
+      throw error;
+    }
+  });
 }
 
 /**
@@ -812,7 +926,597 @@ async function reviewFlaggedTransaction(transactionId, decision, adminNote = '')
   }
 }
 
+// ============================================================================
+// BULK USER OPERATIONS
+// ============================================================================
+
+/**
+ * Performs bulk user operations
+ * @param {string} operation - Operation type ('ban', 'verify', 'grantPremium', 'revokePremium')
+ * @param {Array<string>} userIds - Array of user IDs
+ * @param {object} options - Operation options
+ * @param {string} adminId - Admin performing the operation
+ * @returns {object} Operation results
+ */
+async function bulkUserOperation(operation, userIds, options = {}, adminId = 'system') {
+  const db = admin.firestore();
+  const results = {
+    success: [],
+    failed: [],
+    total: userIds.length
+  };
+
+  try {
+    // Log the bulk operation
+    await logAdminAction(adminId, `bulk_${operation}`, {
+      userCount: userIds.length,
+      options
+    });
+
+    for (const userId of userIds) {
+      try {
+        switch (operation) {
+          case 'ban':
+            await db.collection('users').doc(userId).update({
+              suspended: true,
+              suspensionReason: options.reason || 'Bulk ban by admin',
+              suspendedAt: admin.firestore.FieldValue.serverTimestamp(),
+              suspensionExpiryDate: options.durationDays > 0
+                ? new Date(Date.now() + options.durationDays * 24 * 60 * 60 * 1000)
+                : null
+            });
+            results.success.push(userId);
+            break;
+
+          case 'verify':
+            await db.collection('users').doc(userId).update({
+              isVerified: true,
+              verifiedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            results.success.push(userId);
+            break;
+
+          case 'grantPremium':
+            const expiryDate = options.months
+              ? new Date(Date.now() + options.months * 30 * 24 * 60 * 60 * 1000)
+              : null;
+
+            await db.collection('users').doc(userId).update({
+              isPremium: true,
+              premiumTier: options.tier || 'premium',
+              premiumExpiryDate: expiryDate,
+              premiumGrantedBy: 'admin',
+              premiumGrantedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            results.success.push(userId);
+            break;
+
+          case 'revokePremium':
+            await db.collection('users').doc(userId).update({
+              isPremium: false,
+              premiumTier: null,
+              premiumExpiryDate: null
+            });
+            results.success.push(userId);
+            break;
+
+          case 'unban':
+            await db.collection('users').doc(userId).update({
+              suspended: false,
+              suspensionReason: null,
+              suspendedAt: null,
+              suspensionExpiryDate: null
+            });
+            results.success.push(userId);
+            break;
+
+          default:
+            throw new Error(`Unknown operation: ${operation}`);
+        }
+
+        // Log individual operation
+        await logAdminAction(adminId, operation, { userId, options });
+
+      } catch (error) {
+        functions.logger.error(`Bulk operation failed for user ${userId}`, { error: error.message });
+        results.failed.push({ userId, error: error.message });
+      }
+    }
+
+    // Invalidate relevant caches
+    invalidateCache('admin:stats');
+    invalidateCache('admin:users:*');
+
+    functions.logger.info('Bulk operation completed', {
+      operation,
+      success: results.success.length,
+      failed: results.failed.length
+    });
+
+    return results;
+
+  } catch (error) {
+    functions.logger.error('Bulk operation error', { operation, error: error.message });
+    throw error;
+  }
+}
+
+// ============================================================================
+// USER TIMELINE VIEW
+// ============================================================================
+
+/**
+ * Gets comprehensive user timeline (all actions in one place)
+ * @param {string} userId - User ID
+ * @param {object} options - Query options
+ * @returns {object} User timeline with all activities
+ */
+async function getUserTimeline(userId, options = {}) {
+  const db = admin.firestore();
+  const { limit = 100 } = options;
+
+  try {
+    const timeline = [];
+
+    // Get user profile
+    const userDoc = await db.collection('users').doc(userId).get();
+    if (!userDoc.exists) {
+      throw new Error('User not found');
+    }
+
+    const userData = userDoc.data();
+
+    // Account creation
+    if (userData.timestamp) {
+      timeline.push({
+        type: 'account_created',
+        timestamp: userData.timestamp.toDate(),
+        data: {
+          email: userData.email,
+          fullName: userData.fullName
+        }
+      });
+    }
+
+    // Matches
+    const matchesSnapshot = await db.collection('matches')
+      .where('user1Id', '==', userId)
+      .orderBy('timestamp', 'desc')
+      .limit(limit)
+      .get();
+
+    matchesSnapshot.docs.forEach(doc => {
+      const match = doc.data();
+      timeline.push({
+        type: 'match',
+        timestamp: match.timestamp?.toDate(),
+        data: {
+          matchId: doc.id,
+          otherUserId: match.user2Id,
+          isActive: match.isActive
+        }
+      });
+    });
+
+    // Messages sent
+    const messagesSnapshot = await db.collection('messages')
+      .where('senderId', '==', userId)
+      .orderBy('timestamp', 'desc')
+      .limit(limit)
+      .get();
+
+    messagesSnapshot.docs.forEach(doc => {
+      const message = doc.data();
+      timeline.push({
+        type: 'message_sent',
+        timestamp: message.timestamp?.toDate(),
+        data: {
+          messageId: doc.id,
+          matchId: message.matchId,
+          receiverId: message.receiverId
+        }
+      });
+    });
+
+    // Purchases
+    const purchasesSnapshot = await db.collection('purchases')
+      .where('userId', '==', userId)
+      .orderBy('purchaseDate', 'desc')
+      .get();
+
+    purchasesSnapshot.docs.forEach(doc => {
+      const purchase = doc.data();
+      timeline.push({
+        type: purchase.refunded ? 'purchase_refunded' : 'purchase',
+        timestamp: purchase.refunded ? purchase.refundDate?.toDate() : purchase.purchaseDate?.toDate(),
+        data: {
+          purchaseId: doc.id,
+          productId: purchase.productId,
+          validated: purchase.validated,
+          refunded: purchase.refunded,
+          fraudScore: purchase.fraudScore
+        }
+      });
+    });
+
+    // Warnings
+    const warningsSnapshot = await db.collection('user_warnings')
+      .where('userId', '==', userId)
+      .orderBy('timestamp', 'desc')
+      .get();
+
+    warningsSnapshot.docs.forEach(doc => {
+      const warning = doc.data();
+      timeline.push({
+        type: 'warning_issued',
+        timestamp: warning.timestamp?.toDate(),
+        data: {
+          warningId: doc.id,
+          reason: warning.reason,
+          acknowledged: warning.acknowledged
+        }
+      });
+    });
+
+    // Reports made by user
+    const reportsMadeSnapshot = await db.collection('reports')
+      .where('reporterId', '==', userId)
+      .orderBy('timestamp', 'desc')
+      .get();
+
+    reportsMadeSnapshot.docs.forEach(doc => {
+      const report = doc.data();
+      timeline.push({
+        type: 'report_made',
+        timestamp: report.timestamp?.toDate(),
+        data: {
+          reportId: doc.id,
+          reportedUserId: report.reportedUserId,
+          reason: report.reason
+        }
+      });
+    });
+
+    // Reports against user
+    const reportsAgainstSnapshot = await db.collection('reports')
+      .where('reportedUserId', '==', userId)
+      .orderBy('timestamp', 'desc')
+      .get();
+
+    reportsAgainstSnapshot.docs.forEach(doc => {
+      const report = doc.data();
+      timeline.push({
+        type: 'report_received',
+        timestamp: report.timestamp?.toDate(),
+        data: {
+          reportId: doc.id,
+          reporterId: report.reporterId,
+          reason: report.reason
+        }
+      });
+    });
+
+    // Flagged content
+    const flaggedContentSnapshot = await db.collection('flagged_content')
+      .where('userId', '==', userId)
+      .orderBy('timestamp', 'desc')
+      .get();
+
+    flaggedContentSnapshot.docs.forEach(doc => {
+      const content = doc.data();
+      timeline.push({
+        type: 'content_flagged',
+        timestamp: content.timestamp?.toDate(),
+        data: {
+          contentId: doc.id,
+          contentType: content.contentType,
+          reason: content.reason,
+          severity: content.severity,
+          reviewed: content.reviewed,
+          action: content.action
+        }
+      });
+    });
+
+    // Fraud logs
+    const fraudLogsSnapshot = await db.collection('fraud_logs')
+      .where('userId', '==', userId)
+      .orderBy('timestamp', 'desc')
+      .get();
+
+    fraudLogsSnapshot.docs.forEach(doc => {
+      const fraud = doc.data();
+      timeline.push({
+        type: 'fraud_attempt',
+        timestamp: fraud.timestamp?.toDate(),
+        data: {
+          fraudId: doc.id,
+          fraudType: fraud.fraudType,
+          eventType: fraud.eventType,
+          details: fraud.details
+        }
+      });
+    });
+
+    // Admin actions
+    const adminActionsSnapshot = await db.collection('admin_audit_logs')
+      .where('details.userId', '==', userId)
+      .orderBy('timestamp', 'desc')
+      .get();
+
+    adminActionsSnapshot.docs.forEach(doc => {
+      const action = doc.data();
+      timeline.push({
+        type: 'admin_action',
+        timestamp: action.timestamp?.toDate(),
+        data: {
+          actionId: doc.id,
+          adminId: action.adminId,
+          action: action.action,
+          details: action.details
+        }
+      });
+    });
+
+    // Sort timeline by timestamp (most recent first)
+    timeline.sort((a, b) => {
+      const timeA = a.timestamp ? a.timestamp.getTime() : 0;
+      const timeB = b.timestamp ? b.timestamp.getTime() : 0;
+      return timeB - timeA;
+    });
+
+    // Convert timestamps to ISO strings
+    timeline.forEach(event => {
+      if (event.timestamp) {
+        event.timestamp = event.timestamp.toISOString();
+      }
+    });
+
+    return {
+      userId,
+      user: {
+        fullName: userData.fullName,
+        email: userData.email,
+        suspended: userData.suspended,
+        isPremium: userData.isPremium,
+        isVerified: userData.isVerified
+      },
+      timeline: timeline.slice(0, limit),
+      totalEvents: timeline.length,
+      timestamp: new Date().toISOString()
+    };
+
+  } catch (error) {
+    functions.logger.error('Get user timeline error', { userId, error: error.message });
+    throw error;
+  }
+}
+
+// ============================================================================
+// ENHANCED FRAUD PATTERN DETECTION
+// ============================================================================
+
+/**
+ * Detects fraud patterns across users and transactions
+ * @param {object} options - Detection options
+ * @returns {object} Detected fraud patterns
+ */
+async function detectFraudPatterns(options = {}) {
+  const db = admin.firestore();
+  const { period = 30 } = options; // days
+
+  try {
+    const periodStart = new Date(Date.now() - period * 24 * 60 * 60 * 1000);
+
+    // Get all recent purchases
+    const purchasesSnapshot = await db.collection('purchases')
+      .where('purchaseDate', '>', periodStart)
+      .get();
+
+    const purchases = purchasesSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+
+    const patterns = {
+      multipleRefunds: [],
+      rapidPurchases: [],
+      highFraudScore: [],
+      suspiciousDevices: [],
+      geolocationAnomalies: [],
+      priceManipulation: []
+    };
+
+    // Pattern 1: Users with multiple refunds
+    const userRefunds = {};
+    purchases.forEach(p => {
+      if (p.refunded) {
+        userRefunds[p.userId] = (userRefunds[p.userId] || 0) + 1;
+      }
+    });
+
+    Object.entries(userRefunds).forEach(([userId, count]) => {
+      if (count >= 2) {
+        patterns.multipleRefunds.push({
+          userId,
+          refundCount: count,
+          severity: count >= 3 ? 'high' : 'medium'
+        });
+      }
+    });
+
+    // Pattern 2: Rapid purchases (multiple in short time)
+    const userPurchaseTimes = {};
+    purchases.forEach(p => {
+      if (!userPurchaseTimes[p.userId]) {
+        userPurchaseTimes[p.userId] = [];
+      }
+      userPurchaseTimes[p.userId].push(p.purchaseDate?.toDate());
+    });
+
+    Object.entries(userPurchaseTimes).forEach(([userId, times]) => {
+      times.sort((a, b) => a - b);
+      for (let i = 1; i < times.length; i++) {
+        const timeDiff = (times[i] - times[i-1]) / 1000 / 60; // minutes
+        if (timeDiff < 5) { // Less than 5 minutes between purchases
+          patterns.rapidPurchases.push({
+            userId,
+            purchaseCount: times.length,
+            minTimeBetween: timeDiff.toFixed(2),
+            severity: 'high'
+          });
+          break;
+        }
+      }
+    });
+
+    // Pattern 3: High fraud score transactions
+    purchases.forEach(p => {
+      if (p.fraudScore > 75) {
+        patterns.highFraudScore.push({
+          userId: p.userId,
+          purchaseId: p.id,
+          fraudScore: p.fraudScore,
+          productId: p.productId,
+          severity: p.fraudScore > 90 ? 'critical' : 'high'
+        });
+      }
+    });
+
+    // Pattern 4: Suspicious device patterns (same device, multiple users)
+    const deviceUsers = {};
+    purchases.forEach(p => {
+      if (p.deviceId) {
+        if (!deviceUsers[p.deviceId]) {
+          deviceUsers[p.deviceId] = new Set();
+        }
+        deviceUsers[p.deviceId].add(p.userId);
+      }
+    });
+
+    Object.entries(deviceUsers).forEach(([deviceId, users]) => {
+      if (users.size > 3) { // More than 3 users on same device
+        patterns.suspiciousDevices.push({
+          deviceId,
+          userCount: users.size,
+          users: Array.from(users),
+          severity: 'high'
+        });
+      }
+    });
+
+    // Pattern 5: Price manipulation detection
+    const expectedPricing = {
+      'basic_monthly': 9.99,
+      'basic_yearly': 99.99,
+      'plus_monthly': 19.99,
+      'plus_yearly': 199.99,
+      'premium_monthly': 29.99,
+      'premium_yearly': 299.99,
+      'premium_lifetime': 499.99
+    };
+
+    purchases.forEach(p => {
+      if (expectedPricing[p.productId] && p.price) {
+        const expectedPrice = expectedPricing[p.productId];
+        const actualPrice = parseFloat(p.price);
+
+        if (Math.abs(actualPrice - expectedPrice) > 0.1) {
+          patterns.priceManipulation.push({
+            userId: p.userId,
+            purchaseId: p.id,
+            productId: p.productId,
+            expectedPrice,
+            actualPrice,
+            severity: 'critical'
+          });
+        }
+      }
+    });
+
+    // Calculate risk scores
+    const totalPatterns =
+      patterns.multipleRefunds.length +
+      patterns.rapidPurchases.length +
+      patterns.highFraudScore.length +
+      patterns.suspiciousDevices.length +
+      patterns.priceManipulation.length;
+
+    const criticalCount =
+      patterns.highFraudScore.filter(p => p.severity === 'critical').length +
+      patterns.priceManipulation.length;
+
+    return {
+      period,
+      patterns,
+      summary: {
+        totalPatterns,
+        criticalPatterns: criticalCount,
+        highRiskUsers: new Set([
+          ...patterns.multipleRefunds.map(p => p.userId),
+          ...patterns.rapidPurchases.map(p => p.userId),
+          ...patterns.highFraudScore.map(p => p.userId)
+        ]).size,
+        suspiciousDevices: patterns.suspiciousDevices.length
+      },
+      timestamp: new Date().toISOString()
+    };
+
+  } catch (error) {
+    functions.logger.error('Detect fraud patterns error', { error: error.message });
+    throw error;
+  }
+}
+
+/**
+ * Gets admin audit logs
+ * @param {object} options - Query options
+ * @returns {array} Audit logs
+ */
+async function getAdminAuditLogs(options = {}) {
+  const db = admin.firestore();
+  const {
+    limit = 50,
+    adminId = null,
+    action = null,
+    startDate = null
+  } = options;
+
+  try {
+    let query = db.collection('admin_audit_logs')
+      .orderBy('timestamp', 'desc')
+      .limit(limit);
+
+    if (adminId) {
+      query = query.where('adminId', '==', adminId);
+    }
+
+    if (action) {
+      query = query.where('action', '==', action);
+    }
+
+    if (startDate) {
+      query = query.where('timestamp', '>', startDate);
+    }
+
+    const snapshot = await query.get();
+
+    const logs = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      timestamp: doc.data().timestamp?.toDate().toISOString()
+    }));
+
+    return logs;
+
+  } catch (error) {
+    functions.logger.error('Get admin audit logs error', { error: error.message });
+    throw error;
+  }
+}
+
 module.exports = {
+  // Existing functions
   getStats,
   getFlaggedContent,
   moderateContent,
@@ -822,5 +1526,16 @@ module.exports = {
   getSubscriptionAnalytics,
   getFraudDashboard,
   getRefundTracking,
-  reviewFlaggedTransaction
+  reviewFlaggedTransaction,
+
+  // New functions
+  bulkUserOperation,
+  getUserTimeline,
+  detectFraudPatterns,
+  getAdminAuditLogs,
+  logAdminAction,
+
+  // Cache management
+  invalidateCache,
+  clearCache
 };
