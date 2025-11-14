@@ -18,6 +18,7 @@ struct ShareDateView: View {
     @State private var location = ""
     @State private var additionalNotes = ""
     @State private var selectedContacts: Set<EmergencyContact> = []
+    @State private var showMatchPicker = false
 
     var body: some View {
         ScrollView {
@@ -44,6 +45,9 @@ struct ShareDateView: View {
         }
         .sheet(item: $viewModel.shareConfirmation) { confirmation in
             DateSharedConfirmationView(confirmation: confirmation)
+        }
+        .sheet(isPresented: $showMatchPicker) {
+            MatchPickerView(selectedMatch: $selectedMatch)
         }
     }
 
@@ -79,7 +83,7 @@ struct ShareDateView: View {
             VStack(spacing: 16) {
                 // Match Selection
                 Button {
-                    // TODO: Show match picker
+                    showMatchPicker = true
                 } label: {
                     HStack {
                         Image(systemName: "person.crop.circle")
@@ -489,6 +493,183 @@ class ShareDateViewModel: ObservableObject {
         // TODO: Implement actual SMS/notification sending
         // For now, just log
         Logger.shared.info("Sending date notification to \(contact.name)", category: .general)
+    }
+}
+
+// MARK: - Match Picker View
+
+struct MatchPickerView: View {
+    @Binding var selectedMatch: User?
+    @Environment(\.dismiss) var dismiss
+    @StateObject private var matchService = MatchService.shared
+    @State private var isLoading = false
+    @State private var matches: [Match] = []
+    @State private var matchUsers: [String: User] = [:] // Map of match ID to User
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if isLoading {
+                    ProgressView("Loading matches...")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if matches.isEmpty {
+                    emptyStateView
+                } else {
+                    matchList
+                }
+            }
+            .navigationTitle("Select Match")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+            .task {
+                await loadMatches()
+            }
+        }
+    }
+
+    // MARK: - Empty State
+
+    private var emptyStateView: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "person.2.slash")
+                .font(.system(size: 60))
+                .foregroundColor(.gray.opacity(0.5))
+
+            VStack(spacing: 12) {
+                Text("No Matches Yet")
+                    .font(.title2.bold())
+
+                Text("You don't have any matches to share your date with yet. Start swiping to find matches!")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - Match List
+
+    private var matchList: some View {
+        List {
+            ForEach(matches, id: \.id) { match in
+                if let otherUser = getOtherUser(from: match) {
+                    MatchPickerRow(user: otherUser) {
+                        selectedMatch = otherUser
+                        dismiss()
+
+                        // Track analytics
+                        AnalyticsManager.shared.logEvent(.matchSelected, parameters: [
+                            "match_id": match.id ?? "",
+                            "source": "share_date"
+                        ])
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+    }
+
+    // MARK: - Helper Methods
+
+    private func loadMatches() async {
+        guard let currentUserId = AuthService.shared.currentUser?.id else { return }
+
+        isLoading = true
+        defer { isLoading = false }
+
+        do {
+            // Fetch matches
+            try await matchService.fetchMatches(userId: currentUserId)
+            matches = matchService.matches
+
+            // Load user details for each match
+            for match in matches {
+                let otherUserId = match.user1Id == currentUserId ? match.user2Id : match.user1Id
+                if let user = try? await UserService.shared.fetchUser(userId: otherUserId) {
+                    matchUsers[match.id ?? ""] = user
+                }
+            }
+
+            Logger.shared.info("Loaded \(matches.count) matches for date sharing", category: .general)
+        } catch {
+            Logger.shared.error("Error loading matches for picker", category: .general, error: error)
+        }
+    }
+
+    private func getOtherUser(from match: Match) -> User? {
+        guard let currentUserId = AuthService.shared.currentUser?.id else { return nil }
+        return matchUsers[match.id ?? ""]
+    }
+}
+
+// MARK: - Match Picker Row
+
+struct MatchPickerRow: View {
+    let user: User
+    let onSelect: () -> Void
+
+    var body: some View {
+        Button(action: onSelect) {
+            HStack(spacing: 16) {
+                // Profile Image
+                if let photoURL = user.photos.first, let url = URL(string: photoURL) {
+                    AsyncImage(url: url) { image in
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    } placeholder: {
+                        Circle()
+                            .fill(Color.gray.opacity(0.3))
+                    }
+                    .frame(width: 50, height: 50)
+                    .clipShape(Circle())
+                } else {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [.blue, .purple],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 50, height: 50)
+                        .overlay(
+                            Text(user.name.prefix(1))
+                                .font(.title2.bold())
+                                .foregroundColor(.white)
+                        )
+                }
+
+                // User Info
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(user.name)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+
+                    if user.age > 0 {
+                        Text("\(user.age) years old")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+            .padding(.vertical, 8)
+        }
+        .buttonStyle(.plain)
     }
 }
 

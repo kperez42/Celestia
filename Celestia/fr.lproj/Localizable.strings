@@ -1,0 +1,134 @@
+/*
+ * Celestia Localization - French
+ * Language: Français (fr)
+ */
+
+// MARK: - Common
+
+"common.ok" = "OK";
+"common.cancel" = "Annuler";
+"common.save" = "Enregistrer";
+"common.delete" = "Supprimer";
+"common.edit" = "Modifier";
+"common.done" = "Terminé";
+"common.next" = "Suivant";
+"common.back" = "Retour";
+"common.yes" = "Oui";
+"common.no" = "Non";
+"common.loading" = "Chargement...";
+"common.error" = "Erreur";
+"common.success" = "Succès";
+
+// MARK: - Authentication
+
+"auth.sign_in" = "Se Connecter";
+"auth.sign_up" = "S'inscrire";
+"auth.sign_out" = "Se Déconnecter";
+"auth.email" = "E-mail";
+"auth.password" = "Mot de passe";
+"auth.full_name" = "Nom Complet";
+"auth.age" = "Âge";
+"auth.forgot_password" = "Mot de passe oublié ?";
+"auth.reset_password" = "Réinitialiser le Mot de passe";
+"auth.create_account" = "Créer un Compte";
+"auth.already_have_account" = "Vous avez déjà un compte ? Connectez-vous";
+"auth.dont_have_account" = "Vous n'avez pas de compte ? Inscrivez-vous";
+"auth.verify_email" = "Veuillez vérifier votre e-mail";
+"auth.email_verified" = "E-mail vérifié avec succès !";
+"auth.resend_verification" = "Renvoyer l'E-mail de Vérification";
+
+// MARK: - Profile
+
+"profile.profile" = "Profil";
+"profile.edit_profile" = "Modifier le Profil";
+"profile.bio" = "Biographie";
+"profile.photos" = "Photos";
+"profile.add_photo" = "Ajouter une Photo";
+"profile.settings" = "Paramètres";
+"profile.age" = "Âge";
+"profile.location" = "Localisation";
+"profile.gender" = "Genre";
+"profile.looking_for" = "Recherche";
+"profile.male" = "Homme";
+"profile.female" = "Femme";
+"profile.non_binary" = "Non-binaire";
+
+// MARK: - Swipe
+
+"swipe.discover" = "Découvrir";
+"swipe.like" = "J'aime";
+"swipe.dislike" = "Passer";
+"swipe.super_like" = "Super J'aime";
+"swipe.its_a_match" = "C'est un Match !";
+"swipe.send_message" = "Envoyer un Message";
+"swipe.keep_swiping" = "Continuer à Swiper";
+"swipe.no_more_profiles" = "Plus de profils disponibles";
+
+// MARK: - Matches
+
+"matches.matches" = "Matchs";
+"matches.new_match" = "Nouveau Match !";
+"matches.no_matches" = "Pas encore de matchs";
+"matches.unmatch" = "Annuler le Match";
+"matches.unmatch_confirm" = "Êtes-vous sûr de vouloir annuler ce match ?";
+"matches.matched_with" = "Match avec %@";
+
+// MARK: - Messages
+
+"messages.messages" = "Messages";
+"messages.type_message" = "Tapez un message...";
+"messages.send" = "Envoyer";
+"messages.no_messages" = "Pas encore de messages";
+"messages.delivered" = "Livré";
+"messages.read" = "Lu";
+"messages.typing" = "en train d'écrire...";
+
+// MARK: - Premium
+
+"premium.premium" = "Premium";
+"premium.upgrade_to_premium" = "Passer à Premium";
+"premium.monthly_plan" = "Forfait Mensuel";
+"premium.yearly_plan" = "Forfait Annuel";
+"premium.subscribe" = "S'abonner";
+"premium.restore_purchases" = "Restaurer les Achats";
+"premium.features" = "Fonctionnalités Premium";
+"premium.unlimited_likes" = "J'aime Illimités";
+"premium.see_who_likes_you" = "Voir Qui Vous Aime";
+"premium.rewind" = "Revenir en Arrière";
+"premium.boost_profile" = "Booster Votre Profil";
+
+// MARK: - Settings
+
+"settings.settings" = "Paramètres";
+"settings.account" = "Compte";
+"settings.notifications" = "Notifications";
+"settings.privacy" = "Confidentialité";
+"settings.language" = "Langue";
+"settings.help" = "Aide & Support";
+"settings.about" = "À propos";
+"settings.terms_of_service" = "Conditions d'Utilisation";
+"settings.privacy_policy" = "Politique de Confidentialité";
+
+// MARK: - Errors
+
+"error.generic" = "Une erreur s'est produite. Veuillez réessayer.";
+"error.network" = "Erreur réseau. Veuillez vérifier votre connexion.";
+"error.invalid_email" = "Veuillez entrer une adresse e-mail valide.";
+"error.invalid_password" = "Le mot de passe doit contenir au moins 6 caractères.";
+"error.email_already_in_use" = "Cet e-mail est déjà enregistré.";
+"error.weak_password" = "Le mot de passe est trop faible. Veuillez utiliser un mot de passe plus fort.";
+"error.user_not_found" = "Aucun compte trouvé avec cet e-mail.";
+"error.wrong_password" = "Mot de passe incorrect. Veuillez réessayer.";
+
+// MARK: - Onboarding
+
+"onboarding.welcome" = "Bienvenue sur Celestia";
+"onboarding.find_your_match" = "Trouvez votre match parfait";
+"onboarding.get_started" = "Commencer";
+
+// MARK: - Referrals
+
+"referral.invite_friends" = "Inviter des Amis";
+"referral.share_code" = "Partagez votre code de parrainage";
+"referral.your_code" = "Votre Code";
+"referral.enter_code" = "Entrez le Code de Parrainage (Optionnel)";

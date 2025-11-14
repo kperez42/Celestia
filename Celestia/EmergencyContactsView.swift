@@ -102,6 +102,9 @@ struct EmergencyContactsView: View {
                             onDelete: {
                                 await viewModel.deleteContact(contact)
                             },
+                            onEdit: { updatedContact in
+                                await viewModel.updateContact(updatedContact)
+                            },
                             onToggleDateUpdates: {
                                 await viewModel.toggleDateUpdates(contact)
                             }
@@ -142,9 +145,11 @@ struct EmergencyContactsView: View {
 struct EmergencyContactCard: View {
     let contact: EmergencyContact
     let onDelete: () async -> Void
+    let onEdit: (EmergencyContact) async -> Void
     let onToggleDateUpdates: () async -> Void
 
     @State private var showDeleteConfirmation = false
+    @State private var showEditSheet = false
 
     var body: some View {
         VStack(spacing: 12) {
@@ -189,7 +194,7 @@ struct EmergencyContactCard: View {
                 // Menu
                 Menu {
                     Button {
-                        // TODO: Edit contact
+                        showEditSheet = true
                     } label: {
                         Label("Edit", systemImage: "pencil")
                     }
@@ -242,6 +247,9 @@ struct EmergencyContactCard: View {
             }
         } message: {
             Text("Are you sure you want to remove \(contact.name) from your emergency contacts?")
+        }
+        .sheet(isPresented: $showEditSheet) {
+            EditEmergencyContactView(contact: contact, onUpdate: onEdit)
         }
     }
 }
@@ -305,6 +313,81 @@ struct AddEmergencyContactView: View {
                         }
                     }
                     .disabled(name.isEmpty || phone.isEmpty)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Edit Emergency Contact View
+
+struct EditEmergencyContactView: View {
+    let contact: EmergencyContact
+    let onUpdate: (EmergencyContact) async -> Void
+    @Environment(\.dismiss) var dismiss
+
+    @State private var name: String
+    @State private var phone: String
+    @State private var relationship: ContactRelationship
+
+    init(contact: EmergencyContact, onUpdate: @escaping (EmergencyContact) async -> Void) {
+        self.contact = contact
+        self.onUpdate = onUpdate
+        _name = State(initialValue: contact.name)
+        _phone = State(initialValue: contact.phoneNumber)
+        _relationship = State(initialValue: contact.relationship)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Contact Information") {
+                    TextField("Name", text: $name)
+                    TextField("Phone Number", text: $phone)
+                        .keyboardType(.phonePad)
+                }
+
+                Section("Relationship") {
+                    Picker("Relationship", selection: $relationship) {
+                        ForEach(ContactRelationship.allCases, id: \.self) { rel in
+                            Text(rel.displayName).tag(rel)
+                        }
+                    }
+                }
+
+                Section {
+                    HStack {
+                        Text("Added")
+                        Spacer()
+                        Text(contact.addedAt, style: .date)
+                            .foregroundColor(.secondary)
+                    }
+                } footer: {
+                    Text("Emergency contact information is securely stored and only shared when you explicitly share your date details.")
+                }
+            }
+            .navigationTitle("Edit Contact")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") {
+                        Task {
+                            var updatedContact = contact
+                            updatedContact.name = name
+                            updatedContact.phoneNumber = phone
+                            updatedContact.relationship = relationship
+                            await onUpdate(updatedContact)
+                            dismiss()
+                        }
+                    }
+                    .disabled(name.isEmpty || phone.isEmpty)
+                    .bold()
                 }
             }
         }
@@ -411,6 +494,32 @@ class EmergencyContactsViewModel: ObservableObject {
             Logger.shared.info("Updated date updates for \(contact.name)", category: .general)
         } catch {
             Logger.shared.error("Error updating contact", category: .general, error: error)
+        }
+    }
+
+    func updateContact(_ contact: EmergencyContact) async {
+        guard let index = contacts.firstIndex(where: { $0.id == contact.id }) else { return }
+
+        do {
+            try await db.collection("emergency_contacts")
+                .document(contact.id)
+                .updateData([
+                    "name": contact.name,
+                    "phoneNumber": contact.phoneNumber,
+                    "relationship": contact.relationship.rawValue,
+                    "updatedAt": Timestamp(date: Date())
+                ])
+
+            contacts[index] = contact
+
+            AnalyticsManager.shared.logEvent(.emergencyContactEdited, parameters: [
+                "contactId": contact.id,
+                "relationship": contact.relationship.rawValue
+            ])
+
+            Logger.shared.info("Emergency contact updated: \(contact.name)", category: .general)
+        } catch {
+            Logger.shared.error("Error updating emergency contact", category: .general, error: error)
         }
     }
 }

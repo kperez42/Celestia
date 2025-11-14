@@ -84,6 +84,79 @@ enum AnalyticsEvent: String {
     case profileSaved = "profile_saved"
     case profileUnsaved = "profile_unsaved"
     case savedProfilesCleared = "saved_profiles_cleared"
+
+    // UX Enhancement Events (20+ new events)
+
+    // Localization & Language
+    case languageChanged = "language_changed"
+    case localizationLoaded = "localization_loaded"
+    case translationFallback = "translation_fallback"
+
+    // App Shortcuts & Siri
+    case appShortcutUsed = "app_shortcut_used"
+    case siriIntentTriggered = "siri_intent_triggered"
+    case shortcutSuggestionShown = "shortcut_suggestion_shown"
+    case deepLinkOpened = "deep_link_opened"
+
+    // Review Prompts
+    case reviewPromptShown = "review_prompt_shown"
+    case reviewPromptAccepted = "review_prompt_accepted"
+    case reviewPromptDismissed = "review_prompt_dismissed"
+    case reviewPromptManual = "review_prompt_manual"
+    case reviewConditionsMet = "review_conditions_met"
+
+    // Rich Notifications
+    case notificationActionClicked = "notification_action_clicked"
+    case notificationReplyInline = "notification_reply_inline"
+    case notificationImageLoaded = "notification_image_loaded"
+    case notificationDismissed = "notification_dismissed"
+
+    // Emergency Contacts & Safety
+    case emergencyContactEdited = "emergency_contact_edited"
+    case emergencyContactViewed = "emergency_contact_viewed"
+    case safetyFeatureDiscovered = "safety_feature_discovered"
+    case dateDetailsShared = "date_details_shared"
+    case safetyCheckInReminder = "safety_checkin_reminder"
+
+    // Onboarding & User Journey
+    case onboardingStarted = "onboarding_started"
+    case onboardingStepCompleted = "onboarding_step_completed"
+    case onboardingCompleted = "onboarding_completed"
+    case onboardingSkipped = "onboarding_skipped"
+    case tutorialViewed = "tutorial_viewed"
+    case featureDiscovered = "feature_discovered"
+    case firstTimeActionCompleted = "first_time_action_completed"
+
+    // User Engagement
+    case appLaunched = "app_launched"
+    case appBackgrounded = "app_backgrounded"
+    case appForegrounded = "app_foregrounded"
+    case sessionStarted = "session_started"
+    case sessionEnded = "session_ended"
+    case sessionDuration = "session_duration"
+    case dailyActiveUser = "daily_active_user"
+    case weeklyActiveUser = "weekly_active_user"
+    case monthlyActiveUser = "monthly_active_user"
+
+    // Error Tracking & Recovery
+    case userFriendlyErrorShown = "user_friendly_error_shown"
+    case errorRecovered = "error_recovered"
+    case errorReportSent = "error_report_sent"
+    case retryActionSucceeded = "retry_action_succeeded"
+    case gracefulDegradationUsed = "graceful_degradation_used"
+
+    // Feature Adoption
+    case premiumFeatureViewed = "premium_feature_viewed"
+    case featureTooltipShown = "feature_tooltip_shown"
+    case featureTooltipDismissed = "feature_tooltip_dismissed"
+    case settingsOpened = "settings_opened"
+    case helpDocumentViewed = "help_document_viewed"
+
+    // Match Picker & Date Sharing
+    case matchPickerOpened = "match_picker_opened"
+    case matchSelected = "match_selected"
+    case dateLocationAdded = "date_location_added"
+    case dateTimeScheduled = "date_time_scheduled"
 }
 
 // MARK: - Analytics Manager
