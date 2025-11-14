@@ -85,7 +85,9 @@ struct OnboardingView: View {
                         step5View.tag(4)
                     }
                     .tabViewStyle(.page(indexDisplayMode: .never))
-                    .animation(.easeInOut, value: currentStep)
+                    .accessibleAnimation(.easeInOut, value: currentStep)
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel("Onboarding step \(currentStep + 1) of \(totalSteps)")
                     
                     // Navigation buttons
                     navigationButtons
@@ -105,6 +107,9 @@ struct OnboardingView: View {
                         }
                         .foregroundColor(.purple)
                     }
+                    .accessibilityLabel("Cancel onboarding")
+                    .accessibilityHint("Exit onboarding and return to previous screen")
+                    .accessibilityIdentifier(AccessibilityIdentifier.cancelButton)
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -257,6 +262,9 @@ struct OnboardingView: View {
                                 RoundedRectangle(cornerRadius: 12)
                                     .stroke(Color.purple.opacity(0.2), lineWidth: 1)
                             )
+                            .accessibilityLabel("Full name")
+                            .accessibilityHint("Enter your full name")
+                            .accessibilityIdentifier(AccessibilityIdentifier.nameField)
                     }
                     
                     // Birthday
@@ -280,6 +288,9 @@ struct OnboardingView: View {
                             RoundedRectangle(cornerRadius: 12)
                                 .stroke(Color.purple.opacity(0.2), lineWidth: 1)
                         )
+                        .accessibilityLabel("Birthday")
+                        .accessibilityHint("Select your date of birth. Must be 18 or older")
+                        .accessibilityIdentifier("birthday_picker")
                     }
                     
                     // Gender
@@ -406,6 +417,10 @@ struct OnboardingView: View {
                                         .allowsHitTesting(false)
                                 }
                             }
+                            .accessibilityLabel("Bio")
+                            .accessibilityHint("Write a short bio about yourself. Maximum 500 characters")
+                            .accessibilityValue("\(bio.count) of 500 characters")
+                            .accessibilityIdentifier(AccessibilityIdentifier.bioField)
                     }
                     
                     // Location
@@ -423,6 +438,9 @@ struct OnboardingView: View {
                                 RoundedRectangle(cornerRadius: 12)
                                     .stroke(Color.purple.opacity(0.2), lineWidth: 1)
                             )
+                            .accessibilityLabel("City")
+                            .accessibilityHint("Enter your city")
+                            .accessibilityIdentifier(AccessibilityIdentifier.locationField)
                     }
                     
                     // Country
@@ -440,6 +458,9 @@ struct OnboardingView: View {
                                 RoundedRectangle(cornerRadius: 12)
                                     .stroke(Color.purple.opacity(0.2), lineWidth: 1)
                             )
+                            .accessibilityLabel("Country")
+                            .accessibilityHint("Enter your country")
+                            .accessibilityIdentifier(AccessibilityIdentifier.countryField)
                     }
                 }
             }
@@ -802,6 +823,9 @@ struct OnboardingView: View {
                             .stroke(Color.purple, lineWidth: 2)
                     )
                 }
+                .accessibilityLabel("Back")
+                .accessibilityHint("Go back to previous step")
+                .accessibilityIdentifier(AccessibilityIdentifier.backButton)
             }
             
             Button {
@@ -821,7 +845,7 @@ struct OnboardingView: View {
                     } else {
                         Text(currentStep < totalSteps - 1 ? "Continue" : "Complete")
                             .fontWeight(.semibold)
-                        
+
                         if currentStep < totalSteps - 1 {
                             Image(systemName: "chevron.right")
                         } else {
@@ -845,6 +869,9 @@ struct OnboardingView: View {
                 .shadow(color: canProceed ? .purple.opacity(0.3) : .clear, radius: 10, y: 5)
             }
             .disabled(!canProceed || isLoading)
+            .accessibilityLabel(currentStep < totalSteps - 1 ? "Continue" : "Complete onboarding")
+            .accessibilityHint(currentStep < totalSteps - 1 ? "Continue to next step" : "Finish onboarding and create profile")
+            .accessibilityIdentifier(currentStep < totalSteps - 1 ? "continue_button" : "complete_button")
         }
         .padding(20)
         .background(Color.white)

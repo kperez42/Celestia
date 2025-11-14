@@ -35,6 +35,30 @@ extension EnvironmentValues {
         return false
         #endif
     }
+
+    var accessibilityInvertColors: Bool {
+        #if os(iOS)
+        return UIAccessibility.isInvertColorsEnabled
+        #else
+        return false
+        #endif
+    }
+
+    var accessibilityBoldText: Bool {
+        #if os(iOS)
+        return UIAccessibility.isBoldTextEnabled
+        #else
+        return false
+        #endif
+    }
+
+    var accessibilityGrayscaleEnabled: Bool {
+        #if os(iOS)
+        return UIAccessibility.isGrayscaleEnabled
+        #else
+        return false
+        #endif
+    }
 }
 
 // MARK: - View Extensions for Accessibility
@@ -264,6 +288,23 @@ extension Color {
     static let accessibleTextSecondary = Color.secondary
     static let accessibleTextOnDark = Color.white
     static let accessibleTextOnLight = Color.black
+
+    /// High contrast color variants for increased visibility
+    static let highContrastPrimary = Color(red: 0.5, green: 0, blue: 0.8) // Darker purple
+    static let highContrastSecondary = Color(red: 0.8, green: 0, blue: 0.5) // Darker pink
+    static let highContrastAccent = Color(red: 0, green: 0.3, blue: 0.8) // Darker blue
+    static let highContrastSuccess = Color(red: 0, green: 0.5, blue: 0) // Darker green
+    static let highContrastWarning = Color(red: 0.8, green: 0.4, blue: 0) // Darker orange
+    static let highContrastError = Color(red: 0.7, green: 0, blue: 0) // Darker red
+
+    /// Returns high contrast variant if needed based on accessibility settings
+    func adaptiveContrast(highContrastVariant: Color) -> Color {
+        #if os(iOS)
+        return UIAccessibility.isDarkerSystemColorsEnabled ? highContrastVariant : self
+        #else
+        return self
+        #endif
+    }
 }
 
 // MARK: - Accessibility Identifiers (for UI Testing)
@@ -305,6 +346,22 @@ enum AccessibilityIdentifier {
     static let closeButton = "close_button"
     static let confirmButton = "confirm_button"
     static let cancelButton = "cancel_button"
+
+    // MARK: - Authentication
+    static let emailField = "email_field"
+    static let passwordField = "password_field"
+    static let confirmPasswordField = "confirm_password_field"
+    static let nameField = "name_field"
+    static let ageField = "age_field"
+    static let genderPicker = "gender_picker"
+    static let lookingForPicker = "looking_for_picker"
+    static let locationField = "location_field"
+    static let countryField = "country_field"
+    static let bioField = "bio_field"
+    static let signUpButton = "sign_up_button"
+    static let signInButton = "sign_in_button"
+    static let nextButton = "next_button"
+    static let createAccountButton = "create_account_button"
 }
 
 // MARK: - VoiceOver Announcements
@@ -514,5 +571,191 @@ extension View {
         } else {
             self
         }
+    }
+}
+
+// MARK: - Dynamic Spacing with @ScaledMetric
+
+/// Provides spacing values that scale with Dynamic Type
+struct AccessibleSpacing {
+    @ScaledMetric private var spacing: CGFloat
+
+    init(base: CGFloat) {
+        _spacing = ScaledMetric(wrappedValue: base)
+    }
+
+    var value: CGFloat {
+        spacing
+    }
+
+    /// Common spacing values
+    static let xxSmall = AccessibleSpacing(base: 4)
+    static let xSmall = AccessibleSpacing(base: 8)
+    static let small = AccessibleSpacing(base: 12)
+    static let medium = AccessibleSpacing(base: 16)
+    static let large = AccessibleSpacing(base: 24)
+    static let xLarge = AccessibleSpacing(base: 32)
+    static let xxLarge = AccessibleSpacing(base: 48)
+}
+
+// MARK: - Keyboard Navigation Support
+
+extension View {
+    /// Adds keyboard navigation support for forms and interactive elements
+    func accessibleKeyboardNavigation(
+        onSubmit: @escaping () -> Void = {},
+        submitLabel: SubmitLabel = .done
+    ) -> some View {
+        self
+            .submitLabel(submitLabel)
+            .onSubmit(onSubmit)
+    }
+
+    /// Groups form fields with proper navigation
+    @available(iOS 15.0, *)
+    func accessibleFormField<V: Hashable>(
+        focusState: FocusState<V>.Binding,
+        value: V,
+        next: V? = nil
+    ) -> some View {
+        self
+            .focused(focusState, equals: value)
+            .submitLabel(next != nil ? .next : .done)
+            .onSubmit {
+                if let next = next {
+                    focusState.wrappedValue = next
+                }
+            }
+    }
+}
+
+// MARK: - High Contrast Mode Support
+
+struct HighContrastModifier: ViewModifier {
+    @Environment(\.colorScheme) var colorScheme
+
+    let normalColor: Color
+    let highContrastColor: Color
+
+    func body(content: Content) -> some View {
+        #if os(iOS)
+        let useHighContrast = UIAccessibility.isDarkerSystemColorsEnabled
+        content.foregroundColor(useHighContrast ? highContrastColor : normalColor)
+        #else
+        content.foregroundColor(normalColor)
+        #endif
+    }
+}
+
+extension View {
+    /// Applies high contrast colors when accessibility setting is enabled
+    func highContrastColor(
+        normal: Color,
+        highContrast: Color
+    ) -> some View {
+        self.modifier(HighContrastModifier(normalColor: normal, highContrastColor: highContrast))
+    }
+
+    /// Applies adaptive font weight based on Bold Text setting
+    func adaptiveFontWeight(
+        normal: Font.Weight = .regular,
+        bold: Font.Weight = .semibold
+    ) -> some View {
+        #if os(iOS)
+        let weight = UIAccessibility.isBoldTextEnabled ? bold : normal
+        return self.fontWeight(weight)
+        #else
+        return self.fontWeight(normal)
+        #endif
+    }
+}
+
+// MARK: - Haptic Feedback for Accessibility
+
+struct AccessibleHaptics {
+    /// Provides haptic feedback for accessibility actions
+    static func impact(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .medium) {
+        #if os(iOS)
+        let generator = UIImpactFeedbackGenerator(style: style)
+        generator.impactOccurred()
+        #endif
+    }
+
+    /// Provides notification haptic feedback
+    static func notification(_ type: UINotificationFeedbackGenerator.FeedbackType) {
+        #if os(iOS)
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(type)
+        #endif
+    }
+
+    /// Provides selection haptic feedback
+    static func selection() {
+        #if os(iOS)
+        let generator = UISelectionFeedbackGenerator()
+        generator.selectionChanged()
+        #endif
+    }
+}
+
+// MARK: - Accessibility Quick Check
+
+struct AccessibilityQuickCheck {
+    /// Quick check if any accessibility features are enabled
+    static var hasAccessibilityEnabled: Bool {
+        #if os(iOS)
+        return UIAccessibility.isVoiceOverRunning ||
+               UIAccessibility.isSwitchControlRunning ||
+               UIAccessibility.isReduceMotionEnabled ||
+               UIAccessibility.isDarkerSystemColorsEnabled ||
+               UIAccessibility.isBoldTextEnabled ||
+               UIAccessibility.isReduceTransparencyEnabled
+        #else
+        return false
+        #endif
+    }
+
+    /// Check if VoiceOver is running
+    static var isVoiceOverRunning: Bool {
+        #if os(iOS)
+        return UIAccessibility.isVoiceOverRunning
+        #else
+        return false
+        #endif
+    }
+
+    /// Check if Switch Control is running
+    static var isSwitchControlRunning: Bool {
+        #if os(iOS)
+        return UIAccessibility.isSwitchControlRunning
+        #else
+        return false
+        #endif
+    }
+}
+
+// MARK: - Improved Text Contrast Helper
+
+extension View {
+    /// Ensures text has sufficient contrast against its background
+    func ensureTextContrast(
+        textColor: Color = .primary,
+        backgroundColor: Color = .white
+    ) -> some View {
+        self.foregroundColor(textColor)
+            .background(backgroundColor)
+    }
+
+    /// Adds a contrasting background for better readability
+    func readableTextBackground(
+        padding: EdgeInsets = EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8),
+        cornerRadius: CGFloat = 4
+    ) -> some View {
+        self
+            .padding(padding)
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(Color.black.opacity(0.6))
+            )
     }
 }
