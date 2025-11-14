@@ -202,6 +202,38 @@ class ABTestingManager: ObservableObject {
         }
     }
 
+    /// Records a conversion for a specific experiment
+    func recordConversion(experimentId: String) {
+        trackConversion(event: "experiment_conversion_\(experimentId)", properties: [
+            "experimentId": experimentId,
+            "variantId": userVariants[experimentId] ?? "unknown"
+        ])
+
+        Logger.shared.info("Conversion recorded for experiment: \(experimentId)", category: .general)
+    }
+
+    /// Records a custom metric for an experiment
+    func recordMetric(experimentId: String, metricName: String, value: Double) {
+        Task {
+            guard let userId = AuthService.shared.currentUser?.id else { return }
+
+            try? await db.collection("experiment_metrics").addDocument(data: [
+                "experimentId": experimentId,
+                "userId": userId,
+                "variantId": userVariants[experimentId] ?? "unknown",
+                "metricName": metricName,
+                "value": value,
+                "timestamp": FieldValue.serverTimestamp()
+            ])
+        }
+
+        analyticsService.trackEvent(.featureFlagChanged, properties: [
+            "experimentId": experimentId,
+            "metricName": metricName,
+            "value": value
+        ])
+    }
+
     // MARK: - Experiment Creation (Admin)
 
     /// Creates a new A/B test experiment (admin only)
@@ -402,6 +434,163 @@ struct VariantResult {
     let assignments: Int
     let conversions: Int
     let conversionRate: Double
+}
+
+// MARK: - Onboarding Helpers
+
+extension ABTestingManager {
+    /// Checks if user should see onboarding tutorial
+    func shouldShowTutorial() -> Bool {
+        let variant = getCurrentVariant(for: "onboarding_tutorial")
+        return variant == "with_tutorial" || variant == "control"
+    }
+
+    /// Checks if user should see profile quality tips during onboarding
+    func shouldShowTips() -> Bool {
+        let variant = getCurrentVariant(for: "onboarding_tips")
+        return variant == "with_tips" || variant == "control"
+    }
+
+    /// Gets the disclosure strategy for onboarding (progressive vs all-at-once)
+    func getDisclosureStrategy() -> String {
+        let variant = getCurrentVariant(for: "onboarding_disclosure")
+        return variant == "progressive" || variant == "control" ? "progressive" : "all_at_once"
+    }
+
+    /// Determines if user should be offered a completion reward
+    func shouldOfferCompletionReward() -> (offered: Bool, type: String?, amount: Int?) {
+        let variant = getCurrentVariant(for: "onboarding_incentive")
+
+        switch variant {
+        case "super_likes":
+            return (true, "super_likes", 3)
+        case "boosts":
+            return (true, "boosts", 1)
+        case "premium_trial":
+            return (true, "premium_trial", 7)
+        case "control", "no_incentive":
+            return (false, nil, nil)
+        default:
+            return (false, nil, nil)
+        }
+    }
+
+    /// Creates default onboarding experiments
+    func setupDefaultOnboardingExperiments() async {
+        // Experiment 1: Onboarding Tutorial
+        try? await createExperiment(
+            name: "Onboarding Tutorial Test",
+            description: "Test if showing interactive tutorials improves activation",
+            variants: [
+                Variant(
+                    id: "control",
+                    name: "With Tutorial",
+                    description: "Show interactive tutorials during onboarding",
+                    isControl: true,
+                    trafficAllocation: 50,
+                    featureOverrides: ["show_tutorial": true]
+                ),
+                Variant(
+                    id: "no_tutorial",
+                    name: "No Tutorial",
+                    description: "Skip tutorials, go straight to app",
+                    isControl: false,
+                    trafficAllocation: 50,
+                    featureOverrides: ["show_tutorial": false]
+                )
+            ]
+        )
+
+        // Experiment 2: Profile Quality Tips
+        try? await createExperiment(
+            name: "Profile Quality Tips",
+            description: "Test if showing real-time profile tips improves profile completion",
+            variants: [
+                Variant(
+                    id: "control",
+                    name: "With Tips",
+                    description: "Show profile quality tips in real-time",
+                    isControl: true,
+                    trafficAllocation: 50,
+                    featureOverrides: ["show_tips": true]
+                ),
+                Variant(
+                    id: "no_tips",
+                    name: "No Tips",
+                    description: "No profile tips shown",
+                    isControl: false,
+                    trafficAllocation: 50,
+                    featureOverrides: ["show_tips": false]
+                )
+            ]
+        )
+
+        // Experiment 3: Progressive Disclosure
+        try? await createExperiment(
+            name: "Progressive Disclosure",
+            description: "Test if progressive disclosure reduces onboarding abandonment",
+            variants: [
+                Variant(
+                    id: "control",
+                    name: "Progressive",
+                    description: "Show features progressively",
+                    isControl: true,
+                    trafficAllocation: 50,
+                    featureOverrides: ["disclosure": "progressive"]
+                ),
+                Variant(
+                    id: "all_at_once",
+                    name: "All at Once",
+                    description: "Show all features upfront",
+                    isControl: false,
+                    trafficAllocation: 50,
+                    featureOverrides: ["disclosure": "all_at_once"]
+                )
+            ]
+        )
+
+        // Experiment 4: Completion Incentives
+        try? await createExperiment(
+            name: "Completion Incentives",
+            description: "Test which incentive increases profile completion rate",
+            variants: [
+                Variant(
+                    id: "control",
+                    name: "No Incentive",
+                    description: "No completion reward offered",
+                    isControl: true,
+                    trafficAllocation: 25,
+                    featureOverrides: ["incentive": "none"]
+                ),
+                Variant(
+                    id: "super_likes",
+                    name: "3 Free Super Likes",
+                    description: "Offer 3 free super likes for profile completion",
+                    isControl: false,
+                    trafficAllocation: 25,
+                    featureOverrides: ["incentive": "super_likes", "amount": 3]
+                ),
+                Variant(
+                    id: "boosts",
+                    name: "1 Free Boost",
+                    description: "Offer 1 free boost for profile completion",
+                    isControl: false,
+                    trafficAllocation: 25,
+                    featureOverrides: ["incentive": "boosts", "amount": 1]
+                ),
+                Variant(
+                    id: "premium_trial",
+                    name: "7-Day Premium Trial",
+                    description: "Offer 7-day premium trial for profile completion",
+                    isControl: false,
+                    trafficAllocation: 25,
+                    featureOverrides: ["incentive": "premium_trial", "amount": 7]
+                )
+            ]
+        )
+
+        Logger.shared.info("Default onboarding experiments created", category: .general)
+    }
 }
 
 // MARK: - Example Experiments
