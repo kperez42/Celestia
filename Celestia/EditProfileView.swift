@@ -1150,7 +1150,7 @@ struct EditProfileView: View {
             user.photos = photos
             do {
                 try await authService.updateUser(user)
-                Logger.shared.log("Photo deleted from profile successfully", category: .general, level: .info)
+                Logger.shared.info("Photo deleted from profile successfully", category: .general)
             } catch {
                 Logger.shared.error("Failed to delete photo from profile", category: .general, error: error)
                 await MainActor.run {
@@ -1174,7 +1174,7 @@ struct EditProfileView: View {
             user.photos = photos
             do {
                 try await authService.updateUser(user)
-                Logger.shared.log("Photo order updated successfully", category: .general, level: .info)
+                Logger.shared.info("Photo order updated successfully", category: .general)
             } catch {
                 Logger.shared.error("Failed to update photo order", category: .general, error: error)
             }
@@ -1216,7 +1216,7 @@ struct EditProfileView: View {
                         user.photos = photos
                         try await authService.updateUser(user)
 
-                        Logger.shared.log("Photo saved to profile successfully", category: .general, level: .info)
+                        Logger.shared.info("Photo saved to profile successfully", category: .general)
                     }
                 }
             } catch {
