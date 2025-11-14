@@ -50,12 +50,42 @@ class ProfileEditViewModel: ObservableObject {
         interests: [String],
         profileImageURL: String
     ) async throws {
+        // SECURITY FIX: Validate all inputs before saving to Firestore
+        // This prevents clients from bypassing UI validation and sending invalid data
+
+        // Validate name
+        let nameValidation = ValidationHelper.validateName(name)
+        guard nameValidation.isValid else {
+            errorMessage = nameValidation.errorMessage
+            throw CelestiaError.invalidProfileData
+        }
+
+        // Validate age
+        let ageValidation = ValidationHelper.validateAge(age)
+        guard ageValidation.isValid else {
+            errorMessage = ageValidation.errorMessage
+            throw CelestiaError.ageRestriction
+        }
+
+        // Validate bio length (critical: prevents database bloat)
+        let bioValidation = ValidationHelper.validateBio(bio)
+        guard bioValidation.isValid else {
+            errorMessage = bioValidation.errorMessage
+            throw CelestiaError.validationError(field: "bio", reason: bioValidation.errorMessage ?? "Bio is too long")
+        }
+
+        // Sanitize inputs using InputSanitizer
+        let sanitizedName = InputSanitizer.strict(name)
+        let sanitizedBio = InputSanitizer.standard(bio)
+        let sanitizedLocation = InputSanitizer.basic(location)
+        let sanitizedCountry = InputSanitizer.basic(country)
+
         let userData: [String: Any] = [
-            "fullName": name, // Fixed: Use fullName to match User model
+            "fullName": sanitizedName, // Fixed: Use fullName to match User model
             "age": age,
-            "bio": bio,
-            "location": location,
-            "country": country,
+            "bio": sanitizedBio,
+            "location": sanitizedLocation,
+            "country": sanitizedCountry,
             "languages": languages,
             "interests": interests,
             "profileImageURL": profileImageURL,

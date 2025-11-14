@@ -85,20 +85,23 @@ class ImageUploadService {
             Logger.shared.info("Image uploaded successfully: \(url.absoluteString)", category: .general)
             return url.absoluteString
         } catch let error as NSError {
-            // Convert to CelestiaError
-            if error.domain == "FIRStorageErrorDomain" {
-                switch error.code {
-                case StorageErrorCode.objectNotFound.rawValue:
-                    throw CelestiaError.invalidData
-                case StorageErrorCode.unauthorized.rawValue:
-                    throw CelestiaError.permissionDenied
-                case StorageErrorCode.quotaExceeded.rawValue:
-                    throw CelestiaError.imageTooBig
-                default:
-                    throw CelestiaError.imageUploadFailed
-                }
+            // REFACTORED: Use FirebaseErrorMapper for consistent error handling
+            FirebaseErrorMapper.logError(error, context: "Image Upload")
+
+            // Map Firebase error to CelestiaError
+            let celestiaError = FirebaseErrorMapper.mapError(error)
+
+            // Convert mapped error to appropriate image upload error
+            switch celestiaError {
+            case .storageQuotaExceeded:
+                throw CelestiaError.imageTooBig
+            case .unauthorized, .permissionDenied:
+                throw CelestiaError.permissionDenied
+            case .invalidData:
+                throw CelestiaError.invalidData
+            default:
+                throw CelestiaError.imageUploadFailed
             }
-            throw CelestiaError.imageUploadFailed
         }
     }
 
