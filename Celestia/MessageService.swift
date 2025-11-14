@@ -80,9 +80,9 @@ class MessageService: ObservableObject {
             throw CelestiaError.messageTooLong
         }
 
-        // Content moderation - use server-side validation if available
+        // SECURITY: Server-side validation is mandatory - client-side can be bypassed
         do {
-            // Try server-side validation first (more secure)
+            // Server-side validation is required (client-side validation can be bypassed)
             let validationResponse = try await BackendAPIService.shared.validateContent(
                 sanitizedText,
                 type: .message
@@ -95,14 +95,29 @@ class MessageService: ObservableObject {
 
             Logger.shared.debug("Content validated server-side ✅", category: .moderation)
 
-        } catch is BackendAPIError {
-            // Fallback to client-side validation if server unavailable
-            Logger.shared.warning("Server-side validation unavailable, using client-side", category: .moderation)
+        } catch let error as BackendAPIError {
+            // SECURITY FIX: Do NOT fallback to client-side validation (can be bypassed)
+            // Block sending when backend is unavailable to prevent abuse
+            Logger.shared.error("Server-side validation unavailable - blocking message send", category: .moderation)
 
-            guard ContentModerator.shared.isAppropriate(sanitizedText) else {
-                let violations = ContentModerator.shared.getViolations(sanitizedText)
-                throw CelestiaError.inappropriateContentWithReasons(violations)
-            }
+            // Log for monitoring and alerting
+            AnalyticsManager.shared.logEvent("validation_service_unavailable", parameters: [
+                "error": error.localizedDescription,
+                "action": "blocked_message_send"
+            ])
+
+            // Return user-friendly error
+            throw CelestiaError.serviceTemporarilyUnavailable
+
+            // TODO: Future enhancement - implement message queue for delayed validation:
+            // 1. Store message in local queue with "pending_validation" status
+            // 2. Show user that message is queued for validation
+            // 3. Background task periodically retries validation
+            // 4. Send message once validated, or reject if inappropriate
+            // This provides better UX while maintaining security
+        } catch {
+            // Re-throw other validation errors (content violations, etc.)
+            throw error
         }
 
         let message = Message(
