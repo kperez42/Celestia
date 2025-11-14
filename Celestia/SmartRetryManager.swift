@@ -294,9 +294,8 @@ class SmartRetryManager: ObservableObject {
         }
 
         // HTTP 429 (Too Many Requests) - use longer delay
-        if nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorHTTPTooManyRequests {
-            return max(delay * 2.0, 5.0)
-        }
+        // Note: URLError doesn't directly expose HTTP status codes
+        // This is handled by BackendAPIError.rateLimitExceeded above
 
         // Server errors (5xx) - use moderate delay
         if nsError.domain == NSURLErrorDomain && nsError.code >= 500 {
