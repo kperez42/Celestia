@@ -112,7 +112,9 @@ class ClipboardSecurityManager: ObservableObject {
         if blockSensitiveContent && shouldBlockCopy(sensitivity: sensitivity) {
             Logger.shared.warning("Clipboard copy blocked for sensitive content", category: .security)
 
-            AnalyticsManager.shared.logEvent("clipboard_copy_blocked", parameters: [
+            AnalyticsManager.shared.logEvent(.featureUsed, parameters: [
+                "feature": "clipboard_security",
+                "action": "copy_blocked",
                 "sensitivity": sensitivity.rawValue
             ])
 
@@ -165,7 +167,10 @@ class ClipboardSecurityManager: ObservableObject {
 
         Logger.shared.info("Clipboard cleared", category: .security)
 
-        AnalyticsManager.shared.logEvent("clipboard_cleared")
+        AnalyticsManager.shared.logEvent(.featureUsed, parameters: [
+            "feature": "clipboard_security",
+            "action": "cleared"
+        ])
     }
 
     /// Check if clipboard contains sensitive data
@@ -223,8 +228,10 @@ class ClipboardSecurityManager: ObservableObject {
 
         // Create new timer
         autoClearTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
-            self?.clearClipboard()
-            Logger.shared.info("Clipboard auto-cleared after \(delay)s", category: .security)
+            Task { @MainActor in
+                self?.clearClipboard()
+                Logger.shared.info("Clipboard auto-cleared after \(delay)s", category: .security)
+            }
         }
     }
 
@@ -266,7 +273,9 @@ class ClipboardSecurityManager: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.handleClipboardChange()
+            Task { @MainActor in
+                self?.handleClipboardChange()
+            }
         }
     }
 
@@ -301,7 +310,9 @@ class ClipboardSecurityManager: ObservableObject {
 
     /// Track clipboard usage analytics
     private func trackClipboardUsage(sensitivity: ContentSensitivityLevel, action: String) {
-        AnalyticsManager.shared.logEvent("clipboard_\(action)", parameters: [
+        AnalyticsManager.shared.logEvent(.featureUsed, parameters: [
+            "feature": "clipboard_security",
+            "action": action,
             "sensitivity": sensitivity.rawValue,
             "security_enabled": isEnabled,
             "auto_clear_enabled": autoClearEnabled
