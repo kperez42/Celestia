@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import UIKit
 
 /// Thread-safe cache with time-to-live (TTL) expiration
 actor QueryCache<Value> {
