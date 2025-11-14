@@ -297,6 +297,46 @@ exports.recordAction = functions.https.onCall(async (data, context) => {
   }
 });
 
+/**
+ * Validate action before performing it (backend validation)
+ * Returns whether action is allowed and remaining quota
+ */
+exports.validateRateLimit = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { actionType } = data;
+  const userId = context.auth.uid;
+
+  try {
+    const result = await rateLimiting.validateAction(userId, actionType);
+    return result;
+  } catch (error) {
+    functions.logger.error('Rate limit validation error', { userId, actionType, error: error.message });
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
+ * Get user's rate limit status for all actions
+ */
+exports.getRateLimitStatus = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const userId = context.auth.uid;
+
+  try {
+    const status = await rateLimiting.getUserRateLimitStatus(userId);
+    return status;
+  } catch (error) {
+    functions.logger.error('Get rate limit status error', { userId, error: error.message });
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
 // ============================================================================
 // ADMIN DASHBOARD API
 // ============================================================================

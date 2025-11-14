@@ -310,11 +310,102 @@ async function hasConsumables(userId, consumableType) {
 // Initialize limiters on module load
 initializeLimiters();
 
+// ============================================================================
+// VALIDATION ENDPOINTS (for backend validation from iOS app)
+// ============================================================================
+
+/**
+ * Validates if action is allowed (for backend validation)
+ * Called by iOS app before performing critical actions
+ * @param {string} userId - User ID
+ * @param {string} actionType - Type of action
+ * @returns {object} Validation result with remaining quota
+ */
+async function validateAction(userId, actionType) {
+  try {
+    // Check if action is allowed
+    const isAllowed = await checkRateLimit(userId, actionType);
+
+    if (!isAllowed) {
+      const limits = getLimits(actionType);
+      const remaining = await getRemainingQuota(userId, actionType);
+
+      return {
+        allowed: false,
+        remaining: remaining,
+        limit: limits.points,
+        resetIn: limits.duration,
+        reason: 'Rate limit exceeded'
+      };
+    }
+
+    // Get remaining quota after consuming
+    const remaining = await getRemainingQuota(userId, actionType);
+
+    return {
+      allowed: true,
+      remaining: remaining,
+      limit: RATE_LIMITS[actionType]?.points || -1
+    };
+
+  } catch (error) {
+    functions.logger.error('Action validation error', { userId, actionType, error: error.message });
+
+    // Fail open for availability, but log for monitoring
+    return {
+      allowed: true,
+      remaining: -1,
+      warning: 'Rate limit check failed - allowed by default'
+    };
+  }
+}
+
+/**
+ * Batch validation for multiple actions (optimization)
+ * @param {string} userId - User ID
+ * @param {Array<string>} actionTypes - Array of action types
+ * @returns {object} Validation results for all actions
+ */
+async function validateBatchActions(userId, actionTypes) {
+  const results = {};
+
+  for (const actionType of actionTypes) {
+    results[actionType] = await validateAction(userId, actionType);
+  }
+
+  return results;
+}
+
+/**
+ * Get user's current rate limit status for all actions
+ * @param {string} userId - User ID
+ * @returns {object} Status for all rate-limited actions
+ */
+async function getUserRateLimitStatus(userId) {
+  const status = {};
+
+  for (const actionType of Object.keys(RATE_LIMITS)) {
+    const remaining = await getRemainingQuota(userId, actionType);
+    const limits = getLimits(actionType);
+
+    status[actionType] = {
+      remaining,
+      limit: limits.points,
+      resetIn: limits.duration
+    };
+  }
+
+  return status;
+}
+
 module.exports = {
   checkRateLimit,
   recordAction,
   getRemainingQuota,
   resetRateLimit,
   getLimits,
-  penalizeUser
+  penalizeUser,
+  validateAction,
+  validateBatchActions,
+  getUserRateLimitStatus
 };

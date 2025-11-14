@@ -183,7 +183,40 @@ class MessageService: ObservableObject {
         receiverId: String,
         text: String
     ) async throws {
-        // Check rate limiting
+        // SECURITY: Backend rate limit validation (prevents client bypass)
+        // This is called BEFORE client-side check to ensure server-side enforcement
+        do {
+            let rateLimitResponse = try await BackendAPIService.shared.checkRateLimit(
+                userId: senderId,
+                action: .sendMessage
+            )
+
+            if !rateLimitResponse.allowed {
+                Logger.shared.warning("Backend rate limit exceeded for messages", category: .moderation)
+
+                if let retryAfter = rateLimitResponse.retryAfter {
+                    throw CelestiaError.rateLimitExceededWithTime(retryAfter)
+                }
+
+                throw CelestiaError.rateLimitExceeded
+            }
+
+            Logger.shared.debug("✅ Backend rate limit check passed (remaining: \(rateLimitResponse.remaining))", category: .moderation)
+
+        } catch let error as BackendAPIError {
+            // Backend rate limit service unavailable
+            Logger.shared.error("Backend rate limit check failed - using client-side fallback", category: .moderation)
+
+            // Fall back to client-side rate limiting
+            guard RateLimiter.shared.canSendMessage() else {
+                if let timeRemaining = RateLimiter.shared.timeUntilReset(for: .message) {
+                    throw CelestiaError.rateLimitExceededWithTime(timeRemaining)
+                }
+                throw CelestiaError.rateLimitExceeded
+            }
+        }
+
+        // Client-side rate limiting (additional layer of protection)
         guard RateLimiter.shared.canSendMessage() else {
             if let timeRemaining = RateLimiter.shared.timeUntilReset(for: .message) {
                 throw CelestiaError.rateLimitExceededWithTime(timeRemaining)
