@@ -38,8 +38,8 @@ class DiscoverViewModel: ObservableObject {
     private let performanceMonitor = PerformanceMonitor.shared
 
     // Dependency injection initializer
-    init(userService: any UserServiceProtocol = UserService.shared) {
-        self.userService = userService
+    init(userService: (any UserServiceProtocol)? = nil) {
+        self.userService = userService ?? UserService.shared
     }
     
     func loadUsers(currentUser: User, limit: Int = 20) {

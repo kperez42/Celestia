@@ -121,7 +121,8 @@ class PersonalizedOnboardingManager: ObservableObject {
         saveGoal()
 
         // Track analytics
-        AnalyticsService.shared.trackEvent("onboarding_goal_selected", parameters: [
+        AnalyticsManager.shared.logEvent(.onboardingStepCompleted, parameters: [
+            "step": "goal_selection",
             "goal": goal.rawValue,
             "goal_name": goal.displayName
         ])
