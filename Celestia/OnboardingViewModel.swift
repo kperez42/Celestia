@@ -223,7 +223,8 @@ class OnboardingViewModel: ObservableObject {
         }
 
         // Track analytics
-        AnalyticsService.shared.trackEvent("completion_incentive_granted", parameters: [
+        AnalyticsManager.shared.logEvent(.premiumFeatureViewed, parameters: [
+            "feature": "completion_incentive",
             "incentive_type": "\(incentive.type)",
             "incentive_amount": incentive.amount
         ])
@@ -245,7 +246,7 @@ class OnboardingViewModel: ObservableObject {
     // MARK: - Analytics
 
     func trackStepCompletion(_ step: Int) {
-        AnalyticsService.shared.trackEvent("onboarding_step_completed", parameters: [
+        AnalyticsManager.shared.logEvent(.onboardingStepCompleted, parameters: [
             "step": step,
             "total_steps": 5
         ])
@@ -259,7 +260,7 @@ class OnboardingViewModel: ObservableObject {
     }
 
     func trackOnboardingCompleted(timeSpent: TimeInterval) {
-        AnalyticsService.shared.trackEvent("onboarding_completed", parameters: [
+        AnalyticsManager.shared.logEvent(.onboardingCompleted, parameters: [
             "time_spent_seconds": timeSpent,
             "profile_quality_score": profileQualityScore
         ])
@@ -269,7 +270,7 @@ class OnboardingViewModel: ObservableObject {
     }
 
     func trackOnboardingAbandoned(atStep step: Int) {
-        AnalyticsService.shared.trackEvent("onboarding_abandoned", parameters: [
+        AnalyticsManager.shared.logEvent(.onboardingSkipped, parameters: [
             "abandoned_at_step": step,
             "profile_quality_score": profileQualityScore
         ])

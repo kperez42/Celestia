@@ -265,8 +265,9 @@ class TutorialManager: ObservableObject {
         saveCompletedTutorials()
 
         // Track analytics
-        AnalyticsService.shared.trackEvent("tutorial_completed", parameters: [
-            "tutorial_id": tutorialId
+        AnalyticsManager.shared.logEvent(.tutorialViewed, parameters: [
+            "tutorial_id": tutorialId,
+            "status": "completed"
         ])
     }
 
