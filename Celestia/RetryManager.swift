@@ -89,7 +89,7 @@ class RetryManager {
             }
         }
 
-        throw lastError ?? CelestiaError.unknown
+        throw lastError ?? CelestiaError.unknown("All retry attempts failed")
     }
 
     /// Retry with a completion handler

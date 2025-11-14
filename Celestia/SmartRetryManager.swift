@@ -230,7 +230,7 @@ class SmartRetryManager: ObservableObject {
 
         // All attempts failed
         activeRetries.removeValue(forKey: serviceName)
-        let finalError = lastError ?? CelestiaError.unknown
+        let finalError = lastError ?? CelestiaError.unknown("Max retry attempts exceeded")
         return .failure(finalError, attempts: attempt)
     }
 
