@@ -7,6 +7,7 @@
 
 import Foundation
 
+@MainActor
 class DiscoveryFilters: ObservableObject {
     static let shared = DiscoveryFilters()
 
