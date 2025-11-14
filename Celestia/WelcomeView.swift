@@ -169,10 +169,12 @@ struct WelcomeView: View {
         VStack(spacing: 20) {
             // Current feature card
             FeatureCard(feature: features[currentFeature])
-                .transition(.asymmetric(
+                .accessibleTransition(.asymmetric(
                     insertion: .move(edge: .trailing).combined(with: .opacity),
                     removal: .move(edge: .leading).combined(with: .opacity)
                 ))
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(features[currentFeature].title). \(features[currentFeature].description)")
             
             // Pagination dots
             HStack(spacing: 10) {
@@ -180,9 +182,12 @@ struct WelcomeView: View {
                     Capsule()
                         .fill(index == currentFeature ? Color.white : Color.white.opacity(0.4))
                         .frame(width: index == currentFeature ? 30 : 8, height: 8)
-                        .animation(.spring(response: 0.3), value: currentFeature)
+                        .accessibleAnimation(.spring(response: 0.3), value: currentFeature)
                 }
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Feature page indicator")
+            .accessibilityValue("Page \(currentFeature + 1) of \(features.count)")
         }
         .padding(.horizontal, 30)
     }
@@ -198,7 +203,7 @@ struct WelcomeView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "sparkles")
                         .font(.headline)
-                    
+
                     Text("Create Account")
                         .font(.headline)
                         .fontWeight(.semibold)
@@ -209,7 +214,7 @@ struct WelcomeView: View {
                 .background(
                     ZStack {
                         Color.white
-                        
+
                         // Shimmer effect
                         LinearGradient(
                             colors: [
@@ -226,6 +231,9 @@ struct WelcomeView: View {
                 .cornerRadius(28)
                 .shadow(color: .white.opacity(0.5), radius: 15, y: 5)
             }
+            .accessibilityLabel("Create Account")
+            .accessibilityHint("Start creating your Celestia account")
+            .accessibilityIdentifier(AccessibilityIdentifier.signUpButton)
             .scaleButton()
             
             // Sign In - Secondary
@@ -235,7 +243,7 @@ struct WelcomeView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "arrow.right.circle.fill")
                         .font(.headline)
-                    
+
                     Text("Sign In")
                         .font(.headline)
                         .fontWeight(.semibold)
@@ -250,6 +258,9 @@ struct WelcomeView: View {
                         .stroke(Color.white.opacity(0.5), lineWidth: 2)
                 )
             }
+            .accessibilityLabel("Sign In")
+            .accessibilityHint("Sign in to your existing account")
+            .accessibilityIdentifier(AccessibilityIdentifier.signInButton)
             .scaleButton()
             
             // Terms & Privacy

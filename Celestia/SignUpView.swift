@@ -63,9 +63,12 @@ struct SignUpView: View {
                                     .fill(currentStep >= step ? Color.purple : Color.gray.opacity(0.3))
                                     .frame(width: 12, height: 12)
                                     .scaleEffect(currentStep == step ? 1.2 : 1.0)
-                                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: currentStep)
+                                    .accessibleAnimation(.spring(response: 0.3, dampingFraction: 0.6), value: currentStep)
                             }
                         }
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("Sign up progress")
+                        .accessibilityValue("Step \(currentStep) of 3")
                         .padding(.top, 20)
                         
                         // Header
@@ -136,6 +139,9 @@ struct SignUpView: View {
                                         .background(Color.white)
                                         .cornerRadius(15)
                                 }
+                                .accessibilityLabel("Back")
+                                .accessibilityHint("Go back to previous step")
+                                .accessibilityIdentifier(AccessibilityIdentifier.backButton)
                                 .scaleButton()
                             }
 
@@ -162,6 +168,9 @@ struct SignUpView: View {
                             )
                             .cornerRadius(15)
                             .disabled(!canProceed || authService.isLoading)
+                            .accessibilityLabel(currentStep == 3 ? "Create Account" : "Next")
+                            .accessibilityHint(currentStep == 3 ? "Create your account and sign up" : "Continue to next step")
+                            .accessibilityIdentifier(currentStep == 3 ? AccessibilityIdentifier.createAccountButton : AccessibilityIdentifier.nextButton)
                             .scaleButton()
                         }
                         .padding(.horizontal, 30)
@@ -179,6 +188,9 @@ struct SignUpView: View {
                         Image(systemName: "xmark")
                             .foregroundColor(.primary)
                     }
+                    .accessibilityLabel("Close")
+                    .accessibilityHint("Cancel sign up and return")
+                    .accessibilityIdentifier(AccessibilityIdentifier.closeButton)
                 }
             }
         }
@@ -226,6 +238,9 @@ struct SignUpView: View {
                     .padding()
                     .background(Color(.systemBackground))
                     .cornerRadius(10)
+                    .accessibilityLabel("Email address")
+                    .accessibilityHint("Enter your email address")
+                    .accessibilityIdentifier(AccessibilityIdentifier.emailField)
             }
             
             VStack(alignment: .leading, spacing: 8) {
@@ -237,6 +252,9 @@ struct SignUpView: View {
                     .padding()
                     .background(Color(.systemBackground))
                     .cornerRadius(10)
+                    .accessibilityLabel("Password")
+                    .accessibilityHint("Enter at least 6 characters")
+                    .accessibilityIdentifier(AccessibilityIdentifier.passwordField)
             }
             
             VStack(alignment: .leading, spacing: 8) {
@@ -252,6 +270,10 @@ struct SignUpView: View {
                         RoundedRectangle(cornerRadius: 10)
                             .stroke(passwordsMatch ? Color.green : (!password.isEmpty && !confirmPassword.isEmpty && password != confirmPassword ? Color.red : Color.clear), lineWidth: 2)
                     )
+                    .accessibilityLabel("Confirm password")
+                    .accessibilityHint("Re-enter your password to confirm")
+                    .accessibilityValue(passwordsMatch ? "Passwords match" : (password != confirmPassword && !confirmPassword.isEmpty ? "Passwords do not match" : ""))
+                    .accessibilityIdentifier("confirm_password_field")
             }
 
             // Password validation feedback
@@ -300,6 +322,9 @@ struct SignUpView: View {
                     .padding()
                     .background(Color(.systemBackground))
                     .cornerRadius(10)
+                    .accessibilityLabel("Name")
+                    .accessibilityHint("Enter your full name")
+                    .accessibilityIdentifier(AccessibilityIdentifier.nameField)
             }
             
             VStack(alignment: .leading, spacing: 8) {
@@ -312,6 +337,9 @@ struct SignUpView: View {
                     .padding()
                     .background(Color(.systemBackground))
                     .cornerRadius(10)
+                    .accessibilityLabel("Age")
+                    .accessibilityHint("Enter your age, must be 18 or older")
+                    .accessibilityIdentifier(AccessibilityIdentifier.ageField)
             }
             
             VStack(alignment: .leading, spacing: 8) {
@@ -325,6 +353,10 @@ struct SignUpView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+                .accessibilityLabel("Gender")
+                .accessibilityHint("Select your gender identity")
+                .accessibilityValue(gender)
+                .accessibilityIdentifier(AccessibilityIdentifier.genderPicker)
             }
             
             VStack(alignment: .leading, spacing: 8) {
@@ -338,6 +370,10 @@ struct SignUpView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+                .accessibilityLabel("Looking for")
+                .accessibilityHint("Select who you're interested in meeting")
+                .accessibilityValue(lookingFor)
+                .accessibilityIdentifier(AccessibilityIdentifier.lookingForPicker)
             }
         }
     }
@@ -354,6 +390,9 @@ struct SignUpView: View {
                     .padding()
                     .background(Color(.systemBackground))
                     .cornerRadius(10)
+                    .accessibilityLabel("City")
+                    .accessibilityHint("Enter your city")
+                    .accessibilityIdentifier(AccessibilityIdentifier.locationField)
             }
 
             VStack(alignment: .leading, spacing: 8) {
@@ -365,6 +404,9 @@ struct SignUpView: View {
                     .padding()
                     .background(Color(.systemBackground))
                     .cornerRadius(10)
+                    .accessibilityLabel("Country")
+                    .accessibilityHint("Enter your country")
+                    .accessibilityIdentifier(AccessibilityIdentifier.countryField)
             }
 
             // Referral Code (Optional)
@@ -384,6 +426,10 @@ struct SignUpView: View {
                         .onChange(of: referralCode) { oldValue, newValue in
                             validateReferralCode(newValue)
                         }
+                        .accessibilityLabel("Referral code")
+                        .accessibilityHint("Optional. Enter a referral code to get 3 days of Premium free")
+                        .accessibilityValue(referralCodeValid == true ? "Valid code" : (referralCodeValid == false ? "Invalid code" : ""))
+                        .accessibilityIdentifier("referral_code_field")
 
                     if isValidatingReferral {
                         ProgressView()
