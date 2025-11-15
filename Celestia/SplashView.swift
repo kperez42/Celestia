@@ -111,9 +111,7 @@ struct SplashView: View {
     }
 
     private func startLoadingDots() {
-        // SAFETY: Use weak self to prevent retain cycle
-        dotTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
+        dotTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
             withAnimation {
                 dotCount = (dotCount + 1) % 4
             }
