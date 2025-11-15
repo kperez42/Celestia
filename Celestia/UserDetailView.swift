@@ -15,6 +15,8 @@ struct UserDetailView: View {
     @State private var showingInterestSent = false
     @State private var showingMatched = false
     @State private var isProcessing = false
+    @State private var showingError = false
+    @State private var errorMessage = ""
 
     // Filter out empty photo URLs
     private var validPhotos: [String] {
@@ -219,11 +221,10 @@ struct UserDetailView: View {
                 }
             }
         }
-        .alert("Interest Sent! 💫", isPresented: $showingInterestSent) {
+        .alert("Like Sent! 💫", isPresented: $showingInterestSent) {
             Button("OK") { dismiss() }
         } message: {
-            // FIXED: Changed from user.name to user.fullName
-            Text("If \(user.fullName) is interested too, you'll be matched!")
+            Text("If \(user.fullName) likes you back, you'll be matched!")
         }
         .alert("It's a Match! 🎉", isPresented: $showingMatched) {
             Button("Send Message") {
@@ -235,6 +236,11 @@ struct UserDetailView: View {
         } message: {
             // FIXED: Changed from user.name to user.fullName
             Text("You and \(user.fullName) liked each other!")
+        }
+        .alert("Error", isPresented: $showingError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage.isEmpty ? "Failed to send like. Please try again." : errorMessage)
         }
     }
     
@@ -272,6 +278,8 @@ struct UserDetailView: View {
             } catch {
                 await MainActor.run {
                     isProcessing = false
+                    errorMessage = error.localizedDescription
+                    showingError = true
                 }
                 Logger.shared.error("Error sending like from detail view", category: .matching, error: error)
             }

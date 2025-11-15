@@ -592,11 +592,48 @@ struct FeedDiscoverView: View {
     }
 
     private func handleMessage(user: User) {
-        selectedUser = user
-        // Navigate to Messages tab
-        selectedTab = 2
-        HapticManager.shared.impact(.medium)
-        Logger.shared.debug("Navigate to messages for user: \(user.fullName)", category: .messaging)
+        guard let currentUserId = authService.currentUser?.id,
+              let userId = user.id else {
+            showToast(
+                message: "Unable to send message. Please try again.",
+                icon: "exclamationmark.triangle.fill",
+                color: .red
+            )
+            return
+        }
+
+        // Check if users have matched
+        Task {
+            do {
+                let hasMatched = try await MatchService.shared.hasMatched(user1Id: currentUserId, user2Id: userId)
+
+                await MainActor.run {
+                    if hasMatched {
+                        // Navigate to Messages tab
+                        selectedTab = 2
+                        HapticManager.shared.impact(.medium)
+                        Logger.shared.debug("Navigate to messages for user: \(user.fullName)", category: .messaging)
+                    } else {
+                        // Not matched yet - show info
+                        let truncatedName = user.fullName.count > 20 ? String(user.fullName.prefix(20)) + "..." : user.fullName
+                        showToast(
+                            message: "Like \(truncatedName) first to message",
+                            icon: "heart.fill",
+                            color: .pink
+                        )
+                    }
+                }
+            } catch {
+                Logger.shared.error("Error checking match status", category: .matching, error: error)
+                await MainActor.run {
+                    showToast(
+                        message: "Unable to check match status",
+                        icon: "exclamationmark.triangle.fill",
+                        color: .red
+                    )
+                }
+            }
+        }
     }
 }
 
