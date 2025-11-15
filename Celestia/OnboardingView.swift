@@ -147,8 +147,8 @@ struct OnboardingView: View {
                     showGoalSelection = false
                     // Show tutorial if A/B test says so
                     if viewModel.showTutorialIfNeeded() {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            showTutorial = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                            self?.showTutorial = true
                         }
                     }
                 }
@@ -1273,8 +1273,8 @@ struct CompletionCelebrationView: View {
 
             // Trigger confetti animation
             for i in 0..<20 {
-                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.1) {
-                    confettiCounter += 1
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.1) { [weak self] in
+                    self?.confettiCounter += 1
                 }
             }
         }

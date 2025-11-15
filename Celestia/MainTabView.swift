@@ -201,8 +201,8 @@ struct TabBarButton: View {
         Button(action: {
             isPressed = true
             action()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                isPressed = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+                self?.isPressed = false
             }
         }) {
             VStack(spacing: 4) {
@@ -212,11 +212,7 @@ struct TabBarButton: View {
                         .font(.title3)
                         .foregroundStyle(
                             isSelected ?
-                            LinearGradient(
-                                colors: [Color.purple, Color.pink],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ) :
+                            LinearGradient.brandPrimaryDiagonal :
                             LinearGradient(colors: [Color.gray.opacity(0.5)], startPoint: .leading, endPoint: .trailing)
                         )
                         .frame(height: 24)

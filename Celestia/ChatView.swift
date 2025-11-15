@@ -603,7 +603,7 @@ struct ChatView: View {
                                 .foregroundStyle(
                                     (messageText.isEmpty && selectedImage == nil) ?
                                     LinearGradient(colors: [.gray.opacity(0.5)], startPoint: .leading, endPoint: .trailing) :
-                                    LinearGradient(colors: [.purple, .pink], startPoint: .leading, endPoint: .trailing)
+                                    LinearGradient.brandPrimary
                                 )
                         }
                     }
