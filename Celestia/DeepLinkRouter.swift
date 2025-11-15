@@ -333,9 +333,11 @@ class DeepLinkRouter: ObservableObject {
 
         } catch {
             logger.error("Email verification failed", category: .general, error: error)
+            // SECURITY FIX: Never send tokens to analytics/crash reporting
             CrashlyticsManager.shared.recordError(error, userInfo: [
                 "action": "email_verification",
-                "token": token
+                "token_length": token.count,
+                "token_hash": token.hashValue
             ])
 
             // Show error message to user
@@ -347,9 +349,9 @@ class DeepLinkRouter: ObservableObject {
 
         CrashlyticsManager.shared.logEvent("password_reset_link_opened")
 
-        // Navigate to reset password screen with token
-        // The reset password view will use this token
-        UserDefaults.standard.set(token, forKey: "passwordResetToken")
+        // SECURITY FIX: Store password reset token in Keychain instead of UserDefaults
+        // Keychain provides encrypted storage for sensitive data
+        KeychainManager.shared.savePasswordResetToken(token)
     }
 
     // MARK: - Authentication Check

@@ -29,7 +29,8 @@ class AuthService: ObservableObject, AuthServiceProtocol {
         self.userSession = Auth.auth().currentUser
         self.isEmailVerified = Auth.auth().currentUser?.isEmailVerified ?? false
         Logger.shared.auth("AuthService initialized", level: .info)
-        Logger.shared.auth("Current user session: \(Auth.auth().currentUser?.uid ?? "none")", level: .debug)
+        // SECURITY FIX: Never log UIDs or email addresses
+        Logger.shared.auth("Current user session: \(Auth.auth().currentUser != nil ? "authenticated" : "none")", level: .debug)
         Logger.shared.auth("Email verified: \(isEmailVerified)", level: .info)
 
         // FIXED: Initialize on MainActor and track completion
@@ -85,13 +86,15 @@ class AuthService: ObservableObject, AuthServiceProtocol {
             throw CelestiaError.invalidCredentials
         }
 
-        Logger.shared.auth("Attempting sign in with email: \(sanitizedEmail)", level: .info)
+        // SECURITY FIX: Never log email addresses
+        Logger.shared.auth("Attempting sign in", level: .info)
 
         do {
             let result = try await Auth.auth().signIn(withEmail: sanitizedEmail, password: sanitizedPassword)
             self.userSession = result.user
             self.isEmailVerified = result.user.isEmailVerified
-            Logger.shared.auth("Sign in successful: \(result.user.uid)", level: .info)
+            // SECURITY FIX: Never log UIDs
+            Logger.shared.auth("Sign in successful", level: .info)
             Logger.shared.auth("Email verified: \(isEmailVerified)", level: .info)
 
             await fetchUser()
@@ -129,7 +132,8 @@ class AuthService: ObservableObject, AuthServiceProtocol {
 
         do {
             try await Auth.auth().sendPasswordReset(withEmail: sanitizedEmail)
-            Logger.shared.auth("Password reset email sent to: \(sanitizedEmail)", level: .info)
+            // SECURITY FIX: Never log email addresses
+            Logger.shared.auth("Password reset email sent", level: .info)
         } catch let error as NSError {
             // REFACTORED: Use FirebaseErrorMapper for consistent error handling
             FirebaseErrorMapper.logError(error, context: "Password Reset")
@@ -178,13 +182,15 @@ class AuthService: ObservableObject, AuthServiceProtocol {
             throw CelestiaError.validationError(field: "signup", reason: "Invalid sign up information")
         }
 
-        Logger.shared.auth("Creating user with email: \(sanitizedEmail)", level: .info)
+        // SECURITY FIX: Never log email addresses
+        Logger.shared.auth("Creating new user account", level: .info)
 
         do {
             // Step 1: Create Firebase Auth user
             let result = try await Auth.auth().createUser(withEmail: sanitizedEmail, password: sanitizedPassword)
             self.userSession = result.user
-            Logger.shared.auth("Firebase Auth user created: \(result.user.uid)", level: .info)
+            // SECURITY FIX: Never log UIDs
+            Logger.shared.auth("Firebase Auth user created successfully", level: .info)
 
             // Step 2: Create User object with all required fields
             var user = User(
@@ -235,7 +241,8 @@ class AuthService: ObservableObject, AuthServiceProtocol {
 
             do {
                 try await result.user.sendEmailVerification(with: actionCodeSettings)
-                Logger.shared.auth("Verification email sent to \(sanitizedEmail)", level: .info)
+                // SECURITY FIX: Never log email addresses
+                Logger.shared.auth("Verification email sent successfully", level: .info)
             } catch let emailError as NSError {
                 Logger.shared.auth("Email verification send failed", level: .warning)
                 Logger.shared.error("Failed to send verification email", category: .authentication, error: emailError)
@@ -336,8 +343,9 @@ class AuthService: ObservableObject, AuthServiceProtocol {
                     // Try using the dictionary initializer first (more forgiving)
                     self.currentUser = User(dictionary: data)
 
-                    if let user = currentUser {
-                        Logger.shared.auth("User data fetched successfully - Name: \(user.fullName), Email: \(user.email)", level: .info)
+                    if currentUser != nil {
+                        // SECURITY FIX: Never log PII (names, emails, etc.)
+                        Logger.shared.auth("User data fetched successfully", level: .info)
                     }
                 } else {
                     Logger.shared.auth("Document exists but has no data", level: .warning)
@@ -412,7 +420,8 @@ class AuthService: ObservableObject, AuthServiceProtocol {
         guard let user = Auth.auth().currentUser else { return }
         let uid = user.uid
 
-        Logger.shared.auth("Deleting account: \(uid)", level: .info)
+        // SECURITY FIX: Never log UIDs
+        Logger.shared.auth("Deleting user account", level: .info)
 
         // Delete user data from Firestore
         try await Firestore.firestore().collection("users").document(uid).delete()
@@ -448,7 +457,8 @@ class AuthService: ObservableObject, AuthServiceProtocol {
 
         do {
             try await user.sendEmailVerification(with: actionCodeSettings)
-            Logger.shared.auth("Verification email sent to \(user.email ?? "")", level: .info)
+            // SECURITY FIX: Never log email addresses
+            Logger.shared.auth("Verification email sent successfully", level: .info)
         } catch let error as NSError {
             Logger.shared.auth("Email verification send failed", level: .error)
             Logger.shared.error("Failed to send verification email", category: .authentication, error: error)
