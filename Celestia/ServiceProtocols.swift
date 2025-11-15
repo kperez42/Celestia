@@ -50,6 +50,9 @@ protocol UserServiceProtocol: ObservableObject {
     func updateLastActive(userId: String) async
     func searchUsers(query: String, currentUserId: String, limit: Int, offset: DocumentSnapshot?) async throws -> [User]
     func clearCache() async
+    func checkDailyLikeLimit(userId: String) async -> Bool
+    func decrementDailyLikes(userId: String) async
+    func decrementSuperLikes(userId: String) async
 }
 
 // MARK: - Match Service Protocol

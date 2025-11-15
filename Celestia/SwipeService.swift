@@ -10,7 +10,7 @@ import Firebase
 import FirebaseFirestore
 
 @MainActor
-class SwipeService: ObservableObject {
+class SwipeService: ObservableObject, SwipeServiceProtocol {
     // Dependency injection: Repository for data access
     private let repository: SwipeRepository
     private let matchService: MatchService
