@@ -92,7 +92,8 @@ class MessageService: ObservableObject, MessageServiceProtocol {
 
                 if let error = error {
                     Logger.shared.error("Error listening to new messages", category: .messaging, error: error)
-                    Task { @MainActor in
+                    Task { @MainActor [weak self] in
+                        guard let self = self else { return }
                         self.error = error
                     }
                     return
@@ -100,7 +101,9 @@ class MessageService: ObservableObject, MessageServiceProtocol {
 
                 guard let documents = snapshot?.documents else { return }
 
-                Task { @MainActor in
+                Task { @MainActor [weak self] in
+                    guard let self = self else { return }
+
                     let newMessages = documents.compactMap { try? $0.data(as: Message.self) }
 
                     // Append new messages to existing ones

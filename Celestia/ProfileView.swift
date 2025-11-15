@@ -25,6 +25,15 @@ struct ProfileView: View {
     @State private var profileCompletion = 0
     @State private var showingLogoutConfirmation = false
     @State private var showingShareSheet = false
+    @State private var isRefreshing = false
+    @State private var hasAnimatedStats = false
+
+    // Static date formatter for performance
+    private static let memberSinceDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        return formatter
+    }()
     
     var body: some View {
         NavigationStack {
@@ -107,6 +116,9 @@ struct ProfileView: View {
                             .padding(.top, -40)
                         }
                     }
+                    .refreshable {
+                        await refreshProfileData()
+                    }
                 } else {
                     // Loading state while user data loads
                     profileLoadingView
@@ -156,14 +168,19 @@ struct ProfileView: View {
                 Text("You'll need to sign in again to access your account.")
             }
             .onAppear {
-                let animation: Animation? = reduceMotion ? nil : .spring(response: 0.8, dampingFraction: 0.7)
-                withAnimation(animation) {
-                    animateStats = true
+                // Only animate stats once
+                if !hasAnimatedStats {
+                    let animation: Animation? = reduceMotion ? nil : .spring(response: 0.8, dampingFraction: 0.7)
+                    withAnimation(animation) {
+                        animateStats = true
+                        hasAnimatedStats = true
+                    }
                 }
-                if let user = authService.currentUser {
-                    profileCompletion = userService.profileCompletionPercentage(user)
-                }
+                updateProfileCompletion()
                 VoiceOverAnnouncement.screenChanged(to: "Profile view")
+            }
+            .onChange(of: authService.currentUser) {
+                updateProfileCompletion()
             }
             .detectScreenshots(
                 context: .profile(userId: authService.currentUser?.id ?? ""),
@@ -301,9 +318,11 @@ struct ProfileView: View {
             // Top bar buttons
             VStack {
                 HStack {
-                    // Share button - only show if URL is valid
+                    // Share button - only show if user ID exists and URL is valid
                     if let userId = user.id,
-                       let shareURL = URL(string: "https://celestia.app/profile/\(userId)") {
+                       !userId.isEmpty,
+                       let shareURL = URL(string: "https://celestia.app/profile/\(userId)"),
+                       shareURL.scheme == "https" {
                         ShareLink(item: shareURL, subject: Text("Check out \(user.fullName)'s profile"), message: Text("See \(user.fullName) on Celestia!")) {
                             Image(systemName: "square.and.arrow.up")
                                 .font(.title3)
@@ -1224,9 +1243,12 @@ struct ProfileView: View {
                 color: .blue,
                 accessibilityHint: "Contact Celestia support team for assistance"
             ) {
-                if let url = URL(string: "mailto:support@celestia.app") {
-                    UIApplication.shared.open(url)
+                guard let url = URL(string: "mailto:support@celestia.app"),
+                      UIApplication.shared.canOpenURL(url) else {
+                    Logger.shared.error("Cannot open mail client - email URL invalid or no mail app configured", category: .general)
+                    return
                 }
+                UIApplication.shared.open(url)
             }
 
             actionButton(
@@ -1361,9 +1383,31 @@ struct ProfileView: View {
     // MARK: - Helper Functions
 
     private func formatDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        return formatter.string(from: date)
+        return Self.memberSinceDateFormatter.string(from: date)
+    }
+
+    private func updateProfileCompletion() {
+        if let user = authService.currentUser {
+            profileCompletion = userService.profileCompletionPercentage(user)
+        }
+    }
+
+    private func refreshProfileData() async {
+        guard let userId = authService.currentUser?.id else { return }
+
+        isRefreshing = true
+        defer { isRefreshing = false }
+
+        do {
+            // Reload user data from Firestore
+            try await authService.refreshCurrentUser()
+            await MainActor.run {
+                updateProfileCompletion()
+            }
+            Logger.shared.info("Profile data refreshed successfully", category: .general)
+        } catch {
+            Logger.shared.error("Failed to refresh profile data", category: .general, error: error)
+        }
     }
 }
 
@@ -1380,18 +1424,21 @@ struct PhotoViewerView: View {
             
             TabView(selection: $selectedIndex) {
                 ForEach(photos.indices, id: \.self) { index in
-                    AsyncImage(url: URL(string: photos[index])) { phase in
-                        switch phase {
-                        case .success(let image):
+                    if let url = URL(string: photos[index]) {
+                        CachedAsyncImage(url: url) { image in
                             image
                                 .resizable()
                                 .scaledToFit()
-                        default:
-                            ProgressView()
-                                .tint(.white)
                         }
+                        .tag(index)
+                    } else {
+                        Color.gray.opacity(0.3)
+                            .overlay {
+                                Text("Image unavailable")
+                                    .foregroundColor(.white)
+                            }
+                            .tag(index)
                     }
-                    .tag(index)
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .always))

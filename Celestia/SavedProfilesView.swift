@@ -14,6 +14,7 @@ struct SavedProfilesView: View {
     @Environment(\.dismiss) var dismiss
     @State private var selectedUser: User?
     @State private var showUserDetail = false
+    @State private var showClearAllConfirmation = false
 
     var body: some View {
         NavigationStack {
@@ -47,7 +48,7 @@ struct SavedProfilesView: View {
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Menu {
                             Button(role: .destructive) {
-                                viewModel.clearAllSaved()
+                                showClearAllConfirmation = true
                             } label: {
                                 Label("Clear All", systemImage: "trash")
                             }
@@ -68,6 +69,21 @@ struct SavedProfilesView: View {
                 UserDetailView(user: user)
                     .environmentObject(authService)
             }
+            .confirmationDialog(
+                "Clear All Saved Profiles?",
+                isPresented: $showClearAllConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Clear All (\(viewModel.savedProfiles.count))", role: .destructive) {
+                    HapticManager.shared.notification(.warning)
+                    viewModel.clearAllSaved()
+                }
+                Button("Cancel", role: .cancel) {
+                    HapticManager.shared.impact(.light)
+                }
+            } message: {
+                Text("This will permanently remove all \(viewModel.savedProfiles.count) saved profiles. This action cannot be undone.")
+            }
         }
     }
 
@@ -84,6 +100,7 @@ struct SavedProfilesView: View {
                     ForEach(viewModel.savedProfiles) { saved in
                         SavedProfileCard(
                             savedProfile: saved,
+                            isUnsaving: viewModel.unsavingProfileId == saved.id,
                             onTap: {
                                 selectedUser = saved.user
                                 HapticManager.shared.impact(.light)
@@ -241,6 +258,32 @@ struct SavedProfilesView: View {
                 .foregroundColor(.purple)
                 .padding(.horizontal, 40)
                 .multilineTextAlignment(.center)
+
+            // CTA button to go back to discovering
+            Button {
+                dismiss()
+                HapticManager.shared.impact(.light)
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .font(.body.weight(.semibold))
+                    Text("Start Discovering")
+                        .font(.headline)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .foregroundColor(.white)
+                .background(
+                    LinearGradient(
+                        colors: [.purple, .pink],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(16)
+            }
+            .padding(.horizontal, 40)
+            .padding(.top, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -250,6 +293,7 @@ struct SavedProfilesView: View {
 
 struct SavedProfileCard: View {
     let savedProfile: SavedProfile
+    let isUnsaving: Bool
     let onTap: () -> Void
     let onUnsave: () -> Void
 
@@ -271,6 +315,16 @@ struct SavedProfileCard: View {
                     }
                     .frame(height: 200)
                     .clipped()
+                    .overlay {
+                        if isUnsaving {
+                            Color.black.opacity(0.4)
+                                .overlay {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        .scaleEffect(1.2)
+                                }
+                        }
+                    }
 
                     // User info
                     VStack(alignment: .leading, spacing: 6) {
@@ -301,19 +355,30 @@ struct SavedProfileCard: View {
                     }
                     .padding(12)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .opacity(isUnsaving ? 0.5 : 1.0)
                 }
 
                 // Unsave button
                 Button(action: onUnsave) {
-                    Image(systemName: "bookmark.fill")
-                        .font(.system(size: 16))
-                        .foregroundColor(.white)
-                        .padding(8)
-                        .background(Color.purple)
-                        .clipShape(Circle())
-                        .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
+                    if isUnsaving {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .padding(8)
+                            .background(Color.purple)
+                            .clipShape(Circle())
+                            .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
+                    } else {
+                        Image(systemName: "bookmark.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white)
+                            .padding(8)
+                            .background(Color.purple)
+                            .clipShape(Circle())
+                            .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
+                    }
                 }
-                .buttonStyle(ScaleButtonStyle(scaleEffect: 0.85))
+                .buttonStyle(.plain)
+                .disabled(isUnsaving)
                 .padding(8)
             }
             .background(Color.white)
@@ -321,6 +386,7 @@ struct SavedProfileCard: View {
             .shadow(color: .black.opacity(0.1), radius: 5, y: 2)
         }
         .buttonStyle(ScaleButtonStyle())
+        .disabled(isUnsaving)
     }
 }
 
@@ -380,6 +446,7 @@ class SavedProfilesViewModel: ObservableObject {
     @Published var savedProfiles: [SavedProfile] = []
     @Published var isLoading = false
     @Published var errorMessage = ""
+    @Published var unsavingProfileId: String?
 
     var savedThisWeek: Int {
         let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date())!
@@ -396,33 +463,78 @@ class SavedProfilesViewModel: ObservableObject {
         defer { isLoading = false }
 
         do {
+            // Step 1: Fetch all saved profile references
             let savedSnapshot = try await db.collection("saved_profiles")
                 .whereField("userId", isEqualTo: currentUserId)
                 .order(by: "savedAt", descending: true)
                 .getDocuments()
 
-            var profiles: [SavedProfile] = []
-
+            // Step 2: Extract user IDs and metadata
+            var savedMetadata: [(id: String, userId: String, savedAt: Date, note: String?)] = []
             for doc in savedSnapshot.documents {
                 let data = doc.data()
                 if let savedUserId = data["savedUserId"] as? String,
                    let savedAt = (data["savedAt"] as? Timestamp)?.dateValue() {
+                    savedMetadata.append((
+                        id: doc.documentID,
+                        userId: savedUserId,
+                        savedAt: savedAt,
+                        note: data["note"] as? String
+                    ))
+                }
+            }
 
-                    // Fetch saved user details
-                    let userDoc = try await db.collection("users").document(savedUserId).getDocument()
-                    if let user = try? userDoc.data(as: User.self) {
-                        profiles.append(SavedProfile(
-                            id: doc.documentID,
-                            user: user,
-                            savedAt: savedAt,
-                            note: data["note"] as? String
-                        ))
+            guard !savedMetadata.isEmpty else {
+                savedProfiles = []
+                Logger.shared.info("No saved profiles found", category: .general)
+                return
+            }
+
+            // Step 3: Batch fetch users (Firestore whereIn limit is 10, so chunk requests)
+            let userIds = savedMetadata.map { $0.userId }
+            var fetchedUsers: [String: User] = [:]
+
+            // Chunk user IDs into groups of 10 (Firestore whereIn limit)
+            let chunkedUserIds = userIds.chunked(into: 10)
+
+            for chunk in chunkedUserIds {
+                let usersSnapshot = try await db.collection("users")
+                    .whereField(FieldPath.documentID(), in: chunk)
+                    .getDocuments()
+
+                for doc in usersSnapshot.documents {
+                    if let user = try? doc.data(as: User.self), let userId = user.id {
+                        fetchedUsers[userId] = user
                     }
                 }
             }
 
+            // Step 4: Combine metadata with fetched users
+            var profiles: [SavedProfile] = []
+            var skippedCount = 0
+
+            for metadata in savedMetadata {
+                if let user = fetchedUsers[metadata.userId] {
+                    profiles.append(SavedProfile(
+                        id: metadata.id,
+                        user: user,
+                        savedAt: metadata.savedAt,
+                        note: metadata.note
+                    ))
+                } else {
+                    // User no longer exists or failed to fetch
+                    skippedCount += 1
+                    Logger.shared.warning("Skipped saved profile - user not found: \(metadata.userId)", category: .general)
+                }
+            }
+
             savedProfiles = profiles
-            Logger.shared.info("Loaded \(profiles.count) saved profiles", category: .general)
+
+            if skippedCount > 0 {
+                Logger.shared.warning("Loaded \(profiles.count) saved profiles (\(skippedCount) skipped)", category: .general)
+            } else {
+                Logger.shared.info("Loaded \(profiles.count) saved profiles", category: .general)
+            }
         } catch {
             errorMessage = error.localizedDescription
             Logger.shared.error("Error loading saved profiles", category: .general, error: error)
@@ -432,13 +544,19 @@ class SavedProfilesViewModel: ObservableObject {
     func unsaveProfile(_ profile: SavedProfile) {
         guard let currentUserId = AuthService.shared.currentUser?.id else { return }
 
+        // Set loading state
+        unsavingProfileId = profile.id
+
         Task {
             do {
                 // Remove from Firestore
                 try await db.collection("saved_profiles").document(profile.id).delete()
 
                 // Update local state
-                savedProfiles.removeAll { $0.id == profile.id }
+                await MainActor.run {
+                    savedProfiles.removeAll { $0.id == profile.id }
+                    unsavingProfileId = nil
+                }
 
                 Logger.shared.info("Unsaved profile: \(profile.user.fullName)", category: .general)
 
@@ -451,7 +569,21 @@ class SavedProfilesViewModel: ObservableObject {
                     ]
                 )
             } catch {
+                await MainActor.run {
+                    unsavingProfileId = nil
+                    errorMessage = "Failed to unsave profile. Please try again."
+                }
                 Logger.shared.error("Error unsaving profile", category: .general, error: error)
+
+                // Auto-clear error after 3 seconds
+                Task {
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    await MainActor.run {
+                        if errorMessage == "Failed to unsave profile. Please try again." {
+                            errorMessage = ""
+                        }
+                    }
+                }
             }
         }
     }
@@ -526,4 +658,15 @@ class SavedProfilesViewModel: ObservableObject {
 #Preview {
     SavedProfilesView()
         .environmentObject(AuthService.shared)
+}
+
+// MARK: - Array Extension for Chunking
+
+extension Array {
+    /// Splits the array into chunks of specified size
+    func chunked(into size: Int) -> [[Element]] {
+        return stride(from: 0, to: count, by: size).map {
+            Array(self[$0 ..< Swift.min($0 + size, count)])
+        }
+    }
 }

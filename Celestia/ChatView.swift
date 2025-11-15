@@ -26,6 +26,8 @@ struct ChatView: View {
     @State private var showingUserProfile = false
     @State private var showingReportSheet = false
     @State private var isSending = false
+    @State private var sendingMessagePreview: String?
+    @State private var sendingImagePreview: UIImage?
     @State private var conversationSafetyReport: ConversationSafetyReport?
     @State private var showSafetyWarning = false
 
@@ -33,6 +35,25 @@ struct ChatView: View {
     @State private var selectedImageItem: PhotosPickerItem?
     @State private var selectedImage: UIImage?
     @State private var showImagePreview = false
+
+    // Error handling states
+    @State private var showErrorToast = false
+    @State private var errorToastMessage = ""
+    @State private var failedMessage: (text: String, image: UIImage?)?
+
+    // Cached grouped messages to prevent recalculation on every render
+    @State private var cachedGroupedMessages: [(String, [Message])] = []
+    @State private var lastMessageCount = 0
+
+    // Reusable date formatter for performance
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM d, yyyy"
+        return formatter
+    }()
+
+    private static let calendar = Calendar.current
+
     @Environment(\.dismiss) var dismiss
 
     var body: some View {
@@ -104,6 +125,14 @@ struct ChatView: View {
         .task {
             // Initial safety check
             checkConversationSafety()
+        }
+        .overlay(alignment: .top) {
+            if showErrorToast {
+                errorToastView
+                    .padding(.top, 60)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .zIndex(999)
+            }
         }
     }
 
@@ -298,6 +327,49 @@ struct ChatView: View {
                         }
                     }
 
+                    // Sending message preview
+                    if isSending, let preview = sendingMessagePreview {
+                        HStack {
+                            Spacer()
+                            VStack(alignment: .trailing, spacing: 4) {
+                                if let image = sendingImagePreview {
+                                    Image(uiImage: image)
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 200, height: 200)
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                                }
+
+                                if !preview.isEmpty {
+                                    Text(preview)
+                                        .font(.body)
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 10)
+                                        .background(
+                                            LinearGradient(
+                                                colors: [Color.purple.opacity(0.7), Color.pink.opacity(0.7)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .cornerRadius(18)
+                                }
+
+                                HStack(spacing: 4) {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .gray))
+                                        .scaleEffect(0.7)
+                                    Text("Sending...")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                        .id("sending")
+                    }
+
                     // Typing indicator
                     if isOtherUserTyping {
                         TypingIndicator(userName: otherUser.fullName)
@@ -307,8 +379,13 @@ struct ChatView: View {
                 }
                 .padding()
             }
-            .scrollDismissesKeyboard(.interactively)
+            .scrollDismissesKeyboard(.immediately)
             .background(Color(.systemGroupedBackground))
+            .contentShape(Rectangle())
+            .onTapGesture {
+                // Dismiss keyboard when tapping in scroll view
+                isInputFocused = false
+            }
             .onChange(of: messageService.messages.count) {
                 // Only scroll to bottom for new messages (not when loading older)
                 if !messageService.isLoadingMore {
@@ -319,6 +396,13 @@ struct ChatView: View {
                 if isOtherUserTyping {
                     withAnimation {
                         proxy.scrollTo("typing", anchor: .bottom)
+                    }
+                }
+            }
+            .onChange(of: isSending) {
+                if isSending {
+                    withAnimation {
+                        proxy.scrollTo("sending", anchor: .bottom)
                     }
                 }
             }
@@ -389,27 +473,35 @@ struct ChatView: View {
     }
 
     private func groupedMessages() -> [(String, [Message])] {
-        let grouped = Dictionary(grouping: messageService.messages) { message -> String in
-            let formatter = DateFormatter()
-            let calendar = Calendar.current
+        // Use cache if messages haven't changed
+        if messageService.messages.count == lastMessageCount && !cachedGroupedMessages.isEmpty {
+            return cachedGroupedMessages
+        }
 
-            if calendar.isDateInToday(message.timestamp) {
+        // Recalculate and cache
+        let grouped = Dictionary(grouping: messageService.messages) { message -> String in
+            if Self.calendar.isDateInToday(message.timestamp) {
                 return "Today"
-            } else if calendar.isDateInYesterday(message.timestamp) {
+            } else if Self.calendar.isDateInYesterday(message.timestamp) {
                 return "Yesterday"
             } else {
-                formatter.dateFormat = "MMMM d, yyyy"
-                return formatter.string(from: message.timestamp)
+                return Self.dateFormatter.string(from: message.timestamp)
             }
         }
 
-        return grouped.sorted { first, second in
+        let sorted = grouped.sorted { first, second in
             // Sort by the date of the first message in each group
             if let firstMessage = first.value.first, let secondMessage = second.value.first {
                 return firstMessage.timestamp < secondMessage.timestamp
             }
             return false
         }
+
+        // Update cache
+        cachedGroupedMessages = sorted
+        lastMessageCount = messageService.messages.count
+
+        return sorted
     }
 
     private func scrollToBottom(proxy: ScrollViewProxy) {
@@ -575,10 +667,15 @@ struct ChatView: View {
         let text = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
         let imageToSend = selectedImage
 
-        // Clear input immediately for better UX
+        // Set sending preview
+        sendingMessagePreview = hasText ? text : (hasImage ? "📷 Photo" : "")
+        sendingImagePreview = imageToSend
+
+        // Clear input and dismiss keyboard immediately for better UX
         messageText = ""
         selectedImage = nil
         selectedImageItem = nil
+        isInputFocused = false
 
         isSending = true
 
@@ -606,17 +703,28 @@ struct ChatView: View {
                     )
                 }
                 HapticManager.shared.notification(.success)
+
+                // Clear sending preview on success
+                await MainActor.run {
+                    sendingMessagePreview = nil
+                    sendingImagePreview = nil
+                }
             } catch {
                 Logger.shared.error("Error sending message", category: .messaging, error: error)
                 HapticManager.shared.notification(.error)
 
-                // Restore message on failure
+                // Store failed message for retry and show error toast
                 await MainActor.run {
-                    if let image = imageToSend {
-                        selectedImage = image
-                    }
-                    if !text.isEmpty {
-                        messageText = text
+                    sendingMessagePreview = nil
+                    sendingImagePreview = nil
+                    failedMessage = (text: text, image: imageToSend)
+                    errorToastMessage = "Failed to send message. Tap retry to try again."
+                    showErrorToast = true
+
+                    // Hide toast after 5 seconds
+                    Task {
+                        try? await Task.sleep(nanoseconds: 5_000_000_000)
+                        showErrorToast = false
                     }
                 }
             }
@@ -766,6 +874,142 @@ struct ChatView: View {
             Capsule()
                 .fill(report.isSafe ? Color.green.opacity(0.15) : (report.scamAnalysis.scamScore >= 0.8 ? Color.red.opacity(0.15) : Color.orange.opacity(0.15)))
         )
+    }
+
+    // MARK: - Error Toast
+
+    /// Error toast with retry button
+    private var errorToastView: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "exclamationmark.circle.fill")
+                .font(.title3)
+                .foregroundColor(.white)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Send Failed")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+
+                Text(errorToastMessage)
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.9))
+            }
+
+            Spacer()
+
+            // Retry button
+            if failedMessage != nil {
+                Button {
+                    retryFailedMessage()
+                } label: {
+                    Text("Retry")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.white.opacity(0.3))
+                        .cornerRadius(8)
+                }
+                .accessibilityLabel("Retry sending message")
+            }
+
+            // Dismiss button
+            Button {
+                showErrorToast = false
+                failedMessage = nil
+                HapticManager.shared.impact(.light)
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14))
+                    .foregroundColor(.white)
+                    .padding(4)
+            }
+            .accessibilityLabel("Dismiss error")
+        }
+        .padding()
+        .background(
+            LinearGradient(
+                colors: [Color.red, Color.orange],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        )
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.3), radius: 10, y: 5)
+        .padding(.horizontal)
+    }
+
+    /// Retry sending failed message
+    private func retryFailedMessage() {
+        guard let failed = failedMessage else { return }
+        guard let matchId = match.id else { return }
+        guard let currentUserId = authService.currentUser?.id else { return }
+        guard let receiverId = otherUser.id else { return }
+
+        // Hide error toast and set sending preview
+        showErrorToast = false
+        failedMessage = nil
+        sendingMessagePreview = failed.text.isEmpty ? "📷 Photo" : failed.text
+        sendingImagePreview = failed.image
+
+        // Haptic feedback
+        HapticManager.shared.impact(.light)
+
+        isSending = true
+
+        Task {
+            do {
+                if let image = failed.image {
+                    // Upload image first
+                    let imageURL = try await ImageUploadService.shared.uploadChatImage(image, matchId: matchId)
+
+                    // Send image message (with optional caption)
+                    try await messageService.sendImageMessage(
+                        matchId: matchId,
+                        senderId: currentUserId,
+                        receiverId: receiverId,
+                        imageURL: imageURL,
+                        caption: failed.text.isEmpty ? nil : failed.text
+                    )
+                } else {
+                    // Send text-only message
+                    try await messageService.sendMessage(
+                        matchId: matchId,
+                        senderId: currentUserId,
+                        receiverId: receiverId,
+                        text: failed.text
+                    )
+                }
+                HapticManager.shared.notification(.success)
+
+                // Clear sending preview on success
+                await MainActor.run {
+                    sendingMessagePreview = nil
+                    sendingImagePreview = nil
+                }
+            } catch {
+                Logger.shared.error("Error retrying message", category: .messaging, error: error)
+                HapticManager.shared.notification(.error)
+
+                // Show error again
+                await MainActor.run {
+                    sendingMessagePreview = nil
+                    sendingImagePreview = nil
+                    failedMessage = failed
+                    errorToastMessage = "Failed to send message. Check your connection."
+                    showErrorToast = true
+
+                    // Hide toast after 5 seconds
+                    Task {
+                        try? await Task.sleep(nanoseconds: 5_000_000_000)
+                        showErrorToast = false
+                    }
+                }
+            }
+            isSending = false
+        }
     }
 }
 
