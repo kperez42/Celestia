@@ -207,8 +207,11 @@ class PerformanceMonitor: ObservableObject {
         }
 
         // Calculate FPS from frame timestamps
-        if frameTimestamps.count >= 2 {
-            let timeInterval = frameTimestamps.last! - frameTimestamps.first!
+        // SAFETY: Use safe optional access instead of force unwrap
+        if frameTimestamps.count >= 2,
+           let lastTimestamp = frameTimestamps.last,
+           let firstTimestamp = frameTimestamps.first {
+            let timeInterval = lastTimestamp - firstTimestamp
             let fps = Double(frameTimestamps.count - 1) / timeInterval
             currentFPS = min(60.0, max(0.0, fps))
         }
@@ -611,12 +614,18 @@ class PerformanceStatistics {
         let sorted = durations.sorted()
         let sum = durations.reduce(0, +)
 
+        // SAFETY: Use safe optionals even though guard above ensures non-empty
+        guard let minValue = sorted.first,
+              let maxValue = sorted.last else {
+            return nil
+        }
+
         return Statistics(
             count: durations.count,
             average: sum / Double(durations.count),
             median: sorted[sorted.count / 2],
-            min: sorted.first!,
-            max: sorted.last!,
+            min: minValue,
+            max: maxValue,
             p95: sorted[Int(Double(sorted.count) * 0.95)]
         )
     }

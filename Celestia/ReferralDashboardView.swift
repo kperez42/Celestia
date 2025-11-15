@@ -702,9 +702,10 @@ struct ReferralDashboardView: View {
             copiedToClipboard = true
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+            guard let self = self else { return }
             withAnimation {
-                copiedToClipboard = false
+                self.copiedToClipboard = false
             }
         }
     }

@@ -128,10 +128,13 @@ class FakeProfileDetector {
         }
 
         // Check 5: Image quality too perfect (professional editing)
-        let avgQuality = photos.map { analyzeImageQuality($0) }.reduce(0, +) / Float(photos.count)
-        if avgQuality > 0.95 {
-            score += 0.2
-            indicators.append(.suspiciouslyHighQuality)
+        // SAFETY: Only calculate average quality if photos exist
+        if !photos.isEmpty {
+            let avgQuality = photos.map { analyzeImageQuality($0) }.reduce(0, +) / Float(photos.count)
+            if avgQuality > 0.95 {
+                score += 0.2
+                indicators.append(.suspiciouslyHighQuality)
+            }
         }
 
         return (score, indicators)
@@ -332,7 +335,8 @@ class FakeProfileDetector {
         // - Copy-paste errors
 
         let specialChars = text.filter { "!@#$%^&*()".contains($0) }
-        if Float(specialChars.count) / Float(text.count) > 0.3 {
+        // SAFETY: Avoid division by zero for empty text
+        if !text.isEmpty && Float(specialChars.count) / Float(text.count) > 0.3 {
             return true
         }
 

@@ -295,9 +295,13 @@ class CacheManager {
     // MARK: - Private
 
     private func startPeriodicCleanup() async {
-        while true {
+        // SAFETY: Check for task cancellation to prevent memory leaks
+        while !Task.isCancelled {
             // Clean expired items every 5 minutes
             try? await Task.sleep(nanoseconds: 5 * 60 * 1_000_000_000)
+
+            // Check again after sleep in case task was cancelled during sleep
+            guard !Task.isCancelled else { break }
 
             await users.cleanExpired()
             await matches.cleanExpired()
@@ -305,5 +309,7 @@ class CacheManager {
 
             Logger.shared.debug("Cache cleanup completed", category: .database)
         }
+
+        Logger.shared.debug("Cache cleanup task cancelled", category: .database)
     }
 }

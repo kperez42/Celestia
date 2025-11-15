@@ -582,7 +582,12 @@ struct ChatView: View {
                         hint: "Type your message to \(otherUser.fullName)",
                         identifier: AccessibilityIdentifier.messageInput
                     )
-                    .onChange(of: messageText) {
+                    .onChange(of: messageText) { _, newValue in
+                        // SAFETY: Enforce message character limit to prevent data overflow
+                        if newValue.count > AppConstants.Limits.maxMessageLength {
+                            messageText = String(newValue.prefix(AppConstants.Limits.maxMessageLength))
+                        }
+
                         // Simulate typing indicator (in production, send to Firestore)
                         #if DEBUG
                         // Toggle typing indicator for demo
@@ -603,7 +608,7 @@ struct ChatView: View {
                                 .foregroundStyle(
                                     (messageText.isEmpty && selectedImage == nil) ?
                                     LinearGradient(colors: [.gray.opacity(0.5)], startPoint: .leading, endPoint: .trailing) :
-                                    LinearGradient(colors: [.purple, .pink], startPoint: .leading, endPoint: .trailing)
+                                    LinearGradient.brandPrimary
                                 )
                         }
                     }
@@ -622,9 +627,9 @@ struct ChatView: View {
             if messageText.count > 100 {
                 HStack {
                     Spacer()
-                    Text("\(messageText.count)/500")
+                    Text("\(messageText.count)/\(AppConstants.Limits.maxMessageLength)")
                         .font(.caption2)
-                        .foregroundColor(messageText.count > 450 ? .red : .secondary)
+                        .foregroundColor(messageText.count > AppConstants.Limits.maxMessageLength - 50 ? .red : .secondary)
                 }
             }
         }

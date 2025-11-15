@@ -60,7 +60,7 @@ struct SignInView: View {
                                     .cornerRadius(10)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 10)
-                                            .stroke(emailFieldFocused ? LinearGradient(colors: [.purple, .pink], startPoint: .leading, endPoint: .trailing) : LinearGradient(colors: [.clear], startPoint: .leading, endPoint: .trailing), lineWidth: 2)
+                                            .stroke(emailFieldFocused ? LinearGradient.brandPrimary : LinearGradient.clear, lineWidth: 2)
                                     )
                             }
                             
@@ -91,7 +91,7 @@ struct SignInView: View {
                                 .cornerRadius(10)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 10)
-                                        .stroke(passwordFieldFocused ? LinearGradient(colors: [.purple, .pink], startPoint: .leading, endPoint: .trailing) : LinearGradient(colors: [.clear], startPoint: .leading, endPoint: .trailing), lineWidth: 2)
+                                        .stroke(passwordFieldFocused ? LinearGradient.brandPrimary : LinearGradient.clear, lineWidth: 2)
                                 )
                             }
                             
@@ -127,13 +127,7 @@ struct SignInView: View {
                                         .padding()
                                 }
                             }
-                            .background(
-                                LinearGradient(
-                                    colors: [Color.purple, Color.blue],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
+                            .background(LinearGradient.brandSecondary)
                             .cornerRadius(15)
                             .disabled(email.isEmpty || password.isEmpty || authService.isLoading)
                             .scaleButton()

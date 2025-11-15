@@ -205,13 +205,89 @@ extension Color {
         default:
             (a, r, g, b) = (255, 0, 0, 0)
         }
-        
+
         self.init(
             .sRGB,
             red: Double(r) / 255,
             green: Double(g) / 255,
             blue:  Double(b) / 255,
             opacity: Double(a) / 255
+        )
+    }
+}
+
+// MARK: - LinearGradient Extensions
+
+extension LinearGradient {
+    /// Primary brand gradient (purple to pink)
+    static var brandPrimary: LinearGradient {
+        LinearGradient(
+            colors: [.purple, .pink],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+    }
+
+    /// Primary brand gradient (vertical orientation)
+    static var brandPrimaryVertical: LinearGradient {
+        LinearGradient(
+            colors: [.purple, .pink],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+
+    /// Primary brand gradient (diagonal)
+    static var brandPrimaryDiagonal: LinearGradient {
+        LinearGradient(
+            colors: [.purple, .pink],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    /// Secondary gradient (purple to blue)
+    static var brandSecondary: LinearGradient {
+        LinearGradient(
+            colors: [.purple, .blue],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+    }
+
+    /// Success gradient (green shades)
+    static var success: LinearGradient {
+        LinearGradient(
+            colors: [Color.green.opacity(0.9), Color.green],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    /// Error gradient (red shades)
+    static var error: LinearGradient {
+        LinearGradient(
+            colors: [Color.red.opacity(0.7), Color.orange.opacity(0.5)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    /// Warning gradient (yellow/orange)
+    static var warning: LinearGradient {
+        LinearGradient(
+            colors: [.yellow, .orange],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    /// Clear gradient (for transparent borders/backgrounds)
+    static var clear: LinearGradient {
+        LinearGradient(
+            colors: [.clear],
+            startPoint: .leading,
+            endPoint: .trailing
         )
     }
 }

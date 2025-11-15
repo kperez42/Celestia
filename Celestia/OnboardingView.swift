@@ -147,8 +147,8 @@ struct OnboardingView: View {
                     showGoalSelection = false
                     // Show tutorial if A/B test says so
                     if viewModel.showTutorialIfNeeded() {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            showTutorial = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                            self?.showTutorial = true
                         }
                     }
                 }
@@ -490,6 +490,12 @@ struct OnboardingView: View {
                                         .padding(.top, 20)
                                         .padding(.leading, 16)
                                         .allowsHitTesting(false)
+                                }
+                            }
+                            .onChange(of: bio) { _, newValue in
+                                // SAFETY: Enforce bio character limit to prevent data overflow
+                                if newValue.count > AppConstants.Limits.maxBioLength {
+                                    bio = String(newValue.prefix(AppConstants.Limits.maxBioLength))
                                 }
                             }
                             .accessibilityLabel("Bio")
@@ -1273,8 +1279,8 @@ struct CompletionCelebrationView: View {
 
             // Trigger confetti animation
             for i in 0..<20 {
-                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.1) {
-                    confettiCounter += 1
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.1) { [weak self] in
+                    self?.confettiCounter += 1
                 }
             }
         }

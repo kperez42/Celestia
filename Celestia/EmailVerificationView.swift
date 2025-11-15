@@ -191,8 +191,8 @@ struct EmailVerificationView: View {
                     showSuccess = true
 
                     // Hide success message after 3 seconds
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                        showSuccess = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+                        self?.showSuccess = false
                     }
                 }
             } catch {
