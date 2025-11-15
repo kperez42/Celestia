@@ -249,7 +249,7 @@ class EditProfileViewModel: ObservableObject {
         }
 
         do {
-            try await UserService.shared.updateUserProfile(userId: userId, data: updateData)
+            try await UserService.shared.updateUserFields(userId: userId, fields: updateData)
         } catch {
             errorMessage = "Failed to update profile: \(error.localizedDescription)"
             showErrorAlert = true

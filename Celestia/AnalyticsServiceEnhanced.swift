@@ -91,8 +91,9 @@ class AnalyticsServiceEnhanced: ObservableObject {
                 dailyDistribution: dailyViews,
                 dayOfWeekDistribution: dayOfWeekViews,
                 peakHour: peakHour,
-                peakDayOfWeek: peakDay,
-                trendPercentage: 0
+                peakDay: String(peakDay),
+                trendPercentage: 0,
+                viewsBySource: [:]  // Empty since we don't have source data
             )
             return heatmap
         }
@@ -615,6 +616,7 @@ struct MatchStatistics {
 enum AnalyticsError: LocalizedError {
     case matchNotFound
     case insufficientData
+    case invalidDateRange
 
     var errorDescription: String? {
         switch self {
@@ -622,6 +624,8 @@ enum AnalyticsError: LocalizedError {
             return "Match not found"
         case .insufficientData:
             return "Insufficient data for analysis"
+        case .invalidDateRange:
+            return "Invalid date range for analytics"
         }
     }
 }
