@@ -179,7 +179,7 @@ struct ProfileView: View {
                 updateProfileCompletion()
                 VoiceOverAnnouncement.screenChanged(to: "Profile view")
             }
-            .onChange(of: authService.currentUser) {
+            .onChange(of: authService.currentUser) { oldValue, newValue in
                 updateProfileCompletion()
             }
             .detectScreenshots(
@@ -1400,11 +1400,13 @@ struct ProfileView: View {
 
         do {
             // Reload user data from Firestore
-            try await authService.refreshCurrentUser()
-            await MainActor.run {
-                updateProfileCompletion()
+            if let user = try await userService.fetchUser(userId: userId) {
+                await MainActor.run {
+                    authService.currentUser = user
+                    updateProfileCompletion()
+                }
+                Logger.shared.info("Profile data refreshed successfully", category: .general)
             }
-            Logger.shared.info("Profile data refreshed successfully", category: .general)
         } catch {
             Logger.shared.error("Failed to refresh profile data", category: .general, error: error)
         }
