@@ -462,11 +462,35 @@ class SavedProfilesViewModel: ObservableObject {
 
     private let db = Firestore.firestore()
 
+    // PERFORMANCE: Cache management to reduce database reads
+    private var lastFetchTime: Date?
+    private let cacheDuration: TimeInterval = 300 // 5 minutes
+    private var cachedForUserId: String?
+
     // Private initializer for singleton pattern
     private init() {}
 
-    func loadSavedProfiles() async {
+    func loadSavedProfiles(forceRefresh: Bool = false) async {
         guard let currentUserId = AuthService.shared.currentUser?.id else { return }
+
+        // PERFORMANCE FIX: Check cache first (5-minute TTL)
+        // Prevents 6+ database reads every time view appears
+        if !forceRefresh,
+           let lastFetch = lastFetchTime,
+           cachedForUserId == currentUserId,
+           !savedProfiles.isEmpty,
+           Date().timeIntervalSince(lastFetch) < cacheDuration {
+            Logger.shared.debug("SavedProfiles cache HIT - using cached data", category: .performance)
+            let cacheAge = Date().timeIntervalSince(lastFetch)
+            AnalyticsManager.shared.logEvent(.performance, parameters: [
+                "type": "saved_profiles_cache_hit",
+                "cache_age_seconds": cacheAge,
+                "profiles_count": savedProfiles.count
+            ])
+            return // Use cached data
+        }
+
+        Logger.shared.debug("SavedProfiles cache MISS - fetching from database", category: .performance)
 
         isLoading = true
         errorMessage = ""
@@ -540,15 +564,26 @@ class SavedProfilesViewModel: ObservableObject {
 
             savedProfiles = profiles
 
+            // PERFORMANCE: Update cache timestamp after successful fetch
+            lastFetchTime = Date()
+            cachedForUserId = currentUserId
+
             if skippedCount > 0 {
-                Logger.shared.warning("Loaded \(profiles.count) saved profiles (\(skippedCount) skipped)", category: .general)
+                Logger.shared.warning("Loaded \(profiles.count) saved profiles (\(skippedCount) skipped) - cached for 5 min", category: .general)
             } else {
-                Logger.shared.info("Loaded \(profiles.count) saved profiles", category: .general)
+                Logger.shared.info("Loaded \(profiles.count) saved profiles - cached for 5 min", category: .general)
             }
         } catch {
             errorMessage = error.localizedDescription
             Logger.shared.error("Error loading saved profiles", category: .general, error: error)
         }
+    }
+
+    /// Clear cache and force reload
+    func clearCache() {
+        lastFetchTime = nil
+        cachedForUserId = nil
+        Logger.shared.info("SavedProfiles cache cleared", category: .performance)
     }
 
     func unsaveProfile(_ profile: SavedProfile) {
@@ -566,6 +601,8 @@ class SavedProfilesViewModel: ObservableObject {
                 await MainActor.run {
                     savedProfiles.removeAll { $0.id == profile.id }
                     unsavingProfileId = nil
+                    // PERFORMANCE: Invalidate cache so next load gets fresh data
+                    lastFetchTime = nil
                 }
 
                 Logger.shared.info("Unsaved profile: \(profile.user.fullName)", category: .general)
