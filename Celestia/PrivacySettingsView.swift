@@ -576,8 +576,8 @@ class PrivacySettingsViewModel: ObservableObject {
         store.requestAccess(for: .contacts) { granted, error in
             Task { @MainActor in
                 if granted {
-                    contactsAccess = .authorized
-                    syncContactsWithFirebase()
+                    self.contactsAccess = .authorized
+                    self.syncContactsWithFirebase()
                 }
             }
         }
@@ -610,7 +610,7 @@ class PrivacySettingsViewModel: ObservableObject {
                 ]) { error in
                     if error == nil {
                         Task { @MainActor in
-                            blockedContactsCount = phoneNumbers.count
+                            self.blockedContactsCount = phoneNumbers.count
                         }
                     }
                 }
@@ -627,7 +627,7 @@ class PrivacySettingsViewModel: ObservableObject {
             .whereField("blockerId", isEqualTo: currentUserId)
             .getDocuments { snapshot, error in
                 Task { @MainActor in
-                    blockedUsersCount = snapshot?.documents.count ?? 0
+                    self.blockedUsersCount = snapshot?.documents.count ?? 0
                 }
             }
     }
