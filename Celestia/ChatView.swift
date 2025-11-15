@@ -660,11 +660,19 @@ struct ChatView: View {
         guard let currentUserId = authService.currentUser?.id else { return }
         guard let receiverId = otherUser.id else { return }
 
+        // Check rate limit
+        guard RateLimiter.shared.canSendMessage() else {
+            errorToastMessage = "Slow down! You're sending messages too quickly."
+            showErrorToast = true
+            HapticManager.shared.notification(.warning)
+            return
+        }
+
         // Haptic feedback
         HapticManager.shared.impact(.light)
 
-        // Capture values before clearing
-        let text = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Capture and sanitize values before clearing
+        let text = InputSanitizer.standard(messageText)
         let imageToSend = selectedImage
 
         // Set sending preview

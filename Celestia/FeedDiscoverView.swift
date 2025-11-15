@@ -371,16 +371,6 @@ struct FeedDiscoverView: View {
     // MARK: - Data Loading
 
     private func loadUsers() async {
-        #if DEBUG
-        // Use test data in debug builds for easier testing
-        await MainActor.run {
-            users = TestData.discoverUsers
-            loadMoreUsers()
-            isInitialLoad = false
-        }
-        return
-        #endif
-
         guard let currentUserId = authService.currentUser?.id else {
             await MainActor.run {
                 isInitialLoad = false
@@ -483,6 +473,17 @@ struct FeedDiscoverView: View {
     private func handleLike(user: User) {
         guard let currentUserId = authService.currentUser?.id,
               let userId = user.id else { return }
+
+        // Check rate limit
+        guard RateLimiter.shared.canSendLike() else {
+            let remaining = RateLimiter.shared.getRemainingLikes()
+            showToast(
+                message: "Daily like limit reached. Try again tomorrow.",
+                icon: "exclamationmark.triangle.fill",
+                color: .orange
+            )
+            return
+        }
 
         Task {
             do {
