@@ -28,6 +28,9 @@ class OnboardingViewModel: ObservableObject {
     private let tutorialManager = TutorialManager.shared
     private let activationMetrics = ActivationMetrics.shared
 
+    // MEMORY FIX: Store observer token for cleanup
+    private var milestoneObserver: NSObjectProtocol?
+
     // MARK: - Progressive Disclosure
 
     private var disclosureStrategy: DisclosureStrategy = .progressive
@@ -117,7 +120,8 @@ class OnboardingViewModel: ObservableObject {
     // MARK: - Milestone Observation
 
     private func observeMilestones() {
-        NotificationCenter.default.addObserver(
+        // MEMORY FIX: Store observer token for proper cleanup
+        milestoneObserver = NotificationCenter.default.addObserver(
             forName: .milestoneAchieved,
             object: nil,
             queue: .main
@@ -127,6 +131,13 @@ class OnboardingViewModel: ObservableObject {
             }
 
             self?.celebrateMilestone(milestone)
+        }
+    }
+
+    // MEMORY FIX: Clean up observer to prevent memory leak
+    deinit {
+        if let observer = milestoneObserver {
+            NotificationCenter.default.removeObserver(observer)
         }
     }
 

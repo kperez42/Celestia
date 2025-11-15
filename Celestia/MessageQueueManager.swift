@@ -25,6 +25,9 @@ class MessageQueueManager: ObservableObject {
     private let messageService = MessageService.shared
     private let networkMonitor = NetworkMonitor.shared
 
+    // MEMORY FIX: Store observer token for cleanup
+    private var networkObserver: NSObjectProtocol?
+
     private init() {
         loadQueuedMessages()
         setupNetworkObserver()
@@ -173,8 +176,9 @@ class MessageQueueManager: ObservableObject {
     // MARK: - Private Methods
 
     private func setupNetworkObserver() {
+        // MEMORY FIX: Store observer token for proper cleanup
         // Process queue when connection is restored
-        NotificationCenter.default.addObserver(
+        networkObserver = NotificationCenter.default.addObserver(
             forName: .networkConnectionRestored,
             object: nil,
             queue: .main
@@ -222,8 +226,12 @@ class MessageQueueManager: ObservableObject {
         }
     }
 
+    // MEMORY FIX: Clean up both timer and observer
     deinit {
         syncTimer?.invalidate()
+        if let observer = networkObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 }
 
