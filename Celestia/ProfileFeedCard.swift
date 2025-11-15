@@ -53,6 +53,12 @@ struct ProfileFeedCard: View {
         .onAppear {
             isFavorited = initialIsFavorited
         }
+        .onChange(of: initialIsFavorited) { newValue in
+            // Update when parent changes favorites set (e.g., unsaved from another view)
+            if !isProcessingSave {
+                isFavorited = newValue
+            }
+        }
     }
 
     // MARK: - Components

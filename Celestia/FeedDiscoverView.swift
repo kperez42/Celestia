@@ -10,7 +10,7 @@ import SwiftUI
 struct FeedDiscoverView: View {
     @EnvironmentObject var authService: AuthService
     @StateObject private var filters = DiscoveryFilters.shared
-    @StateObject private var savedProfilesViewModel = SavedProfilesViewModel()
+    @ObservedObject private var savedProfilesViewModel = SavedProfilesViewModel.shared
     @Binding var selectedTab: Int
 
     @State private var users: [User] = []
@@ -189,6 +189,11 @@ struct FeedDiscoverView: View {
                 Task {
                     await reloadWithFilters()
                 }
+            }
+            .onChange(of: savedProfilesViewModel.savedProfiles) { newProfiles in
+                // Sync favorites set whenever savedProfiles changes (save/unsave from any view)
+                favorites = Set(newProfiles.compactMap { $0.user.id })
+                Logger.shared.debug("Favorites set synced: \(favorites.count) profiles", category: .general)
             }
         }
     }
@@ -610,17 +615,23 @@ struct FeedDiscoverView: View {
             Task {
                 await savedProfilesViewModel.saveProfile(user: user)
 
+                // Small delay to ensure state update has propagated
+                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
+
                 // Check if save succeeded (will be in savedProfiles array)
-                let saveSucceeded = savedProfilesViewModel.savedProfiles.contains(where: { $0.user.id == userId })
-                if !saveSucceeded {
-                    // Revert optimistic update on failure
-                    await MainActor.run {
+                await MainActor.run {
+                    let saveSucceeded = savedProfilesViewModel.savedProfiles.contains(where: { $0.user.id == userId })
+                    if !saveSucceeded {
+                        // Revert optimistic update on failure
                         favorites.remove(userId)
                         showToast(
                             message: "Failed to save. Try again.",
                             icon: "exclamationmark.triangle.fill",
                             color: .red
                         )
+                        Logger.shared.warning("Save validation failed for user \(userId)", category: .general)
+                    } else {
+                        Logger.shared.debug("Save validated successfully for user \(userId)", category: .general)
                     }
                 }
             }
