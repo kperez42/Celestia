@@ -17,6 +17,14 @@ struct ProfilePrompt: Codable, Identifiable, Equatable {
         self.question = question
         self.answer = answer
     }
+
+    func toDictionary() -> [String: String] {
+        return [
+            "id": id,
+            "question": question,
+            "answer": answer
+        ]
+    }
 }
 
 // MARK: - Available Prompts
