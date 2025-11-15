@@ -300,7 +300,9 @@ struct WelcomeView: View {
         featureTimer?.invalidate()
 
         // Store timer reference to prevent memory leak
-        featureTimer = Timer.scheduledTimer(withTimeInterval: 4.0, repeats: true) { _ in
+        // SAFETY: Use weak self to prevent retain cycle
+        featureTimer = Timer.scheduledTimer(withTimeInterval: 4.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
             withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                 currentFeature = (currentFeature + 1) % features.count
             }
