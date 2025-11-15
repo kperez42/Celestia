@@ -190,6 +190,11 @@ struct FeedDiscoverView: View {
                     await reloadWithFilters()
                 }
             }
+            .onChange(of: savedProfilesViewModel.savedProfiles) { newProfiles in
+                // Sync favorites set whenever savedProfiles changes (save/unsave from any view)
+                favorites = Set(newProfiles.compactMap { $0.user.id })
+                Logger.shared.debug("Favorites set synced: \(favorites.count) profiles", category: .general)
+            }
         }
     }
 

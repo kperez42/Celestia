@@ -633,6 +633,12 @@ class SavedProfilesViewModel: ObservableObject {
             return
         }
 
+        // Check if already saved to prevent duplicates
+        if savedProfiles.contains(where: { $0.user.id == savedUserId }) {
+            Logger.shared.info("Profile already saved: \(user.fullName)", category: .general)
+            return
+        }
+
         do {
             let saveData: [String: Any] = [
                 "userId": currentUserId,
