@@ -9,12 +9,14 @@ import SwiftUI
 
 struct UserDetailView: View {
     let user: User
-    @StateObject private var viewModel = DiscoverViewModel()
     @EnvironmentObject var authService: AuthService
     @Environment(\.dismiss) var dismiss
 
     @State private var showingInterestSent = false
     @State private var showingMatched = false
+    @State private var isProcessing = false
+    @State private var showingError = false
+    @State private var errorMessage = ""
 
     // Filter out empty photo URLs
     private var validPhotos: [String] {
@@ -175,20 +177,29 @@ struct UserDetailView: View {
                 Button {
                     sendInterest()
                 } label: {
-                    Image(systemName: "heart.fill")
-                        .font(.title)
-                        .foregroundColor(.white)
-                        .frame(width: 70, height: 70)
-                        .background(
-                            LinearGradient(
-                                colors: [Color.purple, Color.pink],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
+                    ZStack {
+                        if isProcessing {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(1.2)
+                        } else {
+                            Image(systemName: "heart.fill")
+                                .font(.title)
+                                .foregroundColor(.white)
+                        }
+                    }
+                    .frame(width: 70, height: 70)
+                    .background(
+                        LinearGradient(
+                            colors: [Color.purple, Color.pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
                         )
-                        .clipShape(Circle())
-                        .shadow(color: Color.purple.opacity(0.4), radius: 10)
+                    )
+                    .clipShape(Circle())
+                    .shadow(color: Color.purple.opacity(0.4), radius: 10)
                 }
+                .disabled(isProcessing)
                 .accessibilityLabel("Like")
                 .accessibilityHint("Send interest to \(user.fullName)")
             }
@@ -210,11 +221,10 @@ struct UserDetailView: View {
                 }
             }
         }
-        .alert("Interest Sent! 💫", isPresented: $showingInterestSent) {
+        .alert("Like Sent! 💫", isPresented: $showingInterestSent) {
             Button("OK") { dismiss() }
         } message: {
-            // FIXED: Changed from user.name to user.fullName
-            Text("If \(user.fullName) is interested too, you'll be matched!")
+            Text("If \(user.fullName) likes you back, you'll be matched!")
         }
         .alert("It's a Match! 🎉", isPresented: $showingMatched) {
             Button("Send Message") {
@@ -227,17 +237,58 @@ struct UserDetailView: View {
             // FIXED: Changed from user.name to user.fullName
             Text("You and \(user.fullName) liked each other!")
         }
+        .alert("Error", isPresented: $showingError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage.isEmpty ? "Failed to send like. Please try again." : errorMessage)
+        }
     }
     
     func sendInterest() {
         guard let currentUserID = authService.currentUser?.id,
-              let targetUserID = user.id else { return }
+              let targetUserID = user.id,
+              !isProcessing else { return }
 
-        viewModel.sendInterest(from: currentUserID, to: targetUserID) { success in
-            if success {
-                // Check if it was a match or just interest sent
-                // For now, just show interest sent
-                showingInterestSent = true
+        // Prevent liking yourself
+        guard currentUserID != targetUserID else {
+            errorMessage = "You can't like your own profile!"
+            showingError = true
+            return
+        }
+
+        isProcessing = true
+
+        Task {
+            do {
+                // Use SwipeService for unified matching system
+                let isMatch = try await SwipeService.shared.likeUser(
+                    fromUserId: currentUserID,
+                    toUserId: targetUserID,
+                    isSuperLike: false
+                )
+
+                await MainActor.run {
+                    isProcessing = false
+
+                    if isMatch {
+                        // It's a match!
+                        showingMatched = true
+                        HapticManager.shared.notification(.success)
+                        Logger.shared.info("Match created with \(user.fullName) from detail view", category: .matching)
+                    } else {
+                        // Just a like, waiting for mutual like
+                        showingInterestSent = true
+                        HapticManager.shared.impact(.medium)
+                        Logger.shared.info("Like sent to \(user.fullName) from detail view", category: .matching)
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    isProcessing = false
+                    errorMessage = error.localizedDescription
+                    showingError = true
+                }
+                Logger.shared.error("Error sending like from detail view", category: .matching, error: error)
             }
         }
     }

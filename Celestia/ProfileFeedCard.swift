@@ -17,6 +17,8 @@ struct ProfileFeedCard: View {
 
     @State private var isFavorited = false
     @State private var isLiked = false
+    @State private var isProcessingLike = false
+    @State private var isProcessingSave = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -147,10 +149,17 @@ struct ProfileFeedCard: View {
                 icon: isLiked ? "heart.fill" : "heart",
                 color: .pink,
                 label: "Like",
+                isProcessing: isProcessingLike,
                 action: {
+                    guard !isProcessingLike else { return }
                     HapticManager.shared.impact(.medium)
-                    isLiked.toggle()
+                    isProcessingLike = true
+                    isLiked = true  // Optimistic update
                     onLike()
+                    // Reset processing state after delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        isProcessingLike = false
+                    }
                 }
             )
 
@@ -159,10 +168,17 @@ struct ProfileFeedCard: View {
                 icon: isFavorited ? "star.fill" : "star",
                 color: .orange,
                 label: "Save",
+                isProcessing: isProcessingSave,
                 action: {
+                    guard !isProcessingSave else { return }
                     HapticManager.shared.impact(.light)
+                    isProcessingSave = true
                     isFavorited.toggle()
                     onFavorite()
+                    // Reset processing state after delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        isProcessingSave = false
+                    }
                 }
             )
 
@@ -171,6 +187,7 @@ struct ProfileFeedCard: View {
                 icon: "message.fill",
                 color: .blue,
                 label: "Message",
+                isProcessing: false,
                 action: {
                     HapticManager.shared.impact(.medium)
                     onMessage()
@@ -182,6 +199,7 @@ struct ProfileFeedCard: View {
                 icon: "camera.fill",
                 color: .purple,
                 label: "Photos",
+                isProcessing: false,
                 action: {
                     HapticManager.shared.impact(.light)
                     onViewPhotos()
@@ -222,6 +240,7 @@ struct ActionButton: View {
     let icon: String
     let color: Color
     let label: String
+    let isProcessing: Bool
     let action: () -> Void
 
     var body: some View {
@@ -229,19 +248,27 @@ struct ActionButton: View {
             VStack(spacing: 6) {
                 ZStack {
                     Circle()
-                        .fill(color.opacity(0.15))
+                        .fill(color.opacity(isProcessing ? 0.25 : 0.15))
                         .frame(width: 56, height: 56)
 
-                    Image(systemName: icon)
-                        .font(.title3)
-                        .foregroundColor(color)
+                    if isProcessing {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: color))
+                            .scaleEffect(0.9)
+                    } else {
+                        Image(systemName: icon)
+                            .font(.title3)
+                            .foregroundColor(color)
+                    }
                 }
 
                 Text(label)
                     .font(.caption2)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(isProcessing ? color.opacity(0.6) : .secondary)
             }
         }
+        .disabled(isProcessing)
+        .opacity(isProcessing ? 0.7 : 1.0)
         .frame(maxWidth: .infinity)
     }
 }
