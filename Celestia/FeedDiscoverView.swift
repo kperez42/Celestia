@@ -10,6 +10,7 @@ import SwiftUI
 struct FeedDiscoverView: View {
     @EnvironmentObject var authService: AuthService
     @StateObject private var filters = DiscoveryFilters.shared
+    @Binding var selectedTab: Int
 
     @State private var users: [User] = []
     @State private var displayedUsers: [User] = []
@@ -578,9 +579,10 @@ struct FeedDiscoverView: View {
 
     private func handleMessage(user: User) {
         selectedUser = user
-        // NOTE: Navigation to messaging should be implemented using NavigationPath or coordinator
-        // For now, user should match first before messaging
-        Logger.shared.debug("Message user: \(user.fullName)", category: .messaging)
+        // Navigate to Messages tab
+        selectedTab = 2
+        HapticManager.shared.impact(.medium)
+        Logger.shared.debug("Navigate to messages for user: \(user.fullName)", category: .messaging)
     }
 }
 
@@ -631,6 +633,6 @@ struct PhotoGalleryView: View {
 }
 
 #Preview {
-    FeedDiscoverView()
+    FeedDiscoverView(selectedTab: .constant(0))
         .environmentObject(AuthService.shared)
 }

@@ -22,7 +22,7 @@ struct MainTabView: View {
             // Main content
             TabView(selection: $selectedTab) {
                 // Discover - Load immediately (tab 0)
-                FeedDiscoverView()
+                FeedDiscoverView(selectedTab: $selectedTab)
                     .tag(0)
 
                 // Matches - Lazy load
