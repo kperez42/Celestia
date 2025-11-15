@@ -291,11 +291,13 @@ struct NotificationHistoryView: View {
 
             notificationService.listenToNotifications(userId: userId)
 
-            // Wait for task cancellation
+            // Keep task alive until cancelled
             await withTaskCancellationHandler {
-                // Keep task alive while view is visible
-                await withCheckedContinuation { continuation in
-                    // This continuation will never resume - task stays alive until cancelled
+                // Infinite sleep - will be cancelled when view disappears
+                do {
+                    try await Task.sleep(nanoseconds: UInt64.max)
+                } catch {
+                    // Task cancelled, cleanup will happen in onCancel
                 }
             } onCancel: {
                 // Cleanup when view disappears
