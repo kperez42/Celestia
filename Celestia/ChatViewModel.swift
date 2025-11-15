@@ -13,6 +13,8 @@ class ChatViewModel: ObservableObject {
     @Published var messages: [Message] = []
     @Published var matches: [Match] = []
     @Published var isLoading = false
+    @Published var errorMessage: String?
+    @Published var showErrorAlert = false
 
     // Dependency injection: Services
     private let matchService: any MatchServiceProtocol
@@ -63,11 +65,20 @@ class ChatViewModel: ObservableObject {
         // Find match between current user and other user
         loadTask = Task {
             guard !Task.isCancelled else { return }
-            // ARCHITECTURE FIX: Use injected matchService instead of .shared singleton
-            if let match = try? await matchService.fetchMatch(user1Id: currentUserId, user2Id: otherUserId),
-               let matchId = match.id {
+            // UX FIX: Properly handle match fetch errors instead of silent failure
+            do {
+                // ARCHITECTURE FIX: Use injected matchService instead of .shared singleton
+                let match = try await matchService.fetchMatch(user1Id: currentUserId, user2Id: otherUserId)
+                guard let matchId = match.id else {
+                    Logger.shared.error("Match found but has no ID", category: .messaging)
+                    await showError("Unable to load chat. Please try again.")
+                    return
+                }
                 guard !Task.isCancelled else { return }
                 await loadMessages(for: matchId)
+            } catch {
+                Logger.shared.error("Failed to fetch match for chat", category: .messaging, error: error)
+                await showError("Unable to load chat. Please check your connection.")
             }
         }
     }
@@ -89,9 +100,18 @@ class ChatViewModel: ObservableObject {
 
                     guard let documents = snapshot?.documents else { return }
 
-                    self.messages = documents.compactMap { doc -> Message? in
-                        try? doc.data(as: Message.self)
+                    // UX FIX: Properly handle message parsing errors instead of silent failure
+                    var parsedMessages: [Message] = []
+                    for doc in documents {
+                        do {
+                            let message = try doc.data(as: Message.self)
+                            parsedMessages.append(message)
+                        } catch {
+                            Logger.shared.error("Failed to parse message \(doc.documentID)", category: .messaging, error: error)
+                            // Continue processing other messages
+                        }
                     }
+                    self.messages = parsedMessages
                 }
         }
     }
@@ -103,20 +123,24 @@ class ChatViewModel: ObservableObject {
         Task {
             do {
                 // Find or create match
-                // ARCHITECTURE FIX: Use injected matchService instead of .shared singleton
-                if let match = try? await matchService.fetchMatch(user1Id: currentUserId, user2Id: otherUserId),
-                   let matchId = match.id {
-
-                    // ARCHITECTURE FIX: Use injected messageService instead of .shared singleton
-                    try await messageService.sendMessage(
-                        matchId: matchId,
-                        senderId: currentUserId,
-                        receiverId: otherUserId,
-                        text: text
-                    )
+                // UX FIX: Properly handle match fetch errors instead of silent failure
+                let match = try await matchService.fetchMatch(user1Id: currentUserId, user2Id: otherUserId)
+                guard let matchId = match.id else {
+                    Logger.shared.error("Match found but has no ID", category: .messaging)
+                    await showError("Unable to send message. Please try again.")
+                    return
                 }
+
+                // ARCHITECTURE FIX: Use injected messageService instead of .shared singleton
+                try await messageService.sendMessage(
+                    matchId: matchId,
+                    senderId: currentUserId,
+                    receiverId: otherUserId,
+                    text: text
+                )
             } catch {
                 Logger.shared.error("Error sending message", category: .messaging, error: error)
+                await showError("Failed to send message. Please check your connection.")
             }
         }
     }
@@ -125,7 +149,14 @@ class ChatViewModel: ObservableObject {
         // ARCHITECTURE FIX: Use injected messageService instead of .shared singleton
         await messageService.markMessagesAsRead(matchId: matchID, userId: currentUserID)
     }
-    
+
+    /// UX FIX: Show error message to user instead of failing silently
+    private func showError(_ message: String) async {
+        errorMessage = message
+        showErrorAlert = true
+        HapticManager.shared.notification(.error)
+    }
+
     /// Cleanup method to cancel ongoing tasks and remove listeners
     func cleanup() {
         loadTask?.cancel()

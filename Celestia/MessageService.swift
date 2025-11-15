@@ -104,7 +104,18 @@ class MessageService: ObservableObject, MessageServiceProtocol {
                 Task { @MainActor [weak self] in
                     guard let self = self else { return }
 
-                    let newMessages = documents.compactMap { try? $0.data(as: Message.self) }
+                    // UX FIX: Properly handle message parsing errors instead of silent failure
+                    var newMessages: [Message] = []
+                    for document in documents {
+                        do {
+                            let message = try document.data(as: Message.self)
+                            newMessages.append(message)
+                        } catch {
+                            // Log parsing errors for debugging
+                            Logger.shared.error("Failed to parse message from document \(document.documentID)", category: .messaging, error: error)
+                            // Continue processing other messages rather than failing entirely
+                        }
+                    }
 
                     // Append new messages to existing ones
                     for message in newMessages {
@@ -314,11 +325,30 @@ class MessageService: ObservableObject, MessageServiceProtocol {
         ])
 
         // Send notification to receiver
-        let senderSnapshot = try? await db.collection("users").document(senderId).getDocument()
-        if let senderName = senderSnapshot?.data()?["fullName"] as? String {
+        // UX FIX: Properly handle sender fetch errors instead of silent failure
+        do {
+            let senderSnapshot = try await db.collection("users").document(senderId).getDocument()
+            if let senderName = senderSnapshot.data()?["fullName"] as? String {
+                await NotificationService.shared.sendMessageNotification(
+                    message: message,
+                    senderName: senderName,
+                    matchId: matchId
+                )
+            } else {
+                Logger.shared.warning("Sender name not found for notification", category: .messaging)
+                // Send notification with generic sender name
+                await NotificationService.shared.sendMessageNotification(
+                    message: message,
+                    senderName: "Someone",
+                    matchId: matchId
+                )
+            }
+        } catch {
+            Logger.shared.error("Failed to fetch sender info for notification", category: .messaging, error: error)
+            // Still send notification with generic sender to ensure user gets notified
             await NotificationService.shared.sendMessageNotification(
                 message: message,
-                senderName: senderName,
+                senderName: "Someone",
                 matchId: matchId
             )
         }
