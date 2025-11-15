@@ -573,11 +573,11 @@ class PrivacySettingsViewModel: ObservableObject {
 
     func requestContactsAccess() {
         let store = CNContactStore()
-        store.requestAccess(for: .contacts) { [weak self] granted, error in
+        store.requestAccess(for: .contacts) { granted, error in
             Task { @MainActor in
                 if granted {
-                    self?.contactsAccess = .authorized
-                    self?.syncContactsWithFirebase()
+                    contactsAccess = .authorized
+                    syncContactsWithFirebase()
                 }
             }
         }
@@ -607,10 +607,10 @@ class PrivacySettingsViewModel: ObservableObject {
                 .updateData([
                     "hiddenContacts": phoneNumbers,
                     "hideFromContactsEnabled": true
-                ]) { [weak self] error in
+                ]) { error in
                     if error == nil {
                         Task { @MainActor in
-                            self?.blockedContactsCount = phoneNumbers.count
+                            blockedContactsCount = phoneNumbers.count
                         }
                     }
                 }
@@ -625,9 +625,9 @@ class PrivacySettingsViewModel: ObservableObject {
         // Count blocked users
         db.collection("blockedUsers")
             .whereField("blockerId", isEqualTo: currentUserId)
-            .getDocuments { [weak self] snapshot, error in
+            .getDocuments { snapshot, error in
                 Task { @MainActor in
-                    self?.blockedUsersCount = snapshot?.documents.count ?? 0
+                    blockedUsersCount = snapshot?.documents.count ?? 0
                 }
             }
     }
