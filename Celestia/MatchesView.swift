@@ -146,8 +146,11 @@ struct MatchesView: View {
                 HapticManager.shared.notification(.success)
                 VoiceOverAnnouncement.announce("Matches refreshed. \(matchService.matches.count) matches available.")
             }
-            .sheet(item: $selectedMatch) { match in
-                if let user = getMatchedUser(match) {
+            .sheet(isPresented: Binding(
+                get: { selectedMatch != nil },
+                set: { if !$0 { selectedMatch = nil } }
+            )) {
+                if let match = selectedMatch, let user = getMatchedUser(match) {
                     ChatView(match: match, otherUser: user)
                         .environmentObject(authService)
                 }
