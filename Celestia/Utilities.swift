@@ -129,16 +129,7 @@ extension Color {
 }
 
 // MARK: - View Utilities
-
-extension View {
-    func cardStyle() -> some View {
-        self
-            .padding()
-            .background(Color.white)
-            .cornerRadius(16)
-            .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
-    }
-}
+// cardStyle() moved to DesignSystem.swift for consistency
 
 // MARK: - Image Validation
 
