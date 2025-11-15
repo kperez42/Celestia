@@ -284,13 +284,25 @@ struct NotificationHistoryView: View {
         }
         .navigationTitle("Notification History")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            if let userId = authService.currentUser?.id {
-                notificationService.listenToNotifications(userId: userId)
+        .task {
+            // Using .task ensures automatic cleanup when view disappears
+            // The task is automatically cancelled when the view is dismissed
+            guard let userId = authService.currentUser?.id else { return }
+
+            notificationService.listenToNotifications(userId: userId)
+
+            // Wait for task cancellation
+            await withTaskCancellationHandler {
+                // Keep task alive while view is visible
+                await withCheckedContinuation { continuation in
+                    // This continuation will never resume - task stays alive until cancelled
+                }
+            } onCancel: {
+                // Cleanup when view disappears
+                Task { @MainActor in
+                    notificationService.stopListening()
+                }
             }
-        }
-        .onDisappear {
-            notificationService.stopListening()
         }
     }
 }

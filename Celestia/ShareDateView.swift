@@ -490,9 +490,60 @@ class ShareDateViewModel: ObservableObject {
         dateTime: Date,
         location: String
     ) async throws {
-        // TODO: Implement actual SMS/notification sending
-        // For now, just log
-        Logger.shared.info("Sending date notification to \(contact.name)", category: .general)
+        guard let userId = AuthService.shared.currentUser?.id else { return }
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .medium
+        dateFormatter.timeStyle = .short
+
+        let notificationData: [String: Any] = [
+            "contactId": contact.id,
+            "contactName": contact.name,
+            "contactEmail": contact.email ?? "",
+            "contactPhone": contact.phoneNumber,
+            "userId": userId,
+            "matchName": match.fullName,
+            "dateTime": Timestamp(date: dateTime),
+            "location": location,
+            "formattedDateTime": dateFormatter.string(from: dateTime),
+            "sentAt": Timestamp(date: Date()),
+            "type": "safety_date_alert"
+        ]
+
+        // Save notification to Firestore for tracking
+        try await db.collection("safety_notifications").addDocument(data: notificationData)
+
+        // PRODUCTION NOTE: Actual SMS/Email sending would be handled by a backend service
+        // This would typically integrate with services like:
+        // - Twilio for SMS
+        // - SendGrid for Email
+        // - Firebase Cloud Functions to trigger these services
+        //
+        // Example backend flow:
+        // 1. Cloud Function watches 'safety_notifications' collection
+        // 2. When new document added, function triggers
+        // 3. Function calls Twilio/SendGrid to send SMS/Email to contact
+        // 4. Updates notification document with delivery status
+        //
+        // For development/testing, notification is logged and saved to database
+
+        let message = """
+        Safety Alert from Celestia:
+        \(AuthService.shared.currentUser?.fullName ?? "A user") has shared their date details with you.
+
+        Date: \(dateFormatter.string(from: dateTime))
+        Meeting: \(match.fullName)
+        Location: \(location)
+
+        This is an automated safety notification.
+        """
+
+        Logger.shared.info("""
+        Safety notification created for \(contact.name):
+        Phone: \(contact.phoneNumber)
+        Email: \(contact.email ?? "N/A")
+        Message: \(message)
+        """, category: .general)
     }
 }
 

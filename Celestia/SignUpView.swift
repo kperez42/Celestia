@@ -536,15 +536,15 @@ struct SignUpView: View {
             Task {
                 do {
                     try await authService.createUser(
-                        withEmail: email,
+                        withEmail: InputSanitizer.email(email),
                         password: password,
-                        fullName: name,
+                        fullName: InputSanitizer.strict(name),
                         age: ageInt,
                         gender: gender,
                         lookingFor: lookingFor,
-                        location: location,
-                        country: country,
-                        referralCode: referralCode.trimmingCharacters(in: .whitespaces)
+                        location: InputSanitizer.standard(location),
+                        country: InputSanitizer.basic(country),
+                        referralCode: InputSanitizer.referralCode(referralCode)
                     )
                 } catch {
                     Logger.shared.error("Error creating account", category: .authentication, error: error)

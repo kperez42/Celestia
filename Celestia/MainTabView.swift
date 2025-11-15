@@ -16,7 +16,6 @@ struct MainTabView: View {
     @State private var previousTab = 0
     @State private var unreadCount = 0
     @State private var newMatchesCount = 0
-    @State private var badgeUpdateTimer: Timer?
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -65,12 +64,7 @@ struct MainTabView: View {
             // PERFORMANCE: Defer badge loading to not block initial render
             // Allow the UI to render first, then load badges in background
             try? await Task.sleep(nanoseconds: 500_000_000) // 500ms delay
-            await loadBadgeCounts()
-        }
-        .onDisappear {
-            // Invalidate timer to prevent memory leak
-            badgeUpdateTimer?.invalidate()
-            badgeUpdateTimer = nil
+            await updateBadgesPeriodically()
         }
     }
     
@@ -151,35 +145,26 @@ struct MainTabView: View {
     }
     
     // MARK: - Helper Functions
-    
-    private func loadBadgeCounts() async {
+
+    private func updateBadgesPeriodically() async {
         guard let userId = authService.currentUser?.id else { return }
 
-        // Load unread messages count
-        unreadCount = await messageService.getUnreadMessageCount(userId: userId)
+        // Continuous polling loop - automatically cancelled when view disappears
+        while !Task.isCancelled {
+            // Load unread messages count
+            unreadCount = await messageService.getUnreadMessageCount(userId: userId)
 
-        // Load new matches count
-        do {
-            try await matchService.fetchMatches(userId: userId)
-            newMatchesCount = matchService.matches.filter { $0.lastMessage == nil }.count
-        } catch {
-            Logger.shared.error("Error loading badge counts", category: .general, error: error)
-        }
-
-        // Invalidate existing timer to prevent leaks
-        badgeUpdateTimer?.invalidate()
-
-        // Update periodically - store timer reference for proper cleanup
-        badgeUpdateTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { _ in
-            Task {
-                unreadCount = await messageService.getUnreadMessageCount(userId: userId)
-                do {
-                    try await matchService.fetchMatches(userId: userId)
-                    newMatchesCount = matchService.matches.filter { $0.lastMessage == nil }.count
-                } catch {
-                    Logger.shared.error("Error updating badge counts", category: .general, error: error)
-                }
+            // Load new matches count
+            do {
+                try await matchService.fetchMatches(userId: userId)
+                newMatchesCount = matchService.matches.filter { $0.lastMessage == nil }.count
+            } catch {
+                Logger.shared.error("Error loading badge counts", category: .general, error: error)
             }
+
+            // Wait 10 seconds before next update
+            // Using Task.sleep instead of Timer - automatically handles cancellation
+            try? await Task.sleep(nanoseconds: 10_000_000_000) // 10 seconds
         }
     }
 }

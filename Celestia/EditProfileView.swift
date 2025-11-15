@@ -1097,12 +1097,12 @@ struct EditProfileView: View {
                     user.profileImageURL = imageURL
                 }
                 
-                // Update user data
-                user.fullName = fullName
+                // Update user data with sanitized input
+                user.fullName = InputSanitizer.strict(fullName)
                 user.age = ageInt
-                user.bio = bio
-                user.location = location
-                user.country = country
+                user.bio = InputSanitizer.standard(bio)
+                user.location = InputSanitizer.standard(location)
+                user.country = InputSanitizer.basic(country)
                 user.gender = gender
                 user.lookingFor = lookingFor
                 user.languages = languages
