@@ -432,7 +432,7 @@ struct SavedProfileCardSkeleton: View {
 
 // MARK: - Saved Profile Model
 
-struct SavedProfile: Identifiable {
+struct SavedProfile: Identifiable, Equatable {
     let id: String
     let user: User
     let savedAt: Date
