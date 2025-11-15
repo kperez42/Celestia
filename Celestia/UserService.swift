@@ -24,11 +24,11 @@ class UserService: ObservableObject, UserServiceProtocol {
 
     private let db = Firestore.firestore()
 
-    // SWIFT 6 CONCURRENCY: These properties are accessed across async boundaries
-    // but are always accessed from MainActor-isolated methods. Marked nonisolated(unsafe)
-    // to satisfy Swift 6 strict concurrency while maintaining thread safety through MainActor.
-    nonisolated(unsafe) private var lastDocument: DocumentSnapshot?
-    nonisolated(unsafe) private var searchTask: Task<Void, Never>?
+    // CONCURRENCY FIX: Removed nonisolated(unsafe) - properties are now properly MainActor-isolated
+    // Since this class is @MainActor, all properties are automatically isolated to the main actor,
+    // providing proper concurrency safety without bypassing Swift's checks.
+    private var lastDocument: DocumentSnapshot?
+    private var searchTask: Task<Void, Never>?
 
     // PERFORMANCE: Search result caching to reduce database queries
     private var searchCache: [String: CachedSearchResult] = [:]

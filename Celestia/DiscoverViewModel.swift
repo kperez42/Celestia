@@ -39,11 +39,11 @@ class DiscoverViewModel: ObservableObject {
     private let swipeService: any SwipeServiceProtocol
     private let authService: any AuthServiceProtocol
 
-    // SWIFT 6 CONCURRENCY: These properties are accessed across async boundaries
-    // but are always accessed from MainActor-isolated methods. Marked nonisolated(unsafe)
-    // to satisfy Swift 6 strict concurrency while maintaining thread safety through MainActor.
-    nonisolated(unsafe) private var lastDocument: DocumentSnapshot?
-    nonisolated(unsafe) private var interestTask: Task<Void, Never>?
+    // CONCURRENCY FIX: Removed nonisolated(unsafe) - properties are now properly MainActor-isolated
+    // Since this class is @MainActor, all properties are automatically isolated to the main actor,
+    // providing proper concurrency safety without bypassing Swift's checks.
+    private var lastDocument: DocumentSnapshot?
+    private var interestTask: Task<Void, Never>?
     private let performanceMonitor = PerformanceMonitor.shared
 
     // Dependency injection initializer
