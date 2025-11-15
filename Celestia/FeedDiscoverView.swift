@@ -47,158 +47,177 @@ struct FeedDiscoverView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                // Background
-                Color(.systemGroupedBackground)
-                    .ignoresSafeArea()
-
-                // Main content
-                if isInitialLoad {
-                    // Skeleton loader for initial load
-                    initialLoadingView
-                } else {
-                    // Main scroll view
-                    ScrollView {
-                        LazyVStack(spacing: 16) {
-                            ForEach(Array(displayedUsers.enumerated()), id: \.element.id) { index, user in
-                                ProfileFeedCard(
-                                    user: user,
-                                    initialIsFavorited: favorites.contains(user.id ?? ""),
-                                    onLike: {
-                                        handleLike(user: user)
-                                    },
-                                    onFavorite: {
-                                        handleFavorite(user: user)
-                                    },
-                                    onMessage: {
-                                        handleMessage(user: user)
-                                    },
-                                    onViewPhotos: {
-                                        selectedUser = user
-                                        showPhotoGallery = true
-                                    }
-                                )
-                                .onAppear {
-                                    if index == displayedUsers.count - preloadThreshold {
-                                        loadMoreUsers()
-                                    }
-                                }
-                            }
-
-                            // Loading indicator (for pagination)
-                            if isLoading {
-                                ProgressView()
-                                    .padding()
-                            }
-
-                            // End of results
-                            if !isLoading && displayedUsers.count >= users.count && users.count > 0 {
-                                endOfResultsView
-                            }
-
-                            // Error state
-                            if !errorMessage.isEmpty {
-                                errorStateView
-                            }
-                            // Empty state
-                            else if !isLoading && displayedUsers.isEmpty {
-                                emptyStateView
-                            }
-                        }
-                        .padding(.horizontal)
-                        .padding(.top, 8)
-                        .padding(.bottom)
-                    }
-                    .refreshable {
-                        await refreshFeed()
-                    }
+            mainContent
+                .navigationTitle("Discover")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    toolbarContent
                 }
-
-                // Match animation overlay
-                if showMatchAnimation {
-                    matchCelebrationView
-                }
-
-                // Action feedback toast
-                if showActionToast {
-                    VStack {
-                        HStack(spacing: 12) {
-                            Image(systemName: toastIcon)
-                                .font(.title3)
-                                .foregroundColor(.white)
-
-                            Text(toastMessage)
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 14)
-                        .background(toastColor)
-                        .cornerRadius(12)
-                        .shadow(color: toastColor.opacity(0.4), radius: 12, y: 6)
-                        .padding(.top, 16)
-
-                        Spacer()
-                    }
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                }
-            }
-            .navigationTitle("Discover")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showFilters = true
-                    } label: {
-                        ZStack(alignment: .topTrailing) {
-                            Image(systemName: "slider.horizontal.3")
-                                .font(.title3)
-                                .foregroundColor(.purple)
-
-                            if filters.hasActiveFilters {
-                                Circle()
-                                    .fill(Color.red)
-                                    .frame(width: 8, height: 8)
-                                    .offset(x: 2, y: -2)
-                            }
-                        }
-                    }
-                    .padding(.trailing, 4)
-                }
-            }
-            .sheet(isPresented: $showFilters) {
-                DiscoverFiltersView()
-                    .environmentObject(authService)
-            }
-            .sheet(isPresented: $showUserDetail) {
-                if let user = selectedUser {
-                    UserDetailView(user: user)
+                .sheet(isPresented: $showFilters) {
+                    DiscoverFiltersView()
                         .environmentObject(authService)
                 }
+                .sheet(isPresented: $showUserDetail) {
+                    if let user = selectedUser {
+                        UserDetailView(user: user)
+                            .environmentObject(authService)
+                    }
+                }
+                .sheet(isPresented: $showPhotoGallery) {
+                    if let user = selectedUser {
+                        PhotoGalleryView(user: user)
+                    }
+                }
+                .onAppear {
+                    if users.isEmpty {
+                        Task {
+                            await loadUsers()
+                            await savedProfilesViewModel.loadSavedProfiles()
+                            syncFavorites()
+                        }
+                    }
+                }
+                .onChange(of: filters.hasActiveFilters) { _ in
+                    Task {
+                        await reloadWithFilters()
+                    }
+                }
+                .onChange(of: savedProfilesViewModel.savedProfiles) { _ in
+                    syncFavorites()
+                }
+        }
+    }
+
+    // MARK: - Main Content
+
+    private var mainContent: some View {
+        ZStack {
+            // Background
+            Color(.systemGroupedBackground)
+                .ignoresSafeArea()
+
+            // Main content
+            if isInitialLoad {
+                // Skeleton loader for initial load
+                initialLoadingView
+            } else {
+                // Main scroll view
+                scrollContent
             }
-            .sheet(isPresented: $showPhotoGallery) {
-                if let user = selectedUser {
-                    PhotoGalleryView(user: user)
+
+            // Match animation overlay
+            if showMatchAnimation {
+                matchCelebrationView
+            }
+
+            // Action feedback toast
+            if showActionToast {
+                toastView
+            }
+        }
+    }
+
+    private var scrollContent: some View {
+        ScrollView {
+            LazyVStack(spacing: 16) {
+                ForEach(Array(displayedUsers.enumerated()), id: \.element.id) { index, user in
+                    ProfileFeedCard(
+                        user: user,
+                        initialIsFavorited: favorites.contains(user.id ?? ""),
+                        onLike: {
+                            handleLike(user: user)
+                        },
+                        onFavorite: {
+                            handleFavorite(user: user)
+                        },
+                        onMessage: {
+                            handleMessage(user: user)
+                        },
+                        onViewPhotos: {
+                            selectedUser = user
+                            showPhotoGallery = true
+                        }
+                    )
+                    .onAppear {
+                        if index == displayedUsers.count - preloadThreshold {
+                            loadMoreUsers()
+                        }
+                    }
+                }
+
+                // Loading indicator (for pagination)
+                if isLoading {
+                    ProgressView()
+                        .padding()
+                }
+
+                // End of results
+                if !isLoading && displayedUsers.count >= users.count && users.count > 0 {
+                    endOfResultsView
+                }
+
+                // Error state
+                if !errorMessage.isEmpty {
+                    errorStateView
+                }
+                // Empty state
+                else if !isLoading && displayedUsers.isEmpty {
+                    emptyStateView
                 }
             }
-            .onAppear {
-                if users.isEmpty {
-                    Task {
-                        await loadUsers()
-                        await savedProfilesViewModel.loadSavedProfiles()
-                        syncFavorites()
+            .padding(.horizontal)
+            .padding(.top, 8)
+            .padding(.bottom)
+        }
+        .refreshable {
+            await refreshFeed()
+        }
+    }
+
+    private var toastView: some View {
+        VStack {
+            HStack(spacing: 12) {
+                Image(systemName: toastIcon)
+                    .font(.title3)
+                    .foregroundColor(.white)
+
+                Text(toastMessage)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+            .background(toastColor)
+            .cornerRadius(12)
+            .shadow(color: toastColor.opacity(0.4), radius: 12, y: 6)
+            .padding(.top, 16)
+
+            Spacer()
+        }
+        .transition(.move(edge: .top).combined(with: .opacity))
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .navigationBarTrailing) {
+            Button {
+                showFilters = true
+            } label: {
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.title3)
+                        .foregroundColor(.purple)
+
+                    if filters.hasActiveFilters {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 8, height: 8)
+                            .offset(x: 2, y: -2)
                     }
                 }
             }
-            .onChange(of: filters.hasActiveFilters) { _ in
-                Task {
-                    await reloadWithFilters()
-                }
-            }
-            .onChange(of: savedProfilesViewModel.savedProfiles) { _ in
-                syncFavorites()
-            }
+            .padding(.trailing, 4)
         }
     }
 
