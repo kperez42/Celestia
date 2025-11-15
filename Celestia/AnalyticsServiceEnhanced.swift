@@ -73,7 +73,8 @@ class AnalyticsServiceEnhanced: ObservableObject {
 
         // Calculate trends
         let totalViews = viewsSnapshot.documents.count
-        let averageViewsPerDay = Double(totalViews) / Double(days)
+        // SAFETY: Avoid division by zero if days is 0
+        let averageViewsPerDay = days > 0 ? Double(totalViews) / Double(days) : 0
 
         // Calculate recent trend (last 7 days vs previous 7 days)
         let last7Days = Calendar.current.date(byAdding: .day, value: -7, to: Date())!

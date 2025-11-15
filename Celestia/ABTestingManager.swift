@@ -61,7 +61,12 @@ class ABTestingManager: ObservableObject {
 
             // Check if user matches targeting criteria
             if await shouldIncludeUser(in: experiment) {
-                let variant = selectVariant(for: experiment, userId: userId)
+                // SAFETY: Handle experiments with no variants gracefully
+                guard let variant = selectVariant(for: experiment, userId: userId) else {
+                    Logger.shared.warning("Skipping experiment '\(experiment.name)' - no variants available", category: .general)
+                    continue
+                }
+
                 userVariants[experiment.id] = variant.id
 
                 // Save assignment to Firestore
@@ -81,7 +86,20 @@ class ABTestingManager: ObservableObject {
     }
 
     /// Selects a variant for a user based on traffic allocation
-    private func selectVariant(for experiment: Experiment, userId: String) -> Variant {
+    private func selectVariant(for experiment: Experiment, userId: String) -> Variant? {
+        // SAFETY: Handle edge case of empty variants array
+        guard !experiment.variants.isEmpty else {
+            Logger.shared.error("Experiment '\(experiment.name)' has no variants", category: .general)
+            CrashlyticsManager.shared.recordError(
+                NSError(domain: "ABTestingManager", code: -1, userInfo: [
+                    "message": "Empty variants array",
+                    "experimentId": experiment.id,
+                    "experimentName": experiment.name
+                ])
+            )
+            return nil
+        }
+
         // Use consistent hashing to ensure same user always gets same variant
         let hash = abs(userId.hashValue) % 100
         var cumulativeTraffic = 0
@@ -93,8 +111,8 @@ class ABTestingManager: ObservableObject {
             }
         }
 
-        // Fallback to control
-        return experiment.variants.first { $0.isControl } ?? experiment.variants[0]
+        // Fallback to control, or first variant if no control exists
+        return experiment.variants.first { $0.isControl } ?? experiment.variants.first
     }
 
     /// Checks if user should be included in experiment based on targeting

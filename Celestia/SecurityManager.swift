@@ -350,11 +350,18 @@ class SecurityManager: ObservableObject {
         }
 
         // Schedule periodic security checks
+        // SAFETY: Check for task cancellation to prevent memory leaks
         Task {
-            while true {
+            while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 5 * 60 * 1_000_000_000) // Every 5 minutes
+
+                // Check again after sleep in case task was cancelled during sleep
+                guard !Task.isCancelled else { break }
+
                 await performSecurityCheck()
             }
+
+            Logger.shared.debug("Security monitoring task cancelled", category: .security)
         }
     }
 
