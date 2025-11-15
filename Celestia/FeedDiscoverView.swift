@@ -10,6 +10,7 @@ import SwiftUI
 struct FeedDiscoverView: View {
     @EnvironmentObject var authService: AuthService
     @StateObject private var filters = DiscoveryFilters.shared
+    @StateObject private var savedProfilesViewModel = SavedProfilesViewModel()
     @Binding var selectedTab: Int
 
     @State private var users: [User] = []
@@ -53,6 +54,7 @@ struct FeedDiscoverView: View {
                             ForEach(Array(displayedUsers.enumerated()), id: \.element.id) { index, user in
                                 ProfileFeedCard(
                                     user: user,
+                                    initialIsFavorited: favorites.contains(user.id ?? ""),
                                     onLike: {
                                         handleLike(user: user)
                                     },
@@ -177,6 +179,9 @@ struct FeedDiscoverView: View {
                 if users.isEmpty {
                     Task {
                         await loadUsers()
+                        await savedProfilesViewModel.loadSavedProfiles()
+                        // Sync favorites set with saved profiles
+                        favorites = Set(savedProfilesViewModel.savedProfiles.compactMap { $0.user.id })
                     }
                 }
             }
@@ -555,13 +560,20 @@ struct FeedDiscoverView: View {
         let wasFavorited = favorites.contains(userId)
 
         if wasFavorited {
+            // Remove from favorites
             favorites.remove(userId)
             showToast(
                 message: "Removed from saved",
                 icon: "star.slash",
                 color: .orange
             )
+
+            // Remove from SavedProfilesViewModel
+            if let savedProfile = savedProfilesViewModel.savedProfiles.first(where: { $0.user.id == userId }) {
+                savedProfilesViewModel.unsaveProfile(savedProfile)
+            }
         } else {
+            // Add to favorites
             favorites.insert(userId)
             let truncatedName = user.fullName.count > 20 ? String(user.fullName.prefix(20)) + "..." : user.fullName
             showToast(
@@ -569,12 +581,14 @@ struct FeedDiscoverView: View {
                 icon: "star.fill",
                 color: .orange
             )
+
+            // Save to SavedProfilesViewModel
+            Task {
+                await savedProfilesViewModel.saveProfile(user: user)
+            }
         }
 
         HapticManager.shared.impact(.light)
-
-        // Save to UserDefaults
-        UserDefaults.standard.set(Array(favorites), forKey: "favoriteUserIds")
     }
 
     private func handleMessage(user: User) {

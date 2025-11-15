@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ProfileFeedCard: View {
     let user: User
+    let initialIsFavorited: Bool
     let onLike: () -> Void
     let onFavorite: () -> Void
     let onMessage: () -> Void
@@ -47,6 +48,9 @@ struct ProfileFeedCard: View {
         .background(Color(.systemBackground))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
+        .onAppear {
+            isFavorited = initialIsFavorited
+        }
     }
 
     // MARK: - Components
@@ -329,6 +333,7 @@ struct ProfileFeedCardSkeleton: View {
                 ageRangeMin: 25,
                 ageRangeMax: 35
             ),
+            initialIsFavorited: false,
             onLike: {},
             onFavorite: {},
             onMessage: {},
