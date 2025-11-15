@@ -187,6 +187,7 @@ struct ProfileView: View {
                 userName: authService.currentUser?.fullName ?? "User"
             )
         }
+        .networkStatusBanner() // UX: Show offline status
     }
 
     // MARK: - Tip Action Handler

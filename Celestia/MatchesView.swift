@@ -157,6 +157,7 @@ struct MatchesView: View {
                     .environmentObject(authService)
             }
         }
+        .networkStatusBanner() // UX: Show offline status
     }
     
     // MARK: - Header

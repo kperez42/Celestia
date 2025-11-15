@@ -95,6 +95,7 @@ struct DiscoverView: View {
                 viewModel.applyFilters()
             }
         }
+        .networkStatusBanner() // UX: Show offline status
     }
     
     // MARK: - Header
