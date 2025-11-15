@@ -245,7 +245,7 @@ struct EmptyStateView: View {
 
 #if DEBUG
 struct LoadingState_Previews: PreviewProvider {
-    static var previews: some Group {
+    static var previews: some View {
         Group {
             LoadingView()
                 .previewDisplayName("Loading")

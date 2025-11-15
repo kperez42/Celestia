@@ -487,35 +487,8 @@ struct ErrorView: View {
     }
 }
 
-// MARK: - Error State Enum
-
-enum LoadingState<T> {
-    case idle
-    case loading
-    case success(T)
-    case failure(CelestiaError)
-
-    var isLoading: Bool {
-        if case .loading = self {
-            return true
-        }
-        return false
-    }
-
-    var error: CelestiaError? {
-        if case .failure(let error) = self {
-            return error
-        }
-        return nil
-    }
-
-    var value: T? {
-        if case .success(let value) = self {
-            return value
-        }
-        return nil
-    }
-}
+// MARK: - Error State Enum (REMOVED - now using LoadingState.swift)
+// LoadingState<T> is now defined in LoadingState.swift for consistent usage across the app
 
 #Preview("Error View") {
     ErrorView(error: .networkError) {

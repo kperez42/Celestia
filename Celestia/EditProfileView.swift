@@ -851,7 +851,7 @@ struct EditProfileView: View {
             }
             
             if languages.isEmpty {
-                EmptyStateView(
+                AddItemButton(
                     icon: "globe",
                     message: "Add languages you speak",
                     action: { showLanguagePicker = true }
@@ -903,7 +903,7 @@ struct EditProfileView: View {
             }
             
             if interests.isEmpty {
-                EmptyStateView(
+                AddItemButton(
                     icon: "star.fill",
                     message: "Add your interests",
                     action: { showInterestPicker = true }
@@ -955,7 +955,7 @@ struct EditProfileView: View {
             }
 
             if prompts.isEmpty {
-                EmptyStateView(
+                AddItemButton(
                     icon: "quote.bubble.fill",
                     message: "Add prompts to showcase your personality",
                     action: { showPromptsEditor = true }
@@ -1303,18 +1303,18 @@ struct TagChip: View {
     }
 }
 
-struct EmptyStateView: View {
+struct AddItemButton: View {
     let icon: String
     let message: String
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             VStack(spacing: 12) {
                 Image(systemName: icon)
                     .font(.title)
                     .foregroundColor(.gray.opacity(0.5))
-                
+
                 Text(message)
                     .font(.subheadline)
                     .foregroundColor(.gray)
