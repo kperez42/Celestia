@@ -63,7 +63,8 @@ class ChatViewModel: ObservableObject {
         // Find match between current user and other user
         loadTask = Task {
             guard !Task.isCancelled else { return }
-            if let match = try? await MatchService.shared.fetchMatch(user1Id: currentUserId, user2Id: otherUserId),
+            // ARCHITECTURE FIX: Use injected matchService instead of .shared singleton
+            if let match = try? await matchService.fetchMatch(user1Id: currentUserId, user2Id: otherUserId),
                let matchId = match.id {
                 guard !Task.isCancelled else { return }
                 await loadMessages(for: matchId)
@@ -102,10 +103,12 @@ class ChatViewModel: ObservableObject {
         Task {
             do {
                 // Find or create match
-                if let match = try? await MatchService.shared.fetchMatch(user1Id: currentUserId, user2Id: otherUserId),
+                // ARCHITECTURE FIX: Use injected matchService instead of .shared singleton
+                if let match = try? await matchService.fetchMatch(user1Id: currentUserId, user2Id: otherUserId),
                    let matchId = match.id {
 
-                    try await MessageService.shared.sendMessage(
+                    // ARCHITECTURE FIX: Use injected messageService instead of .shared singleton
+                    try await messageService.sendMessage(
                         matchId: matchId,
                         senderId: currentUserId,
                         receiverId: otherUserId,
@@ -119,7 +122,8 @@ class ChatViewModel: ObservableObject {
     }
 
     func markMessagesAsRead(matchID: String, currentUserID: String) async {
-        await MessageService.shared.markMessagesAsRead(matchId: matchID, userId: currentUserID)
+        // ARCHITECTURE FIX: Use injected messageService instead of .shared singleton
+        await messageService.markMessagesAsRead(matchId: matchID, userId: currentUserID)
     }
     
     /// Cleanup method to cancel ongoing tasks and remove listeners
