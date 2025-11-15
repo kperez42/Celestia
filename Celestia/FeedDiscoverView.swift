@@ -36,6 +36,15 @@ struct FeedDiscoverView: View {
     private let usersPerPage = 10
     private let preloadThreshold = 3 // Load more when 3 items from bottom
 
+    // Helper gradient for buttons
+    private var buttonGradient: LinearGradient {
+        LinearGradient(
+            colors: [.purple, .pink],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -125,11 +134,9 @@ struct FeedDiscoverView: View {
                         }
                         .padding(.horizontal, 20)
                         .padding(.vertical, 14)
-                        .background(
-                            toastColor
-                                .shadow(color: toastColor.opacity(0.4), radius: 12, y: 6)
-                        )
+                        .background(toastColor)
                         .cornerRadius(12)
+                        .shadow(color: toastColor.opacity(0.4), radius: 12, y: 6)
                         .padding(.top, 16)
 
                         Spacer()
@@ -242,13 +249,7 @@ struct FeedDiscoverView: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 24)
                     .padding(.vertical, 12)
-                    .background(
-                        LinearGradient(
-                            colors: [.purple, .pink],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
+                    .background(buttonGradient)
                     .cornerRadius(12)
             }
         }
@@ -295,13 +296,7 @@ struct FeedDiscoverView: View {
                 .foregroundColor(.white)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 14)
-                .background(
-                    LinearGradient(
-                        colors: [.purple, .pink],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
+                .background(buttonGradient)
                 .cornerRadius(12)
             }
         }
