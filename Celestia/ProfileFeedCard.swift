@@ -15,6 +15,7 @@ struct ProfileFeedCard: View {
     let onViewPhotos: () -> Void
 
     @State private var isFavorited = false
+    @State private var isLiked = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -139,11 +140,12 @@ struct ProfileFeedCard: View {
         HStack(spacing: 12) {
             // Like/Heart button
             ActionButton(
-                icon: "heart.fill",
+                icon: isLiked ? "heart.fill" : "heart",
                 color: .pink,
                 label: "Like",
                 action: {
                     HapticManager.shared.impact(.medium)
+                    isLiked.toggle()
                     onLike()
                 }
             )
