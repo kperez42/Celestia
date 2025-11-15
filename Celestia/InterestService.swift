@@ -47,7 +47,7 @@ class InterestService: ObservableObject {
                 return
             }
         } catch {
-            Logger.shared.warning("Failed to check existing interest, proceeding anyway", category: .matching, error: error)
+            Logger.shared.error("Failed to check existing interest, proceeding anyway", category: .matching, error: error)
             // Continue with sending interest rather than failing silently
         }
 
