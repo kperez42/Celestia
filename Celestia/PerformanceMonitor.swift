@@ -614,12 +614,18 @@ class PerformanceStatistics {
         let sorted = durations.sorted()
         let sum = durations.reduce(0, +)
 
+        // SAFETY: Use safe optionals even though guard above ensures non-empty
+        guard let minValue = sorted.first,
+              let maxValue = sorted.last else {
+            return nil
+        }
+
         return Statistics(
             count: durations.count,
             average: sum / Double(durations.count),
             median: sorted[sorted.count / 2],
-            min: sorted.first!,
-            max: sorted.last!,
+            min: minValue,
+            max: maxValue,
             p95: sorted[Int(Double(sorted.count) * 0.95)]
         )
     }
