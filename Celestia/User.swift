@@ -8,8 +8,13 @@
 import Foundation
 import FirebaseFirestore
 
-struct User: Identifiable, Codable {
+struct User: Identifiable, Codable, Equatable {
     @DocumentID var id: String?
+
+    // Equatable implementation - compare by id
+    static func == (lhs: User, rhs: User) -> Bool {
+        return lhs.id == rhs.id
+    }
     
     // Basic Info
     var email: String
