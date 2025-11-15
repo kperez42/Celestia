@@ -10,7 +10,7 @@ import FirebaseFirestore
 
 struct SavedProfilesView: View {
     @EnvironmentObject var authService: AuthService
-    @StateObject private var viewModel = SavedProfilesViewModel()
+    @ObservedObject private var viewModel = SavedProfilesViewModel.shared
     @Environment(\.dismiss) var dismiss
     @State private var selectedUser: User?
     @State private var showUserDetail = false
@@ -443,6 +443,9 @@ struct SavedProfile: Identifiable {
 
 @MainActor
 class SavedProfilesViewModel: ObservableObject {
+    // Singleton instance for shared state across views
+    static let shared = SavedProfilesViewModel()
+
     @Published var savedProfiles: [SavedProfile] = []
     @Published var isLoading = false
     @Published var errorMessage = ""
@@ -454,6 +457,9 @@ class SavedProfilesViewModel: ObservableObject {
     }
 
     private let db = Firestore.firestore()
+
+    // Private initializer for singleton pattern
+    private init() {}
 
     func loadSavedProfiles() async {
         guard let currentUserId = AuthService.shared.currentUser?.id else { return }
@@ -621,12 +627,16 @@ class SavedProfilesViewModel: ObservableObject {
     }
 
     func saveProfile(user: User, note: String? = nil) async {
-        guard let currentUserId = AuthService.shared.currentUser?.id else { return }
+        guard let currentUserId = AuthService.shared.currentUser?.id,
+              let savedUserId = user.id else {
+            Logger.shared.error("Cannot save profile: Missing user ID", category: .general)
+            return
+        }
 
         do {
             let saveData: [String: Any] = [
                 "userId": currentUserId,
-                "savedUserId": user.id,
+                "savedUserId": savedUserId,
                 "savedAt": Timestamp(date: Date()),
                 "note": note ?? ""
             ]
@@ -642,15 +652,15 @@ class SavedProfilesViewModel: ObservableObject {
             )
             savedProfiles.insert(newSaved, at: 0)
 
-            Logger.shared.info("Saved profile: \(user.fullName)", category: .general)
+            Logger.shared.info("Saved profile: \(user.fullName) (\(docRef.documentID))", category: .general)
 
             // Track analytics
             AnalyticsServiceEnhanced.shared.trackEvent(
                 .profileSaved,
-                properties: ["savedUserId": user.id]
+                properties: ["savedUserId": savedUserId]
             )
         } catch {
-            Logger.shared.error("Error saving profile", category: .general, error: error)
+            Logger.shared.error("Error saving profile to Firestore", category: .general, error: error)
         }
     }
 }
