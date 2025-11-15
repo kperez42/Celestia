@@ -503,9 +503,10 @@ struct FeedDiscoverView: View {
         }
 
         // Auto-hide after 2 seconds
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+            guard let self = self else { return }
             withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                showActionToast = false
+                self.showActionToast = false
             }
         }
     }
