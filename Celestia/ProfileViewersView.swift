@@ -312,7 +312,11 @@ class ProfileViewersViewModel: ObservableObject {
     }
 
     var weekCount: Int {
-        let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date())!
+        // CODE QUALITY FIX: Removed force unwrapping - handle date calculation failure safely
+        guard let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) else {
+            // If date calculation fails, return total count as fallback
+            return viewers.count
+        }
         return viewers.filter { $0.timestamp >= weekAgo }.count
     }
 

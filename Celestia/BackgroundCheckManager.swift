@@ -84,7 +84,11 @@ class BackgroundCheckManager {
         Logger.shared.info("Requesting background check for user", category: .general)
 
         // Create request
-        let url = URL(string: "\(apiBaseURL)/candidates")!
+        // CODE QUALITY FIX: Removed force unwrapping - handle URL creation failure safely
+        guard let url = URL(string: "\(apiBaseURL)/candidates") else {
+            Logger.shared.error("Invalid background check API URL", category: .general)
+            throw BackgroundCheckError.configurationError
+        }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
@@ -115,7 +119,11 @@ class BackgroundCheckManager {
             throw BackgroundCheckError.configurationError
         }
 
-        let url = URL(string: "\(apiBaseURL)/reports/\(checkID)")!
+        // CODE QUALITY FIX: Removed force unwrapping - handle URL creation failure safely
+        guard let url = URL(string: "\(apiBaseURL)/reports/\(checkID)") else {
+            Logger.shared.error("Invalid background check status URL", category: .general)
+            throw BackgroundCheckError.configurationError
+        }
         var request = URLRequest(url: url)
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 

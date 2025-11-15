@@ -16,6 +16,11 @@ struct SettingsView: View {
     @State private var showPremiumUpgrade = false
     @State private var showSeeWhoLikesYou = false
 
+    // CODE QUALITY FIX: Define URL constants to avoid force unwrapping
+    private static let supportEmailURL = URL(string: "mailto:support@celestia.app")!
+    private static let privacyPolicyURL = URL(string: "https://celestia.app/privacy")!
+    private static let termsOfServiceURL = URL(string: "https://celestia.app/terms")!
+
     var body: some View {
         NavigationStack {
             List {
@@ -183,21 +188,21 @@ struct SettingsView: View {
                 }
                 
                 Section("Support") {
-                    Link(destination: URL(string: "mailto:support@celestia.app")!) {
+                    Link(destination: Self.supportEmailURL) {
                         HStack {
                             Image(systemName: "envelope")
                             Text("Contact Support")
                         }
                     }
-                    
-                    Link(destination: URL(string: "https://celestia.app/privacy")!) {
+
+                    Link(destination: Self.privacyPolicyURL) {
                         HStack {
                             Image(systemName: "lock.shield")
                             Text("Privacy Policy")
                         }
                     }
-                    
-                    Link(destination: URL(string: "https://celestia.app/terms")!) {
+
+                    Link(destination: Self.termsOfServiceURL) {
                         HStack {
                             Image(systemName: "doc.text")
                             Text("Terms of Service")

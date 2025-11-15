@@ -452,7 +452,11 @@ class SavedProfilesViewModel: ObservableObject {
     @Published var unsavingProfileId: String?
 
     var savedThisWeek: Int {
-        let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date())!
+        // CODE QUALITY FIX: Removed force unwrapping - handle date calculation failure safely
+        guard let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) else {
+            // If date calculation fails, return total count as fallback
+            return savedProfiles.count
+        }
         return savedProfiles.filter { $0.savedAt >= weekAgo }.count
     }
 

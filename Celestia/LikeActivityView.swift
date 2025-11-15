@@ -330,7 +330,14 @@ class LikeActivityViewModel: ObservableObject {
             // Categorize by time
             let now = Date()
             let todayStart = Calendar.current.startOfDay(for: now)
-            let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: now)!
+            // CODE QUALITY FIX: Removed force unwrapping - handle date calculation failure safely
+            guard let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: now) else {
+                // If date calculation fails, treat all non-today activity as "week"
+                todayActivity = allActivity.filter { $0.timestamp >= todayStart }
+                weekActivity = allActivity.filter { $0.timestamp < todayStart }
+                olderActivity = []
+                return
+            }
 
             todayActivity = allActivity.filter { $0.timestamp >= todayStart }
             weekActivity = allActivity.filter { $0.timestamp < todayStart && $0.timestamp >= weekAgo }

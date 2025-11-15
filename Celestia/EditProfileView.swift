@@ -1037,11 +1037,11 @@ struct EditProfileView: View {
     }
 
     // MARK: - Helper Functions
-    
+
     private var isFormValid: Bool {
+        // CODE QUALITY FIX: Removed force unwrapping - use optional chaining
         !fullName.isEmpty &&
-        Int(age) != nil &&
-        Int(age)! >= 18 &&
+        (Int(age) ?? 0) >= 18 &&
         !location.isEmpty &&
         !country.isEmpty
     }
