@@ -281,6 +281,15 @@ extension LinearGradient {
             endPoint: .bottomTrailing
         )
     }
+
+    /// Clear gradient (for transparent borders/backgrounds)
+    static var clear: LinearGradient {
+        LinearGradient(
+            colors: [.clear],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+    }
 }
 
 // MARK: - Array Extensions

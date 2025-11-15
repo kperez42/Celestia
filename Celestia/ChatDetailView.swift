@@ -58,9 +58,9 @@ struct ChatDetailView: View {
                     Image(systemName: "arrow.up.circle.fill")
                         .font(.system(size: 32))
                         .foregroundStyle(
-                            messageText.isEmpty ? 
+                            messageText.isEmpty ?
                             LinearGradient(colors: [.gray, .gray], startPoint: .leading, endPoint: .trailing) :
-                            LinearGradient(colors: [.purple, .pink], startPoint: .leading, endPoint: .trailing)
+                            LinearGradient.brandPrimary
                         )
                 }
                 .disabled(messageText.isEmpty)
