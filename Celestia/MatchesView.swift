@@ -148,7 +148,7 @@ struct MatchesView: View {
             }
             .sheet(item: $selectedMatch) { match in
                 if let user = getMatchedUser(match) {
-                    ChatView(match: match, matchedUser: user)
+                    ChatView(match: match, otherUser: user)
                         .environmentObject(authService)
                 }
             }
