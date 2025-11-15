@@ -180,8 +180,7 @@ struct FeedDiscoverView: View {
                     Task {
                         await loadUsers()
                         await savedProfilesViewModel.loadSavedProfiles()
-                        // Sync favorites set with saved profiles
-                        favorites = Set(savedProfilesViewModel.savedProfiles.compactMap { $0.user.id })
+                        syncFavorites()
                     }
                 }
             }
@@ -190,12 +189,18 @@ struct FeedDiscoverView: View {
                     await reloadWithFilters()
                 }
             }
-            .onChange(of: savedProfilesViewModel.savedProfiles) { newProfiles in
-                // Sync favorites set whenever savedProfiles changes (save/unsave from any view)
-                favorites = Set(newProfiles.compactMap { $0.user.id })
-                Logger.shared.debug("Favorites set synced: \(favorites.count) profiles", category: .general)
+            .onChange(of: savedProfilesViewModel.savedProfiles) { _ in
+                syncFavorites()
             }
         }
+    }
+
+    // MARK: - Helper Methods
+
+    private func syncFavorites() {
+        let userIds = savedProfilesViewModel.savedProfiles.compactMap { $0.user.id }
+        favorites = Set(userIds)
+        Logger.shared.debug("Favorites set synced: \(favorites.count) profiles", category: .general)
     }
 
     // MARK: - Initial Loading View
