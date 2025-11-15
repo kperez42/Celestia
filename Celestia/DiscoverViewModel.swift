@@ -119,6 +119,8 @@ class DiscoverViewModel: ObservableObject {
         await performanceMonitor.preloadImages(imageURLs)
     }
     
+    // DEPRECATED: Use SwipeService.shared.likeUser() directly for unified matching
+    // This method kept for backward compatibility but should not be used for new code
     func sendInterest(from currentUserID: String, to targetUserID: String, completion: @escaping (Bool) -> Void) {
         // Cancel previous interest task if any
         interestTask?.cancel()
@@ -126,14 +128,16 @@ class DiscoverViewModel: ObservableObject {
         interestTask = Task { @MainActor in
             guard !Task.isCancelled else { return }
             do {
-                try await InterestService.shared.sendInterest(
+                // Use SwipeService for unified matching system
+                let isMatch = try await SwipeService.shared.likeUser(
                     fromUserId: currentUserID,
-                    toUserId: targetUserID
+                    toUserId: targetUserID,
+                    isSuperLike: false
                 )
                 guard !Task.isCancelled else { return }
-                completion(true)
+                completion(isMatch)
             } catch {
-                Logger.shared.error("Error sending interest", category: .matching, error: error)
+                Logger.shared.error("Error sending like via deprecated sendInterest", category: .matching, error: error)
                 guard !Task.isCancelled else { return }
                 completion(false)
             }
