@@ -172,8 +172,7 @@ class DependencyContainer: ObservableObject {
     /// Creates a ProfileEditViewModel with injected dependencies
     func makeProfileEditViewModel() -> ProfileEditViewModel {
         return ProfileEditViewModel(
-            userService: userService,
-            authService: authService
+            userService: userService
         )
     }
 }
