@@ -322,6 +322,8 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
     @State private var isLoading = false
     @State private var loadError: Error?
     @State private var retryCount = 0
+    // PERFORMANCE FIX: Store task for cancellation when view disappears
+    @State private var loadTask: Task<Void, Never>?
 
     init(
         url: URL?,
@@ -370,6 +372,11 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
                     }
             }
         }
+        // PERFORMANCE FIX: Cancel image loading when view disappears
+        .onDisappear {
+            loadTask?.cancel()
+            loadTask = nil
+        }
     }
 
     private func loadImage() {
@@ -383,13 +390,21 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
             return
         }
 
+        // Cancel previous task if any
+        loadTask?.cancel()
+
         // Load from network
         isLoading = true
         loadError = nil
 
-        Task {
+        loadTask = Task {
             do {
                 let (data, _) = try await URLSession.shared.data(from: url)
+
+                guard !Task.isCancelled else {
+                    await MainActor.run { self.isLoading = false }
+                    return
+                }
 
                 if let downloadedImage = UIImage(data: data) {
                     await MainActor.run {
@@ -404,6 +419,10 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
                     }
                 }
             } catch {
+                guard !Task.isCancelled else {
+                    await MainActor.run { self.isLoading = false }
+                    return
+                }
                 await MainActor.run {
                     self.isLoading = false
                     self.loadError = error
@@ -437,6 +456,8 @@ struct CachedProfileImage: View {
     @State private var isLoading = false
     @State private var loadError: Error?
     @State private var retryCount = 0
+    // PERFORMANCE FIX: Store task for cancellation when view disappears
+    @State private var loadTask: Task<Void, Never>?
 
     var body: some View {
         Group {
@@ -484,6 +505,11 @@ struct CachedProfileImage: View {
                 }
             }
         }
+        // PERFORMANCE FIX: Cancel image loading when view disappears
+        .onDisappear {
+            loadTask?.cancel()
+            loadTask = nil
+        }
     }
 
     private func loadImage() {
@@ -497,13 +523,21 @@ struct CachedProfileImage: View {
             return
         }
 
+        // Cancel previous task if any
+        loadTask?.cancel()
+
         // Load from network
         isLoading = true
         loadError = nil
 
-        Task {
+        loadTask = Task {
             do {
                 let (data, _) = try await URLSession.shared.data(from: url)
+
+                guard !Task.isCancelled else {
+                    await MainActor.run { self.isLoading = false }
+                    return
+                }
 
                 if let downloadedImage = UIImage(data: data) {
                     await MainActor.run {
@@ -518,6 +552,10 @@ struct CachedProfileImage: View {
                     }
                 }
             } catch {
+                guard !Task.isCancelled else {
+                    await MainActor.run { self.isLoading = false }
+                    return
+                }
                 await MainActor.run {
                     self.isLoading = false
                     self.loadError = error
@@ -538,6 +576,8 @@ struct CachedCardImage: View {
     @State private var isLoading = false
     @State private var loadError: Error?
     @State private var retryCount = 0
+    // PERFORMANCE FIX: Store task for cancellation when view disappears
+    @State private var loadTask: Task<Void, Never>?
 
     var body: some View {
         Group {
@@ -604,6 +644,11 @@ struct CachedCardImage: View {
                 }
             }
         }
+        // PERFORMANCE FIX: Cancel image loading when view disappears
+        .onDisappear {
+            loadTask?.cancel()
+            loadTask = nil
+        }
     }
 
     private func loadImage() {
@@ -617,13 +662,21 @@ struct CachedCardImage: View {
             return
         }
 
+        // Cancel previous task if any
+        loadTask?.cancel()
+
         // Load from network
         isLoading = true
         loadError = nil
 
-        Task {
+        loadTask = Task {
             do {
                 let (data, _) = try await URLSession.shared.data(from: url)
+
+                guard !Task.isCancelled else {
+                    await MainActor.run { self.isLoading = false }
+                    return
+                }
 
                 if let downloadedImage = UIImage(data: data) {
                     await MainActor.run {
@@ -638,6 +691,10 @@ struct CachedCardImage: View {
                     }
                 }
             } catch {
+                guard !Task.isCancelled else {
+                    await MainActor.run { self.isLoading = false }
+                    return
+                }
                 await MainActor.run {
                     self.isLoading = false
                     self.loadError = error

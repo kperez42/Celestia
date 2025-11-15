@@ -46,6 +46,12 @@ class DiscoverViewModel: ObservableObject {
     private var interestTask: Task<Void, Never>?
     private let performanceMonitor = PerformanceMonitor.shared
 
+    // PERFORMANCE FIX: Store tasks for cancellation to prevent battery waste
+    private var loadUsersTask: Task<Void, Never>?
+    private var likeTask: Task<Void, Never>?
+    private var passTask: Task<Void, Never>?
+    private var filterTask: Task<Void, Never>?
+
     // Dependency injection initializer
     // ARCHITECTURE FIX: Inject all required services to enable testing and reduce coupling
     init(
@@ -67,13 +73,21 @@ class DiscoverViewModel: ObservableObject {
             return
         }
 
+        // Cancel previous load task if any
+        loadUsersTask?.cancel()
+
         isLoading = true
         errorMessage = ""
 
         // Track query performance
         let queryStart = Date()
 
-        Task {
+        loadUsersTask = Task {
+            guard !Task.isCancelled else {
+                isLoading = false
+                return
+            }
+
             do {
                 // Use UserService instead of direct Firestore access
                 let ageRange = currentUser.ageRangeMin...currentUser.ageRangeMax
@@ -87,6 +101,11 @@ class DiscoverViewModel: ObservableObject {
                     limit: limit,
                     reset: users.isEmpty
                 )
+
+                guard !Task.isCancelled else {
+                    isLoading = false
+                    return
+                }
 
                 // Track network latency
                 let queryDuration = Date().timeIntervalSince(queryStart) * 1000
@@ -105,6 +124,10 @@ class DiscoverViewModel: ObservableObject {
 
                 Logger.shared.info("Loaded \(users.count) users in \(String(format: "%.0f", queryDuration))ms", category: .matching)
             } catch {
+                guard !Task.isCancelled else {
+                    isLoading = false
+                    return
+                }
                 errorMessage = error.localizedDescription
                 isLoading = false
                 Logger.shared.error("Error loading users", category: .matching, error: error)
@@ -389,6 +412,9 @@ class DiscoverViewModel: ObservableObject {
             return
         }
 
+        // Cancel previous filter task if any
+        filterTask?.cancel()
+
         // Get current user location for distance filtering
         let currentLocation: (lat: Double, lon: Double)? = {
             if let lat = currentUser.latitude, let lon = currentUser.longitude {
@@ -400,7 +426,12 @@ class DiscoverViewModel: ObservableObject {
         // Show loading state while applying filters
         isLoading = true
 
-        Task {
+        filterTask = Task {
+            guard !Task.isCancelled else {
+                isLoading = false
+                return
+            }
+
             // Clear current users and reload
             users.removeAll()
             lastDocument = nil
@@ -410,6 +441,11 @@ class DiscoverViewModel: ObservableObject {
 
             // Wait for users to load, then filter them locally
             try? await Task.sleep(nanoseconds: 500_000_000) // Wait 0.5s for load
+
+            guard !Task.isCancelled else {
+                isLoading = false
+                return
+            }
 
             await MainActor.run {
                 // Apply filters to loaded users
@@ -465,13 +501,27 @@ class DiscoverViewModel: ObservableObject {
 
     /// Cleanup method to cancel ongoing tasks
     func cleanup() {
+        // PERFORMANCE FIX: Cancel all ongoing tasks to prevent battery waste
         interestTask?.cancel()
         interestTask = nil
+        loadUsersTask?.cancel()
+        loadUsersTask = nil
+        likeTask?.cancel()
+        likeTask = nil
+        passTask?.cancel()
+        passTask = nil
+        filterTask?.cancel()
+        filterTask = nil
         users = []
         lastDocument = nil
     }
 
     deinit {
+        // Cancel all tasks on deinit
         interestTask?.cancel()
+        loadUsersTask?.cancel()
+        likeTask?.cancel()
+        passTask?.cancel()
+        filterTask?.cancel()
     }
 }
