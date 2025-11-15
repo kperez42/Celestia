@@ -181,6 +181,13 @@ class DiscoverViewModel: ObservableObject {
             return
         }
 
+        // Prevent liking yourself (should never happen, but safety check)
+        guard currentUserId != likedUserId else {
+            isProcessingAction = false
+            Logger.shared.warning("Attempted to like own profile", category: .matching)
+            return
+        }
+
         // Check daily like limit for non-premium users
         if !currentUser.isPremium {
             let canLike = await checkDailyLikeLimit()

@@ -249,6 +249,13 @@ struct UserDetailView: View {
               let targetUserID = user.id,
               !isProcessing else { return }
 
+        // Prevent liking yourself
+        guard currentUserID != targetUserID else {
+            errorMessage = "You can't like your own profile!"
+            showingError = true
+            return
+        }
+
         isProcessing = true
 
         Task {

@@ -488,7 +488,24 @@ struct FeedDiscoverView: View {
 
     private func handleLike(user: User) {
         guard let currentUserId = authService.currentUser?.id,
-              let userId = user.id else { return }
+              let userId = user.id else {
+            showToast(
+                message: "Unable to like. Please try again.",
+                icon: "exclamationmark.triangle.fill",
+                color: .red
+            )
+            return
+        }
+
+        // Prevent liking yourself
+        guard currentUserId != userId else {
+            showToast(
+                message: "You can't like your own profile!",
+                icon: "exclamationmark.triangle.fill",
+                color: .orange
+            )
+            return
+        }
 
         // Check rate limit
         guard RateLimiter.shared.canSendLike() else {
@@ -555,12 +572,19 @@ struct FeedDiscoverView: View {
     }
 
     private func handleFavorite(user: User) {
-        guard let userId = user.id else { return }
+        guard let userId = user.id else {
+            showToast(
+                message: "Unable to save profile",
+                icon: "exclamationmark.triangle.fill",
+                color: .red
+            )
+            return
+        }
 
         let wasFavorited = favorites.contains(userId)
 
         if wasFavorited {
-            // Remove from favorites
+            // Remove from favorites (optimistic update)
             favorites.remove(userId)
             showToast(
                 message: "Removed from saved",
@@ -573,7 +597,7 @@ struct FeedDiscoverView: View {
                 savedProfilesViewModel.unsaveProfile(savedProfile)
             }
         } else {
-            // Add to favorites
+            // Add to favorites (optimistic update)
             favorites.insert(userId)
             let truncatedName = user.fullName.count > 20 ? String(user.fullName.prefix(20)) + "..." : user.fullName
             showToast(
@@ -585,6 +609,20 @@ struct FeedDiscoverView: View {
             // Save to SavedProfilesViewModel
             Task {
                 await savedProfilesViewModel.saveProfile(user: user)
+
+                // Check if save succeeded (will be in savedProfiles array)
+                let saveSucceeded = savedProfilesViewModel.savedProfiles.contains(where: { $0.user.id == userId })
+                if !saveSucceeded {
+                    // Revert optimistic update on failure
+                    await MainActor.run {
+                        favorites.remove(userId)
+                        showToast(
+                            message: "Failed to save. Try again.",
+                            icon: "exclamationmark.triangle.fill",
+                            color: .red
+                        )
+                    }
+                }
             }
         }
 
@@ -645,19 +683,32 @@ struct PhotoGalleryView: View {
 
     @State private var selectedPhotoIndex = 0
 
+    // Filter out empty photo URLs
+    private var validPhotos: [String] {
+        user.photos.filter { !$0.isEmpty }
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
                 Color.black.ignoresSafeArea()
 
-                if user.photos.isEmpty {
+                if validPhotos.isEmpty {
                     // Show profile image if no photos
-                    CachedCardImage(url: URL(string: user.profileImageURL))
-                        .scaledToFit()
+                    VStack(spacing: 16) {
+                        CachedCardImage(url: URL(string: user.profileImageURL))
+                            .scaledToFit()
+                            .cornerRadius(12)
+                            .padding()
+
+                        Text("No additional photos")
+                            .font(.headline)
+                            .foregroundColor(.white.opacity(0.7))
+                    }
                 } else {
                     // Photo gallery
                     TabView(selection: $selectedPhotoIndex) {
-                        ForEach(Array(user.photos.enumerated()), id: \.offset) { index, photoURL in
+                        ForEach(Array(validPhotos.enumerated()), id: \.offset) { index, photoURL in
                             CachedCardImage(url: URL(string: photoURL))
                                 .scaledToFit()
                                 .tag(index)
