@@ -164,7 +164,12 @@ class CircuitBreaker: ObservableObject {
             }
 
             // Return first result (success or timeout)
-            let result = try await group.next()!
+            // CODE QUALITY FIX: Removed force unwrapping - handle nil case properly
+            guard let result = try await group.next() else {
+                // This should never happen since we added 2 tasks, but handle it safely
+                group.cancelAll()
+                throw CircuitBreakerError.timeout
+            }
             group.cancelAll()
             return result
         }

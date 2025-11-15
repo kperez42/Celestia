@@ -24,11 +24,11 @@ class UserService: ObservableObject, UserServiceProtocol {
 
     private let db = Firestore.firestore()
 
-    // SWIFT 6 CONCURRENCY: These properties are accessed across async boundaries
-    // but are always accessed from MainActor-isolated methods. Marked nonisolated(unsafe)
-    // to satisfy Swift 6 strict concurrency while maintaining thread safety through MainActor.
-    nonisolated(unsafe) private var lastDocument: DocumentSnapshot?
-    nonisolated(unsafe) private var searchTask: Task<Void, Never>?
+    // CONCURRENCY FIX: Removed nonisolated(unsafe) - properties are now properly MainActor-isolated
+    // Since this class is @MainActor, all properties are automatically isolated to the main actor,
+    // providing proper concurrency safety without bypassing Swift's checks.
+    private var lastDocument: DocumentSnapshot?
+    private var searchTask: Task<Void, Never>?
 
     // PERFORMANCE: Search result caching to reduce database queries
     private var searchCache: [String: CachedSearchResult] = [:]
@@ -177,17 +177,23 @@ class UserService: ObservableObject, UserServiceProtocol {
         let cacheKey = "\(searchQuery)_\(currentUserId)_\(limit)"
 
         // PERFORMANCE: Check cache first (5-minute TTL)
-        if let cached = searchCache[cacheKey], !cached.isExpired {
-            Logger.shared.debug("Search cache HIT for query: '\(searchQuery)'", category: .performance)
-            let cacheAge = Date().timeIntervalSince(cached.timestamp)
-            Task { @MainActor in
-                AnalyticsManager.shared.logEvent(.performance, parameters: [
-                    "type": "search_cache_hit",
-                    "query": searchQuery,
-                    "cache_age_seconds": cacheAge
-                ])
+        if let cached = searchCache[cacheKey] {
+            if !cached.isExpired {
+                Logger.shared.debug("Search cache HIT for query: '\(searchQuery)'", category: .performance)
+                let cacheAge = Date().timeIntervalSince(cached.timestamp)
+                Task { @MainActor in
+                    AnalyticsManager.shared.logEvent(.performance, parameters: [
+                        "type": "search_cache_hit",
+                        "query": searchQuery,
+                        "cache_age_seconds": cacheAge
+                    ])
+                }
+                return cached.results
+            } else {
+                // PERFORMANCE FIX: Remove expired entry immediately to prevent memory bloat
+                searchCache.removeValue(forKey: cacheKey)
+                Logger.shared.debug("Removed expired cache entry for query: '\(searchQuery)'", category: .performance)
             }
-            return cached.results
         }
 
         Logger.shared.debug("Search cache MISS for query: '\(searchQuery)' - querying repository", category: .performance)
@@ -221,6 +227,11 @@ class UserService: ObservableObject, UserServiceProtocol {
 
     /// Cache search results with TTL
     private func cacheSearchResults(cacheKey: String, results: [User]) {
+        // PERFORMANCE FIX: Periodically clean up expired entries (every 10 cache writes)
+        if searchCache.count % 10 == 0 {
+            cleanupExpiredCache()
+        }
+
         // Evict oldest entries if cache is full
         if searchCache.count >= maxSearchCacheSize {
             let oldestKey = searchCache.min(by: { $0.value.timestamp < $1.value.timestamp })?.key

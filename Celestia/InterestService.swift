@@ -40,10 +40,15 @@ class InterestService: ObservableObject {
             throw CelestiaError.rateLimitExceeded
         }
 
-        // Check if interest already exists
-        if let existingInterest = try? await fetchInterest(fromUserId: fromUserId, toUserId: toUserId) {
-            Logger.shared.info("Interest already sent to this user: \(existingInterest.id ?? "unknown")", category: .matching)
-            return
+        // UX FIX: Properly handle interest check instead of silent failure
+        do {
+            if let existingInterest = try await fetchInterest(fromUserId: fromUserId, toUserId: toUserId) {
+                Logger.shared.info("Interest already sent to this user: \(existingInterest.id ?? "unknown")", category: .matching)
+                return
+            }
+        } catch {
+            Logger.shared.warning("Failed to check existing interest, proceeding anyway", category: .matching, error: error)
+            // Continue with sending interest rather than failing silently
         }
 
         // Validate message if provided
@@ -63,17 +68,22 @@ class InterestService: ObservableObject {
         let docRef = try db.collection("interests").addDocument(from: interest)
         Logger.shared.info("Interest sent: \(docRef.documentID)", category: .matching)
 
-        // Check for mutual match
-        if let mutualInterest = try? await fetchInterest(fromUserId: toUserId, toUserId: fromUserId),
-           mutualInterest.status == "pending" {
-            // Both users liked each other - create match!
-            await MatchService.shared.createMatch(user1Id: fromUserId, user2Id: toUserId)
+        // CRITICAL UX FIX: Properly handle mutual match check - silently failing prevents matches!
+        do {
+            if let mutualInterest = try await fetchInterest(fromUserId: toUserId, toUserId: fromUserId),
+               mutualInterest.status == "pending" {
+                // Both users liked each other - create match!
+                await MatchService.shared.createMatch(user1Id: fromUserId, user2Id: toUserId)
 
-            // Update both interests to accepted
-            try await acceptInterest(interestId: docRef.documentID, fromUserId: fromUserId, toUserId: toUserId)
-            if let mutualId = mutualInterest.id {
-                try await acceptInterest(interestId: mutualId, fromUserId: toUserId, toUserId: fromUserId)
+                // Update both interests to accepted
+                try await acceptInterest(interestId: docRef.documentID, fromUserId: fromUserId, toUserId: toUserId)
+                if let mutualId = mutualInterest.id {
+                    try await acceptInterest(interestId: mutualId, fromUserId: toUserId, toUserId: fromUserId)
+                }
             }
+        } catch {
+            Logger.shared.error("Failed to check for mutual interest - match may be delayed", category: .matching, error: error)
+            // Don't throw - the interest was still sent successfully
         }
     }
     

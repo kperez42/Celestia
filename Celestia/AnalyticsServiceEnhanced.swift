@@ -32,7 +32,10 @@ class AnalyticsServiceEnhanced: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
-        let startDate = Calendar.current.date(byAdding: .day, value: -days, to: Date())!
+        // CODE QUALITY FIX: Removed force unwrapping - handle date calculation failure safely
+        guard let startDate = Calendar.current.date(byAdding: .day, value: -days, to: Date()) else {
+            throw AnalyticsError.invalidDateRange
+        }
 
         // Fetch profile views
         let viewsSnapshot = try await db.collection("profile_views")
@@ -77,8 +80,22 @@ class AnalyticsServiceEnhanced: ObservableObject {
         let averageViewsPerDay = days > 0 ? Double(totalViews) / Double(days) : 0
 
         // Calculate recent trend (last 7 days vs previous 7 days)
-        let last7Days = Calendar.current.date(byAdding: .day, value: -7, to: Date())!
-        let previous7Days = Calendar.current.date(byAdding: .day, value: -14, to: Date())!
+        // CODE QUALITY FIX: Removed force unwrapping - handle date calculation failure safely
+        guard let last7Days = Calendar.current.date(byAdding: .day, value: -7, to: Date()),
+              let previous7Days = Calendar.current.date(byAdding: .day, value: -14, to: Date()) else {
+            // If date calculation fails, skip trend calculation
+            let heatmap = ProfileHeatmap(
+                totalViews: totalViews,
+                averageViewsPerDay: averageViewsPerDay,
+                hourlyDistribution: hourlyViews,
+                dailyDistribution: dailyViews,
+                dayOfWeekDistribution: dayOfWeekViews,
+                peakHour: peakHour,
+                peakDayOfWeek: peakDay,
+                trendPercentage: 0
+            )
+            return heatmap
+        }
 
         let recentViews = viewsSnapshot.documents.filter {
             guard let timestamp = ($0.data()["timestamp"] as? Timestamp)?.dateValue() else { return false }
@@ -433,7 +450,10 @@ class AnalyticsServiceEnhanced: ObservableObject {
     }
 
     private func calculateEngagementScore(userId: String) async throws -> Double {
-        let last30Days = Calendar.current.date(byAdding: .day, value: -30, to: Date())!
+        // CODE QUALITY FIX: Removed force unwrapping - handle date calculation failure safely
+        guard let last30Days = Calendar.current.date(byAdding: .day, value: -30, to: Date()) else {
+            throw AnalyticsError.invalidDateRange
+        }
 
         // Fetch activity data
         let likesSnapshot = try? await db.collection("likes")

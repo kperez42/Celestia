@@ -36,17 +36,32 @@ class DiscoverViewModel: ObservableObject {
 
     // Dependency injection: Services
     private let userService: any UserServiceProtocol
+    private let swipeService: any SwipeServiceProtocol
+    private let authService: any AuthServiceProtocol
 
-    // SWIFT 6 CONCURRENCY: These properties are accessed across async boundaries
-    // but are always accessed from MainActor-isolated methods. Marked nonisolated(unsafe)
-    // to satisfy Swift 6 strict concurrency while maintaining thread safety through MainActor.
-    nonisolated(unsafe) private var lastDocument: DocumentSnapshot?
-    nonisolated(unsafe) private var interestTask: Task<Void, Never>?
+    // CONCURRENCY FIX: Removed nonisolated(unsafe) - properties are now properly MainActor-isolated
+    // Since this class is @MainActor, all properties are automatically isolated to the main actor,
+    // providing proper concurrency safety without bypassing Swift's checks.
+    private var lastDocument: DocumentSnapshot?
+    private var interestTask: Task<Void, Never>?
     private let performanceMonitor = PerformanceMonitor.shared
 
+    // PERFORMANCE FIX: Store tasks for cancellation to prevent battery waste
+    private var loadUsersTask: Task<Void, Never>?
+    private var likeTask: Task<Void, Never>?
+    private var passTask: Task<Void, Never>?
+    private var filterTask: Task<Void, Never>?
+
     // Dependency injection initializer
-    init(userService: (any UserServiceProtocol)? = nil) {
+    // ARCHITECTURE FIX: Inject all required services to enable testing and reduce coupling
+    init(
+        userService: (any UserServiceProtocol)? = nil,
+        swipeService: (any SwipeServiceProtocol)? = nil,
+        authService: (any AuthServiceProtocol)? = nil
+    ) {
         self.userService = userService ?? UserService.shared
+        self.swipeService = swipeService ?? SwipeService.shared
+        self.authService = authService ?? AuthService.shared
     }
     
     func loadUsers(currentUser: User, limit: Int = 20) {
@@ -58,13 +73,21 @@ class DiscoverViewModel: ObservableObject {
             return
         }
 
+        // Cancel previous load task if any
+        loadUsersTask?.cancel()
+
         isLoading = true
         errorMessage = ""
 
         // Track query performance
         let queryStart = Date()
 
-        Task {
+        loadUsersTask = Task {
+            guard !Task.isCancelled else {
+                isLoading = false
+                return
+            }
+
             do {
                 // Use UserService instead of direct Firestore access
                 let ageRange = currentUser.ageRangeMin...currentUser.ageRangeMax
@@ -78,6 +101,11 @@ class DiscoverViewModel: ObservableObject {
                     limit: limit,
                     reset: users.isEmpty
                 )
+
+                guard !Task.isCancelled else {
+                    isLoading = false
+                    return
+                }
 
                 // Track network latency
                 let queryDuration = Date().timeIntervalSince(queryStart) * 1000
@@ -96,6 +124,10 @@ class DiscoverViewModel: ObservableObject {
 
                 Logger.shared.info("Loaded \(users.count) users in \(String(format: "%.0f", queryDuration))ms", category: .matching)
             } catch {
+                guard !Task.isCancelled else {
+                    isLoading = false
+                    return
+                }
                 errorMessage = error.localizedDescription
                 isLoading = false
                 Logger.shared.error("Error loading users", category: .matching, error: error)
@@ -129,7 +161,8 @@ class DiscoverViewModel: ObservableObject {
             guard !Task.isCancelled else { return }
             do {
                 // Use SwipeService for unified matching system
-                let isMatch = try await SwipeService.shared.likeUser(
+                // ARCHITECTURE FIX: Use injected swipeService
+                let isMatch = try await swipeService.likeUser(
                     fromUserId: currentUserID,
                     toUserId: targetUserID,
                     isSuperLike: false
@@ -174,7 +207,7 @@ class DiscoverViewModel: ObservableObject {
         isProcessingAction = true
 
         let likedUser = users[currentIndex]
-        guard let currentUser = AuthService.shared.currentUser,
+        guard let currentUser = authService.currentUser,
               let currentUserId = currentUser.id,
               let likedUserId = likedUser.id else {
             isProcessingAction = false
@@ -210,7 +243,8 @@ class DiscoverViewModel: ObservableObject {
 
         // Send like to backend
         do {
-            let isMatch = try await SwipeService.shared.likeUser(
+            // ARCHITECTURE FIX: Use injected swipeService
+            let isMatch = try await swipeService.likeUser(
                 fromUserId: currentUserId,
                 toUserId: likedUserId,
                 isSuperLike: false
@@ -242,13 +276,13 @@ class DiscoverViewModel: ObservableObject {
 
     /// Check if user has daily likes remaining (delegates to UserService)
     private func checkDailyLikeLimit() async -> Bool {
-        guard let userId = AuthService.shared.currentUser?.id else { return false }
+        guard let userId = authService.currentUser?.id else { return false }
 
-        let hasLikes = await UserService.shared.checkDailyLikeLimit(userId: userId)
+        let hasLikes = await userService.checkDailyLikeLimit(userId: userId)
 
         // Refresh current user if limits were reset
         if hasLikes {
-            await AuthService.shared.fetchUser()
+            await authService.fetchUser()
         }
 
         return hasLikes
@@ -256,10 +290,10 @@ class DiscoverViewModel: ObservableObject {
 
     /// Decrement daily like count (delegates to UserService)
     private func decrementDailyLikes() async {
-        guard let userId = AuthService.shared.currentUser?.id else { return }
+        guard let userId = authService.currentUser?.id else { return }
 
-        await UserService.shared.decrementDailyLikes(userId: userId)
-        await AuthService.shared.fetchUser()
+        await userService.decrementDailyLikes(userId: userId)
+        await authService.fetchUser()
     }
 
     /// Handle pass action
@@ -268,7 +302,7 @@ class DiscoverViewModel: ObservableObject {
         isProcessingAction = true
 
         let passedUser = users[currentIndex]
-        guard let currentUserId = AuthService.shared.currentUser?.id,
+        guard let currentUserId = authService.currentUser?.id,
               let passedUserId = passedUser.id else {
             isProcessingAction = false
             return
@@ -285,7 +319,8 @@ class DiscoverViewModel: ObservableObject {
 
         // Record pass in backend
         do {
-            try await SwipeService.shared.passUser(
+            // ARCHITECTURE FIX: Use injected swipeService
+            try await swipeService.passUser(
                 fromUserId: currentUserId,
                 toUserId: passedUserId
             )
@@ -304,7 +339,7 @@ class DiscoverViewModel: ObservableObject {
         isProcessingAction = true
 
         let superLikedUser = users[currentIndex]
-        guard let currentUser = AuthService.shared.currentUser,
+        guard let currentUser = authService.currentUser,
               let currentUserId = currentUser.id,
               let superLikedUserId = superLikedUser.id else {
             isProcessingAction = false
@@ -330,7 +365,8 @@ class DiscoverViewModel: ObservableObject {
 
         // Send super like to backend
         do {
-            let isMatch = try await SwipeService.shared.likeUser(
+            // ARCHITECTURE FIX: Use injected swipeService
+            let isMatch = try await swipeService.likeUser(
                 fromUserId: currentUserId,
                 toUserId: superLikedUserId,
                 isSuperLike: true
@@ -360,21 +396,24 @@ class DiscoverViewModel: ObservableObject {
 
     /// Decrement super like count (delegates to UserService)
     private func decrementSuperLikes() async {
-        guard let userId = AuthService.shared.currentUser?.id else { return }
+        guard let userId = authService.currentUser?.id else { return }
 
-        await UserService.shared.decrementSuperLikes(userId: userId)
-        await AuthService.shared.fetchUser()
-        Logger.shared.info("Super Like used. Remaining: \(AuthService.shared.currentUser?.superLikesRemaining ?? 0)", category: .matching)
+        await userService.decrementSuperLikes(userId: userId)
+        await authService.fetchUser()
+        Logger.shared.info("Super Like used. Remaining: \(authService.currentUser?.superLikesRemaining ?? 0)", category: .matching)
     }
 
     /// Apply filters
     func applyFilters() {
         currentIndex = 0
 
-        guard let currentUser = AuthService.shared.currentUser else {
+        guard let currentUser = authService.currentUser else {
             Logger.shared.warning("Cannot apply filters: No current user", category: .matching)
             return
         }
+
+        // Cancel previous filter task if any
+        filterTask?.cancel()
 
         // Get current user location for distance filtering
         let currentLocation: (lat: Double, lon: Double)? = {
@@ -387,7 +426,12 @@ class DiscoverViewModel: ObservableObject {
         // Show loading state while applying filters
         isLoading = true
 
-        Task {
+        filterTask = Task {
+            guard !Task.isCancelled else {
+                isLoading = false
+                return
+            }
+
             // Clear current users and reload
             users.removeAll()
             lastDocument = nil
@@ -397,6 +441,11 @@ class DiscoverViewModel: ObservableObject {
 
             // Wait for users to load, then filter them locally
             try? await Task.sleep(nanoseconds: 500_000_000) // Wait 0.5s for load
+
+            guard !Task.isCancelled else {
+                isLoading = false
+                return
+            }
 
             await MainActor.run {
                 // Apply filters to loaded users
@@ -442,7 +491,7 @@ class DiscoverViewModel: ObservableObject {
 
     /// Load users (no parameters version for view)
     func loadUsers() async {
-        guard let currentUser = AuthService.shared.currentUser else {
+        guard let currentUser = authService.currentUser else {
             Logger.shared.warning("Cannot load users: No current user", category: .matching)
             return
         }
@@ -452,13 +501,27 @@ class DiscoverViewModel: ObservableObject {
 
     /// Cleanup method to cancel ongoing tasks
     func cleanup() {
+        // PERFORMANCE FIX: Cancel all ongoing tasks to prevent battery waste
         interestTask?.cancel()
         interestTask = nil
+        loadUsersTask?.cancel()
+        loadUsersTask = nil
+        likeTask?.cancel()
+        likeTask = nil
+        passTask?.cancel()
+        passTask = nil
+        filterTask?.cancel()
+        filterTask = nil
         users = []
         lastDocument = nil
     }
 
     deinit {
+        // Cancel all tasks on deinit
         interestTask?.cancel()
+        loadUsersTask?.cancel()
+        likeTask?.cancel()
+        passTask?.cancel()
+        filterTask?.cancel()
     }
 }

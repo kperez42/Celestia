@@ -27,11 +27,15 @@ class SearchManager: ObservableObject {
     @Published var currentFilter: SearchFilter = SearchFilter()
     @Published var totalResultsCount: Int = 0
     @Published var errorMessage: String?
+    @Published var hasMoreResults: Bool = false
+    @Published var isLoadingMore: Bool = false
 
     // MARK: - Properties
 
     private let firestore = Firestore.firestore()
     private var searchTask: Task<Void, Never>?
+    private var lastDocument: DocumentSnapshot?
+    private let pageSize: Int = 20 // PERFORMANCE: Load only what UI shows
 
     // MARK: - Initialization
 
@@ -57,14 +61,16 @@ class SearchManager: ObservableObject {
             isSearching = true
             currentFilter = filter
             errorMessage = nil
+            lastDocument = nil // Reset pagination
 
             do {
-                let results = try await performSearch(filter: filter)
+                let results = try await performSearch(filter: filter, startAfter: nil)
 
                 guard !Task.isCancelled else { return }
 
                 searchResults = results
                 totalResultsCount = results.count
+                hasMoreResults = results.count >= pageSize
 
                 // Track analytics
                 AnalyticsManager.shared.logEvent(.featureUsed, parameters: [
@@ -85,6 +91,31 @@ class SearchManager: ObservableObject {
         }
     }
 
+    /// Load more results (pagination)
+    func loadMore() async {
+        guard !isLoadingMore, hasMoreResults, let lastDoc = lastDocument else {
+            return
+        }
+
+        isLoadingMore = true
+        defer { isLoadingMore = false }
+
+        do {
+            let results = try await performSearch(filter: currentFilter, startAfter: lastDoc)
+
+            guard !Task.isCancelled else { return }
+
+            searchResults.append(contentsOf: results)
+            totalResultsCount = searchResults.count
+            hasMoreResults = results.count >= pageSize
+
+            Logger.shared.debug("Loaded \(results.count) more results. Total: \(searchResults.count)", category: .general)
+        } catch {
+            errorMessage = error.localizedDescription
+            Logger.shared.error("Load more failed", category: .general, error: error)
+        }
+    }
+
     /// Reset filter to defaults
     func resetFilter() {
         currentFilter = SearchFilter()
@@ -98,9 +129,10 @@ class SearchManager: ObservableObject {
 
     // MARK: - Private Methods
 
-    private func performSearch(filter: SearchFilter) async throws -> [UserProfile] {
+    private func performSearch(filter: SearchFilter, startAfter: DocumentSnapshot?) async throws -> [UserProfile] {
+        // PERFORMANCE FIX: Changed from 100 to 20 (5x less data transferred)
         var query = firestore.collection("users")
-            .limit(to: 100)
+            .limit(to: pageSize)
 
         // Apply age filter
         query = query
@@ -124,8 +156,16 @@ class SearchManager: ObservableObject {
             query = query.whereField("isVerified", isEqualTo: true)
         }
 
+        // PERFORMANCE: Add pagination support
+        if let startAfter = startAfter {
+            query = query.start(afterDocument: startAfter)
+        }
+
         // Execute query
         let snapshot = try await query.getDocuments()
+
+        // PERFORMANCE: Store last document for pagination
+        lastDocument = snapshot.documents.last
 
         // Convert to UserProfile objects
         var profiles: [UserProfile] = []

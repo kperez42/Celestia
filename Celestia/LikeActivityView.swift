@@ -55,7 +55,7 @@ struct LikeActivityView: View {
             if !viewModel.todayActivity.isEmpty {
                 Section("Today") {
                     ForEach(viewModel.todayActivity) { activity in
-                        ActivityRow(activity: activity)
+                        ActivityRow(activity: activity, user: viewModel.users[activity.userId])
                     }
                 }
             }
@@ -63,7 +63,7 @@ struct LikeActivityView: View {
             if !viewModel.weekActivity.isEmpty {
                 Section("This Week") {
                     ForEach(viewModel.weekActivity) { activity in
-                        ActivityRow(activity: activity)
+                        ActivityRow(activity: activity, user: viewModel.users[activity.userId])
                     }
                 }
             }
@@ -71,7 +71,7 @@ struct LikeActivityView: View {
             if !viewModel.olderActivity.isEmpty {
                 Section("Older") {
                     ForEach(viewModel.olderActivity) { activity in
-                        ActivityRow(activity: activity)
+                        ActivityRow(activity: activity, user: viewModel.users[activity.userId])
                     }
                 }
             }
@@ -117,7 +117,7 @@ struct LikeActivityView: View {
 
 struct ActivityRow: View {
     let activity: LikeActivity
-    @State private var user: User?
+    let user: User?  // PERFORMANCE FIX: Receive user data from parent instead of fetching
     @State private var showUserDetail = false
 
     var body: some View {
@@ -165,30 +165,10 @@ struct ActivityRow: View {
             .padding(.vertical, 4)
         }
         .buttonStyle(PlainButtonStyle())
-        .task {
-            await loadUser()
-        }
         .sheet(isPresented: $showUserDetail) {
             if let user = user {
                 UserDetailView(user: user)
             }
-        }
-    }
-
-    private func loadUser() async {
-        do {
-            let userDoc = try await Firestore.firestore()
-                .collection("users")
-                .document(activity.userId)
-                .getDocument()
-
-            if let fetchedUser = try? userDoc.data(as: User.self) {
-                await MainActor.run {
-                    user = fetchedUser
-                }
-            }
-        } catch {
-            Logger.shared.error("Error loading user for activity", category: .matching, error: error)
         }
     }
 }
@@ -248,6 +228,7 @@ class LikeActivityViewModel: ObservableObject {
     @Published var weekActivity: [LikeActivity] = []
     @Published var olderActivity: [LikeActivity] = []
     @Published var isLoading = false
+    @Published var users: [String: User] = [:]  // PERFORMANCE FIX: Cache users for batch fetching
 
     private let db = Firestore.firestore()
 
@@ -330,16 +311,61 @@ class LikeActivityViewModel: ObservableObject {
             // Categorize by time
             let now = Date()
             let todayStart = Calendar.current.startOfDay(for: now)
-            let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: now)!
+            // CODE QUALITY FIX: Removed force unwrapping - handle date calculation failure safely
+            guard let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: now) else {
+                // If date calculation fails, treat all non-today activity as "week"
+                todayActivity = allActivity.filter { $0.timestamp >= todayStart }
+                weekActivity = allActivity.filter { $0.timestamp < todayStart }
+                olderActivity = []
+                return
+            }
 
             todayActivity = allActivity.filter { $0.timestamp >= todayStart }
             weekActivity = allActivity.filter { $0.timestamp < todayStart && $0.timestamp >= weekAgo }
             olderActivity = allActivity.filter { $0.timestamp < weekAgo }
 
+            // PERFORMANCE FIX: Batch fetch all users
+            // Old approach: Each ActivityRow fetches its user individually = 130+ queries
+            // New approach: Batch fetch all unique users = ~13 queries (10 users per batch)
+            await fetchUsersForActivities(allActivity)
+
             Logger.shared.info("Loaded like activity - today: \(todayActivity.count), week: \(weekActivity.count)", category: .matching)
         } catch {
             Logger.shared.error("Error loading like activity", category: .matching, error: error)
         }
+    }
+
+    /// PERFORMANCE FIX: Batch fetch users for all activities
+    private func fetchUsersForActivities(_ activities: [LikeActivity]) async {
+        // Collect unique user IDs
+        let userIds = Array(Set(activities.map { $0.userId }))
+
+        guard !userIds.isEmpty else { return }
+
+        // Clear existing users
+        users = [:]
+
+        // Firestore 'in' queries support up to 10 items, so batch by 10
+        let chunkSize = 10
+        for i in stride(from: 0, to: userIds.count, by: chunkSize) {
+            let chunk = Array(userIds[i..<min(i + chunkSize, userIds.count)])
+
+            do {
+                let usersSnapshot = try await db.collection("users")
+                    .whereField("id", in: chunk)
+                    .getDocuments()
+
+                for userDoc in usersSnapshot.documents {
+                    if let user = try? userDoc.data(as: User.self) {
+                        users[user.id] = user
+                    }
+                }
+            } catch {
+                Logger.shared.error("Error batch fetching users for activity", category: .matching, error: error)
+            }
+        }
+
+        Logger.shared.info("Batch fetched \(users.count) users for \(activities.count) activities", category: .matching)
     }
 }
 

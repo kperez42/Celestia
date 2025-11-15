@@ -91,6 +91,7 @@ struct MessagesView: View {
                 }
             }
         }
+        .networkStatusBanner() // UX: Show offline status
     }
     
     // MARK: - Header

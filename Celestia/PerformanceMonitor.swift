@@ -36,6 +36,9 @@ class PerformanceMonitor: ObservableObject {
     private var memoryWarningCount = 0
     private var lastMemoryWarning: Date?
 
+    // MEMORY FIX: Store observer token for cleanup
+    private var memoryWarningObserver: NSObjectProtocol?
+
     // MARK: - Connection Quality
 
     enum ConnectionQuality: String, Codable {
@@ -91,7 +94,8 @@ class PerformanceMonitor: ObservableObject {
 
     private init() {
         // PERFORMANCE: Register for memory warning notifications
-        NotificationCenter.default.addObserver(
+        // MEMORY FIX: Store observer token for proper cleanup
+        memoryWarningObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.didReceiveMemoryWarningNotification,
             object: nil,
             queue: .main
@@ -102,6 +106,15 @@ class PerformanceMonitor: ObservableObject {
         }
 
         Logger.shared.info("PerformanceMonitor initialized", category: .performance)
+    }
+
+    // MEMORY FIX: Clean up observer to prevent memory leak
+    deinit {
+        if let observer = memoryWarningObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        fpsDisplayLink?.invalidate()
+        monitoringTimer?.invalidate()
     }
 
     // MARK: - Memory Pressure Management
@@ -498,14 +511,6 @@ class PerformanceMonitor: ObservableObject {
 
         let duration = (CFAbsoluteTimeGetCurrent() - timer.start) * 1000 // Convert to ms
         logPerformance(name: timer.name, duration: duration, category: category)
-    }
-
-    // MARK: - Cleanup
-
-    deinit {
-        Task { @MainActor in
-            stopMonitoring()
-        }
     }
 
     // MARK: - Private

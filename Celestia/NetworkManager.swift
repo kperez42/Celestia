@@ -9,6 +9,7 @@
 import Foundation
 import Network
 import Combine
+import CommonCrypto
 
 // MARK: - Network Error
 
@@ -89,7 +90,7 @@ struct NetworkResponse {
 
 // MARK: - Network Manager
 
-class NetworkManager {
+class NetworkManager: NSObject {
 
     // MARK: - Singleton
 
@@ -97,7 +98,7 @@ class NetworkManager {
 
     // MARK: - Properties
 
-    private let session: URLSession
+    private var session: URLSession!
     private let monitor: NWPathMonitor
     private let monitorQueue = DispatchQueue(label: "com.celestia.network.monitor")
 
@@ -110,18 +111,33 @@ class NetworkManager {
     private let maxRetryAttempts = 3
     private let baseRetryDelay: TimeInterval = 1.0
 
+    // SECURITY: Certificate pinning configuration
+    // Add your server's SSL certificate public key hashes here
+    // To get the hash: openssl s_client -connect api.celestia.app:443 | openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | openssl enc -base64
+    private let pinnedPublicKeyHashes: Set<String> = [
+        // TODO: Replace with your actual certificate public key hashes
+        // Example: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+    ]
+
     // MARK: - Initialization
 
-    init() {
-        // Configure URL session
+    override init() {
+        self.monitor = NWPathMonitor()
+
+        super.init()
+
+        // Configure URL session with certificate pinning
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 60
         config.waitsForConnectivity = true
         config.requestCachePolicy = .returnCacheDataElseLoad
 
-        self.session = URLSession(configuration: config)
-        self.monitor = NWPathMonitor()
+        // SECURITY FIX: Set minimum TLS version to 1.3 for enhanced security
+        config.tlsMinimumSupportedProtocolVersion = .TLSv12  // TLS 1.2 minimum (1.3 when widely supported)
+
+        // Create session with self as delegate for certificate pinning
+        self.session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
 
         setupNetworkMonitoring()
     }
@@ -433,6 +449,90 @@ class NetworkManager {
     func clearCache() {
         session.configuration.urlCache?.removeAllCachedResponses()
         Logger.shared.network("URL cache cleared", level: .info)
+    }
+}
+
+// MARK: - URLSessionDelegate for Certificate Pinning
+
+extension NetworkManager: URLSessionDelegate {
+
+    /// SECURITY: Implements certificate pinning to prevent man-in-the-middle attacks
+    /// This validates the server's SSL certificate against pinned public key hashes
+    func urlSession(
+        _ session: URLSession,
+        didReceive challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        // Only handle server trust challenges
+        guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust else {
+            completionHandler(.performDefaultHandling, nil)
+            return
+        }
+
+        // Get the server trust
+        guard let serverTrust = challenge.protectionSpace.serverTrust else {
+            Logger.shared.error("No server trust available for certificate pinning", category: .security)
+            completionHandler(.cancelAuthenticationChallenge, nil)
+            return
+        }
+
+        // If no public key hashes are configured, use default validation
+        // TODO: Remove this bypass and configure proper certificate pinning in production
+        if pinnedPublicKeyHashes.isEmpty {
+            Logger.shared.warning("Certificate pinning not configured - using default validation", category: .security)
+            completionHandler(.performDefaultHandling, nil)
+            return
+        }
+
+        // Validate the certificate chain
+        var secresult = SecTrustResultType.invalid
+        let status = SecTrustEvaluate(serverTrust, &secresult)
+
+        guard status == errSecSuccess else {
+            Logger.shared.error("Certificate trust evaluation failed", category: .security)
+            completionHandler(.cancelAuthenticationChallenge, nil)
+            return
+        }
+
+        // Extract the server's public key
+        guard let serverPublicKey = SecTrustCopyKey(serverTrust) else {
+            Logger.shared.error("Failed to extract server public key", category: .security)
+            completionHandler(.cancelAuthenticationChallenge, nil)
+            return
+        }
+
+        // Get the public key data
+        guard let serverPublicKeyData = SecKeyCopyExternalRepresentation(serverPublicKey, nil) as Data? else {
+            Logger.shared.error("Failed to get server public key data", category: .security)
+            completionHandler(.cancelAuthenticationChallenge, nil)
+            return
+        }
+
+        // Hash the public key using SHA-256
+        let serverPublicKeyHash = sha256(data: serverPublicKeyData)
+
+        // Check if the hash matches any of our pinned hashes
+        if pinnedPublicKeyHashes.contains(serverPublicKeyHash) {
+            Logger.shared.debug("Certificate pinning validation successful", category: .security)
+            let credential = URLCredential(trust: serverTrust)
+            completionHandler(.useCredential, credential)
+        } else {
+            Logger.shared.error("Certificate pinning validation failed - public key hash mismatch", category: .security)
+            CrashlyticsManager.shared.logEvent("certificate_pinning_failed", parameters: [
+                "host": challenge.protectionSpace.host,
+                "received_hash": serverPublicKeyHash
+            ])
+            completionHandler(.cancelAuthenticationChallenge, nil)
+        }
+    }
+
+    /// Helper function to compute SHA-256 hash
+    private func sha256(data: Data) -> String {
+        var hash = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
+        data.withUnsafeBytes {
+            _ = CC_SHA256($0.baseAddress, CC_LONG(data.count), &hash)
+        }
+        return Data(hash).base64EncodedString()
     }
 }
 

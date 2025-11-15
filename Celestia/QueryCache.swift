@@ -177,6 +177,9 @@ class CacheManager {
     private var isUnderMemoryPressure = false
     private var memoryWarningCount = 0
 
+    // MEMORY FIX: Store observer token for cleanup
+    private var memoryWarningObserver: NSObjectProtocol?
+
     private init() {
         // PERFORMANCE: Adaptive cache sizes based on device memory
         let physicalMemory = ProcessInfo.processInfo.physicalMemory
@@ -201,7 +204,8 @@ class CacheManager {
         }
 
         // PERFORMANCE: Register for memory warning notifications
-        NotificationCenter.default.addObserver(
+        // MEMORY FIX: Store observer token for proper cleanup
+        memoryWarningObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.didReceiveMemoryWarningNotification,
             object: nil,
             queue: .main
@@ -311,5 +315,12 @@ class CacheManager {
         }
 
         Logger.shared.debug("Cache cleanup task cancelled", category: .database)
+    }
+
+    // MEMORY FIX: Clean up observer to prevent memory leak
+    deinit {
+        if let observer = memoryWarningObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 }

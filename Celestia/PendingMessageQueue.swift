@@ -15,6 +15,8 @@ class PendingMessageQueue: ObservableObject {
 
     @Published private(set) var pendingMessages: [PendingMessage] = []
     @Published private(set) var queueSize: Int = 0
+    // CONCURRENCY FIX: Prevent race condition between timer and manual processQueue calls
+    @Published private(set) var isProcessing = false
 
     private let persistenceKey = "com.celestia.pendingMessageQueue"
     private var processingTimer: Timer?
@@ -93,6 +95,15 @@ class PendingMessageQueue: ObservableObject {
 
     /// Process the queue - validate and send pending messages
     func processQueue() async {
+        // CONCURRENCY FIX: Prevent race condition between timer and manual calls
+        guard !isProcessing else {
+            Logger.shared.debug("Queue processing already in progress, skipping", category: .messaging)
+            return
+        }
+
+        isProcessing = true
+        defer { isProcessing = false }
+
         Logger.shared.debug("Processing pending message queue (\(pendingMessages.count) messages)", category: .messaging)
 
         // Filter messages ready for processing

@@ -194,7 +194,11 @@ class NetworkMonitor: ObservableObject {
         let startTime = Date()
 
         do {
-            let url = URL(string: "https://www.google.com")!
+            // CODE QUALITY FIX: Removed force unwrapping - use guard let instead
+            guard let url = URL(string: "https://www.google.com") else {
+                Logger.shared.error("Invalid latency test URL", category: .networking)
+                return nil
+            }
             var request = URLRequest(url: url)
             request.httpMethod = "HEAD"
             request.timeoutInterval = 5.0
