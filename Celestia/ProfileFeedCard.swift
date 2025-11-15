@@ -163,8 +163,8 @@ struct ProfileFeedCard: View {
                     isLiked = true  // Optimistic update
                     onLike()
                     // Reset processing state after delay
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                        self?.isProcessingLike = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        isProcessingLike = false
                     }
                 }
             )
@@ -182,8 +182,8 @@ struct ProfileFeedCard: View {
                     isFavorited.toggle()
                     onFavorite()
                     // Reset processing state after delay
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                        self?.isProcessingSave = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        isProcessingSave = false
                     }
                 }
             )

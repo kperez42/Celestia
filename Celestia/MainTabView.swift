@@ -201,8 +201,8 @@ struct TabBarButton: View {
         Button(action: {
             isPressed = true
             action()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-                self?.isPressed = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                isPressed = false
             }
         }) {
             VStack(spacing: 4) {

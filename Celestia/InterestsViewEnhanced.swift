@@ -396,11 +396,10 @@ struct InterestsViewEnhanced: View {
         HapticManager.shared.impact(.medium)
 
         // Auto-hide undo toast after 5 seconds
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
-            guard let self = self else { return }
-            if self.showUndoToast {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+            if showUndoToast {
                 withAnimation {
-                    self.showUndoToast = false
+                    showUndoToast = false
                 }
             }
         }
@@ -434,11 +433,10 @@ struct InterestsViewEnhanced: View {
         HapticManager.shared.impact(.light)
 
         // Auto-hide undo toast after 5 seconds
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
-            guard let self = self else { return }
-            if self.showUndoToast {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+            if showUndoToast {
                 withAnimation {
-                    self.showUndoToast = false
+                    showUndoToast = false
                 }
             }
         }
