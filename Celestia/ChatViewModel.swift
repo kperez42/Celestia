@@ -11,7 +11,6 @@ import FirebaseFirestore
 @MainActor
 class ChatViewModel: ObservableObject {
     @Published var messages: [Message] = []
-    @Published var matches: [Match] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var showErrorAlert = false
@@ -42,20 +41,7 @@ class ChatViewModel: ObservableObject {
     func updateCurrentUserId(_ userId: String) {
         self.currentUserId = userId
     }
-    
-    func loadMatches(for userID: String) async {
-        isLoading = true
-        defer { isLoading = false }
 
-        do {
-            // Use MatchService instead of direct Firestore access
-            try await matchService.fetchMatches(userId: userID)
-            matches = matchService.matches
-        } catch {
-            Logger.shared.error("Error loading matches", category: .messaging, error: error)
-        }
-    }
-    
     func loadMessages() {
         guard !currentUserId.isEmpty && !otherUserId.isEmpty else { return }
 
