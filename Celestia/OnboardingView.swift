@@ -492,6 +492,12 @@ struct OnboardingView: View {
                                         .allowsHitTesting(false)
                                 }
                             }
+                            .onChange(of: bio) { _, newValue in
+                                // SAFETY: Enforce bio character limit to prevent data overflow
+                                if newValue.count > AppConstants.Limits.maxBioLength {
+                                    bio = String(newValue.prefix(AppConstants.Limits.maxBioLength))
+                                }
+                            }
                             .accessibilityLabel("Bio")
                             .accessibilityHint("Write a short bio about yourself. Maximum 500 characters")
                             .accessibilityValue("\(bio.count) of 500 characters")

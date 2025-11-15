@@ -207,8 +207,11 @@ class PerformanceMonitor: ObservableObject {
         }
 
         // Calculate FPS from frame timestamps
-        if frameTimestamps.count >= 2 {
-            let timeInterval = frameTimestamps.last! - frameTimestamps.first!
+        // SAFETY: Use safe optional access instead of force unwrap
+        if frameTimestamps.count >= 2,
+           let lastTimestamp = frameTimestamps.last,
+           let firstTimestamp = frameTimestamps.first {
+            let timeInterval = lastTimestamp - firstTimestamp
             let fps = Double(frameTimestamps.count - 1) / timeInterval
             currentFPS = min(60.0, max(0.0, fps))
         }

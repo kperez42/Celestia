@@ -53,7 +53,13 @@ struct ChatDetailView: View {
                     .cornerRadius(20)
                     .focused($isInputFocused)
                     .lineLimit(1...5)
-                
+                    .onChange(of: messageText) { _, newValue in
+                        // SAFETY: Enforce message character limit to prevent data overflow
+                        if newValue.count > AppConstants.Limits.maxMessageLength {
+                            messageText = String(newValue.prefix(AppConstants.Limits.maxMessageLength))
+                        }
+                    }
+
                 Button(action: sendMessage) {
                     Image(systemName: "arrow.up.circle.fill")
                         .font(.system(size: 32))
