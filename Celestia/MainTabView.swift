@@ -73,7 +73,7 @@ struct MainTabView: View {
 
             // Optional: Extract matched user ID for future use (e.g., scroll to conversation)
             if let matchedUserId = notification.userInfo?["matchedUserId"] as? String {
-                Logger.shared.info("Navigating to messages for match: \(matchedUserId)", category: .navigation)
+                Logger.shared.info("Navigating to messages for match: \(matchedUserId)", category: .ui)
             }
         }
     }
