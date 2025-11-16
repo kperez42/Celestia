@@ -952,18 +952,6 @@ struct MatchProfileCard: View {
     }
 }
 
-// MARK: - Array Extension for Chunking
-
-extension Array {
-    /// Splits array into chunks of specified size
-    /// Used for batch Firestore queries which have a limit of 10 items per 'in' query
-    func chunked(into size: Int) -> [[Element]] {
-        return stride(from: 0, to: count, by: size).map {
-            Array(self[$0 ..< Swift.min($0 + size, count)])
-        }
-    }
-}
-
 #Preview {
     NavigationStack {
         MatchesView()
