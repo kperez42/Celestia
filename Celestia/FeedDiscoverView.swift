@@ -187,10 +187,28 @@ struct FeedDiscoverView: View {
                     .font(.title3)
                     .foregroundColor(.white)
 
-                Text(toastMessage)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.white)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(toastMessage)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+
+                    // Show navigation hint for save toasts
+                    if toastIcon == "star.fill" && toastColor == .orange {
+                        Text("Tap to view saved profiles")
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.9))
+                    }
+                }
+
+                Spacer()
+
+                // Show arrow for save toasts to indicate it's tappable
+                if toastIcon == "star.fill" && toastColor == .orange {
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.7))
+                }
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
@@ -198,6 +216,17 @@ struct FeedDiscoverView: View {
             .cornerRadius(12)
             .shadow(color: toastColor.opacity(0.4), radius: 12, y: 6)
             .padding(.top, 16)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                // Navigate to Saved tab when tapping save toast
+                if toastIcon == "star.fill" && toastColor == .orange {
+                    HapticManager.shared.impact(.medium)
+                    selectedTab = 3
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                        showActionToast = false
+                    }
+                }
+            }
 
             Spacer()
         }
