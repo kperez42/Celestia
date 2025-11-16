@@ -402,7 +402,7 @@ struct FeedDiscoverView: View {
                             )
                         }
 
-                        Logger.shared.info("Navigating to messages for match: \(matchedUserId)", category: .navigation)
+                        Logger.shared.info("Navigating to messages for match: \(matchedUserId)", category: .ui)
                     }
                 }
                 .buttonStyle(.borderedProminent)
