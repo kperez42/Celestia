@@ -38,127 +38,247 @@ struct UserDetailView: View {
                 }
                 .frame(height: 450)
                 .tabViewStyle(.page)
-                
-                // Profile info
-                VStack(alignment: .leading, spacing: 20) {
-                    // Name and age
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 5) {
-                            HStack(spacing: 10) {
-                                // FIXED: Changed from user.name to user.fullName
-                                Text(user.fullName)
-                                    .font(.largeTitle.weight(.bold))
 
-                                Text("\(user.age)")
-                                    .font(.title2)
-                                    .foregroundColor(.secondary)
-                                
-                                if user.isVerified {
-                                    Image(systemName: "checkmark.seal.fill")
-                                        .foregroundColor(.blue)
-                                }
-                            }
-                            
-                            HStack(spacing: 4) {
-                                Image(systemName: "mappin.circle.fill")
-                                    .foregroundColor(.purple)
-                                Text("\(user.location), \(user.country)")
-                                    .foregroundColor(.secondary)
-                            }
-                            .font(.subheadline)
+                // Profile info with better design
+                VStack(alignment: .leading, spacing: 24) {
+                    // Name and age - Premium header
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 10) {
+                            Text(user.fullName)
+                                .font(.system(size: 32, weight: .bold))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.purple, .pink],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
 
-                            // Last active status
-                            HStack(spacing: 4) {
-                                if user.isOnline {
-                                    Circle()
-                                        .fill(Color.green)
-                                        .frame(width: 8, height: 8)
-                                    Text("Active now")
-                                        .foregroundColor(.green)
-                                        .fontWeight(.medium)
-                                } else {
-                                    Image(systemName: "clock.fill")
-                                        .foregroundColor(.secondary)
-                                    Text("Active \(user.lastActive.timeAgoShort()) ago")
-                                        .foregroundColor(.secondary)
-                                }
+                            Text("\(user.age)")
+                                .font(.title2)
+                                .foregroundColor(.secondary)
+
+                            if user.isVerified {
+                                Image(systemName: "checkmark.seal.fill")
+                                    .font(.title3)
+                                    .foregroundColor(.blue)
                             }
-                            .font(.caption)
                         }
-                        
-                        Spacer()
-                    }
-                    
-                    Divider()
-                    
-                    // Bio
-                    if !user.bio.isEmpty {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Label("About", systemImage: "text.alignleft")
-                                .font(.headline)
+
+                        // Location
+                        HStack(spacing: 6) {
+                            Image(systemName: "mappin.circle.fill")
                                 .foregroundColor(.purple)
-                            
+                            Text("\(user.location), \(user.country)")
+                                .foregroundColor(.secondary)
+                        }
+                        .font(.subheadline)
+
+                        // Last active status with better styling
+                        HStack(spacing: 6) {
+                            if user.isOnline {
+                                Circle()
+                                    .fill(Color.green)
+                                    .frame(width: 8, height: 8)
+                                Text("Active now")
+                                    .foregroundColor(.green)
+                                    .fontWeight(.semibold)
+                            } else {
+                                Circle()
+                                    .fill(Color.gray.opacity(0.5))
+                                    .frame(width: 8, height: 8)
+                                Text("Active \(user.lastActive.timeAgoShort()) ago")
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .font(.caption)
+                    }
+
+                    // Bio section - Card style
+                    if !user.bio.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "quote.bubble.fill")
+                                    .font(.title3)
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [.purple, .pink],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+
+                                Text("About")
+                                    .font(.title3.weight(.semibold))
+                                    .foregroundColor(.primary)
+                            }
+
                             Text(user.bio)
                                 .font(.body)
+                                .foregroundColor(.secondary)
+                                .lineSpacing(4)
                         }
+                        .padding(16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color(.systemBackground))
+                                .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.purple.opacity(0.1), lineWidth: 1)
+                        )
                     }
-                    
-                    // Languages
-                    if !user.languages.isEmpty {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Label("Languages", systemImage: "globe")
-                                .font(.headline)
-                                .foregroundColor(.purple)
 
-                            FlowLayout2(spacing: 8) {
+                    // Languages section - Better design
+                    if !user.languages.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "globe")
+                                    .font(.title3)
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [.blue, .cyan],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+
+                                Text("Languages")
+                                    .font(.title3.weight(.semibold))
+                                    .foregroundColor(.primary)
+                            }
+
+                            FlowLayout2(spacing: 10) {
                                 ForEach(user.languages, id: \.self) { language in
                                     Text(language)
-                                        .font(.subheadline)
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 6)
-                                        .background(Color.purple.opacity(0.1))
-                                        .foregroundColor(.purple)
-                                        .cornerRadius(20)
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Interests
-                    if !user.interests.isEmpty {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Label("Interests", systemImage: "star.fill")
-                                .font(.headline)
-                                .foregroundColor(.purple)
-
-                            FlowLayout2(spacing: 8) {
-                                ForEach(user.interests, id: \.self) { interest in
-                                    Text(interest)
-                                        .font(.subheadline)
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 6)
-                                        .background(Color.blue.opacity(0.1))
+                                        .font(.subheadline.weight(.medium))
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 8)
+                                        .background(
+                                            LinearGradient(
+                                                colors: [Color.blue.opacity(0.15), Color.cyan.opacity(0.1)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
                                         .foregroundColor(.blue)
                                         .cornerRadius(20)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 20)
+                                                .stroke(Color.blue.opacity(0.2), lineWidth: 1)
+                                        )
                                 }
                             }
                         }
+                        .padding(16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color(.systemBackground))
+                                .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.blue.opacity(0.1), lineWidth: 1)
+                        )
                     }
-                    
-                    // Looking for
-                    VStack(alignment: .leading, spacing: 10) {
-                        Label("Looking for", systemImage: "heart.fill")
-                            .font(.headline)
-                            .foregroundColor(.purple)
+
+                    // Interests section - Premium card design
+                    if !user.interests.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "sparkles")
+                                    .font(.title3)
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [.orange, .pink],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+
+                                Text("Interests")
+                                    .font(.title3.weight(.semibold))
+                                    .foregroundColor(.primary)
+                            }
+
+                            FlowLayout2(spacing: 10) {
+                                ForEach(user.interests, id: \.self) { interest in
+                                    Text(interest)
+                                        .font(.subheadline.weight(.medium))
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 8)
+                                        .background(
+                                            LinearGradient(
+                                                colors: [Color.orange.opacity(0.15), Color.pink.opacity(0.1)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .foregroundColor(.orange)
+                                        .cornerRadius(20)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 20)
+                                                .stroke(Color.orange.opacity(0.2), lineWidth: 1)
+                                        )
+                                }
+                            }
+                        }
+                        .padding(16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color(.systemBackground))
+                                .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.orange.opacity(0.1), lineWidth: 1)
+                        )
+                    }
+
+                    // Looking for section - Card style
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "heart.fill")
+                                .font(.title3)
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.purple, .pink],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+
+                            Text("Looking for")
+                                .font(.title3.weight(.semibold))
+                                .foregroundColor(.primary)
+                        }
 
                         Text(user.lookingFor)
                             .font(.body)
+                            .foregroundColor(.secondary)
                     }
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color(.systemBackground))
+                            .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.purple.opacity(0.1), lineWidth: 1)
+                    )
                 }
                 .padding(20)
                 .padding(.bottom, 100) // Extra space so buttons don't cover content
+                .background(Color(.systemGroupedBackground))
             }
         }
+        .background(Color(.systemGroupedBackground))
         .ignoresSafeArea(edges: .top)
         .overlay(alignment: .bottom) {
             // Action buttons
