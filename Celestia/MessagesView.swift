@@ -279,7 +279,7 @@ struct MessagesView: View {
             LazyVStack(spacing: 12) {
                 ForEach(Array(filteredConversations.enumerated()), id: \.element.0.id) { index, conversation in
                     let (match, user) = conversation
-                    
+
                     ConversationRow(
                         match: match,
                         user: user,
@@ -291,6 +291,16 @@ struct MessagesView: View {
                         selectedMatch = (match, user)
                         showingChat = true
                     }
+                    // PREMIUM: Staggered entrance animation
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
+                    .animation(
+                        .spring(response: 0.4, dampingFraction: 0.7)
+                        .delay(Double(index) * 0.03), // Stagger by 30ms
+                        value: filteredConversations.count
+                    )
                 }
             }
             .padding(20)
@@ -303,8 +313,15 @@ struct MessagesView: View {
     private var loadingView: some View {
         ScrollView(showsIndicators: false) {
             LazyVStack(spacing: 12) {
-                ForEach(0..<8, id: \.self) { _ in
+                ForEach(0..<8, id: \.self) { index in
                     ConversationRowSkeleton()
+                        // PREMIUM: Staggered skeleton appearance
+                        .transition(.scale(scale: 0.95).combined(with: .opacity))
+                        .animation(
+                            .spring(response: 0.4, dampingFraction: 0.7)
+                            .delay(Double(index) * 0.05),
+                            value: matchService.isLoading
+                        )
                 }
             }
             .padding(20)

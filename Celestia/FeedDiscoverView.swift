@@ -144,6 +144,16 @@ struct FeedDiscoverView: View {
                             showUserDetail = true
                         }
                     )
+                    // PREMIUM: Staggered card entrance animation
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.9).combined(with: .opacity),
+                        removal: .scale(scale: 0.95).combined(with: .opacity)
+                    ))
+                    .animation(
+                        .spring(response: 0.5, dampingFraction: 0.7)
+                        .delay(Double(index % 10) * 0.05), // Stagger first 10 cards
+                        value: displayedUsers.count
+                    )
                     .onAppear {
                         if index == displayedUsers.count - preloadThreshold {
                             loadMoreUsers()
@@ -151,10 +161,23 @@ struct FeedDiscoverView: View {
                     }
                 }
 
-                // Loading indicator (for pagination)
+                // PREMIUM: Loading indicator with animation
                 if isLoading {
-                    ProgressView()
-                        .padding()
+                    HStack(spacing: 12) {
+                        ProgressView()
+                            .tint(.purple)
+
+                        Text("Finding more people...")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color(.systemBackground))
+                            .shadow(color: Color.black.opacity(0.05), radius: 8)
+                    )
+                    .transition(.scale.combined(with: .opacity))
                 }
 
                 // End of results
@@ -176,7 +199,9 @@ struct FeedDiscoverView: View {
             .padding(.bottom)
         }
         .refreshable {
+            HapticManager.shared.impact(.light)
             await refreshFeed()
+            HapticManager.shared.notification(.success)
         }
     }
 
@@ -187,10 +212,28 @@ struct FeedDiscoverView: View {
                     .font(.title3)
                     .foregroundColor(.white)
 
-                Text(toastMessage)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.white)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(toastMessage)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+
+                    // Show navigation hint for save toasts
+                    if toastIcon == "star.fill" && toastColor == .orange {
+                        Text("Tap to view saved profiles")
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.9))
+                    }
+                }
+
+                Spacer()
+
+                // Show arrow for save toasts to indicate it's tappable
+                if toastIcon == "star.fill" && toastColor == .orange {
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.7))
+                }
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
@@ -198,6 +241,17 @@ struct FeedDiscoverView: View {
             .cornerRadius(12)
             .shadow(color: toastColor.opacity(0.4), radius: 12, y: 6)
             .padding(.top, 16)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                // Navigate to Saved tab when tapping save toast
+                if toastIcon == "star.fill" && toastColor == .orange {
+                    HapticManager.shared.impact(.medium)
+                    selectedTab = 3
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                        showActionToast = false
+                    }
+                }
+            }
 
             Spacer()
         }
@@ -240,8 +294,15 @@ struct FeedDiscoverView: View {
     private var initialLoadingView: some View {
         ScrollView {
             LazyVStack(spacing: 16) {
-                ForEach(0..<3, id: \.self) { _ in
+                ForEach(0..<3, id: \.self) { index in
                     ProfileFeedCardSkeleton()
+                        // PREMIUM: Staggered skeleton appearance
+                        .transition(.scale(scale: 0.95).combined(with: .opacity))
+                        .animation(
+                            .spring(response: 0.4, dampingFraction: 0.7)
+                            .delay(Double(index) * 0.1),
+                            value: isInitialLoad
+                        )
                 }
             }
             .padding(.horizontal)

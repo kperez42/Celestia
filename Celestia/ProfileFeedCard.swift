@@ -304,15 +304,20 @@ struct ProfileFeedCard: View {
                 }
             )
 
-            // Favorite button
+            // Favorite button with enhanced feedback
             ActionButton(
                 icon: isFavorited ? "star.fill" : "star",
                 color: .orange,
-                label: "Save",
+                label: isFavorited ? "Saved" : "Save",
                 isProcessing: isProcessingSave,
                 action: {
                     guard !isProcessingSave else { return }
-                    HapticManager.shared.impact(.light)
+                    // Enhanced haptic feedback for save action
+                    if !isFavorited {
+                        HapticManager.shared.notification(.success)
+                    } else {
+                        HapticManager.shared.impact(.light)
+                    }
                     isProcessingSave = true
                     isFavorited.toggle()
                     onFavorite()
@@ -443,12 +448,25 @@ struct ActionButton: View {
     let isProcessing: Bool
     let action: () -> Void
 
+    @State private var isAnimating = false
+
     var body: some View {
-        Button(action: action) {
+        Button(action: {
+            action()
+            // Trigger scale animation
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                isAnimating = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                    isAnimating = false
+                }
+            }
+        }) {
             VStack(spacing: 6) {
                 ZStack {
                     Circle()
-                        .fill(color.opacity(isProcessing ? 0.25 : 0.15))
+                        .fill(color.opacity(isProcessing ? 0.25 : (label == "Saved" ? 0.25 : 0.15)))
                         .frame(width: 56, height: 56)
 
                     if isProcessing {
@@ -458,13 +476,16 @@ struct ActionButton: View {
                     } else {
                         Image(systemName: icon)
                             .font(.title3)
+                            .fontWeight(label == "Saved" ? .semibold : .regular)
                             .foregroundColor(color)
                     }
                 }
+                .scaleEffect(isAnimating ? 1.15 : 1.0)
 
                 Text(label)
                     .font(.caption2)
-                    .foregroundColor(isProcessing ? color.opacity(0.6) : .secondary)
+                    .fontWeight(label == "Saved" ? .semibold : .regular)
+                    .foregroundColor(label == "Saved" ? color : (isProcessing ? color.opacity(0.6) : .secondary))
             }
         }
         .disabled(isProcessing)
