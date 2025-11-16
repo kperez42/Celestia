@@ -123,6 +123,7 @@ struct FeedDiscoverView: View {
                 ForEach(Array(displayedUsers.enumerated()), id: \.element.id) { index, user in
                     ProfileFeedCard(
                         user: user,
+                        currentUser: authService.currentUser,  // NEW: Pass current user for shared interests
                         initialIsFavorited: favorites.contains(user.id ?? ""),
                         onLike: {
                             handleLike(user: user)
