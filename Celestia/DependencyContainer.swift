@@ -181,7 +181,7 @@ class DependencyContainer: ObservableObject {
 
 /// Environment key for dependency injection in SwiftUI
 struct DependencyContainerKey: EnvironmentKey {
-    static let defaultValue: DependencyContainer = .shared
+    @MainActor static let defaultValue: DependencyContainer = .shared
 }
 
 extension EnvironmentValues {
@@ -195,7 +195,7 @@ extension EnvironmentValues {
 
 extension View {
     /// Inject dependency container into environment
-    func withDependencies(_ container: DependencyContainer = .shared) -> some View {
+    @MainActor func withDependencies(_ container: DependencyContainer = .shared) -> some View {
         self.environment(\.dependencies, container)
     }
 }
