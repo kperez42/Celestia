@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import FirebaseFirestore
 
 struct MatchesView: View {
     @EnvironmentObject var authService: AuthService
@@ -665,13 +666,22 @@ struct MatchesView: View {
                 errorMessage = ""
             }
 
-            // Load user data for each match
-            for match in matchService.matches {
-                let otherUserId = match.user1Id == userId ? match.user2Id : match.user1Id
-                if matchedUsers[otherUserId] == nil {
-                    if let user = try? await userService.fetchUser(userId: otherUserId) {
-                        await MainActor.run {
-                            matchedUsers[otherUserId] = user
+            // PERFORMANCE FIX: Batch fetch all user data instead of N+1 queries
+            // Collect all user IDs that need to be fetched
+            let userIdsToFetch = matchService.matches
+                .map { match in
+                    match.user1Id == userId ? match.user2Id : match.user1Id
+                }
+                .filter { matchedUsers[$0] == nil }  // Only fetch missing users
+
+            if !userIdsToFetch.isEmpty {
+                // Batch fetch users in chunks of 10 (Firestore 'in' query limit)
+                let fetchedUsers = try await batchFetchUsers(userIds: userIdsToFetch)
+
+                await MainActor.run {
+                    for user in fetchedUsers {
+                        if let userId = user.id {
+                            matchedUsers[userId] = user
                         }
                     }
                 }
@@ -694,6 +704,46 @@ struct MatchesView: View {
 
         let otherUserId = match.user1Id == currentUserId ? match.user2Id : match.user1Id
         return matchedUsers[otherUserId]
+    }
+
+    /// PERFORMANCE: Batch fetch users to prevent N+1 queries
+    /// Firestore 'in' queries support up to 10 values, so we chunk the requests
+    private func batchFetchUsers(userIds: [String]) async throws -> [User] {
+        guard !userIds.isEmpty else { return [] }
+
+        let db = Firestore.firestore()
+        var allUsers: [User] = []
+
+        // Firestore 'in' query limit is 10, so chunk the user IDs
+        let chunks = userIds.chunked(into: 10)
+
+        for chunk in chunks {
+            do {
+                let snapshot = try await db.collection("users")
+                    .whereField(FieldPath.documentID(), in: chunk)
+                    .getDocuments()
+
+                let users = snapshot.documents.compactMap { doc -> User? in
+                    try? doc.data(as: User.self)
+                }
+
+                allUsers.append(contentsOf: users)
+
+                Logger.shared.debug(
+                    "Batch fetched \(users.count) users from chunk of \(chunk.count) IDs",
+                    category: .matching
+                )
+            } catch {
+                Logger.shared.error(
+                    "Failed to batch fetch user chunk",
+                    category: .matching,
+                    error: error
+                )
+                // Continue with other chunks even if one fails
+            }
+        }
+
+        return allUsers
     }
 }
 
@@ -876,12 +926,24 @@ struct MatchProfileCard: View {
     
     private func timeAgo(from date: Date) -> String {
         let interval = Date().timeIntervalSince(date)
-        
+
         if interval < 60 { return "now" }
         else if interval < 3600 { return "\(Int(interval / 60))m" }
         else if interval < 86400 { return "\(Int(interval / 3600))h" }
         else if interval < 604800 { return "\(Int(interval / 86400))d" }
         else { return "\(Int(interval / 604800))w" }
+    }
+}
+
+// MARK: - Array Extension for Chunking
+
+extension Array {
+    /// Splits array into chunks of specified size
+    /// Used for batch Firestore queries which have a limit of 10 items per 'in' query
+    func chunked(into size: Int) -> [[Element]] {
+        return stride(from: 0, to: count, by: size).map {
+            Array(self[$0 ..< Swift.min($0 + size, count)])
+        }
     }
 }
 

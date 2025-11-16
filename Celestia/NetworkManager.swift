@@ -126,14 +126,39 @@ class NetworkManager: NSObject {
     // IMPORTANT: Without certificate pinning, the app is vulnerable to MITM attacks.
     // For production deployment, you MUST configure this with your server's certificate hashes.
     //
-    // Example configuration:
-    // private let pinnedPublicKeyHashes: Set<String> = [
-    //     "primary_cert_hash_here",      // Primary certificate
-    //     "backup_cert_hash_here"        // Backup for cert rotation
-    // ]
-    private let pinnedPublicKeyHashes: Set<String> = [
-        // TODO: Replace with your actual certificate public key hashes before production deployment
-    ]
+    // PRODUCTION REQUIREMENT: Before deploying to production, add your actual certificate hashes below
+    private let pinnedPublicKeyHashes: Set<String> = {
+        #if DEBUG
+        // In debug mode, certificate pinning is optional for development convenience
+        // You can add development certificates here if needed
+        return []
+        #else
+        // PRODUCTION MODE: Certificate pinning is REQUIRED
+        // Uncomment and add your certificate hashes before deployment:
+        let hashes: Set<String> = [
+            // "YOUR_PRIMARY_CERT_HASH_HERE",    // Primary certificate
+            // "YOUR_BACKUP_CERT_HASH_HERE"      // Backup for cert rotation
+        ]
+
+        // Enforce certificate pinning in production builds
+        if hashes.isEmpty {
+            fatalError("""
+                ⚠️ CRITICAL SECURITY ERROR ⚠️
+
+                Certificate pinning is not configured for PRODUCTION build.
+
+                This is a security requirement. You must:
+                1. Get your server's certificate hash using the command in the comments above
+                2. Add the hash to the pinnedPublicKeyHashes array
+                3. Rebuild the app
+
+                Without certificate pinning, the app is vulnerable to MITM attacks.
+                """)
+        }
+
+        return hashes
+        #endif
+    }()
 
     // MARK: - Initialization
 

@@ -11,13 +11,33 @@ import Foundation
 class RateLimiter: ObservableObject {
     static let shared = RateLimiter()
 
+    // SECURITY FIX: Persist timestamps to prevent bypass by restarting app
     // Track action timestamps
-    private var messageTimes: [Date] = []
-    private var likeTimes: [Date] = []
-    private var reportTimes: [Date] = []
-    private var searchTimes: [Date] = []
+    private var messageTimes: [Date] = [] {
+        didSet { saveToDisk(messageTimes, key: "rate_limit_messages") }
+    }
+    private var likeTimes: [Date] = [] {
+        didSet { saveToDisk(likeTimes, key: "rate_limit_likes") }
+    }
+    private var reportTimes: [Date] = [] {
+        didSet { saveToDisk(reportTimes, key: "rate_limit_reports") }
+    }
+    private var searchTimes: [Date] = [] {
+        didSet { saveToDisk(searchTimes, key: "rate_limit_searches") }
+    }
 
-    private init() {}
+    private init() {
+        // Load persisted timestamps
+        messageTimes = loadFromDisk(key: "rate_limit_messages")
+        likeTimes = loadFromDisk(key: "rate_limit_likes")
+        reportTimes = loadFromDisk(key: "rate_limit_reports")
+        searchTimes = loadFromDisk(key: "rate_limit_searches")
+
+        Logger.shared.debug(
+            "RateLimiter initialized - Loaded \(messageTimes.count) messages, \(likeTimes.count) likes, \(reportTimes.count) reports, \(searchTimes.count) searches",
+            category: .general
+        )
+    }
 
     // MARK: - Message Rate Limiting
 
@@ -99,6 +119,29 @@ class RateLimiter: ObservableObject {
         likeTimes = []
         reportTimes = []
         searchTimes = []
+
+        Logger.shared.info("All rate limits reset", category: .general)
+    }
+
+    // MARK: - Persistence
+
+    /// Save timestamps to UserDefaults for persistence across app restarts
+    private func saveToDisk(_ dates: [Date], key: String) {
+        if let encoded = try? JSONEncoder().encode(dates) {
+            UserDefaults.standard.set(encoded, forKey: key)
+        }
+    }
+
+    /// Load timestamps from UserDefaults
+    private func loadFromDisk(key: String) -> [Date] {
+        guard let data = UserDefaults.standard.data(forKey: key),
+              let dates = try? JSONDecoder().decode([Date].self, from: data) else {
+            return []
+        }
+
+        // Clean up old timestamps when loading
+        let cutoffTime = Date().addingTimeInterval(-86400) // 24 hours
+        return dates.filter { $0 > cutoffTime }
     }
 
     /// Check if user is rate limited for a specific action
