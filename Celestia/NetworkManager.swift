@@ -112,11 +112,27 @@ class NetworkManager: NSObject {
     private let baseRetryDelay: TimeInterval = 1.0
 
     // SECURITY: Certificate pinning configuration
-    // Add your server's SSL certificate public key hashes here
-    // To get the hash: openssl s_client -connect api.celestia.app:443 | openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | openssl enc -base64
+    // CERTIFICATE PINNING CONFIGURATION
+    // Add your server's SSL certificate public key hashes here for production security
+    //
+    // How to get certificate hash:
+    // 1. Get your server's public key hash:
+    //    openssl s_client -connect api.celestia.app:443 | openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | openssl enc -base64
+    //
+    // 2. Add the hash string to the array below
+    //
+    // 3. Optional: Add backup certificate hash for smooth rotation
+    //
+    // IMPORTANT: Without certificate pinning, the app is vulnerable to MITM attacks.
+    // For production deployment, you MUST configure this with your server's certificate hashes.
+    //
+    // Example configuration:
+    // private let pinnedPublicKeyHashes: Set<String> = [
+    //     "primary_cert_hash_here",      // Primary certificate
+    //     "backup_cert_hash_here"        // Backup for cert rotation
+    // ]
     private let pinnedPublicKeyHashes: Set<String> = [
-        // TODO: Replace with your actual certificate public key hashes
-        // Example: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+        // TODO: Replace with your actual certificate public key hashes before production deployment
     ]
 
     // MARK: - Initialization
@@ -477,9 +493,15 @@ extension NetworkManager: URLSessionDelegate {
         }
 
         // If no public key hashes are configured, use default validation
-        // TODO: Remove this bypass and configure proper certificate pinning in production
+        // SECURITY WARNING: This bypass is acceptable for development/testing only.
+        // For PRODUCTION, you MUST configure certificate pinning hashes above.
+        // Without certificate pinning, the app is vulnerable to man-in-the-middle attacks.
         if pinnedPublicKeyHashes.isEmpty {
-            Logger.shared.warning("Certificate pinning not configured - using default validation", category: .security)
+            #if DEBUG
+            Logger.shared.warning("Certificate pinning not configured - using default validation (development mode)", category: .security)
+            #else
+            Logger.shared.error("PRODUCTION BUILD WITHOUT CERTIFICATE PINNING - SECURITY RISK!", category: .security)
+            #endif
             completionHandler(.performDefaultHandling, nil)
             return
         }

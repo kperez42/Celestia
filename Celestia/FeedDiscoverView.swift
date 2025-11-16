@@ -381,9 +381,14 @@ struct FeedDiscoverView: View {
                 }
 
                 Button("Send Message") {
+                    // Navigate to Messages tab (tab index 2)
+                    selectedTab = 2
                     showMatchAnimation = false
-                    // NOTE: Navigation to messages should be implemented using NavigationPath or coordinator
-                    // For now, user can access messages from Messages tab
+                    HapticManager.shared.notification(.success)
+
+                    if let matchedUserId = matchedUser?.id {
+                        Logger.shared.info("Navigating to messages for match: \(matchedUserId)", category: .navigation)
+                    }
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.purple)
