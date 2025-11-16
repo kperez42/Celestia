@@ -1177,7 +1177,7 @@ struct EditProfileView: View {
 
     private func deletePhoto(at index: Int) {
         withAnimation {
-            photos.remove(at: index)
+            _ = photos.remove(at: index)
         }
         HapticManager.shared.impact(.medium)
 
