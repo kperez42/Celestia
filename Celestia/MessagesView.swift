@@ -90,6 +90,24 @@ struct MessagesView: View {
                     }
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("OpenChatWithUser"))) { notification in
+                // Open chat with specific user when notification is received
+                guard let userId = notification.userInfo?["userId"] as? String,
+                      let user = notification.userInfo?["user"] as? User else {
+                    Logger.shared.warning("OpenChatWithUser notification missing user data", category: .messaging)
+                    return
+                }
+
+                // Find the match for this user
+                if let matchPair = conversations.first(where: { $0.1.id == userId }) {
+                    selectedMatch = matchPair
+                    showingChat = true
+                    HapticManager.shared.impact(.medium)
+                    Logger.shared.info("Opening chat with \(user.fullName) from Discover", category: .messaging)
+                } else {
+                    Logger.shared.warning("No match found for user \(userId) in conversations", category: .messaging)
+                }
+            }
         }
         .networkStatusBanner() // UX: Show offline status
     }

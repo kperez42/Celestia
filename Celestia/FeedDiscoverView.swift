@@ -387,12 +387,21 @@ struct FeedDiscoverView: View {
                 }
 
                 Button("Send Message") {
-                    // Navigate to Messages tab (tab index 2)
-                    selectedTab = 2
-                    showMatchAnimation = false
-                    HapticManager.shared.notification(.success)
+                    // Navigate to Messages tab and open chat with matched user
+                    if let matchedUser = matchedUser, let matchedUserId = matchedUser.id {
+                        selectedTab = 2
+                        showMatchAnimation = false
+                        HapticManager.shared.notification(.success)
 
-                    if let matchedUserId = matchedUser?.id {
+                        // Small delay to ensure Messages tab loads before opening chat
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            NotificationCenter.default.post(
+                                name: Notification.Name("OpenChatWithUser"),
+                                object: nil,
+                                userInfo: ["userId": matchedUserId, "user": matchedUser]
+                            )
+                        }
+
                         Logger.shared.info("Navigating to messages for match: \(matchedUserId)", category: .navigation)
                     }
                 }
@@ -688,9 +697,19 @@ struct FeedDiscoverView: View {
 
                 await MainActor.run {
                     if hasMatched {
-                        // Navigate to Messages tab
+                        // Navigate to Messages tab and open chat with this user
                         selectedTab = 2
                         HapticManager.shared.impact(.medium)
+
+                        // Small delay to ensure Messages tab loads before opening chat
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            NotificationCenter.default.post(
+                                name: Notification.Name("OpenChatWithUser"),
+                                object: nil,
+                                userInfo: ["userId": userId, "user": user]
+                            )
+                        }
+
                         Logger.shared.debug("Navigate to messages for user: \(user.fullName)", category: .messaging)
                     } else {
                         // Not matched yet - show info
