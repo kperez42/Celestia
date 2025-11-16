@@ -667,18 +667,18 @@ struct MatchesView: View {
             }
 
             // PERFORMANCE FIX: Batch fetch all user data instead of N+1 queries
-            // Collect all user IDs that need to be fetched
+            // IMPORTANT: Always fetch fresh user data to ensure status is up-to-date
             let userIdsToFetch = matchService.matches
                 .map { match in
                     match.user1Id == userId ? match.user2Id : match.user1Id
                 }
-                .filter { matchedUsers[$0] == nil }  // Only fetch missing users
 
             if !userIdsToFetch.isEmpty {
                 // Batch fetch users in chunks of 10 (Firestore 'in' query limit)
                 let fetchedUsers = try await batchFetchUsers(userIds: userIdsToFetch)
 
                 await MainActor.run {
+                    // Update cache with fresh user data (including current online status)
                     for user in fetchedUsers {
                         if let userId = user.id {
                             matchedUsers[userId] = user

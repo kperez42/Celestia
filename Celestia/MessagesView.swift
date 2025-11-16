@@ -437,14 +437,10 @@ struct MessagesView: View {
             try await matchService.fetchMatches(userId: userId)
 
             // Load users for all matches in parallel (performance optimization)
+            // IMPORTANT: Always fetch fresh user data to ensure status is up-to-date
             await withTaskGroup(of: (String, User?).self) { group in
                 for match in matchService.matches {
                     let otherUserId = match.user1Id == userId ? match.user2Id : match.user1Id
-
-                    // Skip if already cached
-                    if matchedUsers[otherUserId] != nil {
-                        continue
-                    }
 
                     group.addTask {
                         let user = try? await self.userService.fetchUser(userId: otherUserId)
@@ -452,7 +448,7 @@ struct MessagesView: View {
                     }
                 }
 
-                // Collect results
+                // Collect results and update cache with fresh data
                 for await (userId, user) in group {
                     if let user = user {
                         await MainActor.run {
