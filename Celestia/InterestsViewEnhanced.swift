@@ -50,9 +50,11 @@ struct InterestsViewEnhanced: View {
         }
 
         if filterOnline {
-            // Filter only online users
+            // Filter only active users (online OR active within last 5 minutes)
             filtered = filtered.filter { interest in
-                users[interest.fromUserId]?.isOnline ?? false
+                guard let user = users[interest.fromUserId] else { return false }
+                let interval = Date().timeIntervalSince(user.lastActive)
+                return user.isOnline || interval < 300
             }
         }
 
@@ -627,16 +629,22 @@ struct InterestCard: View {
                     .clipped()
                     .blur(radius: isBlurred ? 20 : 0)
 
-                    // Online indicator
-                    if !isBlurred && user.isOnline {
-                        Circle()
-                            .fill(Color.green)
-                            .frame(width: 12, height: 12)
-                            .overlay {
-                                Circle()
-                                    .stroke(Color.white, lineWidth: 2)
-                            }
-                            .padding(8)
+                    // Online/Active indicator
+                    if !isBlurred {
+                        // Consider user active if they're online OR were active in the last 5 minutes
+                        let interval = Date().timeIntervalSince(user.lastActive)
+                        let isActive = user.isOnline || interval < 300
+
+                        if isActive {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 12, height: 12)
+                                .overlay {
+                                    Circle()
+                                        .stroke(Color.white, lineWidth: 2)
+                                }
+                                .padding(8)
+                        }
                     }
 
                     // Selection checkmark
