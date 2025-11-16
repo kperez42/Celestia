@@ -47,8 +47,8 @@ struct ProfileView: View {
                             // Hero header with profile photo
                             heroSection(user: user)
 
-                            // Content sections
-                            VStack(spacing: 20) {
+                            // Content sections with better organization
+                            VStack(spacing: 16) {
                                 // Profile completion
                                 if profileCompletion < 100 {
                                     profileCompletionCard(user: user)
@@ -76,6 +76,10 @@ struct ProfileView: View {
                                     premiumUpgradeCard
                                 }
 
+                                // Profile Information Section Header
+                                sectionHeader(title: "Profile Information", icon: "person.text.rectangle")
+                                    .padding(.top, 8)
+
                                 // About section
                                 if !user.bio.isEmpty {
                                     aboutSection(bio: user.bio)
@@ -89,10 +93,9 @@ struct ProfileView: View {
                                 // Details grid
                                 detailsCard(user: user)
 
-                                // Photo gallery
-                                if !user.photos.isEmpty {
-                                    photoGallerySection(photos: user.photos)
-                                }
+                                // Interests & Languages Section Header
+                                sectionHeader(title: "Interests & Languages", icon: "sparkles")
+                                    .padding(.top, 8)
 
                                 // Languages
                                 if !user.languages.isEmpty {
@@ -104,6 +107,19 @@ struct ProfileView: View {
                                     interestsCard(interests: user.interests)
                                 }
 
+                                // Gallery Section Header
+                                if !user.photos.isEmpty {
+                                    sectionHeader(title: "Photo Gallery", icon: "photo.stack")
+                                        .padding(.top, 8)
+
+                                    // Photo gallery
+                                    photoGallerySection(photos: user.photos)
+                                }
+
+                                // Preferences Section Header
+                                sectionHeader(title: "Preferences", icon: "slider.horizontal.3")
+                                    .padding(.top, 8)
+
                                 // Preferences
                                 preferencesCard(user: user)
 
@@ -112,6 +128,7 @@ struct ProfileView: View {
 
                                 // Action buttons
                                 actionButtons
+                                    .padding(.bottom, 20)
                             }
                             .padding(.top, -40)
                         }
@@ -911,6 +928,46 @@ struct ProfileView: View {
         .accessibilityLabel("Upgrade to Premium")
         .accessibilityHint("Unlock unlimited likes, see who likes you, and access all premium features")
         .padding(.horizontal, 20)
+    }
+
+    // MARK: - Section Headers
+
+    private func sectionHeader(title: String, icon: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.purple, .pink],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+
+            Text(title)
+                .font(.title3.weight(.bold))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.purple, .pink],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+
+            Spacer()
+
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [.purple.opacity(0.3), .pink.opacity(0.2), .clear],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .frame(height: 2)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 8)
     }
 
     // MARK: - About Section
