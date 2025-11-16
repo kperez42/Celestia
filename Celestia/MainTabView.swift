@@ -81,27 +81,7 @@ struct MainTabView: View {
     // MARK: - Custom Tab Bar
     
     private var customTabBar: some View {
-        VStack(spacing: 0) {
-            // PREMIUM: Animated tab indicator
-            HStack(spacing: 0) {
-                ForEach(0..<5) { index in
-                    Rectangle()
-                        .fill(
-                            selectedTab == index ?
-                            LinearGradient(
-                                colors: [.purple, .pink],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            ) :
-                            LinearGradient(colors: [Color.clear], startPoint: .leading, endPoint: .trailing)
-                        )
-                        .frame(height: 3)
-                        .frame(maxWidth: .infinity)
-                }
-            }
-            .animation(.spring(response: 0.4, dampingFraction: 0.7), value: selectedTab)
-
-            HStack(spacing: 0) {
+        HStack(spacing: 0) {
                 // Discover
                 TabBarButton(
                     icon: "flame.fill",
@@ -151,11 +131,10 @@ struct MainTabView: View {
                 ) {
                     selectedTab = 4
                 }
-            }
-            .padding(.horizontal, 8)
-            .padding(.top, 8)
-            .padding(.bottom, -20)
         }
+        .padding(.horizontal, 8)
+        .padding(.top, 8)
+        .padding(.bottom, -20)
         .background(
             ZStack {
                 // PREMIUM: Glass morphism effect
