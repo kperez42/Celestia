@@ -54,7 +54,11 @@ class ChatViewModel: ObservableObject {
             // UX FIX: Properly handle match fetch errors instead of silent failure
             do {
                 // ARCHITECTURE FIX: Use injected matchService instead of .shared singleton
-                let match = try await matchService.fetchMatch(user1Id: currentUserId, user2Id: otherUserId)
+                guard let match = try await matchService.fetchMatch(user1Id: currentUserId, user2Id: otherUserId) else {
+                    Logger.shared.error("No match found", category: .messaging)
+                    await showError("Unable to load chat. No match found.")
+                    return
+                }
                 guard let matchId = match.id else {
                     Logger.shared.error("Match found but has no ID", category: .messaging)
                     await showError("Unable to load chat. Please try again.")
@@ -110,7 +114,11 @@ class ChatViewModel: ObservableObject {
             do {
                 // Find or create match
                 // UX FIX: Properly handle match fetch errors instead of silent failure
-                let match = try await matchService.fetchMatch(user1Id: currentUserId, user2Id: otherUserId)
+                guard let match = try await matchService.fetchMatch(user1Id: currentUserId, user2Id: otherUserId) else {
+                    Logger.shared.error("No match found", category: .messaging)
+                    await showError("Unable to send message. No match found.")
+                    return
+                }
                 guard let matchId = match.id else {
                     Logger.shared.error("Match found but has no ID", category: .messaging)
                     await showError("Unable to send message. Please try again.")
