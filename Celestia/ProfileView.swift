@@ -130,6 +130,11 @@ struct ProfileView: View {
             .sheet(isPresented: $showingEditProfile) {
                 EditProfileView()
                     .environmentObject(authService)
+            } onDismiss: {
+                // CACHE FIX: Force refresh profile data when returning from edit
+                Task {
+                    await refreshProfileData()
+                }
             }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
