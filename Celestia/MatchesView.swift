@@ -768,37 +768,54 @@ struct MatchProfileCard: View {
     var body: some View {
         VStack(spacing: 0) {
             // Profile image with badges
-            ZStack(alignment: .topTrailing) {
+            ZStack {
                 profileImage
                     .frame(height: 220)
 
-                // New match or unread badge
-                if isNewMatch {
-                    HStack(spacing: 4) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 10))
-                        Text("NEW")
-                            .font(.system(size: 11, weight: .bold))
+                // Online Status Indicator - Top Left
+                VStack {
+                    HStack {
+                        OnlineStatusIndicator(user: user)
+                            .padding(.top, 8)
+                            .padding(.leading, 8)
+                        Spacer()
                     }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(
-                        LinearGradient(
-                            colors: [Color.purple, Color.pink],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .clipShape(Capsule())
-                    .padding(8)
-                } else if unreadCount > 0 {
-                    Text("\(unreadCount)")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(.white)
-                        .frame(minWidth: 24, minHeight: 24)
-                        .background(Circle().fill(Color.red))
-                        .padding(8)
+                    Spacer()
+                }
+
+                // New match or unread badge - Top Right
+                VStack {
+                    HStack {
+                        Spacer()
+                        if isNewMatch {
+                            HStack(spacing: 4) {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 10))
+                                Text("NEW")
+                                    .font(.system(size: 11, weight: .bold))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color.purple, Color.pink],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .clipShape(Capsule())
+                            .padding(8)
+                        } else if unreadCount > 0 {
+                            Text("\(unreadCount)")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(.white)
+                                .frame(minWidth: 24, minHeight: 24)
+                                .background(Circle().fill(Color.red))
+                                .padding(8)
+                        }
+                    }
+                    Spacer()
                 }
             }
 
@@ -932,6 +949,97 @@ struct MatchProfileCard: View {
         else if interval < 86400 { return "\(Int(interval / 3600))h" }
         else if interval < 604800 { return "\(Int(interval / 86400))d" }
         else { return "\(Int(interval / 604800))w" }
+    }
+}
+
+// MARK: - Online Status Indicator
+
+struct OnlineStatusIndicator: View {
+    let user: User
+    @Environment(\.colorScheme) var colorScheme
+
+    private var isOnline: Bool {
+        user.isOnline
+    }
+
+    private var statusText: String {
+        if isOnline {
+            return "Online"
+        } else {
+            return timeAgoText
+        }
+    }
+
+    private var timeAgoText: String {
+        let interval = Date().timeIntervalSince(user.lastActive)
+
+        if interval < 300 { // Less than 5 minutes
+            return "Active now"
+        } else if interval < 3600 { // Less than 1 hour
+            let minutes = Int(interval / 60)
+            return "Active \(minutes)m ago"
+        } else if interval < 86400 { // Less than 24 hours
+            let hours = Int(interval / 3600)
+            return "Active \(hours)h ago"
+        } else if interval < 604800 { // Less than 7 days
+            let days = Int(interval / 86400)
+            return "Active \(days)d ago"
+        } else {
+            return "Recently active"
+        }
+    }
+
+    private var statusColor: Color {
+        isOnline ? Color.green : Color.gray
+    }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            // Pulsing dot for online users
+            ZStack {
+                // Outer pulsing ring (only for online users)
+                if isOnline {
+                    Circle()
+                        .fill(statusColor.opacity(0.3))
+                        .frame(width: 12, height: 12)
+                        .scaleEffect(1.5)
+                        .opacity(0.8)
+                        .animation(
+                            Animation.easeInOut(duration: 1.5)
+                                .repeatForever(autoreverses: true),
+                            value: isOnline
+                        )
+                }
+
+                // Inner solid dot
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 8, height: 8)
+            }
+            .frame(width: 12, height: 12)
+
+            // Status text
+            Text(statusText)
+                .font(.caption2)
+                .fontWeight(.semibold)
+                .foregroundColor(.white)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            Capsule()
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    Capsule()
+                        .strokeBorder(
+                            statusColor.opacity(0.3),
+                            lineWidth: 1
+                        )
+                )
+        )
+        .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(user.fullName) is \(statusText)")
     }
 }
 
