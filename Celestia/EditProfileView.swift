@@ -39,6 +39,7 @@ struct EditProfileView: View {
     @State private var selectedPhotoItems: [PhotosPickerItem] = []
     @State private var isUploadingPhotos = false
     @State private var uploadProgress: Double = 0.0
+    @State private var isUploadingProfilePhoto = false
 
     // Advanced profile fields
     @State private var height: Int?
@@ -233,15 +234,15 @@ struct EditProfileView: View {
                         )
                 }
                 .shadow(color: .purple.opacity(0.3), radius: 15, y: 8)
-                
-                // Camera button
+
+                // Camera button with loading indicator
                 PhotosPicker(selection: $selectedImage, matching: .images) {
                     ZStack {
                         Circle()
                             .fill(Color.white)
                             .frame(width: 44, height: 44)
                             .shadow(color: .black.opacity(0.2), radius: 5)
-                        
+
                         Circle()
                             .fill(
                                 LinearGradient(
@@ -251,19 +252,41 @@ struct EditProfileView: View {
                                 )
                             )
                             .frame(width: 40, height: 40)
-                        
-                        Image(systemName: "camera.fill")
-                            .font(.system(size: 16))
-                            .foregroundColor(.white)
+
+                        if isUploadingProfilePhoto {
+                            ProgressView()
+                                .tint(.white)
+                                .scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "camera.fill")
+                                .font(.system(size: 16))
+                                .foregroundColor(.white)
+                        }
                     }
                 }
+                .disabled(isUploadingProfilePhoto)
                 .offset(x: 5, y: 5)
+                .accessibilityLabel("Change profile photo")
+                .accessibilityHint("Tap to select a new profile photo from your photo library")
             }
             .onChange(of: selectedImage) { _, newValue in
                 Task {
+                    await MainActor.run {
+                        isUploadingProfilePhoto = true
+                    }
+
                     if let data = try? await newValue?.loadTransferable(type: Data.self),
                        let uiImage = UIImage(data: data) {
-                        profileImage = uiImage
+                        await MainActor.run {
+                            profileImage = uiImage
+                            isUploadingProfilePhoto = false
+                            HapticManager.shared.notification(.success)
+                        }
+                    } else {
+                        await MainActor.run {
+                            isUploadingProfilePhoto = false
+                            HapticManager.shared.notification(.error)
+                        }
                     }
                 }
             }
@@ -365,6 +388,8 @@ struct EditProfileView: View {
                                 }
                             }
                     }
+                    .accessibilityLabel("Add gallery photo")
+                    .accessibilityHint("Tap to add up to \(6 - photos.count) more photos to your gallery")
                 }
             }
         }
