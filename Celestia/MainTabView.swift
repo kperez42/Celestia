@@ -66,6 +66,16 @@ struct MainTabView: View {
             try? await Task.sleep(nanoseconds: 500_000_000) // 500ms delay
             await updateBadgesPeriodically()
         }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToMessages"))) { notification in
+            // Navigate to Messages tab when a match occurs
+            selectedTab = 2
+            HapticManager.shared.notification(.success)
+
+            // Optional: Extract matched user ID for future use (e.g., scroll to conversation)
+            if let matchedUserId = notification.userInfo?["matchedUserId"] as? String {
+                Logger.shared.info("Navigating to messages for match: \(matchedUserId)", category: .navigation)
+            }
+        }
     }
     
     // MARK: - Custom Tab Bar

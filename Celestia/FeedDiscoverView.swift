@@ -123,6 +123,7 @@ struct FeedDiscoverView: View {
                 ForEach(Array(displayedUsers.enumerated()), id: \.element.id) { index, user in
                     ProfileFeedCard(
                         user: user,
+                        currentUser: authService.currentUser,  // NEW: Pass current user for shared interests
                         initialIsFavorited: favorites.contains(user.id ?? ""),
                         onLike: {
                             handleLike(user: user)
@@ -136,6 +137,11 @@ struct FeedDiscoverView: View {
                         onViewPhotos: {
                             selectedUser = user
                             showPhotoGallery = true
+                        },
+                        onViewProfile: {
+                            HapticManager.shared.impact(.light)
+                            selectedUser = user
+                            showUserDetail = true
                         }
                     )
                     .onAppear {
@@ -381,9 +387,23 @@ struct FeedDiscoverView: View {
                 }
 
                 Button("Send Message") {
-                    showMatchAnimation = false
-                    // NOTE: Navigation to messages should be implemented using NavigationPath or coordinator
-                    // For now, user can access messages from Messages tab
+                    // Navigate to Messages tab and open chat with matched user
+                    if let matchedUser = matchedUser, let matchedUserId = matchedUser.id {
+                        selectedTab = 2
+                        showMatchAnimation = false
+                        HapticManager.shared.notification(.success)
+
+                        // Small delay to ensure Messages tab loads before opening chat
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            NotificationCenter.default.post(
+                                name: Notification.Name("OpenChatWithUser"),
+                                object: nil,
+                                userInfo: ["userId": matchedUserId, "user": matchedUser]
+                            )
+                        }
+
+                        Logger.shared.info("Navigating to messages for match: \(matchedUserId)", category: .navigation)
+                    }
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.purple)
@@ -677,9 +697,19 @@ struct FeedDiscoverView: View {
 
                 await MainActor.run {
                     if hasMatched {
-                        // Navigate to Messages tab
+                        // Navigate to Messages tab and open chat with this user
                         selectedTab = 2
                         HapticManager.shared.impact(.medium)
+
+                        // Small delay to ensure Messages tab loads before opening chat
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            NotificationCenter.default.post(
+                                name: Notification.Name("OpenChatWithUser"),
+                                object: nil,
+                                userInfo: ["userId": userId, "user": user]
+                            )
+                        }
+
                         Logger.shared.debug("Navigate to messages for user: \(user.fullName)", category: .messaging)
                     } else {
                         // Not matched yet - show info

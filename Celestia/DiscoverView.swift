@@ -517,6 +517,14 @@ struct DiscoverView: View {
                 }
 
                 Button("Send Message") {
+                    // Navigate to Messages tab (tab index 2)
+                    if let matchedUserId = viewModel.matchedUser?.id {
+                        NotificationCenter.default.post(
+                            name: Notification.Name("NavigateToMessages"),
+                            object: nil,
+                            userInfo: ["matchedUserId": matchedUserId]
+                        )
+                    }
                     viewModel.dismissMatchAnimation()
                 }
                 .buttonStyle(.borderedProminent)
@@ -566,6 +574,15 @@ struct DiscoverView: View {
 
 struct UserCardView: View {
     let user: User
+    @State private var selectedPhotoIndex = 0
+    @State private var isSaved = false
+    @ObservedObject private var savedProfilesVM = SavedProfilesViewModel.shared
+
+    // Filter out empty photo URLs and ensure at least profileImageURL
+    private var validPhotos: [String] {
+        let allPhotos = user.photos.isEmpty ? [user.profileImageURL] : user.photos
+        return allPhotos.filter { !$0.isEmpty }
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -575,10 +592,24 @@ struct UserCardView: View {
                     .fill(Color.white)
                     .shadow(radius: 10)
 
-                // User image with caching
-                CachedCardImage(url: URL(string: user.profileImageURL))
-                    .frame(width: geometry.size.width, height: geometry.size.height)
-                    .clipped()
+                // Photo carousel (if multiple photos) or single image
+                if validPhotos.count > 1 {
+                    TabView(selection: $selectedPhotoIndex) {
+                        ForEach(Array(validPhotos.enumerated()), id: \.offset) { index, photoURL in
+                            CachedCardImage(url: URL(string: photoURL))
+                                .frame(width: geometry.size.width, height: geometry.size.height)
+                                .clipped()
+                                .tag(index)
+                        }
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .always))
+                    .indexViewStyle(.page(backgroundDisplayMode: .always))
+                } else {
+                    // Single image fallback
+                    CachedCardImage(url: URL(string: validPhotos.first ?? user.profileImageURL))
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .clipped()
+                }
 
                 // Gradient overlay for better text readability
                 LinearGradient(
@@ -670,8 +701,52 @@ struct UserCardView: View {
                 }
                 .padding(24)
                 .frame(maxWidth: .infinity, alignment: .leading)
+
+                // Save/Bookmark button overlay (top-right)
+                VStack {
+                    HStack {
+                        Spacer()
+
+                        Button {
+                            HapticManager.shared.impact(.light)
+                            isSaved.toggle()
+                            Task {
+                                if isSaved {
+                                    await savedProfilesVM.saveProfile(user: user)
+                                } else {
+                                    // Find and remove from saved
+                                    if let savedProfile = savedProfilesVM.savedProfiles.first(where: { $0.user.id == user.id }) {
+                                        savedProfilesVM.unsaveProfile(savedProfile)
+                                    }
+                                }
+                            }
+                        } label: {
+                            Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
+                                .font(.title3)
+                                .foregroundColor(.white)
+                                .frame(width: 44, height: 44)
+                                .background(Color.black.opacity(0.5))
+                                .clipShape(Circle())
+                                .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
+                        }
+                        .accessibilityLabel(isSaved ? "Remove from saved" : "Save profile")
+                        .accessibilityHint("Bookmark this profile for later")
+                    }
+                    .padding(.top, 16)
+                    .padding(.trailing, 16)
+
+                    Spacer()
+                }
             }
             .cornerRadius(20)
+            .onAppear {
+                // Check if user is already saved
+                isSaved = savedProfilesVM.savedProfiles.contains(where: { $0.user.id == user.id })
+            }
+            .onChange(of: savedProfilesVM.savedProfiles) { _ in
+                // Sync saved state when savedProfiles array changes (e.g., saved/unsaved from another view)
+                isSaved = savedProfilesVM.savedProfiles.contains(where: { $0.user.id == user.id })
+            }
         }
         .frame(maxHeight: .infinity) // Fill available space
     }

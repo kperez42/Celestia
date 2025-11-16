@@ -39,6 +39,7 @@ struct EditProfileView: View {
     @State private var selectedPhotoItems: [PhotosPickerItem] = []
     @State private var isUploadingPhotos = false
     @State private var uploadProgress: Double = 0.0
+    @State private var isUploadingProfilePhoto = false
 
     // Advanced profile fields
     @State private var height: Int?
@@ -233,15 +234,15 @@ struct EditProfileView: View {
                         )
                 }
                 .shadow(color: .purple.opacity(0.3), radius: 15, y: 8)
-                
-                // Camera button
+
+                // Camera button with loading indicator
                 PhotosPicker(selection: $selectedImage, matching: .images) {
                     ZStack {
                         Circle()
                             .fill(Color.white)
                             .frame(width: 44, height: 44)
                             .shadow(color: .black.opacity(0.2), radius: 5)
-                        
+
                         Circle()
                             .fill(
                                 LinearGradient(
@@ -251,19 +252,41 @@ struct EditProfileView: View {
                                 )
                             )
                             .frame(width: 40, height: 40)
-                        
-                        Image(systemName: "camera.fill")
-                            .font(.system(size: 16))
-                            .foregroundColor(.white)
+
+                        if isUploadingProfilePhoto {
+                            ProgressView()
+                                .tint(.white)
+                                .scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "camera.fill")
+                                .font(.system(size: 16))
+                                .foregroundColor(.white)
+                        }
                     }
                 }
+                .disabled(isUploadingProfilePhoto)
                 .offset(x: 5, y: 5)
+                .accessibilityLabel("Change profile photo")
+                .accessibilityHint("Tap to select a new profile photo from your photo library")
             }
             .onChange(of: selectedImage) { _, newValue in
                 Task {
+                    await MainActor.run {
+                        isUploadingProfilePhoto = true
+                    }
+
                     if let data = try? await newValue?.loadTransferable(type: Data.self),
                        let uiImage = UIImage(data: data) {
-                        profileImage = uiImage
+                        await MainActor.run {
+                            profileImage = uiImage
+                            isUploadingProfilePhoto = false
+                            HapticManager.shared.notification(.success)
+                        }
+                    } else {
+                        await MainActor.run {
+                            isUploadingProfilePhoto = false
+                            HapticManager.shared.notification(.error)
+                        }
                     }
                 }
             }
@@ -365,6 +388,8 @@ struct EditProfileView: View {
                                 }
                             }
                     }
+                    .accessibilityLabel("Add gallery photo")
+                    .accessibilityHint("Tap to add up to \(6 - photos.count) more photos to your gallery")
                 }
             }
         }
@@ -1086,15 +1111,27 @@ struct EditProfileView: View {
             showErrorAlert = true
             return
         }
-        
+
         isLoading = true
-        
+
         Task {
             do {
                 // Upload profile image if changed
                 if let profileImage = profileImage, let userId = user.id {
+                    // CACHE FIX: Clear old cached image before uploading new one
+                    if let oldURL = URL(string: user.profileImageURL) {
+                        await MainActor.run {
+                            ImageCache.shared.removeImage(for: oldURL.absoluteString)
+                        }
+                    }
+
                     let imageURL = try await ImageUploadService.shared.uploadProfileImage(profileImage, userId: userId)
                     user.profileImageURL = imageURL
+
+                    // CACHE FIX: Also clear any cached version of the new URL to force fresh load
+                    await MainActor.run {
+                        ImageCache.shared.removeImage(for: imageURL)
+                    }
                 }
                 
                 // Update user data with sanitized input
@@ -1333,48 +1370,112 @@ struct LanguagePickerView: View {
     @Environment(\.dismiss) var dismiss
     @Binding var selectedLanguages: [String]
     let availableLanguages: [String]
-    
+
     var body: some View {
         NavigationStack {
-            List {
-                ForEach(availableLanguages, id: \.self) { language in
-                    Button {
-                        if selectedLanguages.contains(language) {
-                            selectedLanguages.removeAll { $0 == language }
-                        } else {
-                            selectedLanguages.append(language)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    // Header with count
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Select Languages")
+                                .font(.title2)
+                                .fontWeight(.bold)
+
+                            Text("\(selectedLanguages.count) selected")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
                         }
-                    } label: {
-                        HStack {
-                            Text(language)
-                                .foregroundColor(.primary)
-                            
-                            Spacer()
-                            
-                            if selectedLanguages.contains(language) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(
-                                        LinearGradient(
-                                            colors: [.purple, .pink],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                    )
+
+                        Spacer()
+
+                        Button("Done") {
+                            HapticManager.shared.impact(.light)
+                            dismiss()
+                        }
+                        .font(.headline)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 20)
+
+                    // Grid of language tags
+                    FlowLayoutImproved(spacing: 12) {
+                        ForEach(availableLanguages, id: \.self) { language in
+                            LanguageTagButton(
+                                language: language,
+                                isSelected: selectedLanguages.contains(language)
+                            ) {
+                                HapticManager.shared.impact(.light)
+                                if selectedLanguages.contains(language) {
+                                    selectedLanguages.removeAll { $0 == language }
+                                } else {
+                                    selectedLanguages.append(language)
+                                }
                             }
                         }
                     }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 30)
                 }
             }
-            .navigationTitle("Select Languages")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
+            .background(Color(.systemGroupedBackground))
         }
+    }
+}
+
+struct LanguageTagButton: View {
+    let language: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Text(language)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.caption)
+                }
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 12)
+            .background(
+                isSelected ?
+                LinearGradient(
+                    colors: [.purple, .pink],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ).opacity(0.15) :
+                Color(.systemGray6)
+            )
+            .foregroundColor(isSelected ? .purple : .primary)
+            .cornerRadius(25)
+            .overlay(
+                RoundedRectangle(cornerRadius: 25)
+                    .stroke(
+                        isSelected ?
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ) :
+                        LinearGradient(colors: [.clear], startPoint: .leading, endPoint: .trailing),
+                        lineWidth: 2
+                    )
+            )
+            .shadow(color: isSelected ? .purple.opacity(0.2) : .clear, radius: 8, y: 4)
+        }
+        .scaleButton()
     }
 }
 
@@ -1384,48 +1485,112 @@ struct InterestPickerView: View {
     @Environment(\.dismiss) var dismiss
     @Binding var selectedInterests: [String]
     let availableInterests: [String]
-    
+
     var body: some View {
         NavigationStack {
-            List {
-                ForEach(availableInterests, id: \.self) { interest in
-                    Button {
-                        if selectedInterests.contains(interest) {
-                            selectedInterests.removeAll { $0 == interest }
-                        } else {
-                            selectedInterests.append(interest)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    // Header with count
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Select Interests")
+                                .font(.title2)
+                                .fontWeight(.bold)
+
+                            Text("\(selectedInterests.count) selected")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
                         }
-                    } label: {
-                        HStack {
-                            Text(interest)
-                                .foregroundColor(.primary)
-                            
-                            Spacer()
-                            
-                            if selectedInterests.contains(interest) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(
-                                        LinearGradient(
-                                            colors: [.pink, .orange],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                    )
+
+                        Spacer()
+
+                        Button("Done") {
+                            HapticManager.shared.impact(.light)
+                            dismiss()
+                        }
+                        .font(.headline)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.pink, .orange],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 20)
+
+                    // Grid of interest tags
+                    FlowLayoutImproved(spacing: 12) {
+                        ForEach(availableInterests, id: \.self) { interest in
+                            InterestTagButton(
+                                interest: interest,
+                                isSelected: selectedInterests.contains(interest)
+                            ) {
+                                HapticManager.shared.impact(.light)
+                                if selectedInterests.contains(interest) {
+                                    selectedInterests.removeAll { $0 == interest }
+                                } else {
+                                    selectedInterests.append(interest)
+                                }
                             }
                         }
                     }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 30)
                 }
             }
-            .navigationTitle("Select Interests")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
+            .background(Color(.systemGroupedBackground))
         }
+    }
+}
+
+struct InterestTagButton: View {
+    let interest: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Text(interest)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.caption)
+                }
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 12)
+            .background(
+                isSelected ?
+                LinearGradient(
+                    colors: [.pink, .orange],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ).opacity(0.15) :
+                Color(.systemGray6)
+            )
+            .foregroundColor(isSelected ? .pink : .primary)
+            .cornerRadius(25)
+            .overlay(
+                RoundedRectangle(cornerRadius: 25)
+                    .stroke(
+                        isSelected ?
+                        LinearGradient(
+                            colors: [.pink, .orange],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ) :
+                        LinearGradient(colors: [.clear], startPoint: .leading, endPoint: .trailing),
+                        lineWidth: 2
+                    )
+            )
+            .shadow(color: isSelected ? .pink.opacity(0.2) : .clear, radius: 8, y: 4)
+        }
+        .scaleButton()
     }
 }
 

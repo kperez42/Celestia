@@ -9,23 +9,35 @@ import SwiftUI
 
 struct ProfileFeedCard: View {
     let user: User
+    let currentUser: User?  // NEW: For calculating shared interests
     let initialIsFavorited: Bool
     let onLike: () -> Void
     let onFavorite: () -> Void
     let onMessage: () -> Void
     let onViewPhotos: () -> Void
+    let onViewProfile: () -> Void  // NEW: Callback to view full profile with interests
 
     @State private var isFavorited = false
     @State private var isLiked = false
     @State private var isProcessingLike = false
     @State private var isProcessingSave = false
 
+    // MARK: - Computed Properties
+
+    // Calculate shared interests with current user
+    private var sharedInterests: [String] {
+        guard let currentUser = currentUser else { return [] }
+        let userInterests = Set(user.interests)
+        let myInterests = Set(currentUser.interests)
+        return Array(userInterests.intersection(myInterests)).sorted()
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Profile Image
             profileImage
 
-            // User Details
+            // User Details (tappable to view full profile)
             VStack(alignment: .leading, spacing: 8) {
                 // Name and Verification
                 nameRow
@@ -41,6 +53,18 @@ struct ProfileFeedCard: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                HapticManager.shared.impact(.light)
+                onViewProfile()
+            }
+
+            // Shared Interests (if any)
+            if !sharedInterests.isEmpty {
+                sharedInterestsView
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+            }
 
             // Action Buttons
             actionButtons
@@ -68,6 +92,30 @@ struct ProfileFeedCard: View {
             .frame(height: 400)
             .clipped()
             .cornerRadius(16, corners: [.topLeft, .topRight])
+            .overlay(alignment: .topTrailing) {
+                // Info button overlay
+                Button {
+                    HapticManager.shared.impact(.light)
+                    onViewProfile()
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(Color.black.opacity(0.5))
+                            .frame(width: 44, height: 44)
+
+                        Image(systemName: "info.circle.fill")
+                            .font(.title3)
+                            .foregroundColor(.white)
+                    }
+                }
+                .padding(12)
+                .accessibilityLabel("View full profile")
+                .accessibilityHint("Tap to see \(user.fullName)'s complete profile with interests, bio, and more details")
+            }
+            .onTapGesture {
+                HapticManager.shared.impact(.medium)
+                onViewProfile()
+            }
     }
 
     private var nameRow: some View {
@@ -146,6 +194,93 @@ struct ProfileFeedCard: View {
 
             Spacer()
         }
+    }
+
+    private var sharedInterestsView: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Header
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles")
+                    .font(.caption)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+
+                Text("You both like")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+
+                Spacer()
+            }
+
+            // Interest tags
+            FlowLayoutImproved(spacing: 8) {
+                ForEach(Array(sharedInterests.prefix(3)), id: \.self) { interest in
+                    HStack(spacing: 6) {
+                        Text(getInterestEmoji(interest))
+                            .font(.caption)
+
+                        Text(interest)
+                            .font(.caption)
+                            .fontWeight(.medium)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        LinearGradient(
+                            colors: [.purple.opacity(0.15), .pink.opacity(0.15)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .foregroundColor(.purple)
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [.purple.opacity(0.3), .pink.opacity(0.3)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                ),
+                                lineWidth: 1
+                            )
+                    )
+                }
+
+                // Show count if more than 3
+                if sharedInterests.count > 3 {
+                    Text("+\(sharedInterests.count - 3) more")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.purple.opacity(0.1))
+                        .foregroundColor(.purple)
+                        .cornerRadius(12)
+                }
+            }
+        }
+        .padding(12)
+        .background(
+            LinearGradient(
+                colors: [Color.purple.opacity(0.05), Color.pink.opacity(0.05)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .cornerRadius(12)
     }
 
     private var actionButtons: some View {
@@ -236,6 +371,65 @@ struct ProfileFeedCard: View {
         } else {
             let months = Int(interval / 2592000)
             return "\(months)mo ago"
+        }
+    }
+
+    private func getInterestEmoji(_ interest: String) -> String {
+        let lowercased = interest.lowercased()
+
+        // Map common interests to emojis
+        switch lowercased {
+        // Arts & Entertainment
+        case let str where str.contains("art"): return "🎨"
+        case let str where str.contains("music"): return "🎵"
+        case let str where str.contains("movie") || str.contains("film"): return "🎬"
+        case let str where str.contains("read") || str.contains("book"): return "📚"
+        case let str where str.contains("photo"): return "📸"
+        case let str where str.contains("dance"): return "💃"
+        case let str where str.contains("theater") || str.contains("theatre"): return "🎭"
+
+        // Food & Drink
+        case let str where str.contains("coffee"): return "☕"
+        case let str where str.contains("cook"): return "🍳"
+        case let str where str.contains("wine"): return "🍷"
+        case let str where str.contains("food"): return "🍕"
+        case let str where str.contains("baking"): return "🧁"
+
+        // Sports & Fitness
+        case let str where str.contains("yoga"): return "🧘"
+        case let str where str.contains("gym") || str.contains("fitness"): return "💪"
+        case let str where str.contains("run"): return "🏃"
+        case let str where str.contains("swim"): return "🏊"
+        case let str where str.contains("hik"): return "🥾"
+        case let str where str.contains("bike") || str.contains("cycl"): return "🚴"
+        case let str where str.contains("soccer") || str.contains("football"): return "⚽"
+        case let str where str.contains("basketball"): return "🏀"
+        case let str where str.contains("tennis"): return "🎾"
+
+        // Travel & Outdoors
+        case let str where str.contains("travel"): return "✈️"
+        case let str where str.contains("beach"): return "🏖️"
+        case let str where str.contains("camp"): return "🏕️"
+        case let str where str.contains("nature"): return "🌲"
+        case let str where str.contains("adventure"): return "🧗"
+
+        // Technology & Gaming
+        case let str where str.contains("gaming") || str.contains("video game"): return "🎮"
+        case let str where str.contains("tech"): return "💻"
+        case let str where str.contains("coding") || str.contains("programming"): return "👨‍💻"
+
+        // Animals & Pets
+        case let str where str.contains("dog"): return "🐕"
+        case let str where str.contains("cat"): return "🐱"
+        case let str where str.contains("pet"): return "🐾"
+
+        // Other
+        case let str where str.contains("fashion"): return "👗"
+        case let str where str.contains("meditation"): return "🧘‍♀️"
+        case let str where str.contains("gardening"): return "🌱"
+        case let str where str.contains("volunteer"): return "🤝"
+
+        default: return "✨" // Default sparkle emoji
         }
     }
 }
@@ -364,13 +558,28 @@ struct ProfileFeedCardSkeleton: View {
                 location: "Los Angeles",
                 country: "USA",
                 ageRangeMin: 25,
-                ageRangeMax: 35
+                ageRangeMax: 35,
+                interests: ["Coffee", "Hiking", "Music", "Art", "Photography"]
+            ),
+            currentUser: User(
+                email: "me@test.com",
+                fullName: "John Doe",
+                age: 30,
+                gender: "Male",
+                lookingFor: "Women",
+                bio: "Tech enthusiast",
+                location: "Los Angeles",
+                country: "USA",
+                ageRangeMin: 25,
+                ageRangeMax: 35,
+                interests: ["Coffee", "Music", "Technology", "Hiking"]  // 3 shared: Coffee, Music, Hiking
             ),
             initialIsFavorited: false,
             onLike: {},
             onFavorite: {},
             onMessage: {},
-            onViewPhotos: {}
+            onViewPhotos: {},
+            onViewProfile: {}
         )
         .padding()
     }
