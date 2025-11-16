@@ -81,77 +81,116 @@ struct MainTabView: View {
     // MARK: - Custom Tab Bar
     
     private var customTabBar: some View {
-        HStack(spacing: 0) {
-            // Discover
-            TabBarButton(
-                icon: "flame.fill",
-                title: "Discover",
-                isSelected: selectedTab == 0,
-                badgeCount: 0
-            ) {
-                selectedTab = 0
+        VStack(spacing: 0) {
+            // PREMIUM: Animated tab indicator
+            HStack(spacing: 0) {
+                ForEach(0..<5) { index in
+                    Rectangle()
+                        .fill(
+                            selectedTab == index ?
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ) :
+                            LinearGradient(colors: [Color.clear], startPoint: .leading, endPoint: .trailing)
+                        )
+                        .frame(height: 3)
+                        .frame(maxWidth: .infinity)
+                }
             }
+            .animation(.spring(response: 0.4, dampingFraction: 0.7), value: selectedTab)
 
-            // Matches
-            TabBarButton(
-                icon: "heart.fill",
-                title: "Matches",
-                isSelected: selectedTab == 1,
-                badgeCount: newMatchesCount
-            ) {
-                selectedTab = 1
-            }
+            HStack(spacing: 0) {
+                // Discover
+                TabBarButton(
+                    icon: "flame.fill",
+                    title: "Discover",
+                    isSelected: selectedTab == 0,
+                    badgeCount: 0
+                ) {
+                    selectedTab = 0
+                }
 
-            // Messages
-            TabBarButton(
-                icon: "message.fill",
-                title: "Messages",
-                isSelected: selectedTab == 2,
-                badgeCount: unreadCount
-            ) {
-                selectedTab = 2
-            }
+                // Matches
+                TabBarButton(
+                    icon: "heart.fill",
+                    title: "Matches",
+                    isSelected: selectedTab == 1,
+                    badgeCount: newMatchesCount
+                ) {
+                    selectedTab = 1
+                }
 
-            // Saved
-            TabBarButton(
-                icon: "bookmark.fill",
-                title: "Saved",
-                isSelected: selectedTab == 3,
-                badgeCount: 0
-            ) {
-                selectedTab = 3
-            }
+                // Messages
+                TabBarButton(
+                    icon: "message.fill",
+                    title: "Messages",
+                    isSelected: selectedTab == 2,
+                    badgeCount: unreadCount
+                ) {
+                    selectedTab = 2
+                }
 
-            // Profile
-            TabBarButton(
-                icon: "person.fill",
-                title: "Profile",
-                isSelected: selectedTab == 4,
-                badgeCount: 0
-            ) {
-                selectedTab = 4
+                // Saved
+                TabBarButton(
+                    icon: "bookmark.fill",
+                    title: "Saved",
+                    isSelected: selectedTab == 3,
+                    badgeCount: 0
+                ) {
+                    selectedTab = 3
+                }
+
+                // Profile
+                TabBarButton(
+                    icon: "person.fill",
+                    title: "Profile",
+                    isSelected: selectedTab == 4,
+                    badgeCount: 0
+                ) {
+                    selectedTab = 4
+                }
             }
+            .padding(.horizontal, 8)
+            .padding(.top, 8)
+            .padding(.bottom, -20)
         }
-        .padding(.horizontal, 8)
-        .padding(.top, 8)
-        .padding(.bottom, -20)
         .background(
             ZStack {
-                // Blur effect - adapts to dark mode
+                // PREMIUM: Glass morphism effect
                 Color(.systemBackground)
 
-                // Gradient overlay - adapts to dark mode
+                // PREMIUM: Subtle gradient overlay with glow
                 LinearGradient(
                     colors: [
                         Color(.systemBackground).opacity(0.95),
-                        Color(.systemBackground).opacity(0.98)
+                        Color.purple.opacity(0.02),
+                        Color.pink.opacity(0.02)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
+
+                // PREMIUM: Top border glow
+                VStack {
+                    LinearGradient(
+                        colors: [
+                            Color.purple.opacity(0.3),
+                            Color.pink.opacity(0.2),
+                            Color.clear
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 1)
+                    .blur(radius: 2)
+
+                    Spacer()
+                }
             }
         )
-
+        .shadow(color: Color.black.opacity(0.05), radius: 10, y: -5)
     }
     
     // MARK: - Helper Functions
@@ -217,19 +256,33 @@ struct TabBarButton: View {
         }) {
             VStack(spacing: 4) {
                 ZStack(alignment: .topTrailing) {
-                    // Icon
-                    Image(systemName: icon)
-                        .font(.title3)
-                        .foregroundStyle(
-                            isSelected ?
-                            LinearGradient.brandPrimaryDiagonal :
-                            LinearGradient(colors: [Color.gray.opacity(0.5)], startPoint: .leading, endPoint: .trailing)
-                        )
-                        .frame(height: 24)
-                        .scaleEffect(isPressed ? 0.85 : 1.0)
-                        .scaleEffect(isSelected ? 1.05 : 1.0)
+                    // PREMIUM: Icon with glow effect when selected
+                    ZStack {
+                        // Glow background
+                        if isSelected {
+                            Image(systemName: icon)
+                                .font(.title3)
+                                .foregroundStyle(
+                                    LinearGradient.brandPrimaryDiagonal
+                                )
+                                .blur(radius: 8)
+                                .opacity(0.6)
+                        }
 
-                    // Badge
+                        // Icon
+                        Image(systemName: icon)
+                            .font(.title3)
+                            .foregroundStyle(
+                                isSelected ?
+                                LinearGradient.brandPrimaryDiagonal :
+                                LinearGradient(colors: [Color.gray.opacity(0.5)], startPoint: .leading, endPoint: .trailing)
+                            )
+                            .frame(height: 24)
+                            .scaleEffect(isPressed ? 0.85 : 1.0)
+                            .scaleEffect(isSelected ? 1.1 : 1.0)
+                    }
+
+                    // PREMIUM: Animated badge with pulse
                     if badgeCount > 0 {
                         Text("\(badgeCount)")
                             .font(.caption2.weight(.bold))
@@ -237,38 +290,77 @@ struct TabBarButton: View {
                             .padding(.horizontal, 5)
                             .padding(.vertical, 2)
                             .background(
-                                Capsule()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [Color.red, Color.pink],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
+                                ZStack {
+                                    // Pulse effect
+                                    Capsule()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [Color.red.opacity(0.5), Color.pink.opacity(0.5)],
+                                                startPoint: .leading,
+                                                endPoint: .trailing
+                                            )
                                         )
-                                    )
+                                        .blur(radius: 4)
+                                        .scaleEffect(1.3)
+
+                                    // Main badge
+                                    Capsule()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [Color.red, Color.pink],
+                                                startPoint: .leading,
+                                                endPoint: .trailing
+                                            )
+                                        )
+                                }
                             )
                             .offset(x: 12, y: -6)
                             .scaleEffect(isSelected ? 1.1 : 1.0)
                     }
                 }
 
-                // Title
+                // Title with smooth color transition
                 Text(title)
                     .font(.caption2.weight(isSelected ? .semibold : .regular))
-                    .foregroundColor(isSelected ? .purple : .gray)
+                    .foregroundStyle(
+                        isSelected ?
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ) :
+                        LinearGradient(colors: [Color.gray], startPoint: .leading, endPoint: .trailing)
+                    )
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 15)
             .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(
-                        isSelected ?
-                        LinearGradient(
-                            colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.05)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ) :
-                        LinearGradient(colors: [Color.clear], startPoint: .leading, endPoint: .trailing)
-                    )
+                ZStack {
+                    // PREMIUM: Animated background with subtle glow
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(
+                            isSelected ?
+                            LinearGradient(
+                                colors: [Color.purple.opacity(0.15), Color.pink.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ) :
+                            LinearGradient(colors: [Color.clear], startPoint: .leading, endPoint: .trailing)
+                        )
+
+                    // Glow effect when selected
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.05)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .blur(radius: 8)
+                    }
+                }
             )
             // Accessibility
             .accessibilityLabel("\(title) tab")
@@ -279,6 +371,7 @@ struct TabBarButton: View {
         .buttonStyle(PlainButtonStyle())
         .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isSelected)
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: badgeCount)
     }
 }
 
