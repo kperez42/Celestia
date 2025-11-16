@@ -768,19 +768,24 @@ struct MatchProfileCard: View {
     var body: some View {
         VStack(spacing: 0) {
             // Profile image with badges
-            ZStack {
+            ZStack(alignment: .topLeading) {
                 profileImage
                     .frame(height: 220)
 
-                // Online Status Indicator - Top Left
-                VStack {
-                    HStack {
-                        OnlineStatusIndicator(user: user)
-                            .padding(.top, 8)
-                            .padding(.leading, 8)
-                        Spacer()
-                    }
-                    Spacer()
+                // Active status badge - Top Left (simple green circle)
+                let interval = Date().timeIntervalSince(user.lastActive)
+                let isActive = user.isOnline || interval < 300
+
+                if isActive {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 16, height: 16)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.white, lineWidth: 2.5)
+                        )
+                        .padding(.top, 8)
+                        .padding(.leading, 8)
                 }
 
                 // New match or unread badge - Top Right
