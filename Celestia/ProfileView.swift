@@ -914,26 +914,42 @@ struct ProfileView: View {
     }
 
     // MARK: - About Section
-    
+
     private func aboutSection(bio: String) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                Image(systemName: "text.alignleft")
-                    .foregroundColor(.purple)
+                Image(systemName: "quote.bubble.fill")
+                    .font(.title3)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+
                 Text("About")
-                    .font(.headline)
+                    .font(.title3.weight(.semibold))
+                    .foregroundColor(.primary)
             }
-            
+
             Text(bio)
                 .font(.body)
-                .foregroundColor(.primary)
+                .foregroundColor(.secondary)
+                .lineSpacing(4)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(20)
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.purple.opacity(0.1), lineWidth: 1)
+        )
         .padding(.horizontal, 20)
     }
 
@@ -1066,66 +1082,114 @@ struct ProfileView: View {
     }
     
     // MARK: - Languages Card
-    
+
     private func languagesCard(languages: [String]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: "globe")
-                    .foregroundColor(.purple)
+                    .font(.title3)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.blue, .cyan],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+
                 Text("Languages")
-                    .font(.headline)
+                    .font(.title3.weight(.semibold))
+                    .foregroundColor(.primary)
             }
-            
-            FlowLayout3(spacing: 8) {
+
+            FlowLayout3(spacing: 10) {
                 ForEach(languages, id: \.self) { language in
                     Text(language)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(.purple)
-                        .padding(.horizontal, 14)
+                        .font(.subheadline.weight(.medium))
+                        .padding(.horizontal, 16)
                         .padding(.vertical, 8)
-                        .background(Color.purple.opacity(0.1))
+                        .background(
+                            LinearGradient(
+                                colors: [Color.blue.opacity(0.15), Color.cyan.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .foregroundColor(.blue)
                         .cornerRadius(20)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(Color.blue.opacity(0.2), lineWidth: 1)
+                        )
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(20)
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.blue.opacity(0.1), lineWidth: 1)
+        )
         .padding(.horizontal, 20)
     }
 
     // MARK: - Interests Card
-    
+
     private func interestsCard(interests: [String]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                Image(systemName: "star.fill")
-                    .foregroundColor(.purple)
+                Image(systemName: "sparkles")
+                    .font(.title3)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.orange, .pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+
                 Text("Interests")
-                    .font(.headline)
+                    .font(.title3.weight(.semibold))
+                    .foregroundColor(.primary)
             }
-            
-            FlowLayout3(spacing: 8) {
+
+            FlowLayout3(spacing: 10) {
                 ForEach(interests, id: \.self) { interest in
                     Text(interest)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(.pink)
-                        .padding(.horizontal, 14)
+                        .font(.subheadline.weight(.medium))
+                        .padding(.horizontal, 16)
                         .padding(.vertical, 8)
-                        .background(Color.pink.opacity(0.1))
+                        .background(
+                            LinearGradient(
+                                colors: [Color.orange.opacity(0.15), Color.pink.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .foregroundColor(.orange)
                         .cornerRadius(20)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(Color.orange.opacity(0.2), lineWidth: 1)
+                        )
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(20)
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.orange.opacity(0.1), lineWidth: 1)
+        )
         .padding(.horizontal, 20)
     }
 
