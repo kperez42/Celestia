@@ -17,6 +17,7 @@ struct UserDetailView: View {
     @State private var isProcessing = false
     @State private var showingError = false
     @State private var errorMessage = ""
+    @State private var isSaved = false
 
     // Filter out empty photo URLs
     private var validPhotos: [String] {
@@ -174,6 +175,32 @@ struct UserDetailView: View {
                 .accessibilityLabel("Pass")
                 .accessibilityHint("Skip this profile and return to browsing")
 
+                // Save/Bookmark button
+                Button {
+                    HapticManager.shared.impact(.light)
+                    isSaved.toggle()
+                    Task {
+                        if isSaved {
+                            await SavedProfilesViewModel.shared.saveProfile(user: user)
+                        } else {
+                            // Find and remove from saved
+                            if let savedProfile = SavedProfilesViewModel.shared.savedProfiles.first(where: { $0.user.id == user.id }) {
+                                SavedProfilesViewModel.shared.unsaveProfile(savedProfile)
+                            }
+                        }
+                    }
+                } label: {
+                    Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
+                        .font(.title2)
+                        .foregroundColor(.orange)
+                        .frame(width: 60, height: 60)
+                        .background(Color.white)
+                        .clipShape(Circle())
+                        .shadow(color: Color.black.opacity(0.1), radius: 5)
+                }
+                .accessibilityLabel(isSaved ? "Remove from saved" : "Save profile")
+                .accessibilityHint("Bookmark this profile for later")
+
                 Button {
                     sendInterest()
                 } label: {
@@ -206,6 +233,9 @@ struct UserDetailView: View {
             .padding(.bottom, 30)
         }
         .onAppear {
+            // Check if user is already saved
+            isSaved = SavedProfilesViewModel.shared.savedProfiles.contains(where: { $0.user.id == user.id })
+
             // Track profile view
             Task {
                 guard let currentUserId = authService.currentUser?.id,
@@ -228,8 +258,12 @@ struct UserDetailView: View {
         }
         .alert("It's a Match! 🎉", isPresented: $showingMatched) {
             Button("Send Message") {
-                // NOTE: Navigation to chat should be implemented using NavigationPath or coordinator
-                // For now, user can access chat from Messages tab
+                // Navigate to Messages tab (tab index 2)
+                NotificationCenter.default.post(
+                    name: Notification.Name("NavigateToMessages"),
+                    object: nil,
+                    userInfo: ["matchedUserId": user.id as Any]
+                )
                 dismiss()
             }
             Button("Keep Browsing") { dismiss() }
