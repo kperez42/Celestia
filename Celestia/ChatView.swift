@@ -8,6 +8,7 @@
 
 import SwiftUI
 import PhotosUI
+import FirebaseFirestore
 
 struct ChatView: View {
     @EnvironmentObject var authService: AuthService
