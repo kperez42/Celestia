@@ -372,8 +372,9 @@ class ProfileViewersViewModel: ObservableObject {
                     .getDocuments()
 
                 for userDoc in usersSnapshot.documents {
-                    if let user = try? userDoc.data(as: User.self) {
-                        allUsers[user.id] = user
+                    if let user = try? userDoc.data(as: User.self),
+                       let userId = user.id {
+                        allUsers[userId] = user
                     }
                 }
             }
