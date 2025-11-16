@@ -256,33 +256,18 @@ struct TabBarButton: View {
         }) {
             VStack(spacing: 4) {
                 ZStack(alignment: .topTrailing) {
-                    // PREMIUM: Icon with glow effect when selected
-                    ZStack {
-                        // Glow background
-                        if isSelected {
-                            Image(systemName: icon)
-                                .font(.title3)
-                                .foregroundStyle(
-                                    LinearGradient.brandPrimaryDiagonal
-                                )
-                                .blur(radius: 8)
-                                .opacity(0.6)
-                        }
+                    // Icon (clean, no glow)
+                    Image(systemName: icon)
+                        .font(.title3)
+                        .foregroundStyle(
+                            isSelected ?
+                            LinearGradient.brandPrimaryDiagonal :
+                            LinearGradient(colors: [Color.gray.opacity(0.5)], startPoint: .leading, endPoint: .trailing)
+                        )
+                        .frame(height: 24)
+                        .scaleEffect(isPressed ? 0.85 : 1.0)
 
-                        // Icon
-                        Image(systemName: icon)
-                            .font(.title3)
-                            .foregroundStyle(
-                                isSelected ?
-                                LinearGradient.brandPrimaryDiagonal :
-                                LinearGradient(colors: [Color.gray.opacity(0.5)], startPoint: .leading, endPoint: .trailing)
-                            )
-                            .frame(height: 24)
-                            .scaleEffect(isPressed ? 0.85 : 1.0)
-                            .scaleEffect(isSelected ? 1.1 : 1.0)
-                    }
-
-                    // PREMIUM: Animated badge with pulse
+                    // Clean badge - no pulse
                     if badgeCount > 0 {
                         Text("\(badgeCount)")
                             .font(.caption2.weight(.bold))
@@ -290,32 +275,16 @@ struct TabBarButton: View {
                             .padding(.horizontal, 5)
                             .padding(.vertical, 2)
                             .background(
-                                ZStack {
-                                    // Pulse effect
-                                    Capsule()
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [Color.red.opacity(0.5), Color.pink.opacity(0.5)],
-                                                startPoint: .leading,
-                                                endPoint: .trailing
-                                            )
+                                Capsule()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.red, Color.pink],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
                                         )
-                                        .blur(radius: 4)
-                                        .scaleEffect(1.3)
-
-                                    // Main badge
-                                    Capsule()
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [Color.red, Color.pink],
-                                                startPoint: .leading,
-                                                endPoint: .trailing
-                                            )
-                                        )
-                                }
+                                    )
                             )
                             .offset(x: 12, y: -6)
-                            .scaleEffect(isSelected ? 1.1 : 1.0)
                     }
                 }
 
@@ -335,32 +304,17 @@ struct TabBarButton: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 15)
             .background(
-                ZStack {
-                    // PREMIUM: Animated background with subtle glow
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(
-                            isSelected ?
-                            LinearGradient(
-                                colors: [Color.purple.opacity(0.15), Color.pink.opacity(0.1)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ) :
-                            LinearGradient(colors: [Color.clear], startPoint: .leading, endPoint: .trailing)
-                        )
-
-                    // Glow effect when selected
-                    if isSelected {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(
-                                LinearGradient(
-                                    colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.05)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .blur(radius: 8)
-                    }
-                }
+                // Clean background - no shadow, no glow
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(
+                        isSelected ?
+                        LinearGradient(
+                            colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.05)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ) :
+                        LinearGradient(colors: [Color.clear], startPoint: .leading, endPoint: .trailing)
+                    )
             )
             // Accessibility
             .accessibilityLabel("\(title) tab")
