@@ -40,6 +40,7 @@ struct EditProfileView: View {
     @State private var isUploadingPhotos = false
     @State private var uploadProgress: Double = 0.0
     @State private var isUploadingProfilePhoto = false
+    @State private var uploadingPhotoCount = 0
 
     // Advanced profile fields
     @State private var height: Int?
@@ -356,7 +357,7 @@ struct EditProfileView: View {
 
             // Photo grid with drag-and-drop reordering
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                ForEach(Array(photos.enumerated()), id: \.offset) { index, photoURL in
+                ForEach(Array(photos.enumerated()), id: \.element) { index, photoURL in
                     PhotoGridItem(
                         photoURL: photoURL,
                         onDelete: {
@@ -369,11 +370,28 @@ struct EditProfileView: View {
                             movePhoto(from: index, to: index + 1)
                         } : nil
                     )
+                    .id(photoURL) // Stable ID for proper SwiftUI tracking
+                }
+
+                // Show uploading placeholders
+                ForEach(0..<uploadingPhotoCount, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.purple.opacity(0.1))
+                        .frame(height: 120)
+                        .overlay {
+                            VStack(spacing: 8) {
+                                ProgressView()
+                                    .tint(.purple)
+                                Text("Uploading...")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
                 }
 
                 // Add photo button
-                if photos.count < 6 {
-                    PhotosPicker(selection: $selectedPhotoItems, maxSelectionCount: 6 - photos.count, matching: .images) {
+                if photos.count + uploadingPhotoCount < 6 {
+                    PhotosPicker(selection: $selectedPhotoItems, maxSelectionCount: 6 - photos.count - uploadingPhotoCount, matching: .images) {
                         RoundedRectangle(cornerRadius: 12)
                             .stroke(Color.purple.opacity(0.3), style: StrokeStyle(lineWidth: 2, dash: [8]))
                             .frame(height: 120)
@@ -389,7 +407,9 @@ struct EditProfileView: View {
                             }
                     }
                     .accessibilityLabel("Add gallery photo")
-                    .accessibilityHint("Tap to add up to \(6 - photos.count) more photos to your gallery")
+                    .accessibilityHint("Tap to add up to \(6 - photos.count - uploadingPhotoCount) more photos to your gallery")
+                    .disabled(isUploadingPhotos)
+                    .opacity(isUploadingPhotos ? 0.6 : 1.0)
                 }
             }
         }
@@ -1225,7 +1245,11 @@ struct EditProfileView: View {
         await MainActor.run {
             isUploadingPhotos = true
             uploadProgress = 0.0
+            uploadingPhotoCount = items.count
+            HapticManager.shared.impact(.light)
         }
+
+        var successCount = 0
 
         for (index, item) in items.enumerated() {
             do {
@@ -1247,19 +1271,24 @@ struct EditProfileView: View {
 
                         await MainActor.run {
                             photos.append(photoURL)
+                            uploadingPhotoCount -= 1
+                            HapticManager.shared.impact(.light)
                         }
 
                         // Immediately save to Firestore so photos persist
                         user.photos = photos
                         try await authService.updateUser(user)
 
-                        Logger.shared.info("Photo saved to profile successfully", category: .general)
+                        successCount += 1
+                        Logger.shared.info("Photo \(successCount) saved to profile successfully", category: .general)
                     }
                 }
             } catch {
                 await MainActor.run {
+                    uploadingPhotoCount -= 1
                     errorMessage = "Failed to upload photo: \(error.localizedDescription)"
                     showErrorAlert = true
+                    HapticManager.shared.notification(.error)
                 }
                 Logger.shared.error("Photo upload failed: \(error.localizedDescription)", category: .general)
             }
@@ -1268,7 +1297,13 @@ struct EditProfileView: View {
         await MainActor.run {
             uploadProgress = 1.0
             isUploadingPhotos = false
+            uploadingPhotoCount = 0
             selectedPhotoItems = []
+
+            // Success feedback
+            if successCount > 0 {
+                HapticManager.shared.notification(.success)
+            }
         }
     }
 }
