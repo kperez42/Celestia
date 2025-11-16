@@ -127,14 +127,14 @@ struct ProfileView: View {
             .navigationTitle("")
             .navigationBarHidden(true)
             .accessibilityIdentifier(AccessibilityIdentifier.profileView)
-            .sheet(isPresented: $showingEditProfile) {
-                EditProfileView()
-                    .environmentObject(authService)
-            } onDismiss: {
+            .sheet(isPresented: $showingEditProfile, onDismiss: {
                 // CACHE FIX: Force refresh profile data when returning from edit
                 Task {
                     await refreshProfileData()
                 }
+            }) {
+                EditProfileView()
+                    .environmentObject(authService)
             }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
