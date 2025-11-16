@@ -667,18 +667,18 @@ struct MatchesView: View {
             }
 
             // PERFORMANCE FIX: Batch fetch all user data instead of N+1 queries
-            // Collect all user IDs that need to be fetched
+            // IMPORTANT: Always fetch fresh user data to ensure status is up-to-date
             let userIdsToFetch = matchService.matches
                 .map { match in
                     match.user1Id == userId ? match.user2Id : match.user1Id
                 }
-                .filter { matchedUsers[$0] == nil }  // Only fetch missing users
 
             if !userIdsToFetch.isEmpty {
                 // Batch fetch users in chunks of 10 (Firestore 'in' query limit)
                 let fetchedUsers = try await batchFetchUsers(userIds: userIdsToFetch)
 
                 await MainActor.run {
+                    // Update cache with fresh user data (including current online status)
                     for user in fetchedUsers {
                         if let userId = user.id {
                             matchedUsers[userId] = user
@@ -768,19 +768,24 @@ struct MatchProfileCard: View {
     var body: some View {
         VStack(spacing: 0) {
             // Profile image with badges
-            ZStack {
+            ZStack(alignment: .topLeading) {
                 profileImage
                     .frame(height: 220)
 
-                // Online Status Indicator - Top Left
-                VStack {
-                    HStack {
-                        OnlineStatusIndicator(user: user)
-                            .padding(.top, 8)
-                            .padding(.leading, 8)
-                        Spacer()
-                    }
-                    Spacer()
+                // Active status badge - Top Left (simple green circle)
+                let interval = Date().timeIntervalSince(user.lastActive)
+                let isActive = user.isOnline || interval < 300
+
+                if isActive {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 16, height: 16)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.white, lineWidth: 2.5)
+                        )
+                        .padding(.top, 8)
+                        .padding(.leading, 8)
                 }
 
                 // New match or unread badge - Top Right

@@ -17,18 +17,15 @@ struct SavedProfilesView: View {
     @State private var showClearAllConfirmation = false
 
     var body: some View {
-        NavigationStack {
+        VStack(spacing: 0) {
+            // Custom gradient header (like Messages and Matches)
+            headerView
+
+            // Main content
             ZStack {
-                // Enhanced background gradient
-                LinearGradient(
-                    colors: [
-                        Color(.systemGroupedBackground),
-                        Color.purple.opacity(0.03)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
+                // Background
+                Color(.systemGroupedBackground)
+                    .ignoresSafeArea()
 
                 if viewModel.isLoading {
                     loadingView
@@ -47,74 +44,128 @@ struct SavedProfilesView: View {
             .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.isLoading)
             .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.savedProfiles.isEmpty)
             .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.errorMessage.isEmpty)
-            .navigationTitle("Saved Profiles")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        HapticManager.shared.impact(.light)
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title3)
+        }
+        .navigationBarHidden(true)
+        .task {
+            await viewModel.loadSavedProfiles()
+            // Success haptic when profiles load
+            if !viewModel.savedProfiles.isEmpty {
+                HapticManager.shared.notification(.success)
+            }
+        }
+        .sheet(item: $selectedUser) { user in
+            UserDetailView(user: user)
+                .environmentObject(authService)
+        }
+        .confirmationDialog(
+            "Clear All Saved Profiles?",
+            isPresented: $showClearAllConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Clear All (\(viewModel.savedProfiles.count))", role: .destructive) {
+                HapticManager.shared.notification(.warning)
+                viewModel.clearAllSaved()
+            }
+            Button("Cancel", role: .cancel) {
+                HapticManager.shared.impact(.light)
+            }
+        } message: {
+            Text("This will permanently remove all \(viewModel.savedProfiles.count) saved profiles. This action cannot be undone.")
+        }
+    }
+
+    // MARK: - Header
+
+    private var headerView: some View {
+        ZStack {
+            // Gradient background
+            LinearGradient(
+                colors: [
+                    Color.orange.opacity(0.9),
+                    Color.pink.opacity(0.7),
+                    Color.purple.opacity(0.6)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            // Decorative elements
+            GeometryReader { geo in
+                Circle()
+                    .fill(Color.white.opacity(0.1))
+                    .frame(width: 100, height: 100)
+                    .blur(radius: 20)
+                    .offset(x: -30, y: 20)
+
+                Circle()
+                    .fill(Color.yellow.opacity(0.15))
+                    .frame(width: 60, height: 60)
+                    .blur(radius: 15)
+                    .offset(x: geo.size.width - 50, y: 40)
+            }
+
+            VStack(spacing: 12) {
+                HStack(alignment: .center) {
+                    // Title section
+                    HStack(spacing: 12) {
+                        Image(systemName: "bookmark.circle.fill")
+                            .font(.system(size: 36))
                             .foregroundStyle(
                                 LinearGradient(
-                                    colors: [.purple, .pink],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
+                                    colors: [.white, .yellow.opacity(0.9)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
                                 )
                             )
-                    }
-                }
+                            .shadow(color: .white.opacity(0.4), radius: 10)
 
-                if !viewModel.savedProfiles.isEmpty {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Menu {
-                            Button(role: .destructive) {
-                                showClearAllConfirmation = true
-                            } label: {
-                                Label("Clear All", systemImage: "trash")
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Saved")
+                                .font(.largeTitle.weight(.bold))
+                                .foregroundColor(.white)
+
+                            if !viewModel.savedProfiles.isEmpty {
+                                HStack(spacing: 6) {
+                                    Text("\(viewModel.savedProfiles.count)")
+                                        .fontWeight(.semibold)
+                                    Text(viewModel.savedProfiles.count == 1 ? "profile" : "profiles")
+
+                                    if viewModel.savedThisWeek > 0 {
+                                        Text("•")
+                                        Text("\(viewModel.savedThisWeek) this week")
+                                            .fontWeight(.semibold)
+                                    }
+                                }
+                                .font(.subheadline)
+                                .foregroundColor(.white.opacity(0.95))
                             }
+                        }
+                    }
+
+                    Spacer()
+
+                    // Clear all button
+                    if !viewModel.savedProfiles.isEmpty {
+                        Button {
+                            showClearAllConfirmation = true
+                            HapticManager.shared.impact(.light)
                         } label: {
-                            Image(systemName: "ellipsis.circle.fill")
+                            Image(systemName: "trash.circle.fill")
                                 .font(.title3)
-                                .foregroundColor(.purple)
+                                .foregroundColor(.white)
+                                .frame(width: 44, height: 44)
+                                .background(Color.white.opacity(0.15))
+                                .clipShape(Circle())
                         }
                     }
                 }
-            }
-            .task {
-                await viewModel.loadSavedProfiles()
-                // Success haptic when profiles load
-                if !viewModel.savedProfiles.isEmpty {
-                    HapticManager.shared.notification(.success)
-                }
-            }
-            .refreshable {
-                HapticManager.shared.impact(.light)
-                await viewModel.loadSavedProfiles(forceRefresh: true)
-                HapticManager.shared.notification(.success)
-            }
-            .sheet(item: $selectedUser) { user in
-                UserDetailView(user: user)
-                    .environmentObject(authService)
-            }
-            .confirmationDialog(
-                "Clear All Saved Profiles?",
-                isPresented: $showClearAllConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button("Clear All (\(viewModel.savedProfiles.count))", role: .destructive) {
-                    HapticManager.shared.notification(.warning)
-                    viewModel.clearAllSaved()
-                }
-                Button("Cancel", role: .cancel) {
-                    HapticManager.shared.impact(.light)
-                }
-            } message: {
-                Text("This will permanently remove all \(viewModel.savedProfiles.count) saved profiles. This action cannot be undone.")
+                .padding(.horizontal, 20)
+                .padding(.top, 50)
+                .padding(.bottom, 16)
             }
         }
+        .frame(height: 140)
+        .shadow(color: .black.opacity(0.1), radius: 10, y: 5)
     }
 
     // MARK: - Profiles Grid
@@ -158,6 +209,11 @@ struct SavedProfilesView: View {
             }
             .padding(.top)
             .padding(.bottom, 20)
+        }
+        .refreshable {
+            HapticManager.shared.impact(.light)
+            await viewModel.loadSavedProfiles(forceRefresh: true)
+            HapticManager.shared.notification(.success)
         }
     }
 
@@ -845,14 +901,20 @@ class SavedProfilesViewModel: ObservableObject {
 
             let docRef = try await db.collection("saved_profiles").addDocument(data: saveData)
 
-            // Update local state
-            let newSaved = SavedProfile(
-                id: docRef.documentID,
-                user: user,
-                savedAt: Date(),
-                note: note
-            )
-            savedProfiles.insert(newSaved, at: 0)
+            // Update local state immediately
+            await MainActor.run {
+                let newSaved = SavedProfile(
+                    id: docRef.documentID,
+                    user: user,
+                    savedAt: Date(),
+                    note: note
+                )
+                savedProfiles.insert(newSaved, at: 0)
+
+                // PERFORMANCE: Update cache timestamp to keep it fresh
+                lastFetchTime = Date()
+                cachedForUserId = currentUserId
+            }
 
             Logger.shared.info("Saved profile: \(user.fullName) (\(docRef.documentID))", category: .general)
 
