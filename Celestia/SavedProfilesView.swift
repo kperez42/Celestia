@@ -408,6 +408,12 @@ struct SavedProfileCard: View {
                     }
                     .frame(height: 200)
                     .clipped()
+                    .overlay(alignment: .topLeading) {
+                        // Online Status Indicator
+                        OnlineStatusIndicator(user: savedProfile.user)
+                            .padding(.top, 8)
+                            .padding(.leading, 8)
+                    }
                     .overlay {
                         if isUnsaving {
                             ZStack {

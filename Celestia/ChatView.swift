@@ -19,6 +19,10 @@ struct ChatView: View {
     let match: Match
     let otherUser: User
 
+    // Real-time updated user data
+    @State private var otherUserData: User
+    @State private var userListener: ListenerRegistration?
+
     @State private var messageText = ""
     @FocusState private var isInputFocused: Bool
     @State private var isOtherUserTyping = false
@@ -56,6 +60,13 @@ struct ChatView: View {
 
     @Environment(\.dismiss) var dismiss
 
+    // Initialize with the passed otherUser data
+    init(match: Match, otherUser: User) {
+        self.match = match
+        self.otherUser = otherUser
+        self._otherUserData = State(initialValue: otherUser)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Custom header
@@ -79,10 +90,12 @@ struct ChatView: View {
         .accessibilityIdentifier(AccessibilityIdentifier.chatView)
         .onAppear {
             setupChat()
+            setupUserListener()
             VoiceOverAnnouncement.screenChanged(to: "Chat with \(otherUser.fullName)")
         }
         .onDisappear {
             messageService.stopListening()
+            cleanupUserListener()
         }
         .confirmationDialog("Unmatch with \(otherUser.fullName)?", isPresented: $showingUnmatchConfirmation, titleVisibility: .visible) {
             Button("Unmatch", role: .destructive) {
@@ -168,7 +181,7 @@ struct ChatView: View {
                 )
                 .frame(width: 40, height: 40)
                 .overlay(
-                    Text(otherUser.fullName.prefix(1))
+                    Text(otherUserData.fullName.prefix(1))
                         .font(.system(size: 16, weight: .bold))
                         .foregroundColor(.white)
                 )
@@ -176,11 +189,11 @@ struct ChatView: View {
             // Name and status
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text(otherUser.fullName)
+                    Text(otherUserData.fullName)
                         .font(.headline)
                         .foregroundColor(.primary)
 
-                    if otherUser.isVerified {
+                    if otherUserData.isVerified {
                         Image(systemName: "checkmark.seal.fill")
                             .font(.system(size: 12))
                             .foregroundColor(.blue)
@@ -202,19 +215,25 @@ struct ChatView: View {
                                 endPoint: .trailing
                             )
                         )
-                } else if otherUser.isOnline {
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(Color.green)
-                            .frame(width: 6, height: 6)
-                        Text("Active now")
+                } else {
+                    // Consider user active if they're online OR were active in the last 5 minutes
+                    let interval = Date().timeIntervalSince(otherUserData.lastActive)
+                    let isActive = otherUserData.isOnline || interval < 300
+
+                    if isActive {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 6, height: 6)
+                            Text(otherUserData.isOnline ? "Online" : "Active now")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    } else {
+                        Text("Active \(otherUserData.lastActive.timeAgoShort())")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
-                } else {
-                    Text("Active \(otherUser.lastActive.timeAgoShort())")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
                 }
             }
 
@@ -653,7 +672,38 @@ struct ChatView: View {
             }
         }
     }
-    
+
+    private func setupUserListener() {
+        guard let otherUserId = otherUser.id else { return }
+
+        // Listen to real-time updates for the other user's data (especially online status)
+        let db = Firestore.firestore()
+        userListener = db.collection("users").document(otherUserId)
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self else { return }
+
+                if let error = error {
+                    Logger.shared.error("Error listening to user updates", category: .messaging, error: error)
+                    return
+                }
+
+                guard let snapshot = snapshot, snapshot.exists else { return }
+
+                do {
+                    let updatedUser = try snapshot.data(as: User.self)
+                    Task { @MainActor in
+                        self.otherUserData = updatedUser
+                    }
+                } catch {
+                    Logger.shared.error("Error decoding user update", category: .messaging, error: error)
+                }
+            }
+    }
+
+    private func cleanupUserListener() {
+        userListener?.remove()
+    }
+
     private func sendMessage() {
         // Need either text or image
         let hasText = !messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty

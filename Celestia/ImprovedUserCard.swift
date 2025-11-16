@@ -134,6 +134,17 @@ struct ImprovedUserCard: View {
                                 .foregroundColor(.white.opacity(0.5))
                         }
                 }
+
+                // Online Status Indicator - Top Right
+                VStack {
+                    HStack {
+                        Spacer()
+                        OnlineStatusIndicator(user: user)
+                            .padding(.top, 16)
+                            .padding(.trailing, 16)
+                    }
+                    Spacer()
+                }
             }
         }
     }

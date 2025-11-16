@@ -228,6 +228,19 @@ struct LikeCardView: View {
                     Color.gray.opacity(0.2)
                 }
 
+                // Online Status Indicator - Top Left (only if not blurred)
+                if !isBlurred {
+                    VStack {
+                        HStack {
+                            OnlineStatusIndicator(user: user)
+                                .padding(.top, 8)
+                                .padding(.leading, 8)
+                            Spacer()
+                        }
+                        Spacer()
+                    }
+                }
+
                 // Blur overlay for non-premium
                 if isBlurred {
                     Rectangle()

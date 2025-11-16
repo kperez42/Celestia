@@ -16,6 +16,15 @@ struct OnlineStatusIndicator: View {
         user.isOnline
     }
 
+    // User is considered "active" if they're online OR were active in the last 5 minutes
+    private var isActive: Bool {
+        if isOnline {
+            return true
+        }
+        let interval = Date().timeIntervalSince(user.lastActive)
+        return interval < 300 // Less than 5 minutes
+    }
+
     private var statusText: String {
         if isOnline {
             return "Online"
@@ -44,15 +53,15 @@ struct OnlineStatusIndicator: View {
     }
 
     private var statusColor: Color {
-        isOnline ? Color.green : Color.gray
+        isActive ? Color.green : Color.gray
     }
 
     var body: some View {
         HStack(spacing: 6) {
-            // Pulsing dot for online users
+            // Pulsing dot for active users
             ZStack {
-                // Outer pulsing ring (only for online users)
-                if isOnline {
+                // Outer pulsing ring (only for active users)
+                if isActive {
                     Circle()
                         .fill(statusColor.opacity(0.3))
                         .frame(width: 12, height: 12)
@@ -61,7 +70,7 @@ struct OnlineStatusIndicator: View {
                         .animation(
                             Animation.easeInOut(duration: 1.5)
                                 .repeatForever(autoreverses: true),
-                            value: isOnline
+                            value: isActive
                         )
                 }
 

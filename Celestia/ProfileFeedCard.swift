@@ -153,12 +153,16 @@ struct ProfileFeedCard: View {
 
     private var lastActiveRow: some View {
         HStack(spacing: 4) {
-            if user.isOnline {
+            // Consider user active if they're online OR were active in the last 5 minutes
+            let interval = Date().timeIntervalSince(user.lastActive)
+            let isActive = user.isOnline || interval < 300
+
+            if isActive {
                 Circle()
                     .fill(Color.green)
                     .frame(width: 8, height: 8)
 
-                Text("Active now")
+                Text(user.isOnline ? "Online" : "Active now")
                     .font(.caption)
                     .foregroundColor(.green)
                     .fontWeight(.medium)
