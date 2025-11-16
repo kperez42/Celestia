@@ -845,14 +845,20 @@ class SavedProfilesViewModel: ObservableObject {
 
             let docRef = try await db.collection("saved_profiles").addDocument(data: saveData)
 
-            // Update local state
-            let newSaved = SavedProfile(
-                id: docRef.documentID,
-                user: user,
-                savedAt: Date(),
-                note: note
-            )
-            savedProfiles.insert(newSaved, at: 0)
+            // Update local state immediately
+            await MainActor.run {
+                let newSaved = SavedProfile(
+                    id: docRef.documentID,
+                    user: user,
+                    savedAt: Date(),
+                    note: note
+                )
+                savedProfiles.insert(newSaved, at: 0)
+
+                // PERFORMANCE: Update cache timestamp to keep it fresh
+                lastFetchTime = Date()
+                cachedForUserId = currentUserId
+            }
 
             Logger.shared.info("Saved profile: \(user.fullName) (\(docRef.documentID))", category: .general)
 
