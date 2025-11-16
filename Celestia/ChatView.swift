@@ -680,9 +680,7 @@ struct ChatView: View {
         // Listen to real-time updates for the other user's data (especially online status)
         let db = Firestore.firestore()
         userListener = db.collection("users").document(otherUserId)
-            .addSnapshotListener { [weak self] snapshot, error in
-                guard let self = self else { return }
-
+            .addSnapshotListener { snapshot, error in
                 if let error = error {
                     Logger.shared.error("Error listening to user updates", category: .messaging, error: error)
                     return
