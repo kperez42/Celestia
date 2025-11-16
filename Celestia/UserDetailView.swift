@@ -18,6 +18,7 @@ struct UserDetailView: View {
     @State private var showingError = false
     @State private var errorMessage = ""
     @State private var isSaved = false
+    @ObservedObject private var savedProfilesVM = SavedProfilesViewModel.shared
 
     // Filter out empty photo URLs
     private var validPhotos: [String] {
@@ -181,11 +182,11 @@ struct UserDetailView: View {
                     isSaved.toggle()
                     Task {
                         if isSaved {
-                            await SavedProfilesViewModel.shared.saveProfile(user: user)
+                            await savedProfilesVM.saveProfile(user: user)
                         } else {
                             // Find and remove from saved
-                            if let savedProfile = SavedProfilesViewModel.shared.savedProfiles.first(where: { $0.user.id == user.id }) {
-                                SavedProfilesViewModel.shared.unsaveProfile(savedProfile)
+                            if let savedProfile = savedProfilesVM.savedProfiles.first(where: { $0.user.id == user.id }) {
+                                savedProfilesVM.unsaveProfile(savedProfile)
                             }
                         }
                     }
@@ -234,7 +235,7 @@ struct UserDetailView: View {
         }
         .onAppear {
             // Check if user is already saved
-            isSaved = SavedProfilesViewModel.shared.savedProfiles.contains(where: { $0.user.id == user.id })
+            isSaved = savedProfilesVM.savedProfiles.contains(where: { $0.user.id == user.id })
 
             // Track profile view
             Task {
@@ -250,6 +251,10 @@ struct UserDetailView: View {
                     Logger.shared.error("Error tracking profile view", category: .general, error: error)
                 }
             }
+        }
+        .onChange(of: savedProfilesVM.savedProfiles) { _ in
+            // Sync saved state when savedProfiles array changes (e.g., saved/unsaved from another view)
+            isSaved = savedProfilesVM.savedProfiles.contains(where: { $0.user.id == user.id })
         }
         .alert("Like Sent! 💫", isPresented: $showingInterestSent) {
             Button("OK") { dismiss() }

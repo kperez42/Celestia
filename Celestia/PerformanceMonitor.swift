@@ -605,7 +605,7 @@ class PerformanceStatistics {
         measurements[name]?.append(duration)
 
         // Keep only last 100 measurements per operation
-        if measurements[name]!.count > 100 {
+        if let count = measurements[name]?.count, count > 100 {
             measurements[name]?.removeFirst()
         }
     }

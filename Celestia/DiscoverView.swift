@@ -576,6 +576,7 @@ struct UserCardView: View {
     let user: User
     @State private var selectedPhotoIndex = 0
     @State private var isSaved = false
+    @ObservedObject private var savedProfilesVM = SavedProfilesViewModel.shared
 
     // Filter out empty photo URLs and ensure at least profileImageURL
     private var validPhotos: [String] {
@@ -711,11 +712,11 @@ struct UserCardView: View {
                             isSaved.toggle()
                             Task {
                                 if isSaved {
-                                    await SavedProfilesViewModel.shared.saveProfile(user: user)
+                                    await savedProfilesVM.saveProfile(user: user)
                                 } else {
                                     // Find and remove from saved
-                                    if let savedProfile = SavedProfilesViewModel.shared.savedProfiles.first(where: { $0.user.id == user.id }) {
-                                        SavedProfilesViewModel.shared.unsaveProfile(savedProfile)
+                                    if let savedProfile = savedProfilesVM.savedProfiles.first(where: { $0.user.id == user.id }) {
+                                        savedProfilesVM.unsaveProfile(savedProfile)
                                     }
                                 }
                             }
@@ -740,7 +741,11 @@ struct UserCardView: View {
             .cornerRadius(20)
             .onAppear {
                 // Check if user is already saved
-                isSaved = SavedProfilesViewModel.shared.savedProfiles.contains(where: { $0.user.id == user.id })
+                isSaved = savedProfilesVM.savedProfiles.contains(where: { $0.user.id == user.id })
+            }
+            .onChange(of: savedProfilesVM.savedProfiles) { _ in
+                // Sync saved state when savedProfiles array changes (e.g., saved/unsaved from another view)
+                isSaved = savedProfilesVM.savedProfiles.contains(where: { $0.user.id == user.id })
             }
         }
         .frame(maxHeight: .infinity) // Fill available space
