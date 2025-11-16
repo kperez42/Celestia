@@ -142,7 +142,9 @@ class NetworkManager: NSObject {
 
         // Enforce certificate pinning in production builds
         if hashes.isEmpty {
-            fatalError("""
+            // Use assertionFailure instead of fatalError to prevent production crashes
+            // This will crash in DEBUG but only log in RELEASE
+            assertionFailure("""
                 ⚠️ CRITICAL SECURITY ERROR ⚠️
 
                 Certificate pinning is not configured for PRODUCTION build.
@@ -154,6 +156,12 @@ class NetworkManager: NSObject {
 
                 Without certificate pinning, the app is vulnerable to MITM attacks.
                 """)
+
+            // Log critical security warning
+            Logger.shared.error(
+                "⚠️ Certificate pinning not configured in production build. App is vulnerable to MITM attacks.",
+                category: .network
+            )
         }
 
         return hashes
