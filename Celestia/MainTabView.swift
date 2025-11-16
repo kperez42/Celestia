@@ -135,41 +135,7 @@ struct MainTabView: View {
         .padding(.horizontal, 8)
         .padding(.top, 8)
         .padding(.bottom, -20)
-        .background(
-            ZStack {
-                // PREMIUM: Glass morphism effect
-                Color(.systemBackground)
-
-                // PREMIUM: Subtle gradient overlay with glow
-                LinearGradient(
-                    colors: [
-                        Color(.systemBackground).opacity(0.95),
-                        Color.purple.opacity(0.02),
-                        Color.pink.opacity(0.02)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-
-                // PREMIUM: Top border glow
-                VStack {
-                    LinearGradient(
-                        colors: [
-                            Color.purple.opacity(0.3),
-                            Color.pink.opacity(0.2),
-                            Color.clear
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: 1)
-                    .blur(radius: 2)
-
-                    Spacer()
-                }
-            }
-        )
-        .shadow(color: Color.black.opacity(0.05), radius: 10, y: -5)
+        .background(Color(.systemBackground))
     }
     
     // MARK: - Helper Functions
