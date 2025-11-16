@@ -150,12 +150,13 @@ struct UserDetailView: View {
                         Label("Looking for", systemImage: "heart.fill")
                             .font(.headline)
                             .foregroundColor(.purple)
-                        
+
                         Text(user.lookingFor)
                             .font(.body)
                     }
                 }
                 .padding(20)
+                .padding(.bottom, 100) // Extra space so buttons don't cover content
             }
         }
         .ignoresSafeArea(edges: .top)
