@@ -19,28 +19,51 @@ struct SavedProfilesView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(.systemGroupedBackground)
-                    .ignoresSafeArea()
+                // Enhanced background gradient
+                LinearGradient(
+                    colors: [
+                        Color(.systemGroupedBackground),
+                        Color.purple.opacity(0.03)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
 
                 if viewModel.isLoading {
                     loadingView
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 } else if !viewModel.errorMessage.isEmpty {
                     errorStateView
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
                 } else if viewModel.savedProfiles.isEmpty {
                     emptyStateView
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 } else {
                     profilesGrid
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
             }
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.isLoading)
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.savedProfiles.isEmpty)
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.errorMessage.isEmpty)
             .navigationTitle("Saved Profiles")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
+                        HapticManager.shared.impact(.light)
                         dismiss()
                     } label: {
-                        Image(systemName: "xmark")
-                            .foregroundColor(.primary)
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.purple, .pink],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
                     }
                 }
 
@@ -53,17 +76,24 @@ struct SavedProfilesView: View {
                                 Label("Clear All", systemImage: "trash")
                             }
                         } label: {
-                            Image(systemName: "ellipsis.circle")
-                                .foregroundColor(.primary)
+                            Image(systemName: "ellipsis.circle.fill")
+                                .font(.title3)
+                                .foregroundColor(.purple)
                         }
                     }
                 }
             }
             .task {
                 await viewModel.loadSavedProfiles()
+                // Success haptic when profiles load
+                if !viewModel.savedProfiles.isEmpty {
+                    HapticManager.shared.notification(.success)
+                }
             }
             .refreshable {
-                await viewModel.loadSavedProfiles()
+                HapticManager.shared.impact(.light)
+                await viewModel.loadSavedProfiles(forceRefresh: true)
+                HapticManager.shared.notification(.success)
             }
             .sheet(item: $selectedUser) { user in
                 UserDetailView(user: user)
@@ -90,14 +120,15 @@ struct SavedProfilesView: View {
     // MARK: - Profiles Grid
 
     private var profilesGrid: some View {
-        ScrollView {
+        ScrollView(showsIndicators: false) {
             VStack(spacing: 20) {
-                // Stats header
+                // Stats header with animation
                 statsHeader
+                    .transition(.move(edge: .top).combined(with: .opacity))
 
-                // Saved profiles grid
+                // Saved profiles grid with staggered animation
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                    ForEach(viewModel.savedProfiles) { saved in
+                    ForEach(Array(viewModel.savedProfiles.enumerated()), id: \.element.id) { index, saved in
                         SavedProfileCard(
                             savedProfile: saved,
                             isUnsaving: viewModel.unsavingProfileId == saved.id,
@@ -106,48 +137,103 @@ struct SavedProfilesView: View {
                                 HapticManager.shared.impact(.light)
                             },
                             onUnsave: {
-                                viewModel.unsaveProfile(saved)
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                                    viewModel.unsaveProfile(saved)
+                                }
                                 HapticManager.shared.impact(.medium)
                             }
+                        )
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.8).combined(with: .opacity),
+                            removal: .scale(scale: 0.8).combined(with: .opacity)
+                        ))
+                        .animation(
+                            .spring(response: 0.4, dampingFraction: 0.7)
+                            .delay(Double(index) * 0.05),
+                            value: viewModel.savedProfiles.count
                         )
                     }
                 }
                 .padding(.horizontal)
             }
             .padding(.top)
+            .padding(.bottom, 20)
         }
     }
 
     // MARK: - Stats Header
 
     private var statsHeader: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(viewModel.savedProfiles.count)")
-                    .font(.title.bold())
-                    .foregroundColor(.purple)
+        HStack(spacing: 20) {
+            // Total saved count
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Image(systemName: "bookmark.fill")
+                        .font(.title2)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+
+                    Text("\(viewModel.savedProfiles.count)")
+                        .font(.system(size: 32, weight: .bold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .contentTransition(.numericText())
+                }
 
                 Text("Saved Profiles")
                     .font(.subheadline)
+                    .fontWeight(.medium)
                     .foregroundColor(.secondary)
             }
 
             Spacer()
 
-            VStack(alignment: .trailing, spacing: 4) {
-                Text("\(viewModel.savedThisWeek)")
-                    .font(.title3.bold())
-                    .foregroundColor(.blue)
+            // This week count
+            VStack(alignment: .trailing, spacing: 6) {
+                HStack(spacing: 6) {
+                    Text("\(viewModel.savedThisWeek)")
+                        .font(.title2.bold())
+                        .foregroundColor(.blue)
+                        .contentTransition(.numericText())
+
+                    Image(systemName: "calendar")
+                        .font(.title3)
+                        .foregroundColor(.blue)
+                }
 
                 Text("This Week")
                     .font(.caption)
+                    .fontWeight(.medium)
                     .foregroundColor(.secondary)
             }
         }
-        .padding()
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 5, y: 2)
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.white)
+                .shadow(color: .purple.opacity(0.1), radius: 20, x: 0, y: 10)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(
+                    LinearGradient(
+                        colors: [.purple.opacity(0.1), .pink.opacity(0.05)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
         .padding(.horizontal)
     }
 
@@ -297,11 +383,13 @@ struct SavedProfileCard: View {
     let onTap: () -> Void
     let onUnsave: () -> Void
 
+    @State private var isPressed = false
+
     var body: some View {
         Button(action: onTap) {
             ZStack(alignment: .topTrailing) {
                 VStack(spacing: 0) {
-                    // Profile image
+                    // Profile image with smooth loading
                     Group {
                         if let imageURL = savedProfile.user.photos.first, let url = URL(string: imageURL) {
                             CachedCardImage(url: url)
@@ -311,81 +399,142 @@ struct SavedProfileCard: View {
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
+                            .overlay {
+                                Image(systemName: "person.fill")
+                                    .font(.system(size: 50))
+                                    .foregroundColor(.white.opacity(0.5))
+                            }
                         }
                     }
                     .frame(height: 200)
                     .clipped()
                     .overlay {
                         if isUnsaving {
-                            Color.black.opacity(0.4)
-                                .overlay {
+                            ZStack {
+                                Color.black.opacity(0.6)
+
+                                VStack(spacing: 12) {
                                     ProgressView()
                                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                        .scaleEffect(1.2)
+                                        .scaleEffect(1.3)
+
+                                    Text("Removing...")
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.white)
                                 }
+                            }
+                            .transition(.opacity)
                         }
                     }
 
-                    // User info
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(spacing: 4) {
+                    // User info with enhanced styling
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 6) {
                             Text(savedProfile.user.fullName)
                                 .font(.headline)
+                                .fontWeight(.semibold)
                                 .lineLimit(1)
                                 .truncationMode(.tail)
-                                .fixedSize(horizontal: false, vertical: true)
 
                             Text("\(savedProfile.user.age)")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
-                                .fixedSize()
+
+                            if savedProfile.user.isVerified {
+                                Image(systemName: "checkmark.seal.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.blue)
+                            }
                         }
 
-                        Text(savedProfile.user.location)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
+                        HStack(spacing: 4) {
+                            Image(systemName: "mappin.circle.fill")
+                                .font(.caption2)
+                                .foregroundColor(.purple)
 
-                        Text("Saved \(savedProfile.savedAt.timeAgo())")
-                            .font(.caption)
-                            .foregroundColor(.purple)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
+                            Text(savedProfile.user.location)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
+
+                        HStack(spacing: 4) {
+                            Image(systemName: "clock.fill")
+                                .font(.caption2)
+                                .foregroundColor(.orange)
+
+                            Text("Saved \(savedProfile.savedAt.timeAgo())")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                                .fontWeight(.medium)
+                        }
                     }
-                    .padding(12)
+                    .padding(14)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.white)
                     .opacity(isUnsaving ? 0.5 : 1.0)
                 }
 
-                // Unsave button
-                Button(action: onUnsave) {
-                    if isUnsaving {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .padding(8)
-                            .background(Color.purple)
-                            .clipShape(Circle())
-                            .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
-                    } else {
-                        Image(systemName: "bookmark.fill")
-                            .font(.system(size: 16))
-                            .foregroundColor(.white)
-                            .padding(8)
-                            .background(Color.purple)
-                            .clipShape(Circle())
-                            .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
+                // Enhanced unsave button with animation
+                Button(action: {
+                    HapticManager.shared.impact(.medium)
+                    onUnsave()
+                }) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [.purple, .pink],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 36, height: 36)
+                            .shadow(color: .purple.opacity(0.4), radius: 8, y: 4)
+
+                        if isUnsaving {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "bookmark.fill")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white)
+                        }
                     }
                 }
                 .buttonStyle(.plain)
                 .disabled(isUnsaving)
-                .padding(8)
+                .scaleEffect(isPressed ? 0.85 : 1.0)
+                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
+                .padding(10)
             }
-            .background(Color.white)
-            .cornerRadius(16)
-            .shadow(color: .black.opacity(0.1), radius: 5, y: 2)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color.white)
+                    .shadow(color: .black.opacity(0.08), radius: 15, y: 5)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(
+                        LinearGradient(
+                            colors: [.purple.opacity(0.1), .pink.opacity(0.05)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            )
         }
-        .buttonStyle(ScaleButtonStyle())
+        .buttonStyle(.plain)
+        .scaleEffect(isPressed ? 0.97 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in isPressed = true }
+                .onEnded { _ in isPressed = false }
+        )
         .disabled(isUnsaving)
     }
 }
