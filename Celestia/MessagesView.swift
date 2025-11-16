@@ -507,8 +507,12 @@ struct ConversationRow: View {
             // Profile image with online indicator
             ZStack(alignment: .topTrailing) {
                 profileImage
-                
-                if user.isOnline {
+
+                // Consider user active if they're online OR were active in the last 5 minutes
+                let interval = Date().timeIntervalSince(user.lastActive)
+                let isActive = user.isOnline || interval < 300
+
+                if isActive {
                     Circle()
                         .fill(Color.green)
                         .frame(width: 18, height: 18)
