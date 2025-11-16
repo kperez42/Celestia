@@ -1450,13 +1450,18 @@ struct LanguageTagButton: View {
             .padding(.horizontal, 18)
             .padding(.vertical, 12)
             .background(
-                isSelected ?
-                LinearGradient(
-                    colors: [.purple, .pink],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                ).opacity(0.15) :
-                Color(.systemGray6)
+                Group {
+                    if isSelected {
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                        .opacity(0.15)
+                    } else {
+                        Color(.systemGray6)
+                    }
+                }
             )
             .foregroundColor(isSelected ? .purple : .primary)
             .cornerRadius(25)
@@ -1464,12 +1469,12 @@ struct LanguageTagButton: View {
                 RoundedRectangle(cornerRadius: 25)
                     .stroke(
                         isSelected ?
-                        LinearGradient(
+                        AnyShapeStyle(LinearGradient(
                             colors: [.purple, .pink],
                             startPoint: .leading,
                             endPoint: .trailing
-                        ) :
-                        LinearGradient(colors: [.clear], startPoint: .leading, endPoint: .trailing),
+                        )) :
+                        AnyShapeStyle(LinearGradient(colors: [.clear], startPoint: .leading, endPoint: .trailing)),
                         lineWidth: 2
                     )
             )
@@ -1565,13 +1570,18 @@ struct InterestTagButton: View {
             .padding(.horizontal, 18)
             .padding(.vertical, 12)
             .background(
-                isSelected ?
-                LinearGradient(
-                    colors: [.pink, .orange],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                ).opacity(0.15) :
-                Color(.systemGray6)
+                Group {
+                    if isSelected {
+                        LinearGradient(
+                            colors: [.pink, .orange],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                        .opacity(0.15)
+                    } else {
+                        Color(.systemGray6)
+                    }
+                }
             )
             .foregroundColor(isSelected ? .pink : .primary)
             .cornerRadius(25)
@@ -1579,12 +1589,12 @@ struct InterestTagButton: View {
                 RoundedRectangle(cornerRadius: 25)
                     .stroke(
                         isSelected ?
-                        LinearGradient(
+                        AnyShapeStyle(LinearGradient(
                             colors: [.pink, .orange],
                             startPoint: .leading,
                             endPoint: .trailing
-                        ) :
-                        LinearGradient(colors: [.clear], startPoint: .leading, endPoint: .trailing),
+                        )) :
+                        AnyShapeStyle(LinearGradient(colors: [.clear], startPoint: .leading, endPoint: .trailing)),
                         lineWidth: 2
                     )
             )
