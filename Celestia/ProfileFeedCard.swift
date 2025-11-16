@@ -557,9 +557,9 @@ struct ProfileFeedCardSkeleton: View {
                 bio: "Love hiking and coffee",
                 location: "Los Angeles",
                 country: "USA",
+                interests: ["Coffee", "Hiking", "Music", "Art", "Photography"],
                 ageRangeMin: 25,
-                ageRangeMax: 35,
-                interests: ["Coffee", "Hiking", "Music", "Art", "Photography"]
+                ageRangeMax: 35
             ),
             currentUser: User(
                 email: "me@test.com",
@@ -570,9 +570,9 @@ struct ProfileFeedCardSkeleton: View {
                 bio: "Tech enthusiast",
                 location: "Los Angeles",
                 country: "USA",
+                interests: ["Coffee", "Music", "Technology", "Hiking"],  // 3 shared: Coffee, Music, Hiking
                 ageRangeMin: 25,
-                ageRangeMax: 35,
-                interests: ["Coffee", "Music", "Technology", "Hiking"]  // 3 shared: Coffee, Music, Hiking
+                ageRangeMax: 35
             ),
             initialIsFavorited: false,
             onLike: {},
