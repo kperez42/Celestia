@@ -92,26 +92,6 @@ struct ProfileFeedCard: View {
             .frame(height: 400)
             .clipped()
             .cornerRadius(16, corners: [.topLeft, .topRight])
-            .overlay(alignment: .topTrailing) {
-                // Info button overlay
-                Button {
-                    HapticManager.shared.impact(.light)
-                    onViewProfile()
-                } label: {
-                    ZStack {
-                        Circle()
-                            .fill(Color.black.opacity(0.5))
-                            .frame(width: 44, height: 44)
-
-                        Image(systemName: "info.circle.fill")
-                            .font(.title3)
-                            .foregroundColor(.white)
-                    }
-                }
-                .padding(12)
-                .accessibilityLabel("View full profile")
-                .accessibilityHint("Tap to see \(user.fullName)'s complete profile with interests, bio, and more details")
-            }
             .onTapGesture {
                 HapticManager.shared.impact(.medium)
                 onViewProfile()
