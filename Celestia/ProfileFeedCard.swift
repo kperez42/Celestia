@@ -14,6 +14,7 @@ struct ProfileFeedCard: View {
     let onFavorite: () -> Void
     let onMessage: () -> Void
     let onViewPhotos: () -> Void
+    let onViewProfile: () -> Void  // NEW: Callback to view full profile with interests
 
     @State private var isFavorited = false
     @State private var isLiked = false
@@ -25,7 +26,7 @@ struct ProfileFeedCard: View {
             // Profile Image
             profileImage
 
-            // User Details
+            // User Details (tappable to view full profile)
             VStack(alignment: .leading, spacing: 8) {
                 // Name and Verification
                 nameRow
@@ -41,6 +42,11 @@ struct ProfileFeedCard: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                HapticManager.shared.impact(.light)
+                onViewProfile()
+            }
 
             // Action Buttons
             actionButtons
@@ -68,6 +74,30 @@ struct ProfileFeedCard: View {
             .frame(height: 400)
             .clipped()
             .cornerRadius(16, corners: [.topLeft, .topRight])
+            .overlay(alignment: .topTrailing) {
+                // Info button overlay
+                Button {
+                    HapticManager.shared.impact(.light)
+                    onViewProfile()
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(Color.black.opacity(0.5))
+                            .frame(width: 44, height: 44)
+
+                        Image(systemName: "info.circle.fill")
+                            .font(.title3)
+                            .foregroundColor(.white)
+                    }
+                }
+                .padding(12)
+                .accessibilityLabel("View full profile")
+                .accessibilityHint("Tap to see \(user.fullName)'s complete profile with interests, bio, and more details")
+            }
+            .onTapGesture {
+                HapticManager.shared.impact(.medium)
+                onViewProfile()
+            }
     }
 
     private var nameRow: some View {
@@ -370,7 +400,8 @@ struct ProfileFeedCardSkeleton: View {
             onLike: {},
             onFavorite: {},
             onMessage: {},
-            onViewPhotos: {}
+            onViewPhotos: {},
+            onViewProfile: {}
         )
         .padding()
     }

@@ -136,6 +136,11 @@ struct FeedDiscoverView: View {
                         onViewPhotos: {
                             selectedUser = user
                             showPhotoGallery = true
+                        },
+                        onViewProfile: {
+                            HapticManager.shared.impact(.light)
+                            selectedUser = user
+                            showUserDetail = true
                         }
                     )
                     .onAppear {
