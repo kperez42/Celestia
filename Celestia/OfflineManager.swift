@@ -260,7 +260,13 @@ class OfflineCache {
 
     private init() {
         let urls = fileManager.urls(for: .cachesDirectory, in: .userDomainMask)
-        cacheDirectory = urls[0].appendingPathComponent("OfflineCache", isDirectory: true)
+        guard let baseURL = urls.first else {
+            // Fallback to temporary directory if caches directory is unavailable
+            cacheDirectory = fileManager.temporaryDirectory.appendingPathComponent("OfflineCache", isDirectory: true)
+            createCacheDirectoryIfNeeded()
+            return
+        }
+        cacheDirectory = baseURL.appendingPathComponent("OfflineCache", isDirectory: true)
 
         createCacheDirectoryIfNeeded()
     }
