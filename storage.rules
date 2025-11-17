@@ -1,0 +1,81 @@
+rules_version = '2';
+
+// Firebase Storage Security Rules for Celestia
+// Deploy with: firebase deploy --only storage
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function isValidImageSize() {
+      return request.resource.size < 10 * 1024 * 1024; // 10MB max
+    }
+
+    function isValidImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    function isEmailVerified() {
+      return request.auth.token.email_verified == true;
+    }
+
+    // Profile images - users can only upload to their own folder
+    match /profile_images/{userId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated()
+                   && isOwner(userId)
+                   && isEmailVerified()
+                   && isValidImageSize()
+                   && isValidImage();
+      allow delete: if isAuthenticated() && isOwner(userId);
+    }
+
+    // Chat images - users can upload to match folders they're part of
+    match /chat_images/{matchId}/{fileName} {
+      allow read: if isAuthenticated()
+                  && (request.auth.uid in
+                      firestore.get(/databases/(default)/documents/matches/$(matchId)).data.participants);
+      allow write: if isAuthenticated()
+                   && (request.auth.uid in
+                       firestore.get(/databases/(default)/documents/matches/$(matchId)).data.participants)
+                   && isEmailVerified()
+                   && isValidImageSize()
+                   && isValidImage();
+    }
+
+    // Verification photos - temporary storage for photo verification
+    match /verification_photos/{userId}/{fileName} {
+      allow read: if isAuthenticated() && (isOwner(userId) || hasAdminRole());
+      allow write: if isAuthenticated()
+                   && isOwner(userId)
+                   && isEmailVerified()
+                   && isValidImageSize()
+                   && isValidImage();
+      // Auto-delete after 7 days (handled by Cloud Function)
+    }
+
+    // Admin role check helper (requires custom claims)
+    function hasAdminRole() {
+      return request.auth.token.admin == true;
+    }
+
+    // Admin uploads for app assets, marketing materials, etc.
+    match /admin/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && hasAdminRole();
+    }
+
+    // Deny all other access - security by default
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
