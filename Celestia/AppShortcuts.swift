@@ -409,7 +409,11 @@ class AppShortcutSuggestions {
 
             // Check if user hasn't swiped today
             let lastSwipeDate = UserDefaults.standard.object(forKey: "last_swipe_date") as? Date
-            if lastSwipeDate == nil || !Calendar.current.isDateInToday(lastSwipeDate!) {
+            if let swipeDate = lastSwipeDate {
+                if !Calendar.current.isDateInToday(swipeDate) {
+                    await suggestStartSwiping()
+                }
+            } else {
                 await suggestStartSwiping()
             }
         }

@@ -3,7 +3,7 @@
 //  Celestia
 //
 //  Photo picker component for profile pictures
-//hello
+//
 
 import SwiftUI
 import PhotosUI
@@ -41,9 +41,9 @@ struct ImagePicker: UIViewControllerRepresentable {
             guard let provider = results.first?.itemProvider else { return }
             
             if provider.canLoadObject(ofClass: UIImage.self) {
-                provider.loadObject(ofClass: UIImage.self) { image, _ in
+                provider.loadObject(ofClass: UIImage.self) { [weak self] image, _ in
                     DispatchQueue.main.async {
-                        self.parent.selectedImage = image as? UIImage
+                        self?.parent.selectedImage = image as? UIImage
                     }
                 }
             }
