@@ -94,7 +94,7 @@ class FirestoreMatchRepository: MatchRepository {
         })
 
         // Safely unwrap and return the match ID
-        guard let matchId = result as? String else {
+        guard let resultMatchId = result as? String else {
             throw NSError(
                 domain: "MatchServiceError",
                 code: -1,
@@ -102,7 +102,7 @@ class FirestoreMatchRepository: MatchRepository {
             )
         }
 
-        return matchId
+        return resultMatchId
     }
 
     /// Generate deterministic match ID from user IDs
