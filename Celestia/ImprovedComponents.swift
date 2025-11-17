@@ -34,15 +34,19 @@ struct ImprovedActionButton: View {
                 // Main button
                 Circle()
                     .fill(
-                        gradient != nil ?
-                        AnyShapeStyle(
-                            LinearGradient(
-                                colors: gradient!,
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        ) :
-                        AnyShapeStyle(color ?? .gray)
+                        {
+                            if let gradientColors = gradient {
+                                return AnyShapeStyle(
+                                    LinearGradient(
+                                        colors: gradientColors,
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                            } else {
+                                return AnyShapeStyle(color ?? .gray)
+                            }
+                        }()
                     )
                     .frame(width: size, height: size)
                 

@@ -58,7 +58,7 @@ class FirestoreMatchRepository: MatchRepository {
         let matchRef = db.collection("matches").document(matchId)
 
         // Use transaction for atomic check-and-create
-        let result = try await db.runTransaction({ (transaction, errorPointer) -> Any? in
+        let result: Any = try await db.runTransaction({ (transaction, errorPointer) -> Any? in
             // Get document without throwing - use errorPointer instead
             let matchDoc: DocumentSnapshot
             do {
@@ -94,15 +94,15 @@ class FirestoreMatchRepository: MatchRepository {
         })
 
         // Safely unwrap and return the match ID
-        guard let resultMatchId = result as? String else {
+        if let resultMatchId = result as? String {
+            return resultMatchId
+        } else {
             throw NSError(
                 domain: "MatchServiceError",
                 code: -1,
                 userInfo: [NSLocalizedDescriptionKey: "Transaction failed to create or retrieve match"]
             )
         }
-
-        return resultMatchId
     }
 
     /// Generate deterministic match ID from user IDs
