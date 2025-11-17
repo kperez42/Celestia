@@ -59,7 +59,14 @@ class FirestoreMatchRepository: MatchRepository {
 
         // Use transaction for atomic check-and-create
         try await db.runTransaction({ (transaction, errorPointer) -> Any? in
-            let matchDoc = try transaction.getDocument(matchRef)
+            // Get document without throwing - use errorPointer instead
+            let matchDoc: DocumentSnapshot
+            do {
+                matchDoc = try transaction.getDocument(matchRef)
+            } catch let error as NSError {
+                errorPointer?.pointee = error
+                return nil
+            }
 
             // If match already exists, return existing ID
             guard !matchDoc.exists else {
