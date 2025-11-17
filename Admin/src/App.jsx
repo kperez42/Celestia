@@ -1,6 +1,10 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
+import { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { ThemeProvider, createTheme, CssBaseline, CircularProgress, Box } from '@mui/material';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from './services/firebase';
 import Dashboard from './pages/Dashboard';
+import LoginPage from './pages/LoginPage';
 
 const theme = createTheme({
   palette: {
@@ -15,12 +19,45 @@ const theme = createTheme({
 });
 
 function App() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Subscribe to auth state changes
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+      setLoading(false);
+    });
+
+    // Cleanup subscription on unmount
+    return unsubscribe;
+  }, []);
+
+  // Show loading spinner while checking auth status
+  if (loading) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
+          <CircularProgress />
+        </Box>
+      </ThemeProvider>
+    );
+  }
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Router>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
+          <Route
+            path="/"
+            element={user ? <Dashboard /> : <Navigate to="/login" replace />}
+          />
+          <Route
+            path="/login"
+            element={!user ? <LoginPage /> : <Navigate to="/" replace />}
+          />
         </Routes>
       </Router>
     </ThemeProvider>

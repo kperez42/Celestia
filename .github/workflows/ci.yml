@@ -57,6 +57,9 @@ jobs:
             pod install
           fi
 
+      - name: Install xcpretty
+        run: gem install xcpretty
+
       - name: Run tests
         run: |
           if [ -f "Celestia.xcworkspace" ]; then
@@ -118,6 +121,9 @@ jobs:
             echo "Installing CocoaPods dependencies..."
             pod install
           fi
+
+      - name: Install xcpretty
+        run: gem install xcpretty
 
       - name: Build app
         run: |
