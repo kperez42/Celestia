@@ -44,6 +44,12 @@ GoogleService-Info.plist
 .AppleDouble
 .LSOverride
 
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
 # Temporary exploration/analysis files
 CODEBASE_ANALYSIS.md
 EXPLORATION_SUMMARY.txt

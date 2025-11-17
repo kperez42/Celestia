@@ -15,7 +15,6 @@ import {
 import {
   People,
   TrendingUp,
-  Security,
   AttachMoney,
   Warning
 } from '@mui/icons-material';
