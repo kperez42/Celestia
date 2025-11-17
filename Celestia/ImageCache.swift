@@ -56,7 +56,14 @@ class ImageCache {
 
         // Setup disk cache directory
         let paths = fileManager.urls(for: .cachesDirectory, in: .userDomainMask)
-        cacheDirectory = paths[0].appendingPathComponent("ImageCache")
+
+        // SAFETY: Safely unwrap with fallback to temp directory
+        if let cachesPath = paths.first {
+            cacheDirectory = cachesPath.appendingPathComponent("ImageCache")
+        } else {
+            // Fallback to temp directory if caches directory is unavailable
+            cacheDirectory = fileManager.temporaryDirectory.appendingPathComponent("ImageCache")
+        }
 
         // Create cache directory if needed
         try? fileManager.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)

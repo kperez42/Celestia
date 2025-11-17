@@ -85,6 +85,8 @@ struct SignInView: View {
                                         Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
                                             .foregroundColor(.secondary)
                                     }
+                                    .accessibilityLabel(showPassword ? "Hide password" : "Show password")
+                                    .accessibilityHint("Toggle password visibility")
                                 }
                                 .padding()
                                 .background(Color(.systemBackground))
@@ -158,6 +160,8 @@ struct SignInView: View {
                         Image(systemName: "xmark")
                             .foregroundColor(.primary)
                     }
+                    .accessibilityLabel("Close")
+                    .accessibilityHint("Dismiss sign in screen")
                 }
             }
         }
