@@ -422,8 +422,7 @@ struct ReferralDashboardView: View {
 
     private func referralRow(referral: Referral) -> some View {
         let isNew = referral.status == .completed &&
-                    referral.completedAt != nil &&
-                    Date().timeIntervalSince(referral.completedAt!) < 86400 // 24 hours
+                    referral.completedAt.map { Date().timeIntervalSince($0) < 86400 } ?? false // 24 hours
 
         return HStack(spacing: 16) {
             // Status Icon
