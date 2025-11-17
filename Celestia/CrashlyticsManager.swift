@@ -266,7 +266,7 @@ class CrashlyticsManager {
     func testCrash() {
         Logger.shared.warning("Test crash triggered!", category: .analytics)
         crashlytics.log("Test crash about to occur")
-        fatalError("Test crash triggered from CrashlyticsManager")
+        assertionFailure("Test crash triggered from CrashlyticsManager")
     }
 
     /// Force a non-fatal error for testing

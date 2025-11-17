@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import FirebaseFirestore
 
 struct MainTabView: View {
     @EnvironmentObject var authService: AuthService
@@ -16,6 +17,7 @@ struct MainTabView: View {
     @State private var previousTab = 0
     @State private var unreadCount = 0
     @State private var newMatchesCount = 0
+    @State private var unreadListener: ListenerRegistration?
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -60,11 +62,29 @@ struct MainTabView: View {
             previousTab = oldValue
             HapticManager.shared.selection()
         }
+        .onChange(of: matchService.matches) { _, newMatches in
+            // Update new matches count when matches change (real-time from listener)
+            newMatchesCount = newMatches.filter { $0.lastMessage == nil }.count
+        }
         .task {
-            // PERFORMANCE: Defer badge loading to not block initial render
-            // Allow the UI to render first, then load badges in background
+            // PERFORMANCE FIX: Use real-time listeners instead of polling
+            // This eliminates battery drain from constant polling
+            guard let userId = authService.currentUser?.id else { return }
+
+            // Allow the UI to render first before setting up listeners
             try? await Task.sleep(nanoseconds: 500_000_000) // 500ms delay
-            await updateBadgesPeriodically()
+
+            // Set up real-time listener for matches (already exists in service)
+            matchService.listenToMatches(userId: userId)
+
+            // Set up real-time listener for unread messages
+            setupUnreadMessagesListener(userId: userId)
+        }
+        .onDisappear {
+            // PERFORMANCE: Clean up listeners when view disappears
+            matchService.stopListening()
+            unreadListener?.remove()
+            unreadListener = nil
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToMessages"))) { notification in
             // Navigate to Messages tab when a match occurs
@@ -140,26 +160,27 @@ struct MainTabView: View {
     
     // MARK: - Helper Functions
 
-    private func updateBadgesPeriodically() async {
-        guard let userId = authService.currentUser?.id else { return }
+    /// Set up real-time listener for unread message count
+    /// PERFORMANCE FIX: Replaces inefficient 10-second polling with real-time updates
+    private func setupUnreadMessagesListener(userId: String) {
+        unreadListener?.remove()
 
-        // Continuous polling loop - automatically cancelled when view disappears
-        while !Task.isCancelled {
-            // Load unread messages count
-            unreadCount = await messageService.getUnreadMessageCount(userId: userId)
+        unreadListener = Firestore.firestore().collection("messages")
+            .whereField("receiverId", isEqualTo: userId)
+            .whereField("isRead", isEqualTo: false)
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self else { return }
 
-            // Load new matches count
-            do {
-                try await matchService.fetchMatches(userId: userId)
-                newMatchesCount = matchService.matches.filter { $0.lastMessage == nil }.count
-            } catch {
-                Logger.shared.error("Error loading badge counts", category: .general, error: error)
+                if let error = error {
+                    Logger.shared.error("Error listening to unread messages", category: .messaging, error: error)
+                    return
+                }
+
+                Task { @MainActor in
+                    self.unreadCount = snapshot?.documents.count ?? 0
+                    Logger.shared.debug("Unread count updated: \(self.unreadCount)", category: .messaging)
+                }
             }
-
-            // Wait 10 seconds before next update
-            // Using Task.sleep instead of Timer - automatically handles cancellation
-            try? await Task.sleep(nanoseconds: 10_000_000_000) // 10 seconds
-        }
     }
 }
 
