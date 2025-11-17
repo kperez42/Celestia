@@ -98,15 +98,23 @@ class AnalyticsServiceEnhanced: ObservableObject {
             return heatmap
         }
 
-        let recentViews = viewsSnapshot.documents.filter {
-            guard let timestamp = ($0.data()["timestamp"] as? Timestamp)?.dateValue() else { return false }
-            return timestamp >= last7Days
-        }.count
+        // PERFORMANCE FIX: Single-pass iteration instead of multiple filters
+        // Old: O(3n) with multiple filter passes
+        // New: O(n) with single iteration
+        var recentViews = 0
+        var previousViews = 0
 
-        let previousViews = viewsSnapshot.documents.filter {
-            guard let timestamp = ($0.data()["timestamp"] as? Timestamp)?.dateValue() else { return false }
-            return timestamp >= previous7Days && timestamp < last7Days
-        }.count
+        for doc in viewsSnapshot.documents {
+            guard let timestamp = (doc.data()["timestamp"] as? Timestamp)?.dateValue() else {
+                continue
+            }
+
+            if timestamp >= last7Days {
+                recentViews += 1
+            } else if timestamp >= previous7Days {
+                previousViews += 1
+            }
+        }
 
         let trendPercentage = previousViews > 0 ? Double(recentViews - previousViews) / Double(previousViews) * 100 : 0
 

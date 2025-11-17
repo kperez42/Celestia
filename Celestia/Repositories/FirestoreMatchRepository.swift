@@ -50,9 +50,49 @@ class FirestoreMatchRepository: MatchRepository {
     }
 
     func createMatch(match: Match) async throws -> String {
-        let docRef = try db.collection("matches").addDocument(from: match)
-        Logger.shared.info("Match created: \(docRef.documentID)", category: .matching)
-        return docRef.documentID
+        // CONCURRENCY FIX: Use deterministic match ID to prevent race condition
+        // Old approach: addDocument() could create duplicates if called simultaneously
+        // New approach: Use transaction with deterministic ID for atomic check-and-create
+
+        let matchId = generateMatchId(user1Id: match.user1Id, user2Id: match.user2Id)
+        let matchRef = db.collection("matches").document(matchId)
+
+        // Use transaction for atomic check-and-create
+        try await db.runTransaction({ (transaction, errorPointer) -> Any? in
+            let matchDoc = try transaction.getDocument(matchRef)
+
+            // If match already exists, return existing ID
+            guard !matchDoc.exists else {
+                Logger.shared.info("Match already exists (transaction): \(matchId)", category: .matching)
+                return matchId
+            }
+
+            // Create new match atomically
+            var matchData = match
+            matchData.id = matchId
+
+            do {
+                let encodedMatch = try Firestore.Encoder().encode(matchData)
+                transaction.setData(encodedMatch, forDocument: matchRef)
+                Logger.shared.info("Match created (transaction): \(matchId)", category: .matching)
+                return matchId
+            } catch {
+                errorPointer?.pointee = NSError(
+                    domain: "MatchServiceError",
+                    code: -1,
+                    userInfo: [NSLocalizedDescriptionKey: "Failed to encode match: \(error.localizedDescription)"]
+                )
+                return nil
+            }
+        }) as! String
+    }
+
+    /// Generate deterministic match ID from user IDs
+    /// Always returns the same ID regardless of user order
+    private func generateMatchId(user1Id: String, user2Id: String) -> String {
+        // Sort IDs to ensure consistency
+        let sortedIds = [user1Id, user2Id].sorted()
+        return "\(sortedIds[0])_\(sortedIds[1])"
     }
 
     func updateMatchLastMessage(matchId: String, message: String, timestamp: Date) async throws {

@@ -80,11 +80,9 @@ class MatchService: ObservableObject, MatchServiceProtocol {
     
     /// Create a new match between two users
     func createMatch(user1Id: String, user2Id: String) async {
-        // Check if match already exists
-        if let existingMatch = try? await fetchMatch(user1Id: user1Id, user2Id: user2Id) {
-            Logger.shared.info("Match already exists: \(existingMatch.id ?? "unknown")", category: .matching)
-            return
-        }
+        // CONCURRENCY FIX: Removed redundant check - repository now handles atomically with transaction
+        // The FirestoreMatchRepository.createMatch() now uses a deterministic ID and transaction
+        // to prevent race conditions, so no need to check before creating
 
         let match = Match(user1Id: user1Id, user2Id: user2Id)
 

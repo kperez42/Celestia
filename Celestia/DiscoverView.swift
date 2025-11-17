@@ -183,10 +183,13 @@ struct DiscoverView: View {
         ZStack {
             // Card stack layer (lower z-index)
             ZStack {
-                ForEach(Array(viewModel.users.enumerated().filter { $0.offset >= viewModel.currentIndex && $0.offset < viewModel.currentIndex + 3 }), id: \.offset) { index, user in
-                    let cardIndex = index - viewModel.currentIndex
+                // PERFORMANCE FIX: Use pre-computed visibleUsers instead of filtering in view body
+                // Old: O(n) enumerated().filter() on every render
+                // New: O(1) direct access to visible users
+                ForEach(viewModel.visibleUsers, id: \.index) { item in
+                    let cardIndex = item.index - viewModel.currentIndex
 
-                    UserCardView(user: user)
+                    UserCardView(user: item.user)
                         .overlay(alignment: .topLeading) {
                             // Pass indicator
                             if cardIndex == 0 && viewModel.dragOffset.width < -50 {
