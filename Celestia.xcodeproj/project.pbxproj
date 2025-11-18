@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		BA283BDF2ECCCB3D0065FFE0 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = BA283BDE2ECCCB3D0065FFE0 /* FirebaseFunctions */; };
 		BA58E5AE2EC3C2BA005DE376 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = BA58E5AD2EC3C2BA005DE376 /* FirebaseAnalytics */; };
 		BA58E5B02EC3C2BA005DE376 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = BA58E5AF2EC3C2BA005DE376 /* FirebaseCrashlytics */; };
 		BA58E5B22EC3C2BA005DE376 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = BA58E5B12EC3C2BA005DE376 /* FirebaseMessaging */; };
@@ -66,6 +67,7 @@
 				BA58E5B42EC3C2BA005DE376 /* FirebasePerformance in Frameworks */,
 				BA58E5B22EC3C2BA005DE376 /* FirebaseMessaging in Frameworks */,
 				BA6731D62EB33154005E3235 /* FirebaseAuth in Frameworks */,
+				BA283BDF2ECCCB3D0065FFE0 /* FirebaseFunctions in Frameworks */,
 				BA6731D82EB33154005E3235 /* FirebaseFirestore in Frameworks */,
 				BA58E5B02EC3C2BA005DE376 /* FirebaseCrashlytics in Frameworks */,
 				BA58E5AE2EC3C2BA005DE376 /* FirebaseAnalytics in Frameworks */,
@@ -139,6 +141,7 @@
 				BA58E5B12EC3C2BA005DE376 /* FirebaseMessaging */,
 				BA58E5B32EC3C2BA005DE376 /* FirebasePerformance */,
 				BA58E5B52EC3C2BA005DE376 /* FirebaseRemoteConfig */,
+				BA283BDE2ECCCB3D0065FFE0 /* FirebaseFunctions */,
 			);
 			productName = Celestia;
 			productReference = BA6731632EB320C4005E3235 /* Celestia.app */;
@@ -220,6 +223,9 @@
 				en,
 				Base,
 				es,
+				pt,
+				fr,
+				de,
 			);
 			mainGroup = BA67315A2EB320C4005E3235;
 			minimizedProjectReferenceProxies = 1;
@@ -604,6 +610,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		BA283BDE2ECCCB3D0065FFE0 /* FirebaseFunctions */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BA6731D42EB33154005E3235 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFunctions;
+		};
 		BA58E5AD2EC3C2BA005DE376 /* FirebaseAnalytics */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = BA6731D42EB33154005E3235 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
