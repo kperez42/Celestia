@@ -25,6 +25,8 @@ const notifications = require('./modules/notifications');
 const webhooks = require('./modules/webhooks');
 const fraudDetection = require('./modules/fraudDetection');
 const adminSecurity = require('./modules/adminSecurity');
+const photoVerification = require('./modules/photoVerification');
+const performanceMonitoring = require('./modules/performanceMonitoring');
 
 // ============================================================================
 // API ENDPOINTS
@@ -895,6 +897,335 @@ exports.sendDailyReminders = functions.pubsub
     } catch (error) {
       functions.logger.error('Daily reminders error', { error: error.message });
       return { error: error.message };
+    }
+  });
+
+// ============================================================================
+// PERFORMANCE MONITORING
+// ============================================================================
+
+/**
+ * Get performance dashboard (admin only)
+ * Returns API performance, query performance, and slow queries
+ */
+exports.getPerformanceDashboard = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const userId = context.auth.uid;
+
+  // Check admin permissions
+  const userDoc = await db.collection('users').doc(userId).get();
+  if (!userDoc.exists || !userDoc.data().isAdmin) {
+    throw new functions.https.HttpsError('permission-denied', 'Admin access required');
+  }
+
+  try {
+    const { days } = data;
+    const dashboard = await performanceMonitoring.getPerformanceDashboard(days || 7);
+
+    return dashboard;
+  } catch (error) {
+    functions.logger.error('Get performance dashboard error', { error: error.message });
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
+ * Track slow query (for manual reporting from client)
+ */
+exports.reportSlowQuery = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { collection, operation, duration, resultCount } = data;
+
+  if (!collection || !operation || !duration) {
+    throw new functions.https.HttpsError('invalid-argument', 'Missing required parameters');
+  }
+
+  try {
+    await performanceMonitoring.trackQuery(collection, operation, duration, resultCount || 0);
+
+    return { success: true };
+  } catch (error) {
+    functions.logger.error('Report slow query error', { error: error.message });
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+// ============================================================================
+// PHOTO VERIFICATION
+// ============================================================================
+
+/**
+ * Verify user photo using AI face matching
+ * Compares selfie with profile photos to prevent catfishing
+ * SECURITY: Rate limited to 3 attempts per day
+ */
+exports.verifyPhoto = functions.https.onCall(async (data, context) => {
+  // Authenticate user
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { selfieBase64 } = data;
+  const userId = context.auth.uid;
+
+  // Validate input
+  if (!selfieBase64) {
+    throw new functions.https.HttpsError('invalid-argument', 'Selfie image is required');
+  }
+
+  try {
+    functions.logger.info('Photo verification requested', { userId });
+
+    // Perform verification
+    const result = await photoVerification.verifyUserPhoto(userId, selfieBase64);
+
+    return result;
+
+  } catch (error) {
+    functions.logger.error('Photo verification error', {
+      userId,
+      error: error.message
+    });
+
+    // Return user-friendly error
+    throw new functions.https.HttpsError(
+      'internal',
+      error.message || 'Photo verification failed'
+    );
+  }
+});
+
+/**
+ * Check if user's verification has expired
+ */
+exports.checkVerificationStatus = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const userId = context.auth.uid;
+
+  try {
+    const isExpired = await photoVerification.isVerificationExpired(userId);
+
+    const userDoc = await db.collection('users').doc(userId).get();
+    const userData = userDoc.data();
+
+    return {
+      isVerified: userData?.isVerified || false,
+      isExpired,
+      verifiedAt: userData?.verifiedAt || null,
+      verificationExpiry: userData?.verificationExpiry || null,
+      verificationConfidence: userData?.verificationConfidence || 0
+    };
+  } catch (error) {
+    functions.logger.error('Check verification status error', { userId, error: error.message });
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
+ * Get verification statistics (admin only)
+ */
+exports.getVerificationStats = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const userId = context.auth.uid;
+
+  // Check admin permissions
+  const userDoc = await db.collection('users').doc(userId).get();
+  if (!userDoc.exists || !userDoc.data().isAdmin) {
+    throw new functions.https.HttpsError('permission-denied', 'Admin access required');
+  }
+
+  try {
+    const { days } = data;
+    const stats = await photoVerification.getVerificationStats(days || 30);
+
+    return stats;
+  } catch (error) {
+    functions.logger.error('Get verification stats error', { error: error.message });
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+// ============================================================================
+// FIRESTORE TRIGGERS - AUTOMATIC PUSH NOTIFICATIONS
+// ============================================================================
+
+/**
+ * Firestore Trigger: Send push notifications when a new match is created
+ * Triggers automatically on match creation - sends notification to both users
+ */
+exports.onMatchCreated = functions.firestore
+  .document('matches/{matchId}')
+  .onCreate(async (snap, context) => {
+    try {
+      const match = snap.data();
+      const matchId = context.params.matchId;
+
+      functions.logger.info('New match created - sending notifications', {
+        matchId,
+        user1Id: match.user1Id,
+        user2Id: match.user2Id
+      });
+
+      // Get both users' data
+      const [user1Doc, user2Doc] = await Promise.all([
+        db.collection('users').doc(match.user1Id).get(),
+        db.collection('users').doc(match.user2Id).get()
+      ]);
+
+      if (!user1Doc.exists || !user2Doc.exists) {
+        functions.logger.error('Match users not found', { matchId });
+        return;
+      }
+
+      const user1 = user1Doc.data();
+      const user2 = user2Doc.data();
+
+      // Send notification to user1 about user2
+      const notifyUser1 = notifications.sendMatchNotification(match.user1Id, {
+        matchId,
+        matchedUserId: match.user2Id,
+        matchedUserName: user2.firstName || 'Someone',
+        matchedUserPhoto: user2.photos && user2.photos.length > 0 ? user2.photos[0] : null
+      }).catch(err => {
+        functions.logger.error('Failed to send match notification to user1', {
+          userId: match.user1Id,
+          error: err.message
+        });
+      });
+
+      // Send notification to user2 about user1
+      const notifyUser2 = notifications.sendMatchNotification(match.user2Id, {
+        matchId,
+        matchedUserId: match.user1Id,
+        matchedUserName: user1.firstName || 'Someone',
+        matchedUserPhoto: user1.photos && user1.photos.length > 0 ? user1.photos[0] : null
+      }).catch(err => {
+        functions.logger.error('Failed to send match notification to user2', {
+          userId: match.user2Id,
+          error: err.message
+        });
+      });
+
+      // Send both notifications in parallel
+      await Promise.allSettled([notifyUser1, notifyUser2]);
+
+      functions.logger.info('Match notifications sent successfully', { matchId });
+
+    } catch (error) {
+      functions.logger.error('onMatchCreated trigger error', {
+        matchId: context.params.matchId,
+        error: error.message
+      });
+    }
+  });
+
+/**
+ * Firestore Trigger: Send push notifications when a new message is created
+ * Triggers automatically on message creation - sends notification to recipient
+ */
+exports.onMessageCreated = functions.firestore
+  .document('messages/{messageId}')
+  .onCreate(async (snap, context) => {
+    try {
+      const message = snap.data();
+      const messageId = context.params.messageId;
+
+      // Don't send notification if sender is the same as receiver (shouldn't happen)
+      if (message.senderId === message.receiverId) {
+        return;
+      }
+
+      functions.logger.info('New message created - sending notification', {
+        messageId,
+        senderId: message.senderId,
+        receiverId: message.receiverId
+      });
+
+      // Get sender's data
+      const senderDoc = await db.collection('users').doc(message.senderId).get();
+
+      if (!senderDoc.exists) {
+        functions.logger.error('Message sender not found', { messageId, senderId: message.senderId });
+        return;
+      }
+
+      const sender = senderDoc.data();
+
+      // Send notification to receiver
+      await notifications.sendMessageNotification(message.receiverId, {
+        matchId: message.matchId,
+        messageId,
+        senderId: message.senderId,
+        senderName: sender.firstName || 'Someone',
+        text: message.text || '',
+        hasImage: !!message.imageUrl,
+        imageUrl: sender.photos && sender.photos.length > 0 ? sender.photos[0] : null
+      });
+
+      functions.logger.info('Message notification sent successfully', { messageId });
+
+    } catch (error) {
+      functions.logger.error('onMessageCreated trigger error', {
+        messageId: context.params.messageId,
+        error: error.message
+      });
+    }
+  });
+
+/**
+ * Firestore Trigger: Send push notifications when a user receives a like
+ * Triggers automatically on like creation - sends notification to liked user (premium only)
+ */
+exports.onLikeCreated = functions.firestore
+  .document('likes/{likeId}')
+  .onCreate(async (snap, context) => {
+    try {
+      const like = snap.data();
+      const likeId = context.params.likeId;
+
+      functions.logger.info('New like created - checking if notification needed', {
+        likeId,
+        likerId: like.userId,
+        targetUserId: like.targetUserId
+      });
+
+      // Get liker's data
+      const likerDoc = await db.collection('users').doc(like.userId).get();
+
+      if (!likerDoc.exists) {
+        functions.logger.error('Liker not found', { likeId, likerId: like.userId });
+        return;
+      }
+
+      const liker = likerDoc.data();
+
+      // Send notification to target user (premium users only - handled in sendLikeNotification)
+      await notifications.sendLikeNotification(like.targetUserId, {
+        likerId: like.userId,
+        likerName: liker.firstName || 'Someone',
+        likerPhoto: liker.photos && liker.photos.length > 0 ? liker.photos[0] : null,
+        isSuperLike: like.isSuperLike || false
+      });
+
+      functions.logger.info('Like notification sent successfully', { likeId });
+
+    } catch (error) {
+      functions.logger.error('onLikeCreated trigger error', {
+        likeId: context.params.likeId,
+        error: error.message
+      });
     }
   });
 

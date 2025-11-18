@@ -2,13 +2,15 @@
 //  PhotoVerification.swift
 //  Celestia
 //
-//  Photo verification service with face detection
+//  Photo verification service with face detection and AI matching
+//  Uses CloudFunctions backend with Google Cloud Vision API
 //
 
 import Foundation
 import UIKit
 import Vision
 import FirebaseFirestore
+import FirebaseFunctions
 
 @MainActor
 class PhotoVerification: ObservableObject {
@@ -34,7 +36,7 @@ class PhotoVerification: ObservableObject {
             verificationProgress = 1.0
         }
 
-        // Step 1: Detect face (20%)
+        // Step 1: Detect face locally (20%)
         verificationProgress = 0.2
         let hasFace = try await detectFace(in: image)
 
@@ -45,39 +47,73 @@ class PhotoVerification: ObservableObject {
 
         // Step 2: Check image quality (40%)
         verificationProgress = 0.4
-        try await Task.sleep(nanoseconds: 500_000_000) // 0.5s
-
         let isGoodQuality = checkImageQuality(image)
         guard isGoodQuality else {
             verificationError = "Image quality too low"
             throw PhotoVerificationError.poorQuality
         }
 
-        // Step 3: Simulate face matching (70%)
+        // Step 3: Convert image to base64 for upload (50%)
+        verificationProgress = 0.5
+        guard let imageData = image.jpegData(compressionQuality: 0.85),
+              let base64String = imageData.base64EncodedString() as String? else {
+            verificationError = "Failed to process image"
+            throw PhotoVerificationError.invalidImage
+        }
+
+        // Step 4: Call CloudFunctions for AI face matching (70%)
         verificationProgress = 0.7
-        try await Task.sleep(nanoseconds: 1_000_000_000) // 1s
 
-        // In production, you'd compare with profile photos
-        // For now, we'll simulate a successful match
-        let matchScore = 0.85 // 85% confidence
+        let result = try await callVerificationAPI(selfieBase64: base64String)
 
-        guard matchScore >= 0.75 else {
-            verificationError = "Face doesn't match profile photos"
+        guard result.isVerified else {
+            verificationError = result.message
             throw PhotoVerificationError.noMatch
         }
 
-        // Step 4: Update user verification status (90%)
+        // Step 5: Update local verification status (90%)
         verificationProgress = 0.9
         try await updateUserVerification(userId: userId)
 
-        // Step 5: Complete (100%)
+        // Step 6: Complete (100%)
         verificationProgress = 1.0
 
         return VerificationResult(
             success: true,
-            confidence: matchScore,
+            confidence: result.confidence,
             timestamp: Date()
         )
+    }
+
+    // MARK: - CloudFunctions API
+
+    private func callVerificationAPI(selfieBase64: String) async throws -> CloudVerificationResult {
+        // Get Firebase Functions instance
+        let functions = Functions.functions()
+        let callable = functions.httpsCallable("verifyPhoto")
+
+        do {
+            let result = try await callable.call(["selfieBase64": selfieBase64])
+
+            guard let data = result.data as? [String: Any],
+                  let success = data["success"] as? Bool,
+                  let isVerified = data["isVerified"] as? Bool,
+                  let confidence = data["confidence"] as? Double,
+                  let message = data["message"] as? String else {
+                throw PhotoVerificationError.invalidImage
+            }
+
+            return CloudVerificationResult(
+                success: success,
+                isVerified: isVerified,
+                confidence: confidence,
+                message: message
+            )
+
+        } catch {
+            Logger.shared.error("Photo verification API error: \(error.localizedDescription)", category: .general)
+            throw PhotoVerificationError.invalidImage
+        }
     }
 
     // MARK: - Face Detection
@@ -161,6 +197,13 @@ struct VerificationResult {
     let success: Bool
     let confidence: Double
     let timestamp: Date
+}
+
+struct CloudVerificationResult {
+    let success: Bool
+    let isVerified: Bool
+    let confidence: Double
+    let message: String
 }
 
 enum PhotoVerificationError: LocalizedError {

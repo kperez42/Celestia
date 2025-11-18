@@ -44,6 +44,23 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true
+    sourcemap: true,
+    // Manual chunk splitting for better caching and smaller initial bundle
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // React core (changes rarely, cache well)
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+
+          // Material-UI (large library, separate chunk)
+          'mui-vendor': ['@mui/material', '@mui/icons-material'],
+
+          // Firebase (separate chunk for authentication and firestore)
+          'firebase-vendor': ['firebase/app', 'firebase/auth', 'firebase/firestore']
+        }
+      }
+    },
+    // Increase chunk size warning limit slightly (we're splitting now)
+    chunkSizeWarningLimit: 600
   }
 });
