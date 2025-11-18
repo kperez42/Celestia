@@ -27,6 +27,7 @@ const fraudDetection = require('./modules/fraudDetection');
 const adminSecurity = require('./modules/adminSecurity');
 const photoVerification = require('./modules/photoVerification');
 const performanceMonitoring = require('./modules/performanceMonitoring');
+const imageOptimization = require('./modules/imageOptimization');
 
 // ============================================================================
 // API ENDPOINTS
@@ -1053,6 +1054,150 @@ exports.getVerificationStats = functions.https.onCall(async (data, context) => {
     return stats;
   } catch (error) {
     functions.logger.error('Get verification stats error', { error: error.message });
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+// ============================================================================
+// IMAGE OPTIMIZATION - CDN & RESPONSIVE IMAGES
+// ============================================================================
+
+/**
+ * Optimize and upload photo to CDN
+ * Processes photo: WebP conversion, responsive variants, CDN upload
+ * Returns optimized URLs for all sizes
+ */
+exports.optimizePhoto = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const userId = context.auth.uid;
+  const { photoBase64, folder = 'profile-photos', useCDN = true } = data;
+
+  if (!photoBase64) {
+    throw new functions.https.HttpsError('invalid-argument', 'Photo data is required');
+  }
+
+  try {
+    functions.logger.info('Optimizing photo', { userId, useCDN });
+
+    const result = await imageOptimization.processUploadedPhoto(
+      userId,
+      photoBase64,
+      { folder, useCDN }
+    );
+
+    functions.logger.info('Photo optimized successfully', {
+      userId,
+      cdnUrl: result.photoData.cdnUrl || 'local'
+    });
+
+    return result;
+  } catch (error) {
+    functions.logger.error('Photo optimization error', {
+      userId,
+      error: error.message
+    });
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
+ * Get optimized image URL with custom transformations
+ * Supports responsive sizing, quality adjustment, format conversion
+ */
+exports.getOptimizedImageURL = functions.https.onCall(async (data, context) => {
+  const { publicId, width, height, quality, format } = data;
+
+  if (!publicId) {
+    throw new functions.https.HttpsError('invalid-argument', 'Public ID is required');
+  }
+
+  try {
+    const url = imageOptimization.getOptimizedURL(publicId, {
+      width,
+      height,
+      quality,
+      format
+    });
+
+    return { url };
+  } catch (error) {
+    functions.logger.error('Get optimized URL error', { error: error.message });
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
+ * Migrate existing Firebase Storage images to Cloudinary CDN
+ * Admin only - for batch migration of existing photos
+ */
+exports.migrateImageToCDN = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const userId = context.auth.uid;
+
+  // Check admin permissions
+  const userDoc = await db.collection('users').doc(userId).get();
+  if (!userDoc.exists || !userDoc.data().isAdmin) {
+    throw new functions.https.HttpsError('permission-denied', 'Admin access required');
+  }
+
+  const { firebaseUrl } = data;
+
+  if (!firebaseUrl) {
+    throw new functions.https.HttpsError('invalid-argument', 'Firebase URL is required');
+  }
+
+  try {
+    functions.logger.info('Migrating image to CDN', { firebaseUrl });
+
+    const result = await imageOptimization.migrateToCloudinary(firebaseUrl);
+
+    return result;
+  } catch (error) {
+    functions.logger.error('Migration error', { error: error.message });
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
+ * Delete image from CDN
+ */
+exports.deleteOptimizedImage = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const userId = context.auth.uid;
+  const { publicId } = data;
+
+  if (!publicId) {
+    throw new functions.https.HttpsError('invalid-argument', 'Public ID is required');
+  }
+
+  try {
+    // Verify user owns the image (publicId should contain userId)
+    if (!publicId.includes(userId)) {
+      const userDoc = await db.collection('users').doc(userId).get();
+      if (!userDoc.exists || !userDoc.data().isAdmin) {
+        throw new functions.https.HttpsError(
+          'permission-denied',
+          'You can only delete your own images'
+        );
+      }
+    }
+
+    const result = await imageOptimization.deleteFromCloudinary(publicId);
+
+    functions.logger.info('Image deleted from CDN', { userId, publicId });
+
+    return result;
+  } catch (error) {
+    functions.logger.error('Image deletion error', { error: error.message });
     throw new functions.https.HttpsError('internal', error.message);
   }
 });
