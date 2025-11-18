@@ -26,6 +26,7 @@ const webhooks = require('./modules/webhooks');
 const fraudDetection = require('./modules/fraudDetection');
 const adminSecurity = require('./modules/adminSecurity');
 const photoVerification = require('./modules/photoVerification');
+const performanceMonitoring = require('./modules/performanceMonitoring');
 
 // ============================================================================
 // API ENDPOINTS
@@ -898,6 +899,62 @@ exports.sendDailyReminders = functions.pubsub
       return { error: error.message };
     }
   });
+
+// ============================================================================
+// PERFORMANCE MONITORING
+// ============================================================================
+
+/**
+ * Get performance dashboard (admin only)
+ * Returns API performance, query performance, and slow queries
+ */
+exports.getPerformanceDashboard = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const userId = context.auth.uid;
+
+  // Check admin permissions
+  const userDoc = await db.collection('users').doc(userId).get();
+  if (!userDoc.exists || !userDoc.data().isAdmin) {
+    throw new functions.https.HttpsError('permission-denied', 'Admin access required');
+  }
+
+  try {
+    const { days } = data;
+    const dashboard = await performanceMonitoring.getPerformanceDashboard(days || 7);
+
+    return dashboard;
+  } catch (error) {
+    functions.logger.error('Get performance dashboard error', { error: error.message });
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
+ * Track slow query (for manual reporting from client)
+ */
+exports.reportSlowQuery = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { collection, operation, duration, resultCount } = data;
+
+  if (!collection || !operation || !duration) {
+    throw new functions.https.HttpsError('invalid-argument', 'Missing required parameters');
+  }
+
+  try {
+    await performanceMonitoring.trackQuery(collection, operation, duration, resultCount || 0);
+
+    return { success: true };
+  } catch (error) {
+    functions.logger.error('Report slow query error', { error: error.message });
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
 
 // ============================================================================
 // PHOTO VERIFICATION
