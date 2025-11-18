@@ -17,6 +17,7 @@
     "node": "18"
   },
   "dependencies": {
+    "@google-cloud/vision": "^5.3.4",
     "axios": "^1.6.0",
     "cors": "^2.8.5",
     "crypto": "^1.0.1",
@@ -30,7 +31,6 @@
     "sharp": "^0.33.0"
   },
   "devDependencies": {
-    "@google-cloud/vision": "^5.3.4",
     "@jest/globals": "^29.7.0",
     "@types/jest": "^29.5.11",
     "eslint": "^8.15.0",

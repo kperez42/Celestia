@@ -25,6 +25,7 @@ const notifications = require('./modules/notifications');
 const webhooks = require('./modules/webhooks');
 const fraudDetection = require('./modules/fraudDetection');
 const adminSecurity = require('./modules/adminSecurity');
+const photoVerification = require('./modules/photoVerification');
 
 // ============================================================================
 // API ENDPOINTS
@@ -897,6 +898,107 @@ exports.sendDailyReminders = functions.pubsub
       return { error: error.message };
     }
   });
+
+// ============================================================================
+// PHOTO VERIFICATION
+// ============================================================================
+
+/**
+ * Verify user photo using AI face matching
+ * Compares selfie with profile photos to prevent catfishing
+ * SECURITY: Rate limited to 3 attempts per day
+ */
+exports.verifyPhoto = functions.https.onCall(async (data, context) => {
+  // Authenticate user
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { selfieBase64 } = data;
+  const userId = context.auth.uid;
+
+  // Validate input
+  if (!selfieBase64) {
+    throw new functions.https.HttpsError('invalid-argument', 'Selfie image is required');
+  }
+
+  try {
+    functions.logger.info('Photo verification requested', { userId });
+
+    // Perform verification
+    const result = await photoVerification.verifyUserPhoto(userId, selfieBase64);
+
+    return result;
+
+  } catch (error) {
+    functions.logger.error('Photo verification error', {
+      userId,
+      error: error.message
+    });
+
+    // Return user-friendly error
+    throw new functions.https.HttpsError(
+      'internal',
+      error.message || 'Photo verification failed'
+    );
+  }
+});
+
+/**
+ * Check if user's verification has expired
+ */
+exports.checkVerificationStatus = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const userId = context.auth.uid;
+
+  try {
+    const isExpired = await photoVerification.isVerificationExpired(userId);
+
+    const userDoc = await db.collection('users').doc(userId).get();
+    const userData = userDoc.data();
+
+    return {
+      isVerified: userData?.isVerified || false,
+      isExpired,
+      verifiedAt: userData?.verifiedAt || null,
+      verificationExpiry: userData?.verificationExpiry || null,
+      verificationConfidence: userData?.verificationConfidence || 0
+    };
+  } catch (error) {
+    functions.logger.error('Check verification status error', { userId, error: error.message });
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
+ * Get verification statistics (admin only)
+ */
+exports.getVerificationStats = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const userId = context.auth.uid;
+
+  // Check admin permissions
+  const userDoc = await db.collection('users').doc(userId).get();
+  if (!userDoc.exists || !userDoc.data().isAdmin) {
+    throw new functions.https.HttpsError('permission-denied', 'Admin access required');
+  }
+
+  try {
+    const { days } = data;
+    const stats = await photoVerification.getVerificationStats(days || 30);
+
+    return stats;
+  } catch (error) {
+    functions.logger.error('Get verification stats error', { error: error.message });
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
 
 // ============================================================================
 // FIRESTORE TRIGGERS - AUTOMATIC PUSH NOTIFICATIONS
