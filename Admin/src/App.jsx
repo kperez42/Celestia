@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme, CssBaseline, CircularProgress, Box } from '@mui/material';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './services/firebase';
-import Dashboard from './pages/Dashboard';
-import LoginPage from './pages/LoginPage';
+
+// Lazy load pages for code splitting (reduces initial bundle size)
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
 
 const theme = createTheme({
   palette: {
@@ -49,16 +51,24 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Router>
-        <Routes>
-          <Route
-            path="/"
-            element={user ? <Dashboard /> : <Navigate to="/login" replace />}
-          />
-          <Route
-            path="/login"
-            element={!user ? <LoginPage /> : <Navigate to="/" replace />}
-          />
-        </Routes>
+        <Suspense
+          fallback={
+            <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
+              <CircularProgress />
+            </Box>
+          }
+        >
+          <Routes>
+            <Route
+              path="/"
+              element={user ? <Dashboard /> : <Navigate to="/login" replace />}
+            />
+            <Route
+              path="/login"
+              element={!user ? <LoginPage /> : <Navigate to="/" replace />}
+            />
+          </Routes>
+        </Suspense>
       </Router>
     </ThemeProvider>
   );
