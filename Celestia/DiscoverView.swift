@@ -188,67 +188,9 @@ struct DiscoverView: View {
                 // New: O(1) direct access to visible users
                 ForEach(viewModel.visibleUsers, id: \.index) { item in
                     let cardIndex = item.index - viewModel.currentIndex
+                    let user = item.user
 
-                    UserCardView(user: item.user)
-                        .overlay(alignment: .topLeading) {
-                            // Pass indicator
-                            if cardIndex == 0 && viewModel.dragOffset.width < -50 {
-                                swipeIndicator(icon: "xmark", color: .red, text: "PASS")
-                                    .opacity(min(1.0, abs(Double(viewModel.dragOffset.width)) / 100.0))
-                            }
-                        }
-                        .overlay(alignment: .topTrailing) {
-                            // Like indicator
-                            if cardIndex == 0 && viewModel.dragOffset.width > 50 {
-                                swipeIndicator(icon: "heart.fill", color: .green, text: "LIKE")
-                                    .opacity(min(1.0, Double(viewModel.dragOffset.width) / 100.0))
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 16)
-                        .padding(.bottom, 200) // Space for buttons and tab bar
-                        .offset(y: CGFloat(cardIndex * 8))
-                        .scaleEffect(1.0 - CGFloat(cardIndex) * 0.05)
-                        .opacity(1.0 - Double(cardIndex) * 0.2)
-                        .zIndex(Double(3 - cardIndex))
-                        .offset(cardIndex == 0 ? viewModel.dragOffset : .zero)
-                        .rotationEffect(.degrees(cardIndex == 0 ? (reduceMotion ? 0 : Double(viewModel.dragOffset.width / 20)) : 0))
-                        .contentShape(Rectangle()) // Define tappable area
-                        .accessibilityElement(
-                            label: cardIndex == 0 ? "\(user.fullName), \(user.age) years old, from \(user.location)" : "",
-                            hint: cardIndex == 0 ? "Swipe right to like, left to pass, or tap for full profile. Use the action buttons below for more options" : "",
-                            traits: cardIndex == 0 ? .isButton : [],
-                            identifier: cardIndex == 0 ? AccessibilityIdentifier.userCard : nil,
-                            isHidden: cardIndex != 0
-                        )
-                        .accessibilityActions(cardIndex == 0 ? [
-                            AccessibilityCustomAction(name: "Like") {
-                                Task { await viewModel.handleLike() }
-                            },
-                            AccessibilityCustomAction(name: "Pass") {
-                                Task { await viewModel.handlePass() }
-                            },
-                            AccessibilityCustomAction(name: "Super Like") {
-                                Task { await viewModel.handleSuperLike() }
-                            },
-                            AccessibilityCustomAction(name: "View Profile") {
-                                viewModel.showUserDetail(user)
-                            }
-                        ] : [])
-                        .onTapGesture {
-                            if cardIndex == 0 {
-                                viewModel.showUserDetail(user)
-                            }
-                        }
-                        .gesture(
-                            cardIndex == 0 ? DragGesture(minimumDistance: 20)
-                                .onChanged { value in
-                                    viewModel.dragOffset = value.translation
-                                }
-                                .onEnded { value in
-                                    viewModel.handleSwipeEnd(value: value)
-                                } : nil
-                        )
+                    cardView(for: user, at: cardIndex)
                 }
             }
             .zIndex(0)
@@ -546,6 +488,72 @@ struct DiscoverView: View {
             }
             .padding(40)
         }
+    }
+
+    // MARK: - Card View Helper
+
+    @ViewBuilder
+    private func cardView(for user: User, at cardIndex: Int) -> some View {
+        UserCardView(user: user)
+            .overlay(alignment: .topLeading) {
+                // Pass indicator
+                if cardIndex == 0 && viewModel.dragOffset.width < -50 {
+                    swipeIndicator(icon: "xmark", color: .red, text: "PASS")
+                        .opacity(min(1.0, abs(Double(viewModel.dragOffset.width)) / 100.0))
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                // Like indicator
+                if cardIndex == 0 && viewModel.dragOffset.width > 50 {
+                    swipeIndicator(icon: "heart.fill", color: .green, text: "LIKE")
+                        .opacity(min(1.0, Double(viewModel.dragOffset.width) / 100.0))
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 200) // Space for buttons and tab bar
+            .offset(y: CGFloat(cardIndex * 8))
+            .scaleEffect(1.0 - CGFloat(cardIndex) * 0.05)
+            .opacity(1.0 - Double(cardIndex) * 0.2)
+            .zIndex(Double(3 - cardIndex))
+            .offset(cardIndex == 0 ? viewModel.dragOffset : .zero)
+            .rotationEffect(.degrees(cardIndex == 0 ? (reduceMotion ? 0 : Double(viewModel.dragOffset.width / 20)) : 0))
+            .contentShape(Rectangle()) // Define tappable area
+            .accessibilityElement(
+                label: cardIndex == 0 ? "\(user.fullName), \(user.age) years old, from \(user.location)" : "",
+                hint: cardIndex == 0 ? "Swipe right to like, left to pass, or tap for full profile. Use the action buttons below for more options" : "",
+                traits: cardIndex == 0 ? .isButton : [],
+                identifier: cardIndex == 0 ? AccessibilityIdentifier.userCard : nil,
+                isHidden: cardIndex != 0
+            )
+            .accessibilityActions(cardIndex == 0 ? [
+                AccessibilityCustomAction(name: "Like") {
+                    Task { await viewModel.handleLike() }
+                },
+                AccessibilityCustomAction(name: "Pass") {
+                    Task { await viewModel.handlePass() }
+                },
+                AccessibilityCustomAction(name: "Super Like") {
+                    Task { await viewModel.handleSuperLike() }
+                },
+                AccessibilityCustomAction(name: "View Profile") {
+                    viewModel.showUserDetail(user)
+                }
+            ] : [])
+            .onTapGesture {
+                if cardIndex == 0 {
+                    viewModel.showUserDetail(user)
+                }
+            }
+            .gesture(
+                cardIndex == 0 ? DragGesture(minimumDistance: 20)
+                    .onChanged { value in
+                        viewModel.dragOffset = value.translation
+                    }
+                    .onEnded { value in
+                        viewModel.handleSwipeEnd(value: value)
+                    } : nil
+            )
     }
 
     // MARK: - Swipe Indicator Helper
