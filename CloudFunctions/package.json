@@ -19,7 +19,7 @@
   "dependencies": {
     "@google-cloud/vision": "^5.3.4",
     "axios": "^1.6.0",
-    "cloudinary": "^2.0.0",
+    "cloudinary": "^2.8.0",
     "cors": "^2.8.5",
     "crypto": "^1.0.1",
     "express": "^4.18.2",
@@ -29,7 +29,7 @@
     "jsonwebtoken": "^9.0.2",
     "jwks-rsa": "^3.1.0",
     "rate-limiter-flexible": "^3.0.0",
-    "sharp": "^0.33.0"
+    "sharp": "^0.33.5"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",
