@@ -9,6 +9,7 @@
 import SwiftUI
 import UIKit
 import Firebase
+import FirebaseFunctions
 
 // MARK: - Optimized Image Loader
 
