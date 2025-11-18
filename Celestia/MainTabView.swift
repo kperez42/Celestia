@@ -62,9 +62,9 @@ struct MainTabView: View {
             previousTab = oldValue
             HapticManager.shared.selection()
         }
-        .onChange(of: matchService.matches) { _, newMatches in
+        .onChange(of: matchService.matches.count) { _, _ in
             // Update new matches count when matches change (real-time from listener)
-            newMatchesCount = newMatches.filter { $0.lastMessage == nil }.count
+            newMatchesCount = matchService.matches.filter { $0.lastMessage == nil }.count
         }
         .task {
             // PERFORMANCE FIX: Use real-time listeners instead of polling
@@ -168,17 +168,15 @@ struct MainTabView: View {
         unreadListener = Firestore.firestore().collection("messages")
             .whereField("receiverId", isEqualTo: userId)
             .whereField("isRead", isEqualTo: false)
-            .addSnapshotListener { [weak self] snapshot, error in
-                guard let self = self else { return }
-
+            .addSnapshotListener { snapshot, error in
                 if let error = error {
                     Logger.shared.error("Error listening to unread messages", category: .messaging, error: error)
                     return
                 }
 
                 Task { @MainActor in
-                    self.unreadCount = snapshot?.documents.count ?? 0
-                    Logger.shared.debug("Unread count updated: \(self.unreadCount)", category: .messaging)
+                    unreadCount = snapshot?.documents.count ?? 0
+                    Logger.shared.debug("Unread count updated: \(unreadCount)", category: .messaging)
                 }
             }
     }
