@@ -7,6 +7,7 @@ const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const { RateLimiterMemory } = require('rate-limiter-flexible');
 
 // Initialize Firebase Admin
@@ -23,6 +24,7 @@ const moderationQueue = require('./modules/moderationQueue');
 const notifications = require('./modules/notifications');
 const webhooks = require('./modules/webhooks');
 const fraudDetection = require('./modules/fraudDetection');
+const adminSecurity = require('./modules/adminSecurity');
 
 // ============================================================================
 // API ENDPOINTS
@@ -30,6 +32,25 @@ const fraudDetection = require('./modules/fraudDetection');
 
 // Express app for HTTP endpoints
 const app = express();
+
+// Security middleware - Helmet adds various HTTP headers for security
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https://*.googleapis.com", "https://*.firebaseio.com"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false, // Allow embedding for Firebase
+}));
+
 app.use(cors({ origin: true }));
 app.use(express.json());
 

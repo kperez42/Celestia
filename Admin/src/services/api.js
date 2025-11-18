@@ -46,6 +46,12 @@ api.interceptors.response.use(
         window.location.href = '/login';
       }
 
+      if (error.response.status === 429) {
+        // Rate limited
+        const retryAfter = error.response.data?.retryAfter || 60;
+        throw new Error(`Rate limit exceeded. Please try again in ${retryAfter} seconds.`);
+      }
+
       throw new Error(message);
     } else if (error.request) {
       // Request made but no response
