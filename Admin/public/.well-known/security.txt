@@ -1,0 +1,47 @@
+Contact: mailto:security@celestia-app.com
+Contact: https://github.com/kperez42/Celestia/security
+Expires: 2026-12-31T23:59:59.000Z
+Preferred-Languages: en
+Canonical: https://admin.celestia-app.com/.well-known/security.txt
+Policy: https://celestia-app.com/security-policy
+Acknowledgments: https://celestia-app.com/security-hall-of-fame
+
+# Security Vulnerability Reporting
+
+If you discover a security vulnerability in Celestia, please report it responsibly:
+
+1. Email: security@celestia-app.com
+2. GitHub: https://github.com/kperez42/Celestia/security/advisories/new
+3. Do NOT create public GitHub issues for security vulnerabilities
+
+We take security seriously and will respond to all legitimate reports within 48 hours.
+
+# Encryption
+
+If you need to send sensitive information, please use our PGP key available at:
+https://celestia-app.com/pgp-key.asc
+
+# Scope
+
+In-scope:
+- iOS app (Celestia)
+- Admin dashboard
+- Cloud Functions API
+- Firebase infrastructure configuration
+
+Out-of-scope:
+- Third-party services (Firebase, SendGrid, etc.)
+- Social engineering attacks
+- Physical attacks
+- Denial of Service attacks
+
+# Safe Harbor
+
+We support security researchers and will not pursue legal action against
+individuals who:
+- Make good faith efforts to comply with this policy
+- Report vulnerabilities responsibly
+- Do not access or modify user data beyond what's necessary to demonstrate the vulnerability
+- Do not publicly disclose the vulnerability before we've had time to fix it
+
+Thank you for helping keep Celestia and our users safe!

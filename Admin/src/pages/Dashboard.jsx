@@ -10,14 +10,18 @@ import {
   Paper,
   Typography,
   CircularProgress,
-  Alert
+  Alert,
+  Button
 } from '@mui/material';
 import {
   People,
   TrendingUp,
   AttachMoney,
-  Warning
+  Warning,
+  Logout
 } from '@mui/icons-material';
+import { signOut } from 'firebase/auth';
+import { auth } from '../services/firebase';
 import { getStats } from '../services/api';
 import StatCard from '../components/StatCard';
 
@@ -58,11 +62,28 @@ export default function Dashboard() {
     return <Alert severity="error">{error}</Alert>;
   }
 
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
   return (
-    <Box>
-      <Typography variant="h4" gutterBottom>
-        Platform Overview
-      </Typography>
+    <Box sx={{ p: 3 }}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h4">
+          Platform Overview
+        </Typography>
+        <Button
+          variant="outlined"
+          startIcon={<Logout />}
+          onClick={handleLogout}
+        >
+          Logout
+        </Button>
+      </Box>
 
       <Grid container spacing={3}>
         {/* User Stats */}
