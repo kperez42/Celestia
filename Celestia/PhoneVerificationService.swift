@@ -26,13 +26,28 @@ class PhoneVerificationService: ObservableObject {
 
     // MARK: - Verification States
 
-    enum VerificationState {
+    enum VerificationState: Equatable {
         case initial
         case sendingCode
         case codeSent
         case verifying
         case verified
         case failed(Error)
+
+        static func == (lhs: VerificationState, rhs: VerificationState) -> Bool {
+            switch (lhs, rhs) {
+            case (.initial, .initial),
+                 (.sendingCode, .sendingCode),
+                 (.codeSent, .codeSent),
+                 (.verifying, .verifying),
+                 (.verified, .verified):
+                return true
+            case (.failed(let lhsError), .failed(let rhsError)):
+                return lhsError.localizedDescription == rhsError.localizedDescription
+            default:
+                return false
+            }
+        }
     }
 
     // MARK: - Send Verification Code
@@ -61,15 +76,16 @@ class PhoneVerificationService: ObservableObject {
             self.verificationID = verificationID
             verificationState = .codeSent
 
-            Logger.shared.info("Verification code sent to \(phoneNumber)", category: .auth)
+            Logger.shared.info("Verification code sent to \(phoneNumber)", category: .authentication)
 
             // Log analytics event
+            let countryCode = extractCountryCode(phoneNumber)
             Analytics.logEvent("phone_verification_code_sent", parameters: [
-                "phone_number_country": extractCountryCode(phoneNumber)
+                "phone_number_country": countryCode
             ])
 
         } catch {
-            Logger.shared.error("Failed to send verification code", category: .auth, error: error)
+            Logger.shared.error("Failed to send verification code", category: .authentication, error: error)
             verificationState = .failed(error)
             errorMessage = error.localizedDescription
             throw error
@@ -106,7 +122,7 @@ class PhoneVerificationService: ObservableObject {
 
             verificationState = .verified
 
-            Logger.shared.info("Phone number verified successfully", category: .auth)
+            Logger.shared.info("Phone number verified successfully", category: .authentication)
 
             // Log analytics event
             Analytics.logEvent("phone_verification_completed", parameters: [
@@ -114,7 +130,7 @@ class PhoneVerificationService: ObservableObject {
             ])
 
         } catch let error as NSError {
-            Logger.shared.error("Phone verification failed", category: .auth, error: error)
+            Logger.shared.error("Phone verification failed", category: .authentication, error: error)
 
             // Handle specific error cases
             if error.code == AuthErrorCode.invalidVerificationCode.rawValue {
@@ -128,9 +144,11 @@ class PhoneVerificationService: ObservableObject {
             verificationState = .failed(error)
 
             // Log analytics event
+            let errorCode = error.code
+            let errorDomain = error.domain
             Analytics.logEvent("phone_verification_failed", parameters: [
-                "error_code": error.code,
-                "error_domain": error.domain
+                "error_code": errorCode,
+                "error_domain": errorDomain
             ])
 
             throw error
@@ -155,7 +173,7 @@ class PhoneVerificationService: ObservableObject {
             "verificationMethods": FieldValue.arrayUnion(["phone"])
         ])
 
-        Logger.shared.info("Updated user verification status in Firestore", category: .auth)
+        Logger.shared.info("Updated user verification status in Firestore", category: .authentication)
     }
 
     // MARK: - Validation
