@@ -165,7 +165,10 @@ class DiscoverViewModel: ObservableObject {
                     Logger.shared.info("Filtered out \(removedCount) suspicious profiles", category: .matching)
                 }
 
-                users = filteredUsers
+                // BOOST: Prioritize boosted profiles (show them first)
+                let prioritizedUsers = prioritizeBoostedProfiles(filteredUsers)
+
+                users = prioritizedUsers
                 isLoading = false
 
                 // Preload images for next 2 users
@@ -692,6 +695,35 @@ class DiscoverViewModel: ObservableObject {
         }
 
         return filteredUsers
+    }
+
+    // MARK: - Profile Boost Prioritization
+
+    /// Prioritize boosted profiles - show them first in discovery
+    private func prioritizeBoostedProfiles(_ users: [User]) -> [User] {
+        // Skip if no users
+        guard !users.isEmpty else { return users }
+
+        let now = Date()
+
+        // Separate boosted and non-boosted users
+        let boostedUsers = users.filter { user in
+            user.isBoostActive &&
+            (user.boostExpiryDate ?? Date.distantPast) > now
+        }
+
+        let regularUsers = users.filter { user in
+            !user.isBoostActive ||
+            (user.boostExpiryDate ?? Date.distantPast) <= now
+        }
+
+        // Log boost stats
+        if !boostedUsers.isEmpty {
+            Logger.shared.info("Prioritizing \(boostedUsers.count) boosted profiles", category: .matching)
+        }
+
+        // Return boosted users first, then regular users
+        return boostedUsers + regularUsers
     }
 
     /// Load user images for analysis
