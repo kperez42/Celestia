@@ -1345,6 +1345,211 @@ exports.adminUpdatePhoneVerification = functions.https.onCall(async (data, conte
 });
 
 // ============================================================================
+// REPORTING & MODERATION SYSTEM
+// ============================================================================
+
+/**
+ * Get moderation queue for admin review
+ * Returns pending reports and suspicious profiles
+ */
+exports.getModerationQueue = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const adminId = context.auth.uid;
+
+  // Check admin permissions
+  const adminDoc = await db.collection('users').doc(adminId).get();
+  if (!adminDoc.exists || !adminDoc.data().isAdmin) {
+    throw new functions.https.HttpsError('permission-denied', 'Admin access required');
+  }
+
+  const { status = 'pending', limit = 50, offset = 0 } = data;
+
+  try {
+    // Get reports
+    let reportsQuery = db.collection('reports');
+    if (status) {
+      reportsQuery = reportsQuery.where('status', '==', status);
+    }
+
+    const reportsSnapshot = await reportsQuery
+      .orderBy('timestamp', 'desc')
+      .limit(limit)
+      .offset(offset)
+      .get();
+
+    const reports = await Promise.all(
+      reportsSnapshot.docs.map(async (doc) => {
+        const reportData = doc.data();
+
+        // Fetch reporter and reported user data
+        const [reporterDoc, reportedDoc] = await Promise.all([
+          db.collection('users').doc(reportData.reporterId).get(),
+          db.collection('users').doc(reportData.reportedUserId).get()
+        ]);
+
+        return {
+          id: doc.id,
+          ...reportData,
+          reporter: reporterDoc.exists ? {
+            id: reporterDoc.id,
+            name: reporterDoc.data().fullName,
+            email: reporterDoc.data().email
+          } : null,
+          reportedUser: reportedDoc.exists ? {
+            id: reportedDoc.id,
+            name: reportedDoc.data().fullName,
+            email: reportedDoc.data().email,
+            photoURL: reportedDoc.data().profilePhotoURL
+          } : null,
+          timestamp: reportData.timestamp?.toDate().toISOString()
+        };
+      })
+    );
+
+    // Get moderation queue (suspicious profiles)
+    const moderationSnapshot = await db.collection('moderationQueue')
+      .orderBy('timestamp', 'desc')
+      .limit(limit)
+      .get();
+
+    const moderationQueue = await Promise.all(
+      moderationSnapshot.docs.map(async (doc) => {
+        const queueData = doc.data();
+        const userDoc = await db.collection('users').doc(queueData.reportedUserId).get();
+
+        return {
+          id: doc.id,
+          ...queueData,
+          user: userDoc.exists ? {
+            id: userDoc.id,
+            name: userDoc.data().fullName,
+            photoURL: userDoc.data().profilePhotoURL
+          } : null,
+          timestamp: queueData.timestamp?.toDate().toISOString()
+        };
+      })
+    );
+
+    return {
+      reports,
+      moderationQueue,
+      stats: {
+        totalReports: reports.length,
+        pendingReports: reports.filter(r => r.status === 'pending').length,
+        resolvedReports: reports.filter(r => r.status === 'resolved').length,
+        suspiciousProfiles: moderationQueue.length
+      }
+    };
+  } catch (error) {
+    functions.logger.error('Failed to get moderation queue', { error: error.message });
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
+ * Admin: Take action on a report
+ * Actions: dismiss, warn, suspend, ban
+ */
+exports.moderateReport = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const adminId = context.auth.uid;
+
+  // Check admin permissions
+  const adminDoc = await db.collection('users').doc(adminId).get();
+  if (!adminDoc.exists || !adminDoc.data().isAdmin) {
+    throw new functions.https.HttpsError('permission-denied', 'Admin access required');
+  }
+
+  const { reportId, action, reason, duration } = data;
+
+  if (!reportId || !action) {
+    throw new functions.https.HttpsError('invalid-argument', 'reportId and action are required');
+  }
+
+  try {
+    // Get report details
+    const reportDoc = await db.collection('reports').doc(reportId).get();
+    if (!reportDoc.exists) {
+      throw new functions.https.HttpsError('not-found', 'Report not found');
+    }
+
+    const reportData = reportDoc.data();
+    const reportedUserId = reportData.reportedUserId;
+
+    // Update report status
+    await db.collection('reports').doc(reportId).update({
+      status: 'resolved',
+      action,
+      moderatedBy: adminId,
+      moderatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      moderationReason: reason || ''
+    });
+
+    // Take action based on type
+    switch (action) {
+      case 'dismiss':
+        break;
+
+      case 'warn':
+        await db.collection('users').doc(reportedUserId).update({
+          warnings: admin.firestore.FieldValue.increment(1),
+          lastWarnedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        break;
+
+      case 'suspend':
+        const suspendUntil = new Date();
+        suspendUntil.setDate(suspendUntil.getDate() + (duration || 7));
+        await db.collection('users').doc(reportedUserId).update({
+          suspended: true,
+          suspendedUntil: admin.firestore.Timestamp.fromDate(suspendUntil)
+        });
+        break;
+
+      case 'ban':
+        await db.collection('users').doc(reportedUserId).update({
+          banned: true,
+          bannedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        await auth.updateUser(reportedUserId, { disabled: true });
+        break;
+    }
+
+    return { success: true };
+  } catch (error) {
+    functions.logger.error('Failed to moderate report', { error: error.message });
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
+ * Trigger: Auto-notify admins when new report created
+ */
+exports.onReportCreated = functions.firestore
+  .document('reports/{reportId}')
+  .onCreate(async (snap, context) => {
+    const reportData = snap.data();
+    const adminsSnapshot = await db.collection('users').where('isAdmin', '==', true).get();
+
+    await Promise.all(adminsSnapshot.docs.map(adminDoc =>
+      db.collection('notifications').add({
+        userId: adminDoc.id,
+        type: 'new_report',
+        message: `New report: ${reportData.reason}`,
+        reportId: context.params.reportId,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        read: false
+      })
+    ));
+  });
+
+// ============================================================================
 // FIRESTORE TRIGGERS - AUTOMATIC PUSH NOTIFICATIONS
 // ============================================================================
 
