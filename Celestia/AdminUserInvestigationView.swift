@@ -18,6 +18,14 @@ struct AdminUserInvestigationView: View {
     @State private var messagesCount = 0
     @State private var accountAge = ""
 
+    // Moderation state (fetched separately from user document)
+    @State private var isBanned = false
+    @State private var isSuspended = false
+    @State private var bannedReason: String?
+    @State private var suspendedUntil: Date?
+    @State private var warningsCount = 0
+    @State private var isPhoneVerified = false
+
     private let db = Firestore.firestore()
 
     var body: some View {
@@ -109,15 +117,15 @@ struct AdminUserInvestigationView: View {
             VStack(spacing: 8) {
                 StatusRow(
                     label: "Account Status",
-                    value: user.banned ? "Banned" : (user.suspended ? "Suspended" : "Active"),
-                    color: user.banned ? .red : (user.suspended ? .orange : .green)
+                    value: isBanned ? "Banned" : (isSuspended ? "Suspended" : "Active"),
+                    color: isBanned ? .red : (isSuspended ? .orange : .green)
                 )
 
-                if user.banned, let bannedReason = user.bannedReason {
+                if isBanned, let bannedReason = bannedReason {
                     StatusRow(label: "Ban Reason", value: bannedReason, color: .red)
                 }
 
-                if user.suspended, let suspendedUntil = user.suspendedUntil {
+                if isSuspended, let suspendedUntil = suspendedUntil {
                     StatusRow(
                         label: "Suspended Until",
                         value: suspendedUntil.formatted(date: .abbreviated, time: .shortened),
@@ -127,8 +135,8 @@ struct AdminUserInvestigationView: View {
 
                 StatusRow(
                     label: "Warnings",
-                    value: "\(user.warnings)",
-                    color: user.warnings > 0 ? .orange : .gray
+                    value: "\(warningsCount)",
+                    color: warningsCount > 0 ? .orange : .gray
                 )
             }
         }
@@ -147,14 +155,14 @@ struct AdminUserInvestigationView: View {
             VStack(spacing: 8) {
                 StatusRow(
                     label: "Phone Verified",
-                    value: user.phoneVerified ? "✓ Yes" : "✗ No",
-                    color: user.phoneVerified ? .green : .gray
+                    value: isPhoneVerified ? "✓ Yes" : "✗ No",
+                    color: isPhoneVerified ? .green : .gray
                 )
 
                 StatusRow(
                     label: "Photo Verified",
-                    value: user.photoVerified ? "✓ Yes" : "✗ No",
-                    color: user.photoVerified ? .green : .gray
+                    value: user.isVerified ? "✓ Yes" : "✗ No",
+                    color: user.isVerified ? .green : .gray
                 )
 
                 StatusRow(
@@ -196,7 +204,7 @@ struct AdminUserInvestigationView: View {
 
             VStack(spacing: 8) {
                 StatusRow(label: "Account Age", value: accountAge, color: .gray)
-                StatusRow(label: "Location", value: user.city, color: .gray)
+                StatusRow(label: "Location", value: user.location, color: .gray)
 
                 if !user.bio.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
@@ -292,16 +300,19 @@ struct AdminUserInvestigationView: View {
             messagesCount = messagesSnapshot.documents.count
 
             // Calculate account age
-            if let createdAt = user?.createdAt {
+            if let timestamp = user?.timestamp {
                 let calendar = Calendar.current
-                let components = calendar.dateComponents([.day], from: createdAt, to: Date())
+                let components = calendar.dateComponents([.day], from: timestamp, to: Date())
                 if let days = components.day {
                     accountAge = "\(days) days"
                 }
             }
 
+            // TODO: Load moderation data from separate collection if it exists
+            // For now, moderation fields remain at default values
+
         } catch {
-            Logger.shared.error("Error loading user investigation data", category: .admin, error: error)
+            Logger.shared.error("Error loading user investigation data", category: .moderation, error: error)
         }
 
         isLoading = false
