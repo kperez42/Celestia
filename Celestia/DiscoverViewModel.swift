@@ -757,8 +757,8 @@ class DiscoverViewModel: ObservableObject {
                 switch indicator {
                 case .noPhotos: return "no_photos"
                 case .singlePhoto: return "single_photo"
-                case .stockPhoto: return "stock_photo"
-                case .professionalPhoto: return "professional_photo"
+                case .stockPhoto(_): return "stock_photo"
+                case .professionalPhoto(_): return "professional_photo"
                 case .inconsistentFaces: return "inconsistent_faces"
                 case .suspiciouslyHighQuality: return "suspiciously_high_quality"
                 case .emptyBio: return "empty_bio"
