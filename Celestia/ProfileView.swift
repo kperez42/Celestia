@@ -58,6 +58,10 @@ struct ProfileView: View {
                                 // Stats row
                                 statsRow(user: user)
 
+                                // Profile Boost button
+                                ProfileBoostButton()
+                                    .padding(.top, 8)
+
                                 // Profile insights card
                                 profileInsightsCard
 

@@ -86,19 +86,19 @@ struct AdminMigrationView: View {
                 .font(.headline)
 
             HStack(spacing: 20) {
-                StatBox(
+                MigrationStatBox(
                     value: "\(stats.total)",
                     label: "Total Users",
                     color: .blue
                 )
 
-                StatBox(
+                MigrationStatBox(
                     value: "\(stats.migrated)",
                     label: "Migrated",
                     color: .green
                 )
 
-                StatBox(
+                MigrationStatBox(
                     value: "\(stats.remaining)",
                     label: "Remaining",
                     color: .orange
@@ -306,7 +306,7 @@ struct AdminMigrationView: View {
 
 // MARK: - Stat Box Component
 
-struct StatBox: View {
+struct MigrationStatBox: View {
     let value: String
     let label: String
     let color: Color
