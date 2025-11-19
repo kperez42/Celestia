@@ -770,6 +770,10 @@ class DiscoverViewModel: ObservableObject {
                 case .botLikeText: return "bot_like_text"
                 case .singleName: return "single_name"
                 case .suspiciousName: return "suspicious_name"
+                case .unusualNameFormat: return "unusual_name_format"
+                case .nameContainsNumbers: return "name_contains_numbers"
+                case .suspiciousKeywords: return "suspicious_keywords"
+                case .incompleteProfile: return "incomplete_profile"
                 }
             }
 
