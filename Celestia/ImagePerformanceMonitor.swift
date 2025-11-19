@@ -197,7 +197,7 @@ class ImagePerformanceMonitor: ObservableObject {
 class ImageLoadTrace {
     let imageId: String
     let size: String
-    private let trace: Trace
+    private let trace: Trace?
     private var startTime: Date?
     private var endTime: Date?
 
@@ -206,9 +206,9 @@ class ImageLoadTrace {
         self.size = size
         self.trace = Performance.startTrace(name: "image_load_\(size)")
 
-        // Add custom attributes
-        trace.setValue(imageId, forAttribute: "image_id")
-        trace.setValue(size, forAttribute: "image_size")
+        // Add custom attributes if trace is available
+        trace?.setValue(imageId, forAttribute: "image_id")
+        trace?.setValue(size, forAttribute: "image_size")
     }
 
     func start() {
@@ -217,7 +217,7 @@ class ImageLoadTrace {
 
     func stop() {
         endTime = Date()
-        trace.stop()
+        trace?.stop()
     }
 
     var duration: TimeInterval {
@@ -226,14 +226,14 @@ class ImageLoadTrace {
     }
 
     func recordMetrics(fromCDN: Bool, bytesLoaded: Int64, loadTime: TimeInterval) {
-        trace.setValue(fromCDN ? "true" : "false", forAttribute: "from_cdn")
-        trace.setIntValue(bytesLoaded, forMetric: "bytes_loaded")
-        trace.setIntValue(Int64(loadTime * 1000), forMetric: "load_time_ms")
+        trace?.setValue(fromCDN ? "true" : "false", forAttribute: "from_cdn")
+        trace?.setValue(bytesLoaded, forMetric: "bytes_loaded")
+        trace?.setValue(Int64(loadTime * 1000), forMetric: "load_time_ms")
     }
 
     func recordFailure(error: Error) {
-        trace.setValue("failed", forAttribute: "status")
-        trace.setValue(error.localizedDescription, forAttribute: "error")
+        trace?.setValue("failed", forAttribute: "status")
+        trace?.setValue(error.localizedDescription, forAttribute: "error")
     }
 }
 
@@ -265,103 +265,6 @@ struct PerformanceReport {
 }
 
 // MARK: - Enhanced OptimizedImageLoader with Performance Tracking
-
-extension OptimizedImageLoader {
-    /// Load image with performance monitoring
-    func loadImageWithTracking(
-        urls: [String: String],
-        for size: CGSize,
-        placeholder: UIImage? = nil
-    ) async -> UIImage? {
-        let selectedSize = selectAppropriateSize(for: size)
-        let trace = ImagePerformanceMonitor.shared.startImageLoadTrace(
-            imageId: urls["original"] ?? "unknown",
-            size: selectedSize
-        )
-
-        // Try to get URL for selected size
-        let sizePriority = ["thumbnail", "small", "medium", "large", "original"]
-        guard let startIndex = sizePriority.firstIndex(of: selectedSize) else {
-            ImagePerformanceMonitor.shared.recordImageLoadFailure(
-                trace: trace,
-                error: NSError(domain: "ImageLoader", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid size"])
-            )
-            return nil
-        }
-
-        for sizeOption in sizePriority[startIndex...] {
-            if let url = urls[sizeOption], let imageURL = URL(string: url) {
-                if let image = await loadImageFromURLWithTracking(imageURL, trace: trace) {
-                    return image
-                }
-            }
-        }
-
-        ImagePerformanceMonitor.shared.recordImageLoadFailure(
-            trace: trace,
-            error: NSError(domain: "ImageLoader", code: -1, userInfo: [NSLocalizedDescriptionKey: "No valid URL found"])
-        )
-        return nil
-    }
-
-    private func loadImageFromURLWithTracking(_ url: URL, trace: ImageLoadTrace) async -> UIImage? {
-        let cacheKey = url.absoluteString
-        let startTime = Date()
-
-        // Check if from CDN
-        let fromCDN = url.host?.contains("cloudinary") ?? false
-
-        // Check cache first
-        if let cachedImage = cache.image(for: cacheKey) {
-            let loadTime = Date().timeIntervalSince(startTime)
-
-            // Estimate bytes (can't get exact from cache)
-            let estimatedBytes: Int64 = 100_000 // 100KB average
-
-            ImagePerformanceMonitor.shared.recordImageLoad(
-                trace: trace,
-                fromCDN: fromCDN,
-                bytesLoaded: estimatedBytes,
-                optimizedBytes: nil
-            )
-
-            ImagePerformanceMonitor.shared.trackCDNPerformance(hit: true, latency: loadTime)
-            return cachedImage
-        }
-
-        // Download image
-        do {
-            let (data, response) = try await URLSession.shared.data(from: url)
-
-            guard let httpResponse = response as? HTTPURLResponse,
-                  httpResponse.statusCode == 200 else {
-                return nil
-            }
-
-            guard let image = UIImage(data: data) else {
-                return nil
-            }
-
-            // Cache the image
-            cache.setImage(image, for: cacheKey)
-
-            let loadTime = Date().timeIntervalSince(startTime)
-            let bytesLoaded = Int64(data.count)
-
-            ImagePerformanceMonitor.shared.recordImageLoad(
-                trace: trace,
-                fromCDN: fromCDN,
-                bytesLoaded: bytesLoaded,
-                optimizedBytes: fromCDN ? bytesLoaded : nil
-            )
-
-            ImagePerformanceMonitor.shared.trackCDNPerformance(hit: false, latency: loadTime)
-
-            return image
-
-        } catch {
-            ImagePerformanceMonitor.shared.recordImageLoadFailure(trace: trace, error: error)
-            return nil
-        }
-    }
-}
+// TODO: Integrate performance tracking directly into OptimizedImageLoader
+// This extension cannot access private cache property from a different file
+// Performance tracking should be added to the OptimizedImageLoader.loadImageFromURL method instead
