@@ -375,7 +375,7 @@ struct PhoneVerificationView: View {
         do {
             try await service.sendVerificationCode(phoneNumber: phoneInput)
         } catch {
-            Logger.shared.error("Failed to send verification code", category: .auth, error: error)
+            Logger.shared.error("Failed to send verification code", category: .authentication, error: error)
         }
     }
 
@@ -383,7 +383,7 @@ struct PhoneVerificationView: View {
         do {
             try await service.verifyCode(codeInput)
         } catch {
-            Logger.shared.error("Failed to verify code", category: .auth, error: error)
+            Logger.shared.error("Failed to verify code", category: .authentication, error: error)
         }
     }
 
@@ -392,7 +392,7 @@ struct PhoneVerificationView: View {
         do {
             try await service.resendCode()
         } catch {
-            Logger.shared.error("Failed to resend code", category: .auth, error: error)
+            Logger.shared.error("Failed to resend code", category: .authentication, error: error)
         }
     }
 }

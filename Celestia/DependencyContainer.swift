@@ -17,7 +17,7 @@ class DependencyContainer: ObservableObject {
 
     // MARK: - Singleton for App-Wide Access
 
-    nonisolated(unsafe) static let shared = DependencyContainer()
+    static let shared = DependencyContainer()
 
     // MARK: - Core Services
 
@@ -181,7 +181,7 @@ class DependencyContainer: ObservableObject {
 
 /// Environment key for dependency injection in SwiftUI
 struct DependencyContainerKey: EnvironmentKey {
-    nonisolated(unsafe) static let defaultValue: DependencyContainer = .shared
+    static let defaultValue: DependencyContainer = .shared
 }
 
 extension EnvironmentValues {
