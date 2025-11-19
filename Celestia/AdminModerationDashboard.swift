@@ -727,12 +727,16 @@ class ModerationViewModel: ObservableObject {
     func moderateReport(reportId: String, action: ModerationAction, reason: String?) async throws {
         let callable = functions.httpsCallable("moderateReport")
 
-        let params: [String: Any] = [
+        var params: [String: Any] = [
             "reportId": reportId,
             "action": action.rawValue,
-            "reason": reason ?? "",
-            "duration": action == .suspend ? 7 : nil as Any
+            "reason": reason ?? ""
         ]
+
+        // Only include duration for suspend action
+        if action == .suspend {
+            params["duration"] = 7
+        }
 
         _ = try await callable.call(params)
 
