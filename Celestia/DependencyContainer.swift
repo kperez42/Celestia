@@ -76,7 +76,7 @@ class DependencyContainer: ObservableObject {
     // MARK: - Initialization
 
     /// Default initializer - uses production services
-    private init() {
+    nonisolated private init() {
         // Core Services (using protocols for testability)
         self.authService = AuthService.shared
         self.userService = UserService.shared
@@ -107,7 +107,7 @@ class DependencyContainer: ObservableObject {
     ///   - matchService: Mock match service for testing
     ///   - messageService: Mock message service for testing
     ///   - swipeService: Mock swipe service for testing
-    init(
+    nonisolated init(
         authService: (any AuthServiceProtocol)? = nil,
         userService: (any UserServiceProtocol)? = nil,
         matchService: (any MatchServiceProtocol)? = nil,
