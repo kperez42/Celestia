@@ -610,7 +610,7 @@ struct SuspiciousProfileDetailView: View {
                 // Actions
                 VStack(spacing: 12) {
                     // Investigate Profile - shows detailed user information
-                    NavigationLink(destination: AdminUserInvestigationView(userId: item.reportedUserId)) {
+                    NavigationLink(destination: AdminUserInvestigationView(userId: item.user?.id ?? item.id)) {
                         HStack {
                             Image(systemName: "magnifyingglass")
                             Text("Investigate Profile")
@@ -656,20 +656,20 @@ struct SuspiciousProfileDetailView: View {
     }
 
     private func banUser() async {
-        guard let user = item.user, let userId = user.id else { return }
+        guard let user = item.user else { return }
 
         isBanning = true
 
         do {
             // Use the existing moderation function if there's a report, or create a synthetic one
             try await viewModel.banUserDirectly(
-                userId: userId,
+                userId: user.id,
                 reason: banReason.isEmpty ? "Suspicious profile auto-detected with score \(item.suspicionScore)" : banReason
             )
 
             dismiss()
         } catch {
-            Logger.shared.error("Error banning user from suspicious profile view", category: .admin, error: error)
+            Logger.shared.error("Error banning user from suspicious profile view", category: .moderation, error: error)
         }
 
         isBanning = false
@@ -754,7 +754,7 @@ class ModerationViewModel: ObservableObject {
         // Refresh queue to update suspicious profiles list
         await loadQueue()
 
-        Logger.shared.info("User banned directly from admin panel: \(userId)", category: .admin)
+        Logger.shared.info("User banned directly from admin panel: \(userId)", category: .moderation)
     }
 }
 
