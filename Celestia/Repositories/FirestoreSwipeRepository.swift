@@ -83,4 +83,15 @@ class FirestoreSwipeRepository: SwipeRepository {
 
         return snapshot.documents.compactMap { $0.data()["fromUserId"] as? String }
     }
+
+    /// Delete a swipe (like or pass) for rewind functionality
+    func deleteSwipe(fromUserId: String, toUserId: String) async throws {
+        let swipeId = "\(fromUserId)_\(toUserId)"
+
+        // Delete from both likes and passes collections
+        try await db.collection("likes").document(swipeId).delete()
+        try await db.collection("passes").document(swipeId).delete()
+
+        Logger.shared.info("Deleted swipe documents for rewind: \(swipeId)", category: .matching)
+    }
 }

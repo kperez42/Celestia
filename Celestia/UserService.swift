@@ -527,6 +527,19 @@ class UserService: ObservableObject, UserServiceProtocol {
         }
     }
 
+    /// Decrement user's rewind count
+    func decrementRewinds(userId: String) async throws {
+        do {
+            try await db.collection("users").document(userId).updateData([
+                "rewindsRemaining": FieldValue.increment(Int64(-1))
+            ])
+            Logger.shared.info("Rewind used", category: .user)
+        } catch {
+            Logger.shared.error("Error decrementing rewinds", category: .database, error: error)
+            throw error
+        }
+    }
+
     // MARK: - Cache Management
 
     /// Clear user cache (useful on logout)

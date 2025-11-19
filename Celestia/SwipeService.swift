@@ -127,4 +127,15 @@ class SwipeService: ObservableObject, SwipeServiceProtocol {
     func getLikesReceived(userId: String) async throws -> [String] {
         return try await repository.getLikesReceived(userId: userId)
     }
+
+    /// Delete a swipe (for rewind functionality)
+    func deleteSwipe(fromUserId: String, toUserId: String) async throws {
+        do {
+            try await repository.deleteSwipe(fromUserId: fromUserId, toUserId: toUserId)
+            Logger.shared.info("Swipe deleted for rewind", category: .matching)
+        } catch {
+            Logger.shared.error("Error deleting swipe", category: .matching, error: error)
+            throw error
+        }
+    }
 }
