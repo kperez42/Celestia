@@ -129,13 +129,23 @@ class DiscoverViewModel: ObservableObject {
                 connectionQuality = await performanceMonitor.connectionQuality
 
                 // Update local users array from service
-                users = userService.users
+                var fetchedUsers = userService.users
+
+                // SAFETY: Filter out suspicious/fake profiles
+                let filteredUsers = await filterSuspiciousProfiles(fetchedUsers)
+                let removedCount = fetchedUsers.count - filteredUsers.count
+
+                if removedCount > 0 {
+                    Logger.shared.info("Filtered out \(removedCount) suspicious profiles", category: .matching)
+                }
+
+                users = filteredUsers
                 isLoading = false
 
                 // Preload images for next 2 users
                 await self.preloadUpcomingImages()
 
-                Logger.shared.info("Loaded \(users.count) users in \(String(format: "%.0f", queryDuration))ms", category: .matching)
+                Logger.shared.info("Loaded \(users.count) users in \(String(format: "%.0f", queryDuration))ms (\(removedCount) filtered)", category: .matching)
             } catch {
                 guard !Task.isCancelled else {
                     isLoading = false
@@ -510,6 +520,100 @@ class DiscoverViewModel: ObservableObject {
         }
 
         loadUsers(currentUser: currentUser)
+    }
+
+    // MARK: - Fake Profile Filtering
+
+    /// Filter out suspicious/fake profiles from discovery
+    private func filterSuspiciousProfiles(_ users: [User]) async -> [User] {
+        // Skip if no users
+        guard !users.isEmpty else { return users }
+
+        var filteredUsers: [User] = []
+
+        for user in users {
+            // Load user images (if available)
+            let images = await loadUserImages(user)
+
+            // Analyze profile for fake indicators
+            let analysis = await FakeProfileDetector.shared.analyzeProfile(
+                photos: images,
+                bio: user.bio,
+                name: user.fullName,
+                age: user.age,
+                location: user.city
+            )
+
+            // Only include non-suspicious profiles
+            if !analysis.isSuspicious {
+                filteredUsers.append(user)
+            } else {
+                // Log suspicious profile for admin review
+                Logger.shared.warning(
+                    "Suspicious profile filtered: \(user.fullName) (score: \(analysis.suspicionScore))",
+                    category: .matching
+                )
+
+                // Report to backend for admin review
+                Task {
+                    await reportSuspiciousProfile(user: user, analysis: analysis)
+                }
+            }
+        }
+
+        return filteredUsers
+    }
+
+    /// Load user images for analysis
+    private func loadUserImages(_ user: User) async -> [UIImage] {
+        var images: [UIImage] = []
+
+        // Load profile photo
+        if let profilePhotoURL = user.profilePhotoURL,
+           let url = URL(string: profilePhotoURL),
+           let imageData = try? Data(contentsOf: url),
+           let image = UIImage(data: imageData) {
+            images.append(image)
+        }
+
+        // Load gallery photos (limit to first 3 for performance)
+        if let photos = user.photos {
+            for photoURL in photos.prefix(3) {
+                guard let url = URL(string: photoURL),
+                      let imageData = try? Data(contentsOf: url),
+                      let image = UIImage(data: imageData) else {
+                    continue
+                }
+                images.append(image)
+            }
+        }
+
+        return images
+    }
+
+    /// Report suspicious profile to backend for admin review
+    private func reportSuspiciousProfile(user: User, analysis: FakeProfileAnalysis) async {
+        guard let userId = user.id else { return }
+
+        // Send to backend moderation queue
+        do {
+            let report = [
+                "reportedUserId": userId,
+                "reportType": "suspicious_profile",
+                "suspicionScore": analysis.suspicionScore,
+                "indicators": analysis.indicators.map { $0.rawValue },
+                "autoDetected": true,
+                "timestamp": FieldValue.serverTimestamp()
+            ] as [String: Any]
+
+            try await Firestore.firestore()
+                .collection("moderationQueue")
+                .addDocument(data: report)
+
+            Logger.shared.info("Suspicious profile reported for review: \(userId)", category: .matching)
+        } catch {
+            Logger.shared.error("Failed to report suspicious profile", category: .matching, error: error)
+        }
     }
 
     /// Cleanup method to cancel ongoing tasks

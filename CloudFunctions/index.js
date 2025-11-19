@@ -1203,6 +1203,148 @@ exports.deleteOptimizedImage = functions.https.onCall(async (data, context) => {
 });
 
 // ============================================================================
+// PHONE VERIFICATION
+// ============================================================================
+
+/**
+ * Verify phone number status
+ * Returns verification details for a user
+ */
+exports.getPhoneVerificationStatus = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const userId = context.auth.uid;
+
+  try {
+    const userDoc = await db.collection('users').doc(userId).get();
+
+    if (!userDoc.exists) {
+      throw new functions.https.HttpsError('not-found', 'User not found');
+    }
+
+    const userData = userDoc.data();
+
+    return {
+      phoneVerified: userData.phoneVerified || false,
+      phoneNumber: userData.phoneNumber || null,
+      phoneVerifiedAt: userData.phoneVerifiedAt || null,
+      verificationMethods: userData.verificationMethods || []
+    };
+  } catch (error) {
+    functions.logger.error('Failed to get phone verification status', { error: error.message, userId });
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
+ * Admin: Get users by phone verification status
+ * Admin-only endpoint for moderation
+ */
+exports.getUsersByPhoneStatus = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const userId = context.auth.uid;
+
+  // Check admin permissions
+  const userDoc = await db.collection('users').doc(userId).get();
+  if (!userDoc.exists || !userDoc.data().isAdmin) {
+    throw new functions.https.HttpsError('permission-denied', 'Admin access required');
+  }
+
+  const { verified, limit = 100 } = data;
+
+  try {
+    let query = db.collection('users');
+
+    if (verified !== undefined) {
+      query = query.where('phoneVerified', '==', verified);
+    }
+
+    const snapshot = await query.limit(limit).get();
+
+    const users = snapshot.docs.map(doc => ({
+      userId: doc.id,
+      phoneNumber: doc.data().phoneNumber,
+      phoneVerified: doc.data().phoneVerified,
+      phoneVerifiedAt: doc.data().phoneVerifiedAt,
+      createdAt: doc.data().createdAt
+    }));
+
+    return {
+      users,
+      count: users.length,
+      verifiedCount: users.filter(u => u.phoneVerified).length,
+      unverifiedCount: users.filter(u => !u.phoneVerified).length
+    };
+  } catch (error) {
+    functions.logger.error('Failed to get users by phone status', { error: error.message });
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
+ * Admin: Manually verify/unverify phone number
+ * For special cases or dispute resolution
+ */
+exports.adminUpdatePhoneVerification = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const adminId = context.auth.uid;
+
+  // Check admin permissions
+  const adminDoc = await db.collection('users').doc(adminId).get();
+  if (!adminDoc.exists || !adminDoc.data().isAdmin) {
+    throw new functions.https.HttpsError('permission-denied', 'Admin access required');
+  }
+
+  const { userId, phoneVerified, reason } = data;
+
+  if (!userId || phoneVerified === undefined) {
+    throw new functions.https.HttpsError('invalid-argument', 'userId and phoneVerified are required');
+  }
+
+  try {
+    await db.collection('users').doc(userId).update({
+      phoneVerified,
+      phoneVerificationUpdatedBy: adminId,
+      phoneVerificationUpdateReason: reason || 'Manual admin update',
+      phoneVerificationUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    // Log the admin action
+    await db.collection('adminLogs').add({
+      adminId,
+      action: 'update_phone_verification',
+      targetUserId: userId,
+      newStatus: phoneVerified,
+      reason,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    functions.logger.info('Admin updated phone verification', {
+      adminId,
+      userId,
+      phoneVerified,
+      reason
+    });
+
+    return {
+      success: true,
+      message: `Phone verification ${phoneVerified ? 'enabled' : 'disabled'} for user ${userId}`
+    };
+  } catch (error) {
+    functions.logger.error('Failed to update phone verification', { error: error.message });
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+// ============================================================================
 // FIRESTORE TRIGGERS - AUTOMATIC PUSH NOTIFICATIONS
 // ============================================================================
 
