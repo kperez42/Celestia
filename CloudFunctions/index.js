@@ -1721,6 +1721,86 @@ exports.onLikeCreated = functions.firestore
     }
   });
 
+/**
+ * Admin Function: Ban user directly (without needing a report)
+ * Used from AdminUserInvestigationView and SuspiciousProfileDetailView
+ */
+exports.banUserDirectly = functions.https.onCall(async (data, context) => {
+  // SECURITY: Verify admin access
+  const adminId = context.auth?.uid;
+  if (!adminId) {
+    throw new functions.https.HttpsError('unauthenticated', 'Admin authentication required');
+  }
+
+  const adminDoc = await db.collection('users').doc(adminId).get();
+  if (!adminDoc.exists || !adminDoc.data().isAdmin) {
+    functions.logger.error('Unauthorized ban attempt', { adminId, targetUserId: data.userId });
+    throw new functions.https.HttpsError('permission-denied', 'Admin access required');
+  }
+
+  const { userId, reason } = data;
+
+  if (!userId || !reason) {
+    throw new functions.https.HttpsError('invalid-argument', 'userId and reason are required');
+  }
+
+  try {
+    functions.logger.info('Admin banning user directly', { adminId, userId, reason });
+
+    // 1. Update user document in Firestore
+    await db.collection('users').doc(userId).update({
+      banned: true,
+      bannedAt: admin.firestore.FieldValue.serverTimestamp(),
+      bannedReason: reason,
+      bannedBy: adminId
+    });
+
+    // 2. Disable Firebase Authentication account
+    try {
+      await admin.auth().updateUser(userId, {
+        disabled: true
+      });
+      functions.logger.info('User auth account disabled', { userId });
+    } catch (authError) {
+      functions.logger.error('Error disabling auth account', { userId, error: authError.message });
+      // Continue even if auth disable fails
+    }
+
+    // 3. Send notification to banned user
+    await db.collection('notifications').add({
+      userId: userId,
+      type: 'account_banned',
+      title: 'Account Banned',
+      message: `Your account has been permanently banned. Reason: ${reason}`,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      read: false,
+      data: {
+        reason: reason
+      }
+    });
+
+    // 4. Log admin action
+    await db.collection('adminLogs').add({
+      adminId: adminId,
+      action: 'ban_user_directly',
+      targetUserId: userId,
+      reason: reason,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    functions.logger.info('User banned successfully', { adminId, userId });
+
+    return {
+      success: true,
+      message: 'User banned successfully'
+    };
+
+  } catch (error) {
+    functions.logger.error('Error banning user', { adminId, userId, error: error.message });
+    throw new functions.https.HttpsError('internal', `Failed to ban user: ${error.message}`);
+  }
+});
+
 // Export admin object for use in modules
 exports.admin = admin;
 exports.db = db;

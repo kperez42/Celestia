@@ -526,6 +526,10 @@ struct SuspiciousProfileDetailView: View {
     @ObservedObject var viewModel: ModerationViewModel
     @Environment(\.dismiss) var dismiss
 
+    @State private var showingBanConfirmation = false
+    @State private var banReason = ""
+    @State private var isBanning = false
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -601,9 +605,8 @@ struct SuspiciousProfileDetailView: View {
 
                 // Actions
                 VStack(spacing: 12) {
-                    Button(action: {
-                        // TODO: Investigate profile
-                    }) {
+                    // Investigate Profile - shows detailed user information
+                    NavigationLink(destination: AdminUserInvestigationView(userId: item.reportedUserId)) {
                         HStack {
                             Image(systemName: "magnifyingglass")
                             Text("Investigate Profile")
@@ -615,8 +618,9 @@ struct SuspiciousProfileDetailView: View {
                         .cornerRadius(12)
                     }
 
+                    // Ban User - same as moderation flow
                     Button(action: {
-                        // TODO: Ban user
+                        showingBanConfirmation = true
                     }) {
                         HStack {
                             Image(systemName: "hand.raised.fill")
@@ -634,6 +638,37 @@ struct SuspiciousProfileDetailView: View {
         }
         .navigationTitle("Suspicious Profile")
         .navigationBarTitleDisplayMode(.inline)
+        .alert("Ban User", isPresented: $showingBanConfirmation) {
+            TextField("Reason for ban", text: $banReason)
+            Button("Cancel", role: .cancel) { }
+            Button("Ban Permanently", role: .destructive) {
+                Task {
+                    await banUser()
+                }
+            }
+        } message: {
+            Text("This user will be permanently banned and their account will be disabled. This action cannot be undone.")
+        }
+    }
+
+    private func banUser() async {
+        guard let user = item.user, let userId = user.id else { return }
+
+        isBanning = true
+
+        do {
+            // Use the existing moderation function if there's a report, or create a synthetic one
+            try await viewModel.banUserDirectly(
+                userId: userId,
+                reason: banReason.isEmpty ? "Suspicious profile auto-detected with score \(item.suspicionScore)" : banReason
+            )
+
+            dismiss()
+        } catch {
+            Logger.shared.error("Error banning user from suspicious profile view", category: .admin, error: error)
+        }
+
+        isBanning = false
     }
 }
 
@@ -723,6 +758,23 @@ class ModerationViewModel: ObservableObject {
 
         // Refresh queue
         await loadQueue()
+    }
+
+    /// Ban user directly (without needing a report)
+    func banUserDirectly(userId: String, reason: String) async throws {
+        let callable = functions.httpsCallable("banUserDirectly")
+
+        let params: [String: Any] = [
+            "userId": userId,
+            "reason": reason
+        ]
+
+        _ = try await callable.call(params)
+
+        // Refresh queue to update suspicious profiles list
+        await loadQueue()
+
+        Logger.shared.info("User banned directly from admin panel: \(userId)", category: .admin)
     }
 }
 
