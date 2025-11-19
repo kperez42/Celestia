@@ -739,17 +739,5 @@ enum PurchaseError: LocalizedError {
 }
 
 // MARK: - Product Extensions
-
-extension Product {
-    var displayPrice: String {
-        return self.displayPrice
-    }
-
-    var displayName: String {
-        return self.displayName
-    }
-
-    var localizedDescription: String {
-        return self.description
-    }
-}
+// Note: Product already has displayPrice, displayName, and description properties
+// in StoreKit 2, so no extension is needed
