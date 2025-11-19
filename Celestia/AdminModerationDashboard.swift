@@ -116,12 +116,14 @@ struct AdminModerationDashboard: View {
                     StatCard(
                         title: "Total Reports",
                         value: "\(viewModel.stats.totalReports)",
+                        icon: "exclamationmark.triangle.fill",
                         color: .blue
                     )
 
                     StatCard(
                         title: "Pending",
                         value: "\(viewModel.stats.pendingReports)",
+                        icon: "clock.fill",
                         color: .orange
                     )
                 }
@@ -130,12 +132,14 @@ struct AdminModerationDashboard: View {
                     StatCard(
                         title: "Resolved",
                         value: "\(viewModel.stats.resolvedReports)",
+                        icon: "checkmark.circle.fill",
                         color: .green
                     )
 
                     StatCard(
                         title: "Suspicious",
                         value: "\(viewModel.stats.suspiciousProfiles)",
+                        icon: "eye.trianglebadge.exclamationmark.fill",
                         color: .red
                     )
                 }
@@ -669,30 +673,6 @@ struct SuspiciousProfileDetailView: View {
         }
 
         isBanning = false
-    }
-}
-
-// MARK: - Stat Card
-
-struct StatCard: View {
-    let title: String
-    let value: String
-    let color: Color
-
-    var body: some View {
-        VStack(spacing: 8) {
-            Text(value)
-                .font(.title.bold())
-                .foregroundColor(color)
-
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding()
-        .background(color.opacity(0.1))
-        .cornerRadius(12)
     }
 }
 

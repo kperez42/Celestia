@@ -629,30 +629,3 @@ struct ActivationDashboardView: View {
         .background(Color(.systemGroupedBackground))
     }
 }
-
-struct StatCard: View {
-    let title: String
-    let value: String
-    let icon: String
-    let color: Color
-
-    var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundColor(color)
-
-            Text(value)
-                .font(.title3)
-                .fontWeight(.bold)
-
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding()
-        .background(Color.white)
-        .cornerRadius(12)
-    }
-}

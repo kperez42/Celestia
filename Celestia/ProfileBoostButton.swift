@@ -285,29 +285,6 @@ struct BoostConfirmationSheet: View {
     }
 }
 
-// MARK: - Benefit Row
-
-struct BenefitRow: View {
-    let icon: String
-    let text: String
-    let color: Color
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundColor(color)
-                .frame(width: 24)
-
-            Text(text)
-                .font(.subheadline)
-                .foregroundColor(.primary)
-
-            Spacer()
-        }
-    }
-}
-
 // MARK: - Preview
 
 #Preview {

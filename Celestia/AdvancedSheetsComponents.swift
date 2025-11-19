@@ -669,34 +669,6 @@ struct BoostProfileSheet: View {
     }
 }
 
-// MARK: - Benefit Row
-
-struct BenefitRow: View {
-    let icon: String
-    let text: String
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [Color.purple, Color.blue],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .frame(width: 32)
-            
-            Text(text)
-                .font(.subheadline)
-                .foregroundColor(.primary)
-            
-            Spacer()
-        }
-    }
-}
-
 // MARK: - Previews
 
 #Preview("Advanced Filters") {
