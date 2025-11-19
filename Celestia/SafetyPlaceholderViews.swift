@@ -2,7 +2,9 @@
 //  SafetyPlaceholderViews.swift
 //  Celestia
 //
-//  Placeholder views for safety features to be implemented
+//  Placeholder views for safety features not yet implemented
+//  NOTE: Phone verification is now functional - see PhoneVerificationView.swift
+//  NOTE: Photo verification is now functional - see PhotoVerificationView.swift
 //
 
 import SwiftUI
@@ -28,29 +30,6 @@ struct IDVerificationView: View {
                 .padding(.horizontal)
         }
         .navigationTitle("ID Verification")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
-struct PhoneVerificationView: View {
-    @Environment(\.dismiss) var dismiss
-
-    var body: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "phone.fill")
-                .font(.system(size: 60))
-                .foregroundColor(.green)
-
-            Text("Phone Verification")
-                .font(.title.bold())
-
-            Text("Phone number verification coming soon")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-        }
-        .navigationTitle("Phone Verification")
         .navigationBarTitleDisplayMode(.inline)
     }
 }
