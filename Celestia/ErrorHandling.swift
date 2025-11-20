@@ -91,6 +91,7 @@ enum CelestiaError: LocalizedError, Identifiable {
     // Operation Errors
     case operationCancelled
     case configurationError(String)
+    case notImplemented
 
     // General Errors
     case unknown(String)
@@ -229,6 +230,8 @@ enum CelestiaError: LocalizedError, Identifiable {
             return "Operation was cancelled."
         case .configurationError(let message):
             return "Configuration error: \(message)"
+        case .notImplemented:
+            return "This feature is not implemented in test mode."
 
         // General
         case .unknown(let message):
