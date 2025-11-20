@@ -343,71 +343,148 @@ struct EditProfileView: View {
 
                 Spacer()
 
-                // Upload progress indicator with animation
+                // Enhanced upload progress indicator with circular animation
                 if isUploadingPhotos {
-                    HStack(spacing: 8) {
-                        ProgressView(value: uploadProgress)
-                            .frame(width: 60)
-                            .tint(.purple)
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text("\(photos.count)/\(photos.count + uploadingPhotoCount)")
+                    HStack(spacing: 12) {
+                        // Circular progress indicator
+                        ZStack {
+                            Circle()
+                                .stroke(Color.purple.opacity(0.2), lineWidth: 3)
+                                .frame(width: 40, height: 40)
+
+                            Circle()
+                                .trim(from: 0, to: uploadProgress)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [.purple, .pink],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    ),
+                                    style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                                )
+                                .frame(width: 40, height: 40)
+                                .rotationEffect(.degrees(-90))
+                                .animation(.easeInOut(duration: 0.3), value: uploadProgress)
+
+                            // Percentage text
+                            Text("\(Int(uploadProgress * 100))%")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.purple)
+                        }
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Uploading...")
                                 .font(.caption)
                                 .fontWeight(.semibold)
                                 .foregroundColor(.purple)
-                            Text("Uploading")
+                            Text("\(photos.count)/\(photos.count + uploadingPhotoCount) photos")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
                     }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.purple.opacity(0.1))
+                    )
                     .transition(.scale.combined(with: .opacity))
                 }
             }
 
-            // Photo grid with drag-and-drop reordering
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                ForEach(Array(photos.enumerated()), id: \.element) { index, photoURL in
-                    PhotoGridItem(
-                        photoURL: photoURL,
-                        onDelete: {
-                            deletePhoto(at: index)
-                        },
-                        onMoveUp: index > 0 ? {
-                            movePhoto(from: index, to: index - 1)
-                        } : nil,
-                        onMoveDown: index < photos.count - 1 ? {
-                            movePhoto(from: index, to: index + 1)
-                        } : nil
-                    )
-                    .id(photoURL) // Stable ID for proper SwiftUI tracking
-                }
+            // Empty state or photo grid
+            if photos.isEmpty && uploadingPhotoCount == 0 {
+                // Empty state with helpful message
+                VStack(spacing: 16) {
+                    Image(systemName: "photo.on.rectangle.angled")
+                        .font(.system(size: 50))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple.opacity(0.6), .pink.opacity(0.6)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
 
-                // Show uploading placeholders with smooth animation
-                ForEach(0..<uploadingPhotoCount, id: \.self) { index in
-                    UploadingPhotoPlaceholder(index: index)
-                        .transition(.scale.combined(with: .opacity))
-                }
+                    VStack(spacing: 6) {
+                        Text("No Photos Yet")
+                            .font(.headline)
+                            .foregroundColor(.primary)
 
-                // Add photo button
-                if photos.count + uploadingPhotoCount < 6 {
-                    PhotosPicker(selection: $selectedPhotoItems, maxSelectionCount: 6 - photos.count - uploadingPhotoCount, matching: .images) {
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.purple.opacity(0.3), style: StrokeStyle(lineWidth: 2, dash: [8]))
-                            .frame(height: 120)
-                            .overlay {
-                                VStack(spacing: 8) {
-                                    Image(systemName: "plus.circle.fill")
-                                        .font(.title)
-                                        .foregroundColor(.purple)
-                                    Text("Add Photo")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
+                        Text("Add up to 6 photos to showcase yourself.\nPhotos help you get more matches!")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
                     }
-                    .accessibilityLabel("Add gallery photo")
-                    .accessibilityHint("Tap to add up to \(6 - photos.count - uploadingPhotoCount) more photos to your gallery")
-                    .disabled(isUploadingPhotos)
-                    .opacity(isUploadingPhotos ? 0.6 : 1.0)
+
+                    PhotosPicker(selection: $selectedPhotoItems, maxSelectionCount: 6, matching: .images) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "plus.circle.fill")
+                            Text("Add Your First Photo")
+                        }
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 14)
+                        .background(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .cornerRadius(12)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 40)
+            } else {
+                // Photo grid with drag-and-drop reordering
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                    ForEach(Array(photos.enumerated()), id: \.element) { index, photoURL in
+                        PhotoGridItem(
+                            photoURL: photoURL,
+                            onDelete: {
+                                deletePhoto(at: index)
+                            },
+                            onMoveUp: index > 0 ? {
+                                movePhoto(from: index, to: index - 1)
+                            } : nil,
+                            onMoveDown: index < photos.count - 1 ? {
+                                movePhoto(from: index, to: index + 1)
+                            } : nil
+                        )
+                        .id(photoURL) // Stable ID for proper SwiftUI tracking
+                    }
+
+                    // Show uploading placeholders with smooth animation
+                    ForEach(0..<uploadingPhotoCount, id: \.self) { index in
+                        UploadingPhotoPlaceholder(index: index)
+                            .transition(.scale.combined(with: .opacity))
+                    }
+
+                    // Add photo button
+                    if photos.count + uploadingPhotoCount < 6 {
+                        PhotosPicker(selection: $selectedPhotoItems, maxSelectionCount: 6 - photos.count - uploadingPhotoCount, matching: .images) {
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.purple.opacity(0.3), style: StrokeStyle(lineWidth: 2, dash: [8]))
+                                .frame(height: 120)
+                                .overlay {
+                                    VStack(spacing: 8) {
+                                        Image(systemName: "plus.circle.fill")
+                                            .font(.title)
+                                            .foregroundColor(.purple)
+                                        Text("Add Photo")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                        }
+                        .accessibilityLabel("Add gallery photo")
+                        .accessibilityHint("Tap to add up to \(6 - photos.count - uploadingPhotoCount) more photos to your gallery")
+                        .disabled(isUploadingPhotos)
+                        .opacity(isUploadingPhotos ? 0.6 : 1.0)
+                    }
                 }
             }
         }
@@ -1237,8 +1314,17 @@ struct EditProfileView: View {
     }
 
     private func uploadNewPhotos(_ items: [PhotosPickerItem]) async {
-        guard !items.isEmpty else { return }
-        guard let userId = authService.currentUser?.id else { return }
+        guard !items.isEmpty else {
+            Logger.shared.warning("Upload cancelled: No items selected", category: .general)
+            return
+        }
+        guard let userId = authService.currentUser?.id else {
+            Logger.shared.error("Upload cancelled: No user ID found", category: .general)
+            return
+        }
+
+        Logger.shared.info("📸 Starting upload of \(items.count) photo(s)", category: .general)
+        Logger.shared.info("Current photos count: \(photos.count)", category: .general)
 
         await MainActor.run {
             isUploadingPhotos = true
@@ -1254,42 +1340,56 @@ struct EditProfileView: View {
             // Add all upload tasks to the group (parallel execution)
             for (index, item) in items.enumerated() {
                 group.addTask {
+                    Logger.shared.info("📤 Uploading photo \(index + 1)/\(items.count)...", category: .general)
+
                     do {
                         // Load and optimize image
                         guard let data = try await item.loadTransferable(type: Data.self),
                               let originalImage = UIImage(data: data) else {
+                            Logger.shared.error("❌ Failed to load image data for photo \(index + 1)", category: .general)
                             return nil
                         }
 
-                        // OPTIMIZATION: Compress image for faster upload (max 1200px, 80% quality)
+                        Logger.shared.info("Image loaded: \(originalImage.size.width)x\(originalImage.size.height)", category: .general)
+
+                        // OPTIMIZATION: Compress image for faster upload (max 1024px, 75% quality)
                         let optimizedImage = self.optimizeImageForUpload(originalImage)
+                        Logger.shared.info("Image optimized: \(optimizedImage.size.width)x\(optimizedImage.size.height)", category: .general)
 
                         // Upload with retry logic (3 attempts)
                         var lastError: Error?
                         for attempt in 0..<3 {
                             do {
+                                Logger.shared.info("🔄 Upload attempt \(attempt + 1)/3 for photo \(index + 1)", category: .general)
+
                                 let photoURL = try await PhotoUploadService.shared.uploadPhoto(
                                     optimizedImage,
                                     userId: userId,
                                     imageType: .gallery
                                 )
 
+                                Logger.shared.info("✅ Photo \(index + 1) uploaded successfully: \(photoURL)", category: .general)
+
                                 // Success - update UI immediately
                                 await MainActor.run {
                                     self.photos.append(photoURL)
                                     self.uploadingPhotoCount -= 1
-                                    self.uploadProgress = Double(self.photos.count) / Double(items.count)
+                                    let progress = Double(items.count - self.uploadingPhotoCount) / Double(items.count)
+                                    self.uploadProgress = progress
                                     HapticManager.shared.impact(.light)
+                                    Logger.shared.info("UI updated: photos.count = \(self.photos.count), progress = \(Int(progress * 100))%", category: .general)
                                 }
 
-                                Logger.shared.info("Photo \(index + 1) uploaded successfully", category: .general)
                                 return (index, photoURL)
                             } catch {
                                 lastError = error
+                                Logger.shared.error("❌ Upload attempt \(attempt + 1) failed for photo \(index + 1)", category: .general, error: error)
+
                                 if attempt < 2 {
                                     // Wait before retry (exponential backoff)
-                                    try? await Task.sleep(nanoseconds: UInt64(pow(2.0, Double(attempt)) * 500_000_000))
-                                    Logger.shared.warning("Photo upload attempt \(attempt + 1) failed, retrying...", category: .general)
+                                    let delay = UInt64(pow(2.0, Double(attempt)) * 500_000_000)
+                                    Logger.shared.warning("⏳ Waiting before retry...", category: .general)
+                                    try? await Task.sleep(nanoseconds: delay)
                                 }
                             }
                         }
@@ -1298,14 +1398,14 @@ struct EditProfileView: View {
                         await MainActor.run {
                             self.uploadingPhotoCount -= 1
                         }
-                        Logger.shared.error("Photo upload failed after 3 attempts", category: .general, error: lastError)
+                        Logger.shared.error("❌ Photo \(index + 1) failed after all retries", category: .general, error: lastError)
                         return nil
 
                     } catch {
                         await MainActor.run {
                             self.uploadingPhotoCount -= 1
                         }
-                        Logger.shared.error("Photo processing failed", category: .general, error: error)
+                        Logger.shared.error("❌ Photo \(index + 1) processing failed", category: .general, error: error)
                         return nil
                     }
                 }
@@ -1325,19 +1425,36 @@ struct EditProfileView: View {
         let successCount = uploadedURLs.compactMap { $0.1 }.count
         let failedCount = items.count - successCount
 
-        // OPTIMIZATION: Single Firestore update instead of multiple updates
+        Logger.shared.info("📊 Upload complete: \(successCount) succeeded, \(failedCount) failed", category: .general)
+        Logger.shared.info("Total photos now: \(photos.count)", category: .general)
+
+        // CRITICAL: Save photos to Firebase immediately after upload
         if successCount > 0, var user = authService.currentUser {
+            Logger.shared.info("💾 Saving \(photos.count) photos to Firebase...", category: .general)
+            Logger.shared.info("Photos array: \(photos)", category: .general)
+
             do {
                 user.photos = photos
                 try await authService.updateUser(user)
-                Logger.shared.info("Saved \(successCount) photos to profile successfully", category: .general)
+
+                Logger.shared.info("✅ Successfully saved \(successCount) photos to Firebase!", category: .general)
+                Logger.shared.info("User photos in Firebase: \(user.photos)", category: .general)
+
+                // Verify save by refreshing current user
+                if let refreshedUser = authService.currentUser {
+                    Logger.shared.info("🔍 Verification - User now has \(refreshedUser.photos.count) photos", category: .general)
+                }
             } catch {
-                Logger.shared.error("Failed to save photos to profile", category: .general, error: error)
+                Logger.shared.error("❌ CRITICAL: Failed to save photos to Firebase!", category: .general, error: error)
                 await MainActor.run {
                     errorMessage = "Photos uploaded but failed to save to profile. Please try again."
                     showErrorAlert = true
                 }
             }
+        } else if successCount == 0 {
+            Logger.shared.warning("⚠️ No successful uploads to save", category: .general)
+        } else {
+            Logger.shared.error("❌ No current user found, cannot save photos", category: .general)
         }
 
         await MainActor.run {
@@ -1346,6 +1463,8 @@ struct EditProfileView: View {
             uploadingPhotoCount = 0
             selectedPhotoItems = []
 
+            Logger.shared.info("🏁 Upload process finished. Final photos count: \(photos.count)", category: .general)
+
             // Success feedback
             if successCount > 0 {
                 HapticManager.shared.notification(.success)
@@ -1353,6 +1472,10 @@ struct EditProfileView: View {
                 // Show error if some failed
                 if failedCount > 0 {
                     errorMessage = "Uploaded \(successCount) photo\(successCount > 1 ? "s" : ""). \(failedCount) failed - please try again."
+                    showErrorAlert = true
+                } else {
+                    // All succeeded - show success message
+                    errorMessage = "Successfully uploaded \(successCount) photo\(successCount > 1 ? "s" : "")! 🎉"
                     showErrorAlert = true
                 }
             } else if failedCount > 0 {
