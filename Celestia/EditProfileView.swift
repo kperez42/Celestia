@@ -144,9 +144,6 @@ struct EditProfileView: View {
 
                         // Prompts Card
                         promptsSection
-
-                        // Save Button
-                        saveButton
                     }
                     .padding(.horizontal, 20)
                     .padding(.vertical, 20)
@@ -172,6 +169,33 @@ struct EditProfileView: View {
                             )
                         )
                     }
+                }
+
+                // SAVE BUTTON IN TOOLBAR
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        saveProfile()
+                    } label: {
+                        if isLoading {
+                            ProgressView()
+                                .tint(.purple)
+                        } else {
+                            HStack(spacing: 4) {
+                                Text("Save")
+                                    .fontWeight(.semibold)
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.title3)
+                            }
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.purple, .pink],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                        }
+                    }
+                    .disabled(isLoading || !isFormValid)
                 }
             }
             .alert("Success! 🎉", isPresented: $showSuccessAlert) {
@@ -1529,9 +1553,22 @@ struct EditProfileView: View {
                 Logger.shared.info("✅ Successfully saved \(successCount) photos to Firebase!", category: .general)
                 Logger.shared.info("User photos in Firebase: \(user.photos)", category: .general)
 
-                // Verify save by refreshing current user
-                if let refreshedUser = authService.currentUser {
-                    Logger.shared.info("🔍 Verification - User now has \(refreshedUser.photos.count) photos", category: .general)
+                // CRITICAL FIX: Force refresh current user from Firebase to get latest data
+                if let userId = user.id {
+                    Logger.shared.info("🔄 Refreshing user data from Firebase...", category: .general)
+                    try? await authService.fetchUser(userId: userId)
+
+                    // Verify the refresh worked
+                    if let refreshedUser = authService.currentUser {
+                        Logger.shared.info("🔍 Verification - User now has \(refreshedUser.photos.count) photos", category: .general)
+
+                        // Update local photos array to match
+                        await MainActor.run {
+                            self.photos = refreshedUser.photos
+                        }
+                    }
+                } else {
+                    Logger.shared.warning("⚠️ Could not refresh - no user ID", category: .general)
                 }
             } catch {
                 Logger.shared.error("❌ CRITICAL: Failed to save photos to Firebase!", category: .general, error: error)
