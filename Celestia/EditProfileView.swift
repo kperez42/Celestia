@@ -204,9 +204,10 @@ struct EditProfileView: View {
             .onAppear {
                 // CRITICAL FIX: Refresh user ID when view appears
                 // This ensures we have the latest user ID even if init happened before user data loaded
-                if let currentUser = authService.currentUser {
-                    Logger.shared.info("✅ Refreshing user ID on appear: \(currentUser.id)", category: .general)
-                    userId = currentUser.id
+                if let currentUser = authService.currentUser,
+                   let userIdValue = currentUser.id {
+                    Logger.shared.info("✅ Refreshing user ID on appear: \(userIdValue)", category: .general)
+                    userId = userIdValue
                     photos = currentUser.photos
                 } else if let firebaseAuthId = Auth.auth().currentUser?.uid {
                     // Fallback: Use Firebase Auth UID directly
