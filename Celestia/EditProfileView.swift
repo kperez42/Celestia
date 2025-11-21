@@ -42,6 +42,9 @@ struct EditProfileView: View {
     @State private var isUploadingProfilePhoto = false
     @State private var uploadingPhotoCount = 0
 
+    // Store user ID to ensure it's available during uploads
+    @State private var userId: String = ""
+
     // Advanced profile fields
     @State private var height: Int?
     @State private var religion: String?
@@ -73,6 +76,13 @@ struct EditProfileView: View {
     
     init() {
         let user = AuthService.shared.currentUser
+
+        // CRITICAL: Store user ID for uploads
+        _userId = State(initialValue: user?.id ?? "")
+
+        print("🔍 EditProfileView init - User ID: \(user?.id ?? "NIL")")
+        print("🔍 EditProfileView init - Photos count: \(user?.photos.count ?? 0)")
+
         _fullName = State(initialValue: user?.fullName ?? "")
         _age = State(initialValue: "\(user?.age ?? 18)")
         _bio = State(initialValue: user?.bio ?? "")
@@ -348,10 +358,12 @@ struct EditProfileView: View {
                     HStack(spacing: 12) {
                         // Circular progress indicator
                         ZStack {
+                            // Background circle
                             Circle()
-                                .stroke(Color.purple.opacity(0.2), lineWidth: 3)
-                                .frame(width: 40, height: 40)
+                                .stroke(Color.purple.opacity(0.2), lineWidth: 4)
+                                .frame(width: 44, height: 44)
 
+                            // Progress circle
                             Circle()
                                 .trim(from: 0, to: uploadProgress)
                                 .stroke(
@@ -360,35 +372,69 @@ struct EditProfileView: View {
                                         startPoint: .leading,
                                         endPoint: .trailing
                                     ),
-                                    style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                                    style: StrokeStyle(lineWidth: 4, lineCap: .round)
                                 )
-                                .frame(width: 40, height: 40)
+                                .frame(width: 44, height: 44)
                                 .rotationEffect(.degrees(-90))
-                                .animation(.easeInOut(duration: 0.3), value: uploadProgress)
+                                .animation(.easeInOut(duration: 0.5), value: uploadProgress)
+
+                            // Spinning animation while uploading
+                            if uploadProgress < 1.0 {
+                                Circle()
+                                    .trim(from: 0, to: 0.2)
+                                    .stroke(Color.white.opacity(0.3), lineWidth: 4)
+                                    .frame(width: 44, height: 44)
+                                    .rotationEffect(.degrees(uploadProgress * 360))
+                            }
 
                             // Percentage text
                             Text("\(Int(uploadProgress * 100))%")
-                                .font(.system(size: 10, weight: .bold))
+                                .font(.system(size: 11, weight: .bold))
                                 .foregroundColor(.purple)
                         }
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Uploading...")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.purple)
-                            Text("\(photos.count)/\(photos.count + uploadingPhotoCount) photos")
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 4) {
+                                // Animated dots
+                                Text("Uploading")
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.purple)
+
+                                ForEach(0..<3, id: \.self) { index in
+                                    Circle()
+                                        .fill(Color.purple)
+                                        .frame(width: 3, height: 3)
+                                        .opacity(uploadProgress * 3 > Double(index) ? 1.0 : 0.3)
+                                        .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true).delay(Double(index) * 0.2), value: uploadProgress)
+                                }
+                            }
+
+                            Text("\(photos.count)/\(photos.count + uploadingPhotoCount) uploaded")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
                     .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.purple.opacity(0.1))
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(Color.purple.opacity(0.15))
+                            .shadow(color: .purple.opacity(0.2), radius: 8, x: 0, y: 2)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [.purple.opacity(0.3), .pink.opacity(0.3)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                ),
+                                lineWidth: 1
+                            )
                     )
                     .transition(.scale.combined(with: .opacity))
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isUploadingPhotos)
                 }
             }
 
@@ -492,7 +538,16 @@ struct EditProfileView: View {
         .background(Color.white)
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
-        .onChange(of: selectedPhotoItems) { _, newItems in
+        .onChange(of: selectedPhotoItems) { oldItems, newItems in
+            Logger.shared.info("📸 Photo picker changed: \(oldItems.count) → \(newItems.count) items", category: .general)
+
+            guard !newItems.isEmpty else {
+                Logger.shared.warning("No photos selected", category: .general)
+                return
+            }
+
+            Logger.shared.info("🚀 Triggering upload for \(newItems.count) photos", category: .general)
+
             Task {
                 await uploadNewPhotos(newItems)
             }
@@ -1318,10 +1373,21 @@ struct EditProfileView: View {
             Logger.shared.warning("Upload cancelled: No items selected", category: .general)
             return
         }
-        guard let userId = authService.currentUser?.id else {
-            Logger.shared.error("Upload cancelled: No user ID found", category: .general)
+
+        // CRITICAL FIX: Use stored userId instead of authService.currentUser
+        guard !userId.isEmpty else {
+            Logger.shared.error("❌ CRITICAL: Upload cancelled - No user ID found!", category: .general)
+            Logger.shared.error("AuthService.currentUser: \(authService.currentUser?.id ?? "NIL")", category: .general)
+            Logger.shared.error("Stored userId: \(userId)", category: .general)
+
+            await MainActor.run {
+                errorMessage = "Cannot upload photos: User not logged in. Please try logging out and back in."
+                showErrorAlert = true
+            }
             return
         }
+
+        Logger.shared.info("✅ Using user ID: \(userId)", category: .general)
 
         Logger.shared.info("📸 Starting upload of \(items.count) photo(s)", category: .general)
         Logger.shared.info("Current photos count: \(photos.count)", category: .general)
@@ -1331,6 +1397,9 @@ struct EditProfileView: View {
             uploadProgress = 0.0
             uploadingPhotoCount = items.count
             HapticManager.shared.impact(.light)
+
+            Logger.shared.info("🎬 Upload UI activated - isUploadingPhotos: true", category: .general)
+            Logger.shared.info("🎬 Upload progress: 0%, uploading count: \(items.count)", category: .general)
         }
 
         // PERFORMANCE: Upload photos in parallel using TaskGroup for maximum speed
