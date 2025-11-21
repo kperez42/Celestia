@@ -7,6 +7,7 @@
 
 import SwiftUI
 import PhotosUI
+import FirebaseAuth
 
 struct EditProfileView: View {
     @Environment(\.dismiss) var dismiss
@@ -199,6 +200,24 @@ struct EditProfileView: View {
             }
             .sheet(isPresented: $showPromptsEditor) {
                 ProfilePromptsEditorView(prompts: $prompts)
+            }
+            .onAppear {
+                // CRITICAL FIX: Refresh user ID when view appears
+                // This ensures we have the latest user ID even if init happened before user data loaded
+                if let currentUser = authService.currentUser {
+                    Logger.shared.info("✅ Refreshing user ID on appear: \(currentUser.id)", category: .general)
+                    userId = currentUser.id
+                    photos = currentUser.photos
+                } else if let firebaseAuthId = Auth.auth().currentUser?.uid {
+                    // Fallback: Use Firebase Auth UID directly
+                    Logger.shared.info("✅ Using Firebase Auth UID: \(firebaseAuthId)", category: .general)
+                    userId = firebaseAuthId
+                } else {
+                    Logger.shared.error("❌ No user ID available in onAppear!", category: .general)
+                }
+
+                Logger.shared.info("🔍 onAppear - Final userId: \(userId)", category: .general)
+                Logger.shared.info("🔍 onAppear - Photos count: \(photos.count)", category: .general)
             }
         }
     }
