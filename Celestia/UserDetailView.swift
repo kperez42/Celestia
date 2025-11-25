@@ -252,6 +252,9 @@ struct UserDetailView: View {
                     if let height = user.height {
                         DetailRow(icon: "ruler", label: "Height", value: "\(height) cm (\(heightToFeetInches(height)))")
                     }
+                    if let education = user.educationLevel, education != "Prefer not to say" {
+                        DetailRow(icon: "graduationcap.fill", label: "Education", value: education)
+                    }
                     if let goal = user.relationshipGoal, goal != "Prefer not to say" {
                         DetailRow(icon: "heart.circle", label: "Looking for", value: goal)
                     }
@@ -398,6 +401,7 @@ struct UserDetailView: View {
 
     private var hasAdvancedDetails: Bool {
         user.height != nil ||
+        (user.educationLevel != nil && user.educationLevel != "Prefer not to say") ||
         (user.relationshipGoal != nil && user.relationshipGoal != "Prefer not to say") ||
         (user.religion != nil && user.religion != "Prefer not to say")
     }
