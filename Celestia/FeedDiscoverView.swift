@@ -517,7 +517,7 @@ struct FeedDiscoverView: View {
         return
         #endif
 
-        guard let currentUserId = authService.currentUser?.id else {
+        guard let currentUserId = authService.currentUser?.effectiveId else {
             await MainActor.run {
                 isInitialLoad = false
             }
@@ -617,8 +617,8 @@ struct FeedDiscoverView: View {
     }
 
     private func handleLike(user: User) {
-        guard let currentUserId = authService.currentUser?.id,
-              let userId = user.id else {
+        guard let currentUserId = authService.currentUser?.effectiveId,
+              let userId = user.effectiveId else {
             showToast(
                 message: "Unable to like. Please try again.",
                 icon: "exclamationmark.triangle.fill",
@@ -766,8 +766,8 @@ struct FeedDiscoverView: View {
     }
 
     private func handleMessage(user: User) {
-        guard let currentUserId = authService.currentUser?.id,
-              let userId = user.id else {
+        guard let currentUserId = authService.currentUser?.effectiveId,
+              let userId = user.effectiveId else {
             showToast(
                 message: "Unable to send message. Please try again.",
                 icon: "exclamationmark.triangle.fill",
