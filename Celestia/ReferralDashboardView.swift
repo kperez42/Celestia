@@ -558,8 +558,8 @@ struct ReferralDashboardView: View {
                     .foregroundColor(rankColor(rank: entry.rank))
             }
 
-            // Profile image
-            AsyncImage(url: URL(string: entry.profileImageURL)) { image in
+            // Profile image - PERFORMANCE: Use CachedAsyncImage
+            CachedAsyncImage(url: URL(string: entry.profileImageURL)) { image in
                 image
                     .resizable()
                     .scaledToFill()

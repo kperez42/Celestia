@@ -520,8 +520,8 @@ struct ProfileInsightsView: View {
 
     private func viewerCard(viewer: ProfileViewer) -> some View {
         HStack(spacing: 16) {
-            // Profile image
-            AsyncImage(url: URL(string: viewer.userPhoto)) { phase in
+            // Profile image - PERFORMANCE: Use CachedAsyncImage
+            CachedAsyncImage(url: URL(string: viewer.userPhoto)) { phase in
                 switch phase {
                 case .success(let image):
                     image
@@ -617,9 +617,9 @@ struct ProfileInsightsView: View {
 
     private func photoPerformanceCard(photo: PhotoPerformance) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Photo with badge
+            // Photo with badge - PERFORMANCE: Use CachedAsyncImage
             ZStack(alignment: .topTrailing) {
-                AsyncImage(url: URL(string: photo.photoURL)) { phase in
+                CachedAsyncImage(url: URL(string: photo.photoURL)) { phase in
                     switch phase {
                     case .success(let image):
                         image
