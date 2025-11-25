@@ -255,22 +255,17 @@ struct BasicInterestCard: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // User image
-            AsyncImage(url: URL(string: user.profileImageURL)) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                case .failure(_), .empty:
-                    LinearGradient(
-                        colors: [Color.purple.opacity(0.6), Color.pink.opacity(0.5)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                @unknown default:
-                    Color.gray
-                }
+            // User image - cached for smooth scrolling
+            CachedAsyncImage(url: URL(string: user.profileImageURL)) { image in
+                image
+                    .resizable()
+                    .scaledToFill()
+            } placeholder: {
+                LinearGradient(
+                    colors: [Color.purple.opacity(0.6), Color.pink.opacity(0.5)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
             }
             .frame(height: 180)
             .clipped()

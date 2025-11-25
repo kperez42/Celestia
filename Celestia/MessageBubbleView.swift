@@ -20,26 +20,16 @@ struct MessageBubble: View {
             VStack(alignment: isFromCurrentUser ? .trailing : .leading, spacing: 4) {
                 // Message content
                 if let imageURL = message.imageURL, !imageURL.isEmpty {
-                    // Image message
-                    AsyncImage(url: URL(string: imageURL)) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .scaledToFill()
-                                .frame(maxWidth: 200, maxHeight: 200)
-                                .cornerRadius(12)
-                        case .failure(_):
-                            Text("📷 Image")
-                                .padding(12)
-                                .background(Color.gray.opacity(0.3))
-                                .cornerRadius(16)
-                        case .empty:
-                            ProgressView()
-                                .frame(width: 200, height: 200)
-                        @unknown default:
-                            EmptyView()
-                        }
+                    // Image message - using cached image for better scroll performance
+                    CachedAsyncImage(url: URL(string: imageURL)) { image in
+                        image
+                            .resizable()
+                            .scaledToFill()
+                            .frame(maxWidth: 200, maxHeight: 200)
+                            .cornerRadius(12)
+                    } placeholder: {
+                        ProgressView()
+                            .frame(width: 200, height: 200)
                     }
                 } else {
                     // Text message
@@ -132,34 +122,19 @@ struct MessageBubbleGradient: View {
             VStack(alignment: isFromCurrentUser ? .trailing : .leading, spacing: 4) {
                 // Message content (image or text)
                 if let imageURL = message.imageURL, !imageURL.isEmpty {
-                    // Image message
-                    AsyncImage(url: URL(string: imageURL)) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .scaledToFill()
-                                .frame(maxWidth: 250, maxHeight: 300)
-                                .clipShape(RoundedRectangle(cornerRadius: 16))
-                                .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
-                        case .failure(_):
-                            HStack(spacing: 8) {
-                                Image(systemName: "photo")
-                                    .foregroundColor(.secondary)
-                                Text("Image unavailable")
-                                    .font(.subheadline)
-                            }
-                            .padding(12)
-                            .background(Color.gray.opacity(0.3))
+                    // Image message - using cached image for better scroll performance
+                    CachedAsyncImage(url: URL(string: imageURL)) { image in
+                        image
+                            .resizable()
+                            .scaledToFill()
+                            .frame(maxWidth: 250, maxHeight: 300)
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+                    } placeholder: {
+                        ProgressView()
+                            .frame(width: 250, height: 200)
+                            .background(Color.gray.opacity(0.1))
                             .cornerRadius(16)
-                        case .empty:
-                            ProgressView()
-                                .frame(width: 250, height: 200)
-                                .background(Color.gray.opacity(0.1))
-                                .cornerRadius(16)
-                        @unknown default:
-                            EmptyView()
-                        }
                     }
 
                     // Caption if text exists
