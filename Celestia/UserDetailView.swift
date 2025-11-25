@@ -190,7 +190,7 @@ struct UserDetailView: View {
             ) {
                 FlowLayout2(spacing: 10) {
                     ForEach(user.languages, id: \.self) { language in
-                        TagView(text: language, colors: [.blue, .cyan], textColor: .blue)
+                        ProfileTagView(text: language, colors: [.blue, .cyan], textColor: .blue)
                     }
                 }
             }
@@ -210,7 +210,7 @@ struct UserDetailView: View {
             ) {
                 FlowLayout2(spacing: 10) {
                     ForEach(user.interests, id: \.self) { interest in
-                        TagView(text: interest, colors: [.orange, .pink], textColor: .orange)
+                        ProfileTagView(text: interest, colors: [.orange, .pink], textColor: .orange)
                     }
                 }
             }
@@ -528,7 +528,7 @@ struct ProfileSectionCard<Content: View>: View {
     }
 }
 
-struct TagView: View {
+struct ProfileTagView: View {
     let text: String
     let colors: [Color]
     let textColor: Color
