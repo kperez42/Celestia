@@ -447,6 +447,19 @@ struct TestData {
         discoverUsers[4]  // Jessica
     ]
 
+    // MARK: - Test Profile Viewers Data
+
+    /// Users who viewed the current user's profile (for Profile Viewers page)
+    static let profileViewers: [(user: User, timestamp: Date)] = [
+        (discoverUsers[0], Date().addingTimeInterval(-3600)),        // Sarah - 1 hour ago
+        (discoverUsers[1], Date().addingTimeInterval(-3600 * 3)),    // Mike - 3 hours ago
+        (discoverUsers[2], Date().addingTimeInterval(-3600 * 8)),    // Emma - 8 hours ago
+        (discoverUsers[3], Date().addingTimeInterval(-86400)),       // Alex - 1 day ago
+        (discoverUsers[4], Date().addingTimeInterval(-86400 * 2)),   // Jessica - 2 days ago
+        (discoverUsers[0], Date().addingTimeInterval(-86400 * 4)),   // Sarah again - 4 days ago
+        (discoverUsers[1], Date().addingTimeInterval(-86400 * 6))    // Mike again - 6 days ago
+    ]
+
     // MARK: - Helper to get current user for testing
 
     static let currentUser = User(
