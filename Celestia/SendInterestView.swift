@@ -21,10 +21,10 @@ struct SendInterestView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 20) {
-                // User info
+                // User info - PERFORMANCE: Use CachedAsyncImage
                 VStack(spacing: 10) {
                     if let imageURL = URL(string: user.profileImageURL), !user.profileImageURL.isEmpty {
-                        AsyncImage(url: imageURL) { image in
+                        CachedAsyncImage(url: imageURL) { image in
                             image
                                 .resizable()
                                 .scaledToFill()

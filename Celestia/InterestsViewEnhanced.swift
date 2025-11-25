@@ -608,8 +608,8 @@ struct InterestCard: View {
             VStack(spacing: 0) {
                 // Selection indicator overlay
                 ZStack(alignment: .topTrailing) {
-                    // User image
-                    AsyncImage(url: URL(string: user.profileImageURL)) { phase in
+                    // User image - PERFORMANCE: Use CachedAsyncImage for smooth scrolling
+                    CachedAsyncImage(url: URL(string: user.profileImageURL)) { phase in
                         switch phase {
                         case .success(let image):
                             image
