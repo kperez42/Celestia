@@ -41,10 +41,12 @@ struct ProfileView: View {
     var body: some View {
         if isEmbedded {
             profileContent
+                .networkStatusBanner()
         } else {
             NavigationStack {
                 profileContent
             }
+            .networkStatusBanner()
         }
     }
 
@@ -225,7 +227,6 @@ struct ProfileView: View {
                 context: .profile(userId: authService.currentUser?.id ?? ""),
                 userName: authService.currentUser?.fullName ?? "User"
             )
-        }
     }
 
     // MARK: - Tip Action Handler
