@@ -26,7 +26,8 @@ struct FeedDiscoverView: View {
     @State private var matchedUser: User?
     @State private var favorites: Set<String> = []
     @State private var errorMessage: String = ""
-    @State private var showOwnProfile = false
+    @State private var showOwnProfileDetail = false
+    @State private var showEditProfile = false
 
     // Action feedback toast
     @State private var showActionToast = false
@@ -86,8 +87,18 @@ struct FeedDiscoverView: View {
                 .onChange(of: savedProfilesViewModel.savedProfiles) { _ in
                     syncFavorites()
                 }
-                .navigationDestination(isPresented: $showOwnProfile) {
-                    ProfileView(isEmbedded: true)
+                .sheet(isPresented: $showOwnProfileDetail) {
+                    if let currentUser = authService.currentUser {
+                        CurrentUserDetailView(
+                            user: currentUser,
+                            onEditProfile: {
+                                showEditProfile = true
+                            }
+                        )
+                    }
+                }
+                .sheet(isPresented: $showEditProfile) {
+                    EditProfileView()
                         .environmentObject(authService)
                 }
         }
@@ -128,7 +139,7 @@ struct FeedDiscoverView: View {
                 // Current user's profile card
                 if let currentUser = authService.currentUser {
                     CurrentUserProfileCard(user: currentUser) {
-                        showOwnProfile = true
+                        showOwnProfileDetail = true
                     }
                     .transition(.scale(scale: 0.95).combined(with: .opacity))
                     .animation(.spring(response: 0.5, dampingFraction: 0.7), value: authService.currentUser)
