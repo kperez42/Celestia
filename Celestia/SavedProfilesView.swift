@@ -969,19 +969,8 @@ class SavedProfilesViewModel: ObservableObject {
             let userIds = savedMetadata.map { $0.userId }
             var fetchedUsers: [String: User] = [:]
 
-            #if DEBUG
-            // In DEBUG mode, also include test users from TestData
-            for testUser in TestData.discoverUsers {
-                if let testUserId = testUser.id, userIds.contains(testUserId) {
-                    fetchedUsers[testUserId] = testUser
-                }
-            }
-            #endif
-
             // Chunk user IDs into groups of 10 (Firestore whereIn limit)
-            // Only fetch from Firestore for IDs not already found in test data
-            let remainingUserIds = userIds.filter { fetchedUsers[$0] == nil }
-            let chunkedUserIds = remainingUserIds.chunked(into: 10)
+            let chunkedUserIds = userIds.chunked(into: 10)
 
             // Only query Firestore if there are remaining user IDs to fetch
             for chunk in chunkedUserIds where !chunk.isEmpty {
@@ -1042,16 +1031,8 @@ class SavedProfilesViewModel: ObservableObject {
     /// Load profiles of people who saved your profile
     func loadSavedYouProfiles() async {
         guard let currentUserId = AuthService.shared.currentUser?.effectiveId else {
-            #if DEBUG
-            loadTestSavedYouProfiles()
-            #endif
             return
         }
-
-        #if DEBUG
-        loadTestSavedYouProfiles()
-        return
-        #endif
 
         do {
             // Query for profiles where savedUserId is the current user (others saved you)
@@ -1103,19 +1084,6 @@ class SavedProfilesViewModel: ObservableObject {
             Logger.shared.error("Error loading saved you profiles", category: .general, error: error)
         }
     }
-
-    #if DEBUG
-    private func loadTestSavedYouProfiles() {
-        // Use test data for demo
-        savedYouProfiles = TestData.discoverUsers.prefix(3).enumerated().map { index, user in
-            SavedYouProfile(
-                id: "test_saved_you_\(index)",
-                user: user,
-                savedAt: Date().addingTimeInterval(-Double(index) * 86400)
-            )
-        }
-    }
-    #endif
 
     func unsaveProfile(_ profile: SavedProfile) {
         guard let currentUserId = AuthService.shared.currentUser?.effectiveId else { return }
