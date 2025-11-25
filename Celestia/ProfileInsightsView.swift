@@ -521,16 +521,17 @@ struct ProfileInsightsView: View {
     private func viewerCard(viewer: ProfileViewer) -> some View {
         HStack(spacing: 16) {
             // Profile image - PERFORMANCE: Use CachedAsyncImage
-            CachedAsyncImage(url: URL(string: viewer.userPhoto)) { phase in
-                switch phase {
-                case .success(let image):
+            CachedAsyncImage(
+                url: URL(string: viewer.userPhoto),
+                content: { image in
                     image
                         .resizable()
                         .scaledToFill()
-                default:
+                },
+                placeholder: {
                     Color.purple.opacity(0.3)
                 }
-            }
+            )
             .frame(width: 60, height: 60)
             .clipShape(Circle())
             .overlay(
@@ -619,16 +620,17 @@ struct ProfileInsightsView: View {
         VStack(alignment: .leading, spacing: 16) {
             // Photo with badge - PERFORMANCE: Use CachedAsyncImage
             ZStack(alignment: .topTrailing) {
-                CachedAsyncImage(url: URL(string: photo.photoURL)) { phase in
-                    switch phase {
-                    case .success(let image):
+                CachedAsyncImage(
+                    url: URL(string: photo.photoURL),
+                    content: { image in
                         image
                             .resizable()
                             .scaledToFill()
-                    default:
+                    },
+                    placeholder: {
                         Color.gray.opacity(0.3)
                     }
-                }
+                )
                 .frame(height: 200)
                 .cornerRadius(16)
                 .clipped()
