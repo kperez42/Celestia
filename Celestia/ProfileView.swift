@@ -1100,6 +1100,12 @@ struct ProfileView: View {
                 detailRow(icon: "ruler", label: "Height", value: "\(height) cm (\(heightToFeetInches(height)))")
             }
 
+            // Education
+            if let education = user.educationLevel, education != "Prefer not to say" {
+                Divider()
+                detailRow(icon: "graduationcap.fill", label: "Education", value: education)
+            }
+
             // Relationship goal
             if let goal = user.relationshipGoal, goal != "Prefer not to say" {
                 Divider()
