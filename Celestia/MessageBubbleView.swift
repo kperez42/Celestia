@@ -208,18 +208,14 @@ struct MessageBubbleGradient: View {
         }
     }
 
+    // PERFORMANCE: Use cached formatters from Date extension
     private func formatReadTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        let calendar = Calendar.current
-
-        if calendar.isDateInToday(date) {
-            formatter.timeStyle = .short
-            return formatter.string(from: date)
-        } else if calendar.isDateInYesterday(date) {
+        if Calendar.current.isDateInToday(date) {
+            return date.formattedTime()
+        } else if Calendar.current.isDateInYesterday(date) {
             return "yesterday"
         } else {
-            formatter.dateFormat = "MMM d"
-            return formatter.string(from: date)
+            return date.formattedDate()
         }
     }
 }
@@ -227,25 +223,34 @@ struct MessageBubbleGradient: View {
 // MARK: - Date Extension
 
 extension Date {
-    /// Format as "3:45 PM"
-    func formattedTime() -> String {
+    // PERFORMANCE: Cache DateFormatters - creating them is expensive
+    private static let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.timeStyle = .short
-        return formatter.string(from: self)
+        return formatter
+    }()
+
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        return formatter
+    }()
+
+    private static let calendar = Calendar.current
+
+    /// Format as "3:45 PM"
+    func formattedTime() -> String {
+        Self.timeFormatter.string(from: self)
     }
-    
+
     /// Format as "Today", "Yesterday", or "Dec 4"
     func formattedDate() -> String {
-        let calendar = Calendar.current
-        
-        if calendar.isDateInToday(self) {
+        if Self.calendar.isDateInToday(self) {
             return "Today"
-        } else if calendar.isDateInYesterday(self) {
+        } else if Self.calendar.isDateInYesterday(self) {
             return "Yesterday"
         } else {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "MMM d"
-            return formatter.string(from: self)
+            return Self.dateFormatter.string(from: self)
         }
     }
 }
