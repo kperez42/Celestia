@@ -39,7 +39,8 @@ struct CurrentUserDetailView: View {
                         }
                     }
                     .frame(height: 450)
-                    .tabViewStyle(.page)
+                    .tabViewStyle(.page(indexDisplayMode: .always))
+                    .indexViewStyle(.page(backgroundDisplayMode: .always))
 
                     // "Your Profile" badge
                     HStack(spacing: 6) {
