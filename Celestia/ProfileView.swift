@@ -1100,6 +1100,12 @@ struct ProfileView: View {
                 detailRow(icon: "ruler", label: "Height", value: "\(height) cm (\(heightToFeetInches(height)))")
             }
 
+            // Education
+            if let education = user.educationLevel, education != "Prefer not to say" {
+                Divider()
+                detailRow(icon: "graduationcap.fill", label: "Education", value: education)
+            }
+
             // Relationship goal
             if let goal = user.relationshipGoal, goal != "Prefer not to say" {
                 Divider()
@@ -1398,18 +1404,6 @@ struct ProfileView: View {
                         .foregroundColor(.secondary)
                     Spacer()
                     Text("\(user.ageRangeMin) - \(user.ageRangeMax)")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                }
-                
-                Divider()
-                
-                HStack {
-                    Text("Max distance")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Text("\(user.maxDistance) km")
                         .font(.subheadline)
                         .fontWeight(.semibold)
                 }

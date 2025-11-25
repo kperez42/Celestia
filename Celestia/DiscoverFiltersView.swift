@@ -43,11 +43,6 @@ struct DiscoverFiltersView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Distance filter
-                    distanceSection
-
-                    Divider()
-
                     // Age range filter
                     ageRangeSection
 
@@ -138,49 +133,6 @@ struct DiscoverFiltersView: View {
                 }
             }
         }
-    }
-
-    // MARK: - Distance Section
-
-    private var distanceSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Image(systemName: "location.circle.fill")
-                    .font(.title3)
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.purple, .pink],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-
-                Text("Maximum Distance")
-                    .font(.headline)
-
-                Spacer()
-
-                Text("\(Int(filters.maxDistance)) mi")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
-
-            Slider(value: $filters.maxDistance, in: 5...100, step: 5)
-                .accentColor(.purple)
-
-            HStack {
-                Text("5 mi")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Spacer()
-                Text("100 mi")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-        }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
     }
 
     // MARK: - Age Range Section

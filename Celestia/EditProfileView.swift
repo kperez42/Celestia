@@ -47,6 +47,7 @@ struct EditProfileView: View {
     @State private var userId: String = ""
 
     // Advanced profile fields
+    @State private var educationLevel: String?
     @State private var height: Int?
     @State private var religion: String?
     @State private var relationshipGoal: String?
@@ -59,17 +60,17 @@ struct EditProfileView: View {
     // Preference fields
     @State private var ageRangeMin: Int
     @State private var ageRangeMax: Int
-    @State private var maxDistance: Int
 
     let genderOptions = ["Male", "Female", "Non-binary", "Other"]
     let lookingForOptions = ["Men", "Women", "Everyone"]
+    let educationOptions = ["Prefer not to say", "High School", "Some College", "Associate's", "Bachelor's", "Master's", "Doctorate", "Trade School"]
     let religionOptions = ["Prefer not to say", "Agnostic", "Atheist", "Buddhist", "Catholic", "Christian", "Hindu", "Jewish", "Muslim", "Spiritual", "Other"]
-    let relationshipGoalOptions = ["Prefer not to say", "Casual dating", "Relationship", "Long-term partner", "Marriage", "Open to anything"]
-    let smokingOptions = ["Prefer not to say", "Non-smoker", "Social smoker", "Regular smoker", "Trying to quit"]
-    let drinkingOptions = ["Prefer not to say", "Non-drinker", "Social drinker", "Regular drinker"]
-    let petsOptions = ["Prefer not to say", "No pets", "Dog", "Cat", "Dog & Cat", "Other pets"]
-    let exerciseOptions = ["Prefer not to say", "Never", "Sometimes", "Often", "Daily"]
-    let dietOptions = ["Prefer not to say", "Anything", "Vegetarian", "Vegan", "Pescatarian", "Halal", "Kosher", "Other"]
+    let relationshipGoalOptions = ["Prefer not to say", "Casual Dating", "Long-term Relationship", "Marriage", "Friendship", "Not Sure Yet"]
+    let smokingOptions = ["Prefer not to say", "Never", "Socially", "Regularly", "Trying to Quit"]
+    let drinkingOptions = ["Prefer not to say", "Never", "Rarely", "Socially", "Regularly"]
+    let petsOptions = ["Prefer not to say", "No Pets", "Dog", "Cat", "Both", "Other Pets", "Want Pets"]
+    let exerciseOptions = ["Prefer not to say", "Never", "Rarely", "Sometimes", "Often", "Daily"]
+    let dietOptions = ["Prefer not to say", "No Restrictions", "Vegan", "Vegetarian", "Pescatarian", "Kosher", "Halal"]
     let predefinedLanguages = [
         "English", "Spanish", "French", "German", "Italian", "Portuguese",
         "Russian", "Chinese", "Japanese", "Korean", "Arabic", "Hindi"
@@ -102,6 +103,7 @@ struct EditProfileView: View {
         _photos = State(initialValue: user?.photos ?? [])
 
         // Initialize advanced profile fields
+        _educationLevel = State(initialValue: user?.educationLevel)
         _height = State(initialValue: user?.height)
         _religion = State(initialValue: user?.religion)
         _relationshipGoal = State(initialValue: user?.relationshipGoal)
@@ -114,7 +116,6 @@ struct EditProfileView: View {
         // Initialize preference fields
         _ageRangeMin = State(initialValue: user?.ageRangeMin ?? 18)
         _ageRangeMax = State(initialValue: user?.ageRangeMax ?? 99)
-        _maxDistance = State(initialValue: user?.maxDistance ?? 50)
     }
     
     var body: some View {
@@ -909,44 +910,6 @@ struct EditProfileView: View {
             .padding()
             .background(Color.pink.opacity(0.05))
             .cornerRadius(12)
-
-            // Max Distance Preference
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("Maximum Distance")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.secondary)
-
-                    Spacer()
-
-                    Text(maxDistance >= 500 ? "Anywhere" : "\(maxDistance) km")
-                        .font(.subheadline)
-                        .fontWeight(.bold)
-                        .foregroundColor(.pink)
-                }
-
-                Slider(value: Binding(
-                    get: { Double(maxDistance) },
-                    set: { maxDistance = Int($0) }
-                ), in: 5...500, step: 5)
-                .tint(.pink)
-
-                HStack {
-                    Text("5 km")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    Spacer()
-
-                    Text("Anywhere")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-            .padding()
-            .background(Color.pink.opacity(0.05))
-            .cornerRadius(12)
         }
         .padding(20)
         .background(Color.white)
@@ -985,6 +948,27 @@ struct EditProfileView: View {
                         .font(.caption)
                         .foregroundColor(.gray)
                 }
+            }
+
+            // Education
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Education")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+
+                Picker("Education", selection: Binding(
+                    get: { educationLevel ?? "Prefer not to say" },
+                    set: { educationLevel = $0 == "Prefer not to say" ? nil : $0 }
+                )) {
+                    ForEach(educationOptions, id: \.self) { option in
+                        Text(option).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
             }
 
             // Relationship Goal
@@ -1443,6 +1427,7 @@ struct EditProfileView: View {
                 user.photos = photos
 
                 // Update advanced profile fields
+                user.educationLevel = educationLevel
                 user.height = height
                 user.religion = religion
                 user.relationshipGoal = relationshipGoal
@@ -1455,7 +1440,6 @@ struct EditProfileView: View {
                 // Update preference fields
                 user.ageRangeMin = ageRangeMin
                 user.ageRangeMax = ageRangeMax
-                user.maxDistance = maxDistance
 
                 try await authService.updateUser(user)
                 
