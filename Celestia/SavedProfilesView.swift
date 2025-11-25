@@ -17,7 +17,7 @@ struct SavedProfilesView: View {
     @State private var showClearAllConfirmation = false
     @State private var selectedTab = 0
 
-    private let tabs = ["All Saved", "Recent", "Favorites"]
+    private let tabs = ["All Saved", "Recent", "Saved You"]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -43,7 +43,7 @@ struct SavedProfilesView: View {
                     TabView(selection: $selectedTab) {
                         allSavedTab.tag(0)
                         recentTab.tag(1)
-                        favoritesTab.tag(2)
+                        savedYouTab.tag(2)
                     }
                     .tabViewStyle(.page(indexDisplayMode: .never))
                 }
@@ -55,6 +55,7 @@ struct SavedProfilesView: View {
         .navigationBarHidden(true)
         .task {
             await viewModel.loadSavedProfiles()
+            await viewModel.loadSavedYouProfiles()
             // Success haptic when profiles load
             if !viewModel.savedProfiles.isEmpty {
                 HapticManager.shared.notification(.success)
@@ -142,7 +143,7 @@ struct SavedProfilesView: View {
         switch index {
         case 0: return viewModel.savedProfiles.count
         case 1: return viewModel.recentProfiles.count
-        case 2: return viewModel.favoriteProfiles.count
+        case 2: return viewModel.savedYouProfiles.count
         default: return 0
         }
     }
@@ -169,12 +170,12 @@ struct SavedProfilesView: View {
         }
     }
 
-    private var favoritesTab: some View {
+    private var savedYouTab: some View {
         Group {
-            if viewModel.favoriteProfiles.isEmpty {
-                emptyStateView(message: "No favorites yet", hint: "Long press on a saved profile to mark as favorite")
+            if viewModel.savedYouProfiles.isEmpty {
+                emptyStateView(message: "No one saved you yet", hint: "When someone saves your profile, they'll appear here")
             } else {
-                profilesGrid(profiles: viewModel.favoriteProfiles)
+                savedYouGrid(profiles: viewModel.savedYouProfiles)
             }
         }
     }
@@ -250,15 +251,15 @@ struct SavedProfilesView: View {
                                     }
                                 }
 
-                                if viewModel.favoriteProfiles.count > 0 {
+                                if viewModel.savedYouProfiles.count > 0 {
                                     Circle()
                                         .fill(Color.white.opacity(0.5))
                                         .frame(width: 4, height: 4)
 
                                     HStack(spacing: 4) {
-                                        Image(systemName: "star.fill")
+                                        Image(systemName: "person.2.fill")
                                             .font(.caption)
-                                        Text("\(viewModel.favoriteProfiles.count) fav")
+                                        Text("\(viewModel.savedYouProfiles.count) saved you")
                                             .fontWeight(.semibold)
                                     }
                                 }
@@ -314,12 +315,6 @@ struct SavedProfilesView: View {
                                     viewModel.unsaveProfile(saved)
                                 }
                                 HapticManager.shared.impact(.medium)
-                            },
-                            onToggleFavorite: {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                    viewModel.toggleFavorite(saved)
-                                }
-                                HapticManager.shared.impact(.medium)
                             }
                         )
                         .transition(.asymmetric(
@@ -341,6 +336,43 @@ struct SavedProfilesView: View {
         .refreshable {
             HapticManager.shared.impact(.light)
             await viewModel.loadSavedProfiles(forceRefresh: true)
+            HapticManager.shared.notification(.success)
+        }
+    }
+
+    // MARK: - Saved You Grid (simpler cards for people who saved your profile)
+
+    private func savedYouGrid(profiles: [SavedYouProfile]) -> some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 20) {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                    ForEach(Array(profiles.enumerated()), id: \.element.id) { index, profile in
+                        SavedYouCard(
+                            profile: profile,
+                            onTap: {
+                                selectedUser = profile.user
+                                HapticManager.shared.impact(.light)
+                            }
+                        )
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.8).combined(with: .opacity),
+                            removal: .scale(scale: 0.8).combined(with: .opacity)
+                        ))
+                        .animation(
+                            .spring(response: 0.4, dampingFraction: 0.7)
+                            .delay(Double(index) * 0.05),
+                            value: profiles.count
+                        )
+                    }
+                }
+                .padding(.horizontal)
+            }
+            .padding(.top)
+            .padding(.bottom, 20)
+        }
+        .refreshable {
+            HapticManager.shared.impact(.light)
+            await viewModel.loadSavedYouProfiles()
             HapticManager.shared.notification(.success)
         }
     }
@@ -484,7 +516,6 @@ struct SavedProfileCard: View {
     let isUnsaving: Bool
     let onTap: () -> Void
     let onUnsave: () -> Void
-    let onToggleFavorite: () -> Void
 
     @State private var isPressed = false
 
@@ -512,21 +543,9 @@ struct SavedProfileCard: View {
                     .frame(height: 200)
                     .clipped()
                     .overlay(alignment: .topLeading) {
-                        // Online Status Indicator and Favorite badge
-                        HStack {
-                            OnlineStatusIndicator(user: savedProfile.user)
-
-                            if savedProfile.isFavorite {
-                                Image(systemName: "star.fill")
-                                    .font(.caption)
-                                    .foregroundColor(.yellow)
-                                    .padding(6)
-                                    .background(Color.black.opacity(0.5))
-                                    .clipShape(Circle())
-                            }
-                        }
-                        .padding(.top, 8)
-                        .padding(.leading, 8)
+                        OnlineStatusIndicator(user: savedProfile.user)
+                            .padding(.top, 8)
+                            .padding(.leading, 8)
                     }
                     .overlay {
                         if isUnsaving {
@@ -596,56 +615,36 @@ struct SavedProfileCard: View {
                     .opacity(isUnsaving ? 0.5 : 1.0)
                 }
 
-                // Action buttons stack (favorite + bookmark)
-                VStack(spacing: 8) {
-                    // Favorite button
-                    Button(action: {
-                        HapticManager.shared.impact(.medium)
-                        onToggleFavorite()
-                    }) {
-                        ZStack {
-                            Circle()
-                                .fill(savedProfile.isFavorite ? Color.yellow : Color.black.opacity(0.5))
-                                .frame(width: 32, height: 32)
-
-                            Image(systemName: savedProfile.isFavorite ? "star.fill" : "star")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(savedProfile.isFavorite ? .white : .white)
-                        }
-                    }
-                    .buttonStyle(.plain)
-
-                    // Unsave button
-                    Button(action: {
-                        HapticManager.shared.impact(.medium)
-                        onUnsave()
-                    }) {
-                        ZStack {
-                            Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [.purple, .pink],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
+                // Unsave button
+                Button(action: {
+                    HapticManager.shared.impact(.medium)
+                    onUnsave()
+                }) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [.purple, .pink],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
                                 )
-                                .frame(width: 32, height: 32)
-                                .shadow(color: .purple.opacity(0.4), radius: 8, y: 4)
+                            )
+                            .frame(width: 36, height: 36)
+                            .shadow(color: .purple.opacity(0.4), radius: 8, y: 4)
 
-                            if isUnsaving {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .scaleEffect(0.6)
-                            } else {
-                                Image(systemName: "bookmark.fill")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(.white)
-                            }
+                        if isUnsaving {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(0.7)
+                        } else {
+                            Image(systemName: "bookmark.fill")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white)
                         }
                     }
-                    .buttonStyle(.plain)
-                    .disabled(isUnsaving)
                 }
+                .buttonStyle(.plain)
+                .disabled(isUnsaving)
                 .padding(10)
             }
             .background(
@@ -656,18 +655,12 @@ struct SavedProfileCard: View {
             .overlay(
                 RoundedRectangle(cornerRadius: 20)
                     .stroke(
-                        savedProfile.isFavorite ?
-                        LinearGradient(
-                            colors: [.yellow.opacity(0.5), .orange.opacity(0.3)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ) :
                         LinearGradient(
                             colors: [.purple.opacity(0.1), .pink.opacity(0.05)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),
-                        lineWidth: savedProfile.isFavorite ? 2 : 1
+                        lineWidth: 1
                     )
             )
         }
@@ -723,6 +716,145 @@ struct SavedProfileCardSkeleton: View {
     }
 }
 
+// MARK: - Saved You Profile Model (people who saved your profile)
+
+struct SavedYouProfile: Identifiable, Equatable {
+    let id: String
+    let user: User
+    let savedAt: Date
+}
+
+// MARK: - Saved You Card (simpler card for people who saved your profile)
+
+struct SavedYouCard: View {
+    let profile: SavedYouProfile
+    let onTap: () -> Void
+
+    @State private var isPressed = false
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 0) {
+                // Profile image
+                Group {
+                    if let imageURL = profile.user.photos.first, let url = URL(string: imageURL) {
+                        CachedCardImage(url: url)
+                    } else {
+                        LinearGradient(
+                            colors: [.blue.opacity(0.6), .purple.opacity(0.5)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        .overlay {
+                            Image(systemName: "person.fill")
+                                .font(.system(size: 50))
+                                .foregroundColor(.white.opacity(0.5))
+                        }
+                    }
+                }
+                .frame(height: 200)
+                .clipped()
+                .overlay(alignment: .topLeading) {
+                    OnlineStatusIndicator(user: profile.user)
+                        .padding(.top, 8)
+                        .padding(.leading, 8)
+                }
+                .overlay(alignment: .topTrailing) {
+                    // "Saved You" badge
+                    HStack(spacing: 4) {
+                        Image(systemName: "bookmark.fill")
+                            .font(.caption2)
+                        Text("Saved You")
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(LinearGradient(
+                                colors: [.blue, .purple],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ))
+                    )
+                    .padding(8)
+                }
+
+                // User info
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        Text(profile.user.fullName)
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                            .lineLimit(1)
+
+                        Text("\(profile.user.age)")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+
+                        if profile.user.isVerified {
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                        }
+                    }
+
+                    HStack(spacing: 4) {
+                        Image(systemName: "mappin.circle.fill")
+                            .font(.caption2)
+                            .foregroundColor(.purple)
+
+                        Text(profile.user.location)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock.fill")
+                            .font(.caption2)
+                            .foregroundColor(.blue)
+
+                        Text(profile.savedAt.timeAgo())
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                            .fontWeight(.medium)
+                    }
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.white)
+            }
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color.white)
+                    .shadow(color: .black.opacity(0.08), radius: 15, y: 5)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(
+                        LinearGradient(
+                            colors: [.blue.opacity(0.2), .purple.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+        .scaleEffect(isPressed ? 0.97 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in isPressed = true }
+                .onEnded { _ in isPressed = false }
+        )
+    }
+}
+
 // MARK: - Saved Profile Model
 
 struct SavedProfile: Identifiable, Equatable {
@@ -730,14 +862,12 @@ struct SavedProfile: Identifiable, Equatable {
     let user: User
     let savedAt: Date
     let note: String?
-    var isFavorite: Bool
 
-    init(id: String, user: User, savedAt: Date, note: String?, isFavorite: Bool = false) {
+    init(id: String, user: User, savedAt: Date, note: String?) {
         self.id = id
         self.user = user
         self.savedAt = savedAt
         self.note = note
-        self.isFavorite = isFavorite
     }
 }
 
@@ -749,6 +879,7 @@ class SavedProfilesViewModel: ObservableObject {
     static let shared = SavedProfilesViewModel()
 
     @Published var savedProfiles: [SavedProfile] = []
+    @Published var savedYouProfiles: [SavedYouProfile] = []
     @Published var isLoading = false
     @Published var errorMessage = ""
     @Published var unsavingProfileId: String?
@@ -768,11 +899,6 @@ class SavedProfilesViewModel: ObservableObject {
             return savedProfiles
         }
         return savedProfiles.filter { $0.savedAt >= weekAgo }
-    }
-
-    /// Profiles marked as favorites
-    var favoriteProfiles: [SavedProfile] {
-        savedProfiles.filter { $0.isFavorite }
     }
 
     private let db = Firestore.firestore()
@@ -819,7 +945,7 @@ class SavedProfilesViewModel: ObservableObject {
                 .getDocuments()
 
             // Step 2: Extract user IDs and metadata
-            var savedMetadata: [(id: String, userId: String, savedAt: Date, note: String?, isFavorite: Bool)] = []
+            var savedMetadata: [(id: String, userId: String, savedAt: Date, note: String?)] = []
             for doc in savedSnapshot.documents {
                 let data = doc.data()
                 if let savedUserId = data["savedUserId"] as? String,
@@ -828,8 +954,7 @@ class SavedProfilesViewModel: ObservableObject {
                         id: doc.documentID,
                         userId: savedUserId,
                         savedAt: savedAt,
-                        note: data["note"] as? String,
-                        isFavorite: data["isFavorite"] as? Bool ?? false
+                        note: data["note"] as? String
                     ))
                 }
             }
@@ -881,8 +1006,7 @@ class SavedProfilesViewModel: ObservableObject {
                         id: metadata.id,
                         user: user,
                         savedAt: metadata.savedAt,
-                        note: metadata.note,
-                        isFavorite: metadata.isFavorite
+                        note: metadata.note
                     ))
                 } else {
                     // User no longer exists or failed to fetch
@@ -915,31 +1039,83 @@ class SavedProfilesViewModel: ObservableObject {
         Logger.shared.info("SavedProfiles cache cleared", category: .performance)
     }
 
-    /// Toggle favorite status for a profile
-    func toggleFavorite(_ profile: SavedProfile) {
-        guard let index = savedProfiles.firstIndex(where: { $0.id == profile.id }) else { return }
+    /// Load profiles of people who saved your profile
+    func loadSavedYouProfiles() async {
+        guard let currentUserId = AuthService.shared.currentUser?.effectiveId else {
+            #if DEBUG
+            loadTestSavedYouProfiles()
+            #endif
+            return
+        }
 
-        let newFavoriteStatus = !savedProfiles[index].isFavorite
-        savedProfiles[index].isFavorite = newFavoriteStatus
+        #if DEBUG
+        loadTestSavedYouProfiles()
+        return
+        #endif
 
-        // Persist to Firestore
-        Task {
-            do {
-                try await db.collection("saved_profiles").document(profile.id).updateData([
-                    "isFavorite": newFavoriteStatus
-                ])
-                Logger.shared.info("Toggled favorite for \(profile.user.fullName): \(newFavoriteStatus)", category: .general)
-            } catch {
-                // Revert on failure
-                await MainActor.run {
-                    if let index = savedProfiles.firstIndex(where: { $0.id == profile.id }) {
-                        savedProfiles[index].isFavorite = !newFavoriteStatus
+        do {
+            // Query for profiles where savedUserId is the current user (others saved you)
+            let snapshot = try await db.collection("saved_profiles")
+                .whereField("savedUserId", isEqualTo: currentUserId)
+                .order(by: "savedAt", descending: true)
+                .getDocuments()
+
+            var metadata: [(id: String, userId: String, savedAt: Date)] = []
+            for doc in snapshot.documents {
+                let data = doc.data()
+                if let userId = data["userId"] as? String,
+                   let savedAt = (data["savedAt"] as? Timestamp)?.dateValue() {
+                    metadata.append((id: doc.documentID, userId: userId, savedAt: savedAt))
+                }
+            }
+
+            guard !metadata.isEmpty else {
+                savedYouProfiles = []
+                return
+            }
+
+            // Batch fetch users
+            let userIds = metadata.map { $0.userId }
+            var fetchedUsers: [String: User] = [:]
+
+            for chunk in userIds.chunked(into: 10) {
+                let usersSnapshot = try await db.collection("users")
+                    .whereField(FieldPath.documentID(), in: chunk)
+                    .getDocuments()
+
+                for userDoc in usersSnapshot.documents {
+                    if let user = try? userDoc.data(as: User.self), let userId = user.id {
+                        fetchedUsers[userId] = user
                     }
                 }
-                Logger.shared.error("Error toggling favorite", category: .general, error: error)
             }
+
+            var profiles: [SavedYouProfile] = []
+            for meta in metadata {
+                if let user = fetchedUsers[meta.userId] {
+                    profiles.append(SavedYouProfile(id: meta.id, user: user, savedAt: meta.savedAt))
+                }
+            }
+
+            savedYouProfiles = profiles
+            Logger.shared.info("Loaded \(profiles.count) users who saved your profile", category: .general)
+        } catch {
+            Logger.shared.error("Error loading saved you profiles", category: .general, error: error)
         }
     }
+
+    #if DEBUG
+    private func loadTestSavedYouProfiles() {
+        // Use test data for demo
+        savedYouProfiles = TestData.discoverUsers.prefix(3).enumerated().map { index, user in
+            SavedYouProfile(
+                id: "test_saved_you_\(index)",
+                user: user,
+                savedAt: Date().addingTimeInterval(-Double(index) * 86400)
+            )
+        }
+    }
+    #endif
 
     func unsaveProfile(_ profile: SavedProfile) {
         guard let currentUserId = AuthService.shared.currentUser?.effectiveId else { return }

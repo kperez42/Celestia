@@ -155,6 +155,7 @@ struct TestData {
                 timestamp: Date().addingTimeInterval(-86400 * 2), // 2 days ago
                 lastMessageTimestamp: Date().addingTimeInterval(-3600 * 2), // 2 hours ago
                 lastMessage: "Sounds great! See you at 7pm 😊",
+                lastMessageSenderId: "test_user_1", // Sarah sent last - RECEIVED
                 unreadCount: ["current_user": 2],
                 isActive: true
             )
@@ -168,6 +169,7 @@ struct TestData {
                 timestamp: Date().addingTimeInterval(-86400 * 5), // 5 days ago
                 lastMessageTimestamp: Date().addingTimeInterval(-3600 * 8), // 8 hours ago
                 lastMessage: "That startup idea sounds awesome! Let's grab coffee and discuss more.",
+                lastMessageSenderId: "current_user", // You sent last - SENT
                 unreadCount: [:],
                 isActive: true
             )
@@ -181,19 +183,21 @@ struct TestData {
                 timestamp: Date().addingTimeInterval(-86400), // 1 day ago
                 lastMessageTimestamp: Date().addingTimeInterval(-3600 * 5), // 5 hours ago
                 lastMessage: "I'd love to see your artwork! Do you have an Instagram for your art?",
+                lastMessageSenderId: "current_user", // You sent last - SENT
                 unreadCount: [:],
                 isActive: true
             )
         ),
         (
-            user: discoverUsers[3], // Alex
+            user: discoverUsers[3], // Alex - New match, no messages yet
             match: Match(
                 id: "match_4",
                 user1Id: "current_user",
                 user2Id: "test_user_4",
                 timestamp: Date().addingTimeInterval(-3600), // 1 hour ago
-                lastMessageTimestamp: Date().addingTimeInterval(-1800), // 30 mins ago
-                lastMessage: "Just matched! What kind of music do you spin? 🎵",
+                lastMessageTimestamp: nil,
+                lastMessage: nil,
+                lastMessageSenderId: nil, // New match - no messages - RECEIVED (needs action)
                 unreadCount: [:],
                 isActive: true
             )
@@ -207,6 +211,7 @@ struct TestData {
                 timestamp: Date().addingTimeInterval(-86400 * 3), // 3 days ago
                 lastMessageTimestamp: Date().addingTimeInterval(-60 * 10), // 10 mins ago
                 lastMessage: "Hey! What's your dog's name? I have a golden too! 🐕",
+                lastMessageSenderId: "test_user_5", // Jessica sent last - RECEIVED
                 unreadCount: ["current_user": 1],
                 isActive: true
             )

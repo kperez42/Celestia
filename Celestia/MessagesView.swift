@@ -21,22 +21,45 @@ struct MessagesView: View {
     @State private var showSearch = false
     @State private var selectedMatch: (Match, User)?
     @State private var showingChat = false
-    
+    @State private var selectedMessageTab = 0
+
+    private let tabs = ["Received", "Sent"]
+
     var conversations: [(Match, User)] {
         matchService.matches.compactMap { match in
             guard let user = getMatchedUser(match) else { return nil }
             return (match, user)
         }
     }
-    
+
+    /// Conversations where the other person sent the last message (needs your reply)
+    var receivedConversations: [(Match, User)] {
+        let currentUserId = authService.currentUser?.id ?? "current_user"
+        return conversations.filter { match, _ in
+            // If no last message, it's a new match - show in received
+            guard let lastSenderId = match.lastMessageSenderId else { return true }
+            return lastSenderId != currentUserId
+        }
+    }
+
+    /// Conversations where you sent the last message (waiting for reply)
+    var sentConversations: [(Match, User)] {
+        let currentUserId = authService.currentUser?.id ?? "current_user"
+        return conversations.filter { match, _ in
+            guard let lastSenderId = match.lastMessageSenderId else { return false }
+            return lastSenderId == currentUserId
+        }
+    }
+
     var filteredConversations: [(Match, User)] {
-        guard !searchDebouncer.debouncedText.isEmpty else { return conversations }
-        return conversations.filter { _, user in
+        let baseConversations = selectedMessageTab == 0 ? receivedConversations : sentConversations
+        guard !searchDebouncer.debouncedText.isEmpty else { return baseConversations }
+        return baseConversations.filter { _, user in
             user.fullName.localizedCaseInsensitiveContains(searchDebouncer.debouncedText) ||
             user.location.localizedCaseInsensitiveContains(searchDebouncer.debouncedText)
         }
     }
-    
+
     var totalUnread: Int {
         #if DEBUG
         let userId = authService.currentUser?.id ?? "current_user"
@@ -55,20 +78,52 @@ struct MessagesView: View {
                 VStack(spacing: 0) {
                     // Header
                     headerView
-                    
+
+                    // Tab selector
+                    messageTabSelector
+
                     // Search bar
                     if showSearch {
                         searchBar
                             .transition(.move(edge: .top).combined(with: .opacity))
                     }
-                    
+
                     // Content
                     if matchService.isLoading && conversations.isEmpty {
                         loadingView
                     } else if conversations.isEmpty {
                         emptyStateView
                     } else {
-                        conversationsListView
+                        TabView(selection: $selectedMessageTab) {
+                            // Received tab
+                            Group {
+                                if receivedConversations.isEmpty {
+                                    tabEmptyStateView(
+                                        icon: "arrow.down.circle",
+                                        title: "No Messages to Reply",
+                                        subtitle: "When someone messages you, they'll appear here"
+                                    )
+                                } else {
+                                    conversationsListView
+                                }
+                            }
+                            .tag(0)
+
+                            // Sent tab
+                            Group {
+                                if sentConversations.isEmpty {
+                                    tabEmptyStateView(
+                                        icon: "arrow.up.circle",
+                                        title: "No Sent Messages",
+                                        subtitle: "Messages you've sent waiting for replies will appear here"
+                                    )
+                                } else {
+                                    conversationsListView
+                                }
+                            }
+                            .tag(1)
+                        }
+                        .tabViewStyle(.page(indexDisplayMode: .never))
                     }
                 }
             }
@@ -162,26 +217,43 @@ struct MessagesView: View {
                                 .font(.largeTitle.weight(.bold))
                                 .foregroundColor(.white)
                             
-                            if !conversations.isEmpty {
-                                HStack(spacing: 6) {
-                                    Text("\(conversations.count)")
+                            HStack(spacing: 8) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "arrow.down.circle.fill")
+                                        .font(.caption)
+                                    Text("\(receivedConversations.count)")
                                         .fontWeight(.semibold)
-                                    Text("chats")
-                                    
-                                    if totalUnread > 0 {
-                                        Text("•")
-                                        HStack(spacing: 4) {
-                                            Circle()
-                                                .fill(Color.white)
-                                                .frame(width: 6, height: 6)
-                                            Text("\(totalUnread) unread")
-                                                .fontWeight(.semibold)
-                                        }
+                                }
+
+                                if sentConversations.count > 0 {
+                                    Circle()
+                                        .fill(Color.white.opacity(0.5))
+                                        .frame(width: 4, height: 4)
+
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "arrow.up.circle.fill")
+                                            .font(.caption)
+                                        Text("\(sentConversations.count) sent")
+                                            .fontWeight(.semibold)
                                     }
                                 }
-                                .font(.subheadline)
-                                .foregroundColor(.white.opacity(0.95))
+
+                                if totalUnread > 0 {
+                                    Circle()
+                                        .fill(Color.white.opacity(0.5))
+                                        .frame(width: 4, height: 4)
+
+                                    HStack(spacing: 4) {
+                                        Circle()
+                                            .fill(Color.white)
+                                            .frame(width: 6, height: 6)
+                                        Text("\(totalUnread) unread")
+                                            .fontWeight(.semibold)
+                                    }
+                                }
                             }
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.95))
                         }
                     }
                     
@@ -236,7 +308,64 @@ struct MessagesView: View {
         }
         .frame(height: 140)
     }
-    
+
+    // MARK: - Tab Selector
+
+    private var messageTabSelector: some View {
+        HStack(spacing: 0) {
+            ForEach(0..<tabs.count, id: \.self) { index in
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        selectedMessageTab = index
+                    }
+                    HapticManager.shared.impact(.light)
+                } label: {
+                    VStack(spacing: 8) {
+                        HStack(spacing: 6) {
+                            Text(tabs[index])
+                                .font(.subheadline)
+                                .fontWeight(selectedMessageTab == index ? .bold : .medium)
+
+                            // Show count badge
+                            let count = index == 0 ? receivedConversations.count : sentConversations.count
+                            if count > 0 {
+                                Text("\(count)")
+                                    .font(.caption2)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(selectedMessageTab == index ? .white : .purple)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(
+                                        Capsule()
+                                            .fill(selectedMessageTab == index ? Color.purple : Color.purple.opacity(0.2))
+                                    )
+                            }
+                        }
+                        .foregroundColor(selectedMessageTab == index ? .primary : .secondary)
+
+                        // Indicator line
+                        Rectangle()
+                            .fill(
+                                selectedMessageTab == index ?
+                                LinearGradient(
+                                    colors: [.purple, .pink],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                ) :
+                                LinearGradient(colors: [Color.clear], startPoint: .leading, endPoint: .trailing)
+                            )
+                            .frame(height: 3)
+                            .cornerRadius(1.5)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(.horizontal)
+        .padding(.top, 8)
+        .background(Color(.systemBackground))
+    }
+
     // MARK: - Search Bar
     
     private var searchBar: some View {
@@ -399,7 +528,52 @@ struct MessagesView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-    
+
+    // MARK: - Tab Empty State
+
+    private func tabEmptyStateView(icon: String, title: String, subtitle: String) -> some View {
+        VStack(spacing: 20) {
+            Spacer()
+
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.purple.opacity(0.15), Color.pink.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 100, height: 100)
+
+                Image(systemName: icon)
+                    .font(.system(size: 40))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+
+            VStack(spacing: 8) {
+                Text(title)
+                    .font(.title3)
+                    .fontWeight(.semibold)
+
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+            }
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     // MARK: - Helper Functions
     
     private func loadData() async {
