@@ -76,19 +76,27 @@ class FirestoreSwipeRepository: SwipeRepository {
     }
 
     func getLikesReceived(userId: String) async throws -> [String] {
+        Logger.shared.debug("Querying likes received for userId: \(userId)", category: .matching)
+
         let snapshot = try await db.collection("likes")
             .whereField("toUserId", isEqualTo: userId)
             .whereField("isActive", isEqualTo: true)
             .getDocuments()
 
+        Logger.shared.debug("Found \(snapshot.documents.count) likes received", category: .matching)
+
         return snapshot.documents.compactMap { $0.data()["fromUserId"] as? String }
     }
 
     func getLikesSent(userId: String) async throws -> [String] {
+        Logger.shared.debug("Querying likes sent for userId: \(userId)", category: .matching)
+
         let snapshot = try await db.collection("likes")
             .whereField("fromUserId", isEqualTo: userId)
             .whereField("isActive", isEqualTo: true)
             .getDocuments()
+
+        Logger.shared.debug("Found \(snapshot.documents.count) likes sent", category: .matching)
 
         return snapshot.documents.compactMap { $0.data()["toUserId"] as? String }
     }
