@@ -563,22 +563,20 @@ class LikesViewModel: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
-        #if DEBUG
-        // In DEBUG mode, always show test data for demo purposes
-        usersWhoLikedMe = TestData.usersWhoLikedMe
-        usersILiked = TestData.usersILiked
-        mutualLikes = TestData.mutualLikes
-
-        // Cache test matches so Message button works
-        for (user, match) in TestData.testMatches {
-            if let userId = user.effectiveId {
-                matchesCache[userId] = match
-            }
-        }
-        return
-        #endif
-
         guard let currentUserId = AuthService.shared.currentUser?.effectiveId else {
+            #if DEBUG
+            // Only use test data when NOT authenticated
+            usersWhoLikedMe = TestData.usersWhoLikedMe
+            usersILiked = TestData.usersILiked
+            mutualLikes = TestData.mutualLikes
+
+            // Cache test matches so Message button works
+            for (user, match) in TestData.testMatches {
+                if let userId = user.effectiveId {
+                    matchesCache[userId] = match
+                }
+            }
+            #endif
             return
         }
 
@@ -645,43 +643,6 @@ class LikesViewModel: ObservableObject {
 
     func likeBackUser(_ user: User) async {
         guard let targetUserId = user.effectiveId else { return }
-
-        #if DEBUG
-        // In DEBUG mode, simulate liking back - they liked us, so we create a mutual match
-        await MainActor.run {
-            if let index = usersWhoLikedMe.firstIndex(where: { $0.effectiveId == targetUserId }) {
-                let likedUser = usersWhoLikedMe.remove(at: index)
-
-                // Add to mutual likes if not already there
-                if !mutualLikes.contains(where: { $0.effectiveId == targetUserId }) {
-                    mutualLikes.append(likedUser)
-                }
-
-                // Add to my likes if not already there
-                if !usersILiked.contains(where: { $0.effectiveId == targetUserId }) {
-                    usersILiked.append(likedUser)
-                }
-
-                // Create a test match and cache it for messaging
-                let newMatch = Match(
-                    id: "match_\(targetUserId)",
-                    user1Id: "current_user",
-                    user2Id: targetUserId,
-                    timestamp: Date(),
-                    lastMessageTimestamp: nil,
-                    lastMessage: nil,
-                    lastMessageSenderId: nil,
-                    unreadCount: [:],
-                    isActive: true
-                )
-                matchesCache[targetUserId] = newMatch
-            }
-        }
-        HapticManager.shared.notification(.success)
-        Logger.shared.info("Liked back user - now mutual!", category: .matching)
-        return
-        #endif
-
         guard let currentUserId = AuthService.shared.currentUser?.effectiveId else { return }
 
         do {
