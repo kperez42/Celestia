@@ -145,11 +145,11 @@ struct FeedDiscoverView: View {
                     .animation(.spring(response: 0.5, dampingFraction: 0.7), value: authService.currentUser)
                 }
 
-                ForEach(Array(displayedUsers.enumerated()), id: \.element.id) { index, user in
+                ForEach(Array(displayedUsers.enumerated()), id: \.element.effectiveId) { index, user in
                     ProfileFeedCard(
                         user: user,
                         currentUser: authService.currentUser,  // NEW: Pass current user for shared interests
-                        initialIsFavorited: favorites.contains(user.id ?? ""),
+                        initialIsFavorited: favorites.contains(user.effectiveId ?? ""),
                         onLike: {
                             handleLike(user: user)
                         },
@@ -309,7 +309,7 @@ struct FeedDiscoverView: View {
     // MARK: - Helper Methods
 
     private func syncFavorites() {
-        let userIds = savedProfilesViewModel.savedProfiles.compactMap { $0.user.id }
+        let userIds = savedProfilesViewModel.savedProfiles.compactMap { $0.user.effectiveId }
         favorites = Set(userIds)
         Logger.shared.debug("Favorites set synced: \(favorites.count) profiles", category: .general)
     }
@@ -702,7 +702,7 @@ struct FeedDiscoverView: View {
     }
 
     private func handleFavorite(user: User) {
-        guard let userId = user.id else {
+        guard let userId = user.effectiveId else {
             showToast(
                 message: "Unable to save profile",
                 icon: "exclamationmark.triangle.fill",
@@ -723,7 +723,7 @@ struct FeedDiscoverView: View {
             )
 
             // Remove from SavedProfilesViewModel
-            if let savedProfile = savedProfilesViewModel.savedProfiles.first(where: { $0.user.id == userId }) {
+            if let savedProfile = savedProfilesViewModel.savedProfiles.first(where: { $0.user.effectiveId == userId }) {
                 savedProfilesViewModel.unsaveProfile(savedProfile)
             }
         } else {
@@ -745,7 +745,7 @@ struct FeedDiscoverView: View {
 
                 // Check if save succeeded (will be in savedProfiles array)
                 await MainActor.run {
-                    let saveSucceeded = savedProfilesViewModel.savedProfiles.contains(where: { $0.user.id == userId })
+                    let saveSucceeded = savedProfilesViewModel.savedProfiles.contains(where: { $0.user.effectiveId == userId })
                     if !saveSucceeded {
                         // Revert optimistic update on failure
                         favorites.remove(userId)

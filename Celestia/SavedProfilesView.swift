@@ -892,13 +892,13 @@ class SavedProfilesViewModel: ObservableObject {
 
     func saveProfile(user: User, note: String? = nil) async {
         guard let currentUserId = AuthService.shared.currentUser?.id,
-              let savedUserId = user.id else {
-            Logger.shared.error("Cannot save profile: Missing user ID", category: .general)
+              let savedUserId = user.effectiveId else {
+            Logger.shared.error("Cannot save profile: Missing user ID (id=\(user.id ?? "nil"), effectiveId=\(user.effectiveId ?? "nil"))", category: .general)
             return
         }
 
         // Check if already saved to prevent duplicates
-        if savedProfiles.contains(where: { $0.user.id == savedUserId }) {
+        if savedProfiles.contains(where: { $0.user.effectiveId == savedUserId }) {
             Logger.shared.info("Profile already saved: \(user.fullName)", category: .general)
             return
         }
