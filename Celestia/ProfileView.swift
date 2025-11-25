@@ -1676,18 +1676,32 @@ struct PhotoViewerView: View {
     let photos: [String]
     @Binding var selectedIndex: Int
     @Environment(\.dismiss) var dismiss
-    
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            
+
             TabView(selection: $selectedIndex) {
                 ForEach(photos.indices, id: \.self) { index in
                     if let url = URL(string: photos[index]) {
-                        CachedAsyncImage(url: url) { image in
-                            image
-                                .resizable()
-                                .scaledToFit()
+                        GeometryReader { geometry in
+                            CachedAsyncImage(
+                                url: url,
+                                content: { image in
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fit)
+                                        .frame(width: geometry.size.width, height: geometry.size.height)
+                                },
+                                placeholder: {
+                                    ZStack {
+                                        Color.clear
+                                        ProgressView()
+                                            .tint(.white)
+                                            .scaleEffect(1.5)
+                                    }
+                                }
+                            )
                         }
                         .tag(index)
                     } else {
@@ -1701,7 +1715,8 @@ struct PhotoViewerView: View {
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .always))
-            
+            .indexViewStyle(.page(backgroundDisplayMode: .always))
+
             VStack {
                 HStack {
                     Spacer()
