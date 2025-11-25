@@ -739,10 +739,22 @@ class SavedProfilesViewModel: ObservableObject {
             let userIds = savedMetadata.map { $0.userId }
             var fetchedUsers: [String: User] = [:]
 
-            // Chunk user IDs into groups of 10 (Firestore whereIn limit)
-            let chunkedUserIds = userIds.chunked(into: 10)
+            #if DEBUG
+            // In DEBUG mode, also include test users from TestData
+            for testUser in TestData.discoverUsers {
+                if let testUserId = testUser.id, userIds.contains(testUserId) {
+                    fetchedUsers[testUserId] = testUser
+                }
+            }
+            #endif
 
-            for chunk in chunkedUserIds {
+            // Chunk user IDs into groups of 10 (Firestore whereIn limit)
+            // Only fetch from Firestore for IDs not already found in test data
+            let remainingUserIds = userIds.filter { fetchedUsers[$0] == nil }
+            let chunkedUserIds = remainingUserIds.chunked(into: 10)
+
+            // Only query Firestore if there are remaining user IDs to fetch
+            for chunk in chunkedUserIds where !chunk.isEmpty {
                 let usersSnapshot = try await db.collection("users")
                     .whereField(FieldPath.documentID(), in: chunk)
                     .getDocuments()
