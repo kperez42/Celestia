@@ -14,6 +14,9 @@ struct ProfileView: View {
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
 
+    // When true, ProfileView is embedded in another NavigationStack (no nested nav)
+    var isEmbedded: Bool = false
+
     @State private var showingEditProfile = false
     @State private var showingSettings = false
     @State private var showingPremiumUpgrade = false
@@ -34,9 +37,20 @@ struct ProfileView: View {
         formatter.dateStyle = .medium
         return formatter
     }()
-    
+
     var body: some View {
-        NavigationStack {
+        if isEmbedded {
+            profileContent
+                .networkStatusBanner()
+        } else {
+            NavigationStack {
+                profileContent
+            }
+            .networkStatusBanner()
+        }
+    }
+
+    private var profileContent: some View {
             ZStack {
                 Color(.systemGroupedBackground)
                     .ignoresSafeArea()
@@ -145,8 +159,9 @@ struct ProfileView: View {
                     profileLoadingView
                 }
             }
-            .navigationTitle("")
-            .navigationBarHidden(true)
+            .navigationTitle(isEmbedded ? "Your Profile" : "")
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarHidden(!isEmbedded)
             .accessibilityIdentifier(AccessibilityIdentifier.profileView)
             .sheet(isPresented: $showingEditProfile, onDismiss: {
                 // CACHE FIX: Force refresh profile data when returning from edit
@@ -212,8 +227,6 @@ struct ProfileView: View {
                 context: .profile(userId: authService.currentUser?.id ?? ""),
                 userName: authService.currentUser?.fullName ?? "User"
             )
-        }
-        .networkStatusBanner() // UX: Show offline status
     }
 
     // MARK: - Tip Action Handler

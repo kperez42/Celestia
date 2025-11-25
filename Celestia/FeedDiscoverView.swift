@@ -87,7 +87,7 @@ struct FeedDiscoverView: View {
                     syncFavorites()
                 }
                 .navigationDestination(isPresented: $showOwnProfile) {
-                    ProfileView()
+                    ProfileView(isEmbedded: true)
                         .environmentObject(authService)
                 }
         }
