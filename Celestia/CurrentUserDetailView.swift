@@ -110,182 +110,128 @@ struct CurrentUserDetailView: View {
 
                     // Bio section
                     if !user.bio.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "quote.bubble.fill")
-                                    .font(.title3)
-                                    .foregroundStyle(
-                                        LinearGradient(
-                                            colors: [.purple, .pink],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-
-                                Text("About")
-                                    .font(.title3.weight(.semibold))
-                                    .foregroundColor(.primary)
-                            }
-
+                        ProfileSectionCard(
+                            icon: "quote.bubble.fill",
+                            title: "About",
+                            iconColors: [.purple, .pink],
+                            borderColor: .purple
+                        ) {
                             Text(user.bio)
                                 .font(.body)
                                 .foregroundColor(.secondary)
                                 .lineSpacing(4)
                         }
-                        .padding(16)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(Color(.systemBackground))
-                                .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(Color.purple.opacity(0.1), lineWidth: 1)
-                        )
                     }
 
                     // Languages section
                     if !user.languages.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "globe")
-                                    .font(.title3)
-                                    .foregroundStyle(
-                                        LinearGradient(
-                                            colors: [.blue, .cyan],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-
-                                Text("Languages")
-                                    .font(.title3.weight(.semibold))
-                                    .foregroundColor(.primary)
-                            }
-
+                        ProfileSectionCard(
+                            icon: "globe",
+                            title: "Languages",
+                            iconColors: [.blue, .cyan],
+                            borderColor: .blue
+                        ) {
                             FlowLayout2(spacing: 10) {
                                 ForEach(user.languages, id: \.self) { language in
-                                    Text(language)
-                                        .font(.subheadline.weight(.medium))
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 8)
-                                        .background(
-                                            LinearGradient(
-                                                colors: [Color.blue.opacity(0.15), Color.cyan.opacity(0.1)],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                        )
-                                        .foregroundColor(.blue)
-                                        .cornerRadius(20)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 20)
-                                                .stroke(Color.blue.opacity(0.2), lineWidth: 1)
-                                        )
+                                    ProfileTagView(text: language, colors: [.blue, .cyan], textColor: .blue)
                                 }
                             }
                         }
-                        .padding(16)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(Color(.systemBackground))
-                                .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(Color.blue.opacity(0.1), lineWidth: 1)
-                        )
                     }
 
                     // Interests section
                     if !user.interests.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "sparkles")
-                                    .font(.title3)
-                                    .foregroundStyle(
-                                        LinearGradient(
-                                            colors: [.orange, .pink],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-
-                                Text("Interests")
-                                    .font(.title3.weight(.semibold))
-                                    .foregroundColor(.primary)
-                            }
-
+                        ProfileSectionCard(
+                            icon: "sparkles",
+                            title: "Interests",
+                            iconColors: [.orange, .pink],
+                            borderColor: .orange
+                        ) {
                             FlowLayout2(spacing: 10) {
                                 ForEach(user.interests, id: \.self) { interest in
-                                    Text(interest)
-                                        .font(.subheadline.weight(.medium))
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 8)
-                                        .background(
-                                            LinearGradient(
-                                                colors: [Color.orange.opacity(0.15), Color.pink.opacity(0.1)],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                        )
-                                        .foregroundColor(.orange)
-                                        .cornerRadius(20)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 20)
-                                                .stroke(Color.orange.opacity(0.2), lineWidth: 1)
-                                        )
+                                    ProfileTagView(text: interest, colors: [.orange, .pink], textColor: .orange)
                                 }
                             }
                         }
-                        .padding(16)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(Color(.systemBackground))
-                                .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(Color.orange.opacity(0.1), lineWidth: 1)
-                        )
+                    }
+
+                    // Prompts section
+                    if !user.prompts.isEmpty {
+                        ProfileSectionCard(
+                            icon: "quote.bubble.fill",
+                            title: "Get to Know Me",
+                            iconColors: [.purple, .pink],
+                            borderColor: .purple
+                        ) {
+                            VStack(spacing: 12) {
+                                ForEach(user.prompts) { prompt in
+                                    PromptCard(prompt: prompt)
+                                }
+                            }
+                        }
+                    }
+
+                    // Details section (height, religion, relationship goal)
+                    if hasAdvancedDetails {
+                        ProfileSectionCard(
+                            icon: "person.text.rectangle",
+                            title: "Details",
+                            iconColors: [.indigo, .purple],
+                            borderColor: .indigo
+                        ) {
+                            VStack(spacing: 12) {
+                                if let height = user.height {
+                                    DetailRow(icon: "ruler", label: "Height", value: "\(height) cm (\(heightToFeetInches(height)))")
+                                }
+                                if let goal = user.relationshipGoal, goal != "Prefer not to say" {
+                                    DetailRow(icon: "heart.circle", label: "Looking for", value: goal)
+                                }
+                                if let religion = user.religion, religion != "Prefer not to say" {
+                                    DetailRow(icon: "sparkles", label: "Religion", value: religion)
+                                }
+                            }
+                        }
+                    }
+
+                    // Lifestyle section
+                    if hasLifestyleDetails {
+                        ProfileSectionCard(
+                            icon: "leaf.fill",
+                            title: "Lifestyle",
+                            iconColors: [.green, .mint],
+                            borderColor: .green
+                        ) {
+                            VStack(spacing: 12) {
+                                if let smoking = user.smoking, smoking != "Prefer not to say" {
+                                    DetailRow(icon: "smoke", label: "Smoking", value: smoking)
+                                }
+                                if let drinking = user.drinking, drinking != "Prefer not to say" {
+                                    DetailRow(icon: "wineglass", label: "Drinking", value: drinking)
+                                }
+                                if let exercise = user.exercise, exercise != "Prefer not to say" {
+                                    DetailRow(icon: "figure.run", label: "Exercise", value: exercise)
+                                }
+                                if let diet = user.diet, diet != "Prefer not to say" {
+                                    DetailRow(icon: "fork.knife", label: "Diet", value: diet)
+                                }
+                                if let pets = user.pets, pets != "Prefer not to say" {
+                                    DetailRow(icon: "pawprint.fill", label: "Pets", value: pets)
+                                }
+                            }
+                        }
                     }
 
                     // Looking for section
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "heart.fill")
-                                .font(.title3)
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [.purple, .pink],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-
-                            Text("Looking for")
-                                .font(.title3.weight(.semibold))
-                                .foregroundColor(.primary)
-                        }
-
+                    ProfileSectionCard(
+                        icon: "heart.fill",
+                        title: "Looking for",
+                        iconColors: [.purple, .pink],
+                        borderColor: .purple
+                    ) {
                         Text("\(user.lookingFor), ages \(user.ageRangeMin)-\(user.ageRangeMax)")
                             .font(.body)
                             .foregroundColor(.secondary)
                     }
-                    .padding(16)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(Color(.systemBackground))
-                            .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(Color.purple.opacity(0.1), lineWidth: 1)
-                    )
                 }
                 .padding(20)
                 .padding(.bottom, 100)
@@ -346,6 +292,31 @@ struct CurrentUserDetailView: View {
                 selectedIndex: $selectedPhotoIndex
             )
         }
+    }
+
+    // MARK: - Helper Properties
+
+    private var hasAdvancedDetails: Bool {
+        user.height != nil ||
+        (user.relationshipGoal != nil && user.relationshipGoal != "Prefer not to say") ||
+        (user.religion != nil && user.religion != "Prefer not to say")
+    }
+
+    private var hasLifestyleDetails: Bool {
+        (user.smoking != nil && user.smoking != "Prefer not to say") ||
+        (user.drinking != nil && user.drinking != "Prefer not to say") ||
+        (user.exercise != nil && user.exercise != "Prefer not to say") ||
+        (user.diet != nil && user.diet != "Prefer not to say") ||
+        (user.pets != nil && user.pets != "Prefer not to say")
+    }
+
+    // MARK: - Helper Functions
+
+    private func heightToFeetInches(_ cm: Int) -> String {
+        let totalInches = Double(cm) / 2.54
+        let feet = Int(totalInches / 12)
+        let inches = Int(totalInches.truncatingRemainder(dividingBy: 12))
+        return "\(feet)'\(inches)\""
     }
 }
 
