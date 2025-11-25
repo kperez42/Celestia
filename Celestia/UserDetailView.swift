@@ -243,6 +243,162 @@ struct UserDetailView: View {
                         )
                     }
 
+                    // Profile Prompts section
+                    if !user.prompts.isEmpty {
+                        VStack(alignment: .leading, spacing: 16) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "quote.bubble.fill")
+                                    .font(.title3)
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [.purple, .pink],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+
+                                Text("Get to Know Me")
+                                    .font(.title3.weight(.semibold))
+                                    .foregroundColor(.primary)
+                            }
+
+                            ForEach(user.prompts) { prompt in
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text(prompt.question)
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.purple)
+
+                                    Text(prompt.answer)
+                                        .font(.body)
+                                        .foregroundColor(.primary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                .padding(16)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(
+                                    LinearGradient(
+                                        colors: [Color.purple.opacity(0.05), Color.pink.opacity(0.03)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .cornerRadius(12)
+                            }
+                        }
+                        .padding(16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color(.systemBackground))
+                                .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.purple.opacity(0.1), lineWidth: 1)
+                        )
+                    }
+
+                    // Advanced Details section (height, relationship goal, religion)
+                    if hasAdvancedDetails {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "person.text.rectangle")
+                                    .font(.title3)
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [.indigo, .purple],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+
+                                Text("Details")
+                                    .font(.title3.weight(.semibold))
+                                    .foregroundColor(.primary)
+                            }
+
+                            VStack(spacing: 12) {
+                                if let height = user.height {
+                                    detailRow(icon: "ruler", label: "Height", value: "\(height) cm (\(heightToFeetInches(height)))")
+                                }
+
+                                if let goal = user.relationshipGoal, goal != "Prefer not to say" {
+                                    detailRow(icon: "heart.circle", label: "Looking for", value: goal)
+                                }
+
+                                if let religion = user.religion, religion != "Prefer not to say" {
+                                    detailRow(icon: "sparkles", label: "Religion", value: religion)
+                                }
+                            }
+                        }
+                        .padding(16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color(.systemBackground))
+                                .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.indigo.opacity(0.1), lineWidth: 1)
+                        )
+                    }
+
+                    // Lifestyle section (smoking, drinking, exercise, diet, pets)
+                    if hasLifestyleDetails {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "leaf.fill")
+                                    .font(.title3)
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [.green, .mint],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+
+                                Text("Lifestyle")
+                                    .font(.title3.weight(.semibold))
+                                    .foregroundColor(.primary)
+                            }
+
+                            VStack(spacing: 12) {
+                                if let smoking = user.smoking, smoking != "Prefer not to say" {
+                                    detailRow(icon: "smoke", label: "Smoking", value: smoking)
+                                }
+
+                                if let drinking = user.drinking, drinking != "Prefer not to say" {
+                                    detailRow(icon: "wineglass", label: "Drinking", value: drinking)
+                                }
+
+                                if let exercise = user.exercise, exercise != "Prefer not to say" {
+                                    detailRow(icon: "figure.run", label: "Exercise", value: exercise)
+                                }
+
+                                if let diet = user.diet, diet != "Prefer not to say" {
+                                    detailRow(icon: "fork.knife", label: "Diet", value: diet)
+                                }
+
+                                if let pets = user.pets, pets != "Prefer not to say" {
+                                    detailRow(icon: "pawprint.fill", label: "Pets", value: pets)
+                                }
+                            }
+                        }
+                        .padding(16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color(.systemBackground))
+                                .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.green.opacity(0.1), lineWidth: 1)
+                        )
+                    }
+
                     // Looking for section - Card style
                     VStack(alignment: .leading, spacing: 12) {
                         HStack(spacing: 8) {
@@ -407,7 +563,54 @@ struct UserDetailView: View {
             Text(errorMessage.isEmpty ? "Failed to send like. Please try again." : errorMessage)
         }
     }
-    
+
+    // MARK: - Helper Properties
+
+    private var hasAdvancedDetails: Bool {
+        user.height != nil ||
+        (user.relationshipGoal != nil && user.relationshipGoal != "Prefer not to say") ||
+        (user.religion != nil && user.religion != "Prefer not to say")
+    }
+
+    private var hasLifestyleDetails: Bool {
+        (user.smoking != nil && user.smoking != "Prefer not to say") ||
+        (user.drinking != nil && user.drinking != "Prefer not to say") ||
+        (user.exercise != nil && user.exercise != "Prefer not to say") ||
+        (user.diet != nil && user.diet != "Prefer not to say") ||
+        (user.pets != nil && user.pets != "Prefer not to say")
+    }
+
+    // MARK: - Helper Views
+
+    private func detailRow(icon: String, label: String, value: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.body)
+                .foregroundColor(.secondary)
+                .frame(width: 24)
+
+            Text(label)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+
+            Spacer()
+
+            Text(value)
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundColor(.primary)
+        }
+    }
+
+    private func heightToFeetInches(_ cm: Int) -> String {
+        let totalInches = Double(cm) / 2.54
+        let feet = Int(totalInches / 12)
+        let inches = Int(totalInches.truncatingRemainder(dividingBy: 12))
+        return "\(feet)'\(inches)\""
+    }
+
+    // MARK: - Actions
+
     func sendInterest() {
         guard let currentUserID = authService.currentUser?.id,
               let targetUserID = user.id,
