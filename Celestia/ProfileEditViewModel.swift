@@ -24,7 +24,7 @@ class ProfileEditViewModel: ObservableObject {
     }
     
     func uploadProfileImage(_ image: UIImage, userId: String) async throws -> String {
-        guard let imageData = image.jpegData(compressionQuality: 0.5) else {
+        guard let imageData = image.jpegData(compressionQuality: 0.85) else {
             throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to convert image"])
         }
 
@@ -100,7 +100,7 @@ class ProfileEditViewModel: ObservableObject {
         var photoURLs: [String] = []
 
         for (index, image) in images.enumerated() {
-            guard let imageData = image.jpegData(compressionQuality: 0.7) else { continue }
+            guard let imageData = image.jpegData(compressionQuality: 0.85) else { continue }
 
             let storageRef = Storage.storage().reference().child("user_photos/\(userId)/photo_\(index)_\(UUID().uuidString).jpg")
             
