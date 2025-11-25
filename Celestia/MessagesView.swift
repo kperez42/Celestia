@@ -595,18 +595,6 @@ struct MessagesView: View {
             return
         }
 
-        #if DEBUG
-        // Use test data in debug mode even with authenticated user
-        await MainActor.run {
-            matchService.matches = TestData.testMatches.map { $0.match }
-            for (user, match) in TestData.testMatches {
-                let otherUserId = match.user2Id
-                matchedUsers[otherUserId] = user
-            }
-        }
-        return
-        #endif
-
         do {
             try await matchService.fetchMatches(userId: userId)
 
@@ -642,13 +630,7 @@ struct MessagesView: View {
     }
     
     private func getMatchedUser(_ match: Match) -> User? {
-        #if DEBUG
-        // In debug mode, use "current_user" as default if not authenticated
-        let currentUserId = authService.currentUser?.id ?? "current_user"
-        #else
         guard let currentUserId = authService.currentUser?.id else { return nil }
-        #endif
-
         let otherUserId = match.user1Id == currentUserId ? match.user2Id : match.user1Id
         return matchedUsers[otherUserId]
     }
