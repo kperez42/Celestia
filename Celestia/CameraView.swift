@@ -215,7 +215,7 @@ class CameraManager: NSObject, ObservableObject {
     }
 
     func startSession() async throws {
-        try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             sessionQueue.async { [weak self] in
                 guard let self = self else {
                     continuation.resume(throwing: CameraError.sessionSetupFailed)
