@@ -610,7 +610,7 @@ struct MatchPickerView: View {
 
     private var matchList: some View {
         List {
-            ForEach(Array(matches.enumerated()), id: \.offset) { index, match in
+            ForEach(Array(matches.enumerated()), id: \.0) { index, match in
                 if let otherUser = getOtherUser(from: match) {
                     MatchPickerRow(user: otherUser) {
                         selectedMatch = otherUser

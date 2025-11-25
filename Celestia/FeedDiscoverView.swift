@@ -855,8 +855,8 @@ struct PhotoGalleryView: View {
                 } else {
                     // Photo gallery
                     TabView(selection: $selectedPhotoIndex) {
-                        ForEach(Array(validPhotos.enumerated()), id: \.offset) { index, photoURL in
-                            CachedCardImage(url: URL(string: photoURL))
+                        ForEach(validPhotos.indices, id: \.self) { index in
+                            CachedCardImage(url: URL(string: validPhotos[index]))
                                 .scaledToFit()
                                 .tag(index)
                         }

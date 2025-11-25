@@ -634,8 +634,8 @@ struct UserCardView: View {
                 // Photo carousel (if multiple photos) or single image
                 if validPhotos.count > 1 {
                     TabView(selection: $selectedPhotoIndex) {
-                        ForEach(Array(validPhotos.enumerated()), id: \.offset) { index, photoURL in
-                            CachedCardImage(url: URL(string: photoURL))
+                        ForEach(validPhotos.indices, id: \.self) { index in
+                            CachedCardImage(url: URL(string: validPhotos[index]))
                                 .frame(width: geometry.size.width, height: geometry.size.height)
                                 .clipped()
                                 .tag(index)
