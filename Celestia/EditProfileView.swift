@@ -261,16 +261,17 @@ struct EditProfileView: View {
                     } else if let currentUser = authService.currentUser,
                               let imageURL = URL(string: currentUser.profileImageURL),
                               !currentUser.profileImageURL.isEmpty {
-                        CachedAsyncImage(url: imageURL) { phase in
-                            switch phase {
-                            case .success(let image):
+                        CachedAsyncImage(
+                            url: imageURL,
+                            content: { image in
                                 image
                                     .resizable()
                                     .scaledToFill()
-                            default:
+                            },
+                            placeholder: {
                                 placeholderImage
                             }
-                        }
+                        )
                     } else {
                         placeholderImage
                     }
@@ -2063,29 +2064,21 @@ struct PhotoGridItem: View {
     var body: some View {
         ZStack(alignment: .topTrailing) {
             // Photo - PERFORMANCE: Use CachedAsyncImage
-            CachedAsyncImage(url: URL(string: photoURL)) { phase in
-                switch phase {
-                case .success(let image):
+            CachedAsyncImage(
+                url: URL(string: photoURL),
+                content: { image in
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                case .failure:
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.2))
-                        .overlay {
-                            Image(systemName: "photo")
-                                .foregroundColor(.gray)
-                        }
-                case .empty:
+                },
+                placeholder: {
                     Rectangle()
                         .fill(Color.gray.opacity(0.1))
                         .overlay {
                             ProgressView()
                         }
-                @unknown default:
-                    EmptyView()
                 }
-            }
+            )
             .frame(height: 120)
             .clipShape(RoundedRectangle(cornerRadius: 12))
 

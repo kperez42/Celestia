@@ -114,18 +114,19 @@ struct ImprovedUserCard: View {
             ZStack {
                 // Background image or gradient - PERFORMANCE: Use CachedAsyncImage for smooth scrolling
                 if let imageURL = URL(string: user.profileImageURL), !user.profileImageURL.isEmpty {
-                    CachedAsyncImage(url: imageURL) { phase in
-                        switch phase {
-                        case .success(let image):
+                    CachedAsyncImage(
+                        url: imageURL,
+                        content: { image in
                             image
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
                                 .frame(width: geometry.size.width, height: geometry.size.height)
                                 .clipped()
-                        default:
+                        },
+                        placeholder: {
                             placeholderGradient
                         }
-                    }
+                    )
                 } else {
                     placeholderGradient
                         .overlay {

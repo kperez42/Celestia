@@ -171,16 +171,17 @@ struct ImprovedUserDetailSheet: View {
                     .tag(0)
             } else {
                 ForEach(photos.indices, id: \.self) { index in
-                    CachedAsyncImage(url: URL(string: photos[index])) { phase in
-                        switch phase {
-                        case .success(let image):
+                    CachedAsyncImage(
+                        url: URL(string: photos[index]),
+                        content: { image in
                             image
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
-                        default:
+                        },
+                        placeholder: {
                             placeholderPhoto
                         }
-                    }
+                    )
                     .tag(index)
                 }
             }

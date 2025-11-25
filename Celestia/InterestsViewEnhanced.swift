@@ -635,22 +635,21 @@ struct InterestCard: View {
                 // Selection indicator overlay
                 ZStack(alignment: .topTrailing) {
                     // User image - PERFORMANCE: Use CachedAsyncImage for smooth scrolling
-                    CachedAsyncImage(url: URL(string: user.profileImageURL)) { phase in
-                        switch phase {
-                        case .success(let image):
+                    CachedAsyncImage(
+                        url: URL(string: user.profileImageURL),
+                        content: { image in
                             image
                                 .resizable()
                                 .scaledToFill()
-                        case .failure(_), .empty:
+                        },
+                        placeholder: {
                             LinearGradient(
                                 colors: [Color.purple.opacity(0.6), Color.pink.opacity(0.5)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
-                        @unknown default:
-                            Color.gray
                         }
-                    }
+                    )
                     .frame(height: 180)
                     .clipped()
                     .blur(radius: isBlurred ? 20 : 0)
