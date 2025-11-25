@@ -1548,6 +1548,13 @@ struct EditProfileView: View {
 
             do {
                 user.photos = photos
+
+                // Auto-set profileImageURL to first photo if empty
+                if user.profileImageURL.isEmpty, let firstPhoto = photos.first, !firstPhoto.isEmpty {
+                    user.profileImageURL = firstPhoto
+                    Logger.shared.info("📸 Auto-set profileImageURL to first uploaded photo", category: .general)
+                }
+
                 try await authService.updateUser(user)
 
                 Logger.shared.info("✅ Successfully saved \(successCount) photos to Firebase!", category: .general)

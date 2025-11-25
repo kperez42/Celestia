@@ -32,6 +32,14 @@ struct ProfileFeedCard: View {
         return Array(userInterests.intersection(myInterests)).sorted()
     }
 
+    // Get the best available photo URL (photos array first, then profileImageURL)
+    private var displayPhotoURL: String {
+        if let firstPhoto = user.photos.first, !firstPhoto.isEmpty {
+            return firstPhoto
+        }
+        return user.profileImageURL
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Profile Image
@@ -88,7 +96,7 @@ struct ProfileFeedCard: View {
     // MARK: - Components
 
     private var profileImage: some View {
-        CachedCardImage(url: URL(string: user.profileImageURL))
+        CachedCardImage(url: URL(string: displayPhotoURL))
             .frame(height: 400)
             .clipped()
             .cornerRadius(16, corners: [.topLeft, .topRight])
