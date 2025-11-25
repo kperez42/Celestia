@@ -134,6 +134,85 @@ class ImageCache {
         try? fileManager.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
     }
 
+    // MARK: - In-Flight Request Deduplication
+
+    /// Track in-flight requests to prevent duplicate network calls
+    private var inFlightRequests: [String: Task<UIImage?, Never>] = [:]
+
+    /// Load image with deduplication - prevents multiple network requests for same URL
+    func loadImageAsync(for url: URL) async -> UIImage? {
+        let cacheKey = url.absoluteString
+
+        // Check cache first
+        if let cachedImage = image(for: cacheKey) {
+            return cachedImage
+        }
+
+        // Check if there's already an in-flight request for this URL
+        if let existingTask = inFlightRequests[cacheKey] {
+            return await existingTask.value
+        }
+
+        // Create new task for this request
+        let task = Task<UIImage?, Never> {
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+
+                guard !Task.isCancelled else { return nil }
+
+                if let downloadedImage = UIImage(data: data) {
+                    setImage(downloadedImage, for: cacheKey)
+                    return downloadedImage
+                }
+            } catch {
+                Logger.shared.error("Failed to load image: \(url.absoluteString)", category: .storage, error: error)
+            }
+            return nil
+        }
+
+        inFlightRequests[cacheKey] = task
+        let result = await task.value
+        inFlightRequests.removeValue(forKey: cacheKey)
+
+        return result
+    }
+
+    // MARK: - Image Prefetching
+
+    /// Prefetch images for smooth scrolling - call with upcoming user photo URLs
+    func prefetchImages(urls: [String]) {
+        for urlString in urls {
+            guard let url = URL(string: urlString), !urlString.isEmpty else { continue }
+
+            let cacheKey = url.absoluteString
+
+            // Skip if already cached
+            if image(for: cacheKey) != nil { continue }
+
+            // Skip if already loading
+            if inFlightRequests[cacheKey] != nil { continue }
+
+            // Start prefetch with low priority
+            Task.detached(priority: .utility) {
+                _ = await self.loadImageAsync(for: url)
+            }
+        }
+    }
+
+    /// Prefetch images for a list of users
+    func prefetchUserImages(users: [User]) {
+        var urls: [String] = []
+        for user in users {
+            // Prefetch first photo or profile image
+            if let firstPhoto = user.photos.first, !firstPhoto.isEmpty {
+                urls.append(firstPhoto)
+            } else if !user.profileImageURL.isEmpty {
+                urls.append(user.profileImageURL)
+            }
+        }
+        prefetchImages(urls: urls)
+    }
+
     func getCacheSize() async -> Int64 {
         var totalSize: Int64 = 0
 
@@ -232,7 +311,7 @@ class ImageCache {
     }
 
     private func saveToDisk(image: UIImage, key: String) async {
-        guard let data = image.jpegData(compressionQuality: 0.8) else { return }
+        guard let data = image.jpegData(compressionQuality: 0.9) else { return } // Higher quality cache
 
         let fileURL = cacheDirectory.appendingPathComponent(key.sha256())
         try? data.write(to: fileURL)
@@ -672,41 +751,27 @@ struct CachedCardImage: View {
         // Cancel previous task if any
         loadTask?.cancel()
 
-        // Load from network
+        // Load using deduplicated method
         isLoading = true
         loadError = nil
 
         loadTask = Task {
-            do {
-                let (data, _) = try await URLSession.shared.data(from: url)
+            // Use deduplicated loading to prevent multiple network requests
+            let loadedImage = await ImageCache.shared.loadImageAsync(for: url)
 
-                guard !Task.isCancelled else {
-                    await MainActor.run { self.isLoading = false }
-                    return
-                }
+            guard !Task.isCancelled else {
+                await MainActor.run { self.isLoading = false }
+                return
+            }
 
-                if let downloadedImage = UIImage(data: data) {
-                    await MainActor.run {
-                        ImageCache.shared.setImage(downloadedImage, for: cacheKey)
-                        self.image = downloadedImage
-                        self.isLoading = false
-                    }
-                } else {
-                    await MainActor.run {
-                        self.isLoading = false
-                        self.loadError = NSError(domain: "ImageCache", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid image data"])
-                    }
-                }
-            } catch {
-                guard !Task.isCancelled else {
-                    await MainActor.run { self.isLoading = false }
-                    return
-                }
-                await MainActor.run {
+            await MainActor.run {
+                if let loadedImage = loadedImage {
+                    self.image = loadedImage
                     self.isLoading = false
-                    self.loadError = error
+                } else {
+                    self.isLoading = false
+                    self.loadError = NSError(domain: "ImageCache", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to load image"])
                 }
-                Logger.shared.error("Failed to load card image", category: .storage, error: error)
             }
         }
     }

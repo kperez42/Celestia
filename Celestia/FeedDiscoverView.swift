@@ -551,6 +551,9 @@ struct FeedDiscoverView: View {
                 errorMessage = ""  // Clear any previous errors
                 isInitialLoad = false  // Hide skeleton and show content
                 loadMoreUsers()
+
+                // Prefetch images for smooth scrolling
+                ImageCache.shared.prefetchUserImages(users: Array(users.prefix(10)))
             }
         } catch {
             Logger.shared.error("Error loading users", category: .database, error: error)
@@ -572,6 +575,14 @@ struct FeedDiscoverView: View {
         let newUsers = Array(users[startIndex..<endIndex])
         displayedUsers.append(contentsOf: newUsers)
         currentPage += 1
+
+        // Prefetch images for next batch to ensure smooth scrolling
+        let nextBatchStart = endIndex
+        let nextBatchEnd = min(nextBatchStart + usersPerPage, users.count)
+        if nextBatchStart < users.count {
+            let upcomingUsers = Array(users[nextBatchStart..<nextBatchEnd])
+            ImageCache.shared.prefetchUserImages(users: upcomingUsers)
+        }
     }
 
     private func refreshFeed() async {

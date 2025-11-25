@@ -16,7 +16,7 @@ class ImageUploadService {
     // Image constraints
     private let maxImageSize: Int = 10 * 1024 * 1024 // 10 MB
     private let maxDimension: CGFloat = 2048
-    private let compressionQuality: CGFloat = 0.7
+    private let compressionQuality: CGFloat = 0.85 // Higher quality for better photos
 
     private init() {}
 
