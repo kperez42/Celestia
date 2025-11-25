@@ -119,11 +119,20 @@ struct CameraView: View {
 
     private func setupCamera() {
         Task {
-            let authorized = await cameraManager.requestPermission()
-            if authorized {
-                await cameraManager.startSession()
-            } else {
-                showingPermissionAlert = true
+            do {
+                let authorized = await cameraManager.requestPermission()
+                if authorized {
+                    try await cameraManager.startSession()
+                } else {
+                    await MainActor.run {
+                        showingPermissionAlert = true
+                    }
+                }
+            } catch {
+                Logger.shared.error("Camera setup failed: \(error.localizedDescription)", category: .general)
+                await MainActor.run {
+                    showingPermissionAlert = true
+                }
             }
         }
     }
@@ -180,50 +189,112 @@ struct CameraPreviewView: UIViewRepresentable {
 
 // MARK: - Camera Manager
 
-@MainActor
 class CameraManager: NSObject, ObservableObject {
     let session = AVCaptureSession()
     private var photoOutput = AVCapturePhotoOutput()
     private var captureCompletion: ((UIImage?) -> Void)?
+    private let sessionQueue = DispatchQueue(label: "com.celestia.camera.session")
 
     func requestPermission() async -> Bool {
-        await withCheckedContinuation { continuation in
-            AVCaptureDevice.requestAccess(for: .video) { granted in
-                continuation.resume(returning: granted)
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+
+        switch status {
+        case .authorized:
+            return true
+        case .notDetermined:
+            return await withCheckedContinuation { continuation in
+                AVCaptureDevice.requestAccess(for: .video) { granted in
+                    continuation.resume(returning: granted)
+                }
+            }
+        case .denied, .restricted:
+            return false
+        @unknown default:
+            return false
+        }
+    }
+
+    func startSession() async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            sessionQueue.async { [weak self] in
+                guard let self = self else {
+                    continuation.resume(throwing: CameraError.sessionSetupFailed)
+                    return
+                }
+
+                self.session.beginConfiguration()
+                self.session.sessionPreset = .photo
+
+                // Add front camera input
+                guard let frontCamera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) else {
+                    self.session.commitConfiguration()
+                    Logger.shared.error("Front camera not available", category: .general)
+                    continuation.resume(throwing: CameraError.cameraNotAvailable)
+                    return
+                }
+
+                guard let input = try? AVCaptureDeviceInput(device: frontCamera) else {
+                    self.session.commitConfiguration()
+                    Logger.shared.error("Failed to create camera input", category: .general)
+                    continuation.resume(throwing: CameraError.inputCreationFailed)
+                    return
+                }
+
+                guard self.session.canAddInput(input) else {
+                    self.session.commitConfiguration()
+                    Logger.shared.error("Cannot add camera input to session", category: .general)
+                    continuation.resume(throwing: CameraError.cannotAddInput)
+                    return
+                }
+
+                self.session.addInput(input)
+
+                // Add photo output
+                if self.session.canAddOutput(self.photoOutput) {
+                    self.session.addOutput(self.photoOutput)
+                    self.photoOutput.maxPhotoQualityPrioritization = .quality
+                } else {
+                    self.session.commitConfiguration()
+                    Logger.shared.error("Cannot add photo output to session", category: .general)
+                    continuation.resume(throwing: CameraError.cannotAddOutput)
+                    return
+                }
+
+                self.session.commitConfiguration()
+
+                Logger.shared.debug("Starting camera session", category: .general)
+                self.session.startRunning()
+
+                continuation.resume()
             }
         }
     }
 
-    func startSession() async {
-        session.beginConfiguration()
-        session.sessionPreset = .photo
+    enum CameraError: LocalizedError {
+        case sessionSetupFailed
+        case cameraNotAvailable
+        case inputCreationFailed
+        case cannotAddInput
+        case cannotAddOutput
 
-        // Add front camera input
-        guard let frontCamera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front),
-              let input = try? AVCaptureDeviceInput(device: frontCamera),
-              session.canAddInput(input) else {
-            session.commitConfiguration()
-            return
-        }
-
-        session.addInput(input)
-
-        // Add photo output
-        if session.canAddOutput(photoOutput) {
-            session.addOutput(photoOutput)
-            photoOutput.maxPhotoQualityPrioritization = .quality
-        }
-
-        session.commitConfiguration()
-
-        // Start session on background thread
-        Task.detached { [weak self] in
-            self?.session.startRunning()
+        var errorDescription: String? {
+            switch self {
+            case .sessionSetupFailed:
+                return "Camera session setup failed"
+            case .cameraNotAvailable:
+                return "Camera not available on this device"
+            case .inputCreationFailed:
+                return "Failed to create camera input"
+            case .cannotAddInput:
+                return "Cannot add camera input to session"
+            case .cannotAddOutput:
+                return "Cannot add photo output to session"
+            }
         }
     }
 
     func stopSession() {
-        Task.detached { [weak self] in
+        sessionQueue.async { [weak self] in
             self?.session.stopRunning()
         }
     }

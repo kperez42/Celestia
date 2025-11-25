@@ -56,6 +56,11 @@ struct EditProfileView: View {
     @State private var exercise: String?
     @State private var diet: String?
 
+    // Preference fields
+    @State private var ageRangeMin: Int
+    @State private var ageRangeMax: Int
+    @State private var maxDistance: Int
+
     let genderOptions = ["Male", "Female", "Non-binary", "Other"]
     let lookingForOptions = ["Men", "Women", "Everyone"]
     let religionOptions = ["Prefer not to say", "Agnostic", "Atheist", "Buddhist", "Catholic", "Christian", "Hindu", "Jewish", "Muslim", "Spiritual", "Other"]
@@ -105,6 +110,11 @@ struct EditProfileView: View {
         _pets = State(initialValue: user?.pets)
         _exercise = State(initialValue: user?.exercise)
         _diet = State(initialValue: user?.diet)
+
+        // Initialize preference fields
+        _ageRangeMin = State(initialValue: user?.ageRangeMin ?? 18)
+        _ageRangeMax = State(initialValue: user?.ageRangeMax ?? 99)
+        _maxDistance = State(initialValue: user?.maxDistance ?? 50)
     }
     
     var body: some View {
@@ -831,7 +841,7 @@ struct EditProfileView: View {
     // MARK: - Preferences Section
 
     private var preferencesSection: some View {
-        VStack(spacing: 15) {
+        VStack(spacing: 20) {
             SectionHeader(icon: "heart.fill", title: "Dating Preferences", color: .pink)
 
             VStack(alignment: .leading, spacing: 8) {
@@ -847,6 +857,96 @@ struct EditProfileView: View {
                 }
                 .pickerStyle(.segmented)
             }
+
+            // Age Range Preference
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("Age Range")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+
+                    Spacer()
+
+                    Text("\(ageRangeMin) - \(ageRangeMax) years")
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundColor(.pink)
+                }
+
+                HStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Min: \(ageRangeMin)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        Slider(value: Binding(
+                            get: { Double(ageRangeMin) },
+                            set: {
+                                let newValue = Int($0)
+                                ageRangeMin = min(newValue, ageRangeMax - 1)
+                            }
+                        ), in: 18...98, step: 1)
+                        .tint(.pink)
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Max: \(ageRangeMax)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        Slider(value: Binding(
+                            get: { Double(ageRangeMax) },
+                            set: {
+                                let newValue = Int($0)
+                                ageRangeMax = max(newValue, ageRangeMin + 1)
+                            }
+                        ), in: 19...99, step: 1)
+                        .tint(.pink)
+                    }
+                }
+            }
+            .padding()
+            .background(Color.pink.opacity(0.05))
+            .cornerRadius(12)
+
+            // Max Distance Preference
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("Maximum Distance")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+
+                    Spacer()
+
+                    Text(maxDistance >= 500 ? "Anywhere" : "\(maxDistance) km")
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundColor(.pink)
+                }
+
+                Slider(value: Binding(
+                    get: { Double(maxDistance) },
+                    set: { maxDistance = Int($0) }
+                ), in: 5...500, step: 5)
+                .tint(.pink)
+
+                HStack {
+                    Text("5 km")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    Spacer()
+
+                    Text("Anywhere")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding()
+            .background(Color.pink.opacity(0.05))
+            .cornerRadius(12)
         }
         .padding(20)
         .background(Color.white)
@@ -1351,6 +1451,11 @@ struct EditProfileView: View {
                 user.pets = pets
                 user.exercise = exercise
                 user.diet = diet
+
+                // Update preference fields
+                user.ageRangeMin = ageRangeMin
+                user.ageRangeMax = ageRangeMax
+                user.maxDistance = maxDistance
 
                 try await authService.updateUser(user)
                 
