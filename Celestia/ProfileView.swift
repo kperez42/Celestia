@@ -30,6 +30,7 @@ struct ProfileView: View {
     @State private var showingShareSheet = false
     @State private var isRefreshing = false
     @State private var hasAnimatedStats = false
+    @State private var showingProfileViewers = false
 
     // Static date formatter for performance
     private static let memberSinceDateFormatter: DateFormatter = {
@@ -195,6 +196,10 @@ struct ProfileView: View {
             }
             .sheet(isPresented: $showingInsights) {
                 ProfileInsightsView()
+                    .environmentObject(authService)
+            }
+            .sheet(isPresented: $showingProfileViewers) {
+                ProfileViewersView()
                     .environmentObject(authService)
             }
             .confirmationDialog("Are you sure you want to sign out?", isPresented: $showingLogoutConfirmation, titleVisibility: .visible) {
@@ -555,20 +560,28 @@ struct ProfileView: View {
                 label: "Matches",
                 color: .pink
             )
-            
+
             Divider()
                 .frame(height: 40)
-            
-            statCard(
-                icon: "eye.fill",
-                value: "\(user.profileViews)",
-                label: "Views",
-                color: .blue
-            )
-            
+
+            // Tappable Views stat - opens Profile Viewers page
+            Button {
+                showingProfileViewers = true
+                HapticManager.shared.impact(.light)
+            } label: {
+                statCard(
+                    icon: "eye.fill",
+                    value: "\(user.profileViews)",
+                    label: "Views",
+                    color: .blue
+                )
+            }
+            .accessibilityLabel("Profile Views")
+            .accessibilityHint("Tap to see who viewed your profile")
+
             Divider()
                 .frame(height: 40)
-            
+
             statCard(
                 icon: "hand.thumbsup.fill",
                 value: "\(user.likesReceived)",

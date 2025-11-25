@@ -55,6 +55,7 @@ protocol SwipeRepository {
     func checkMutualLike(fromUserId: String, toUserId: String) async throws -> Bool
     func hasSwipedOn(fromUserId: String, toUserId: String) async throws -> (liked: Bool, passed: Bool)
     func getLikesReceived(userId: String) async throws -> [String]
+    func getLikesSent(userId: String) async throws -> [String]
     func deleteSwipe(fromUserId: String, toUserId: String) async throws
 }
 

@@ -323,7 +323,19 @@ class ProfileViewersViewModel: ObservableObject {
     private let db = Firestore.firestore()
 
     func loadViewers() async {
-        guard let currentUserId = AuthService.shared.currentUser?.id else { return }
+        guard let currentUserId = AuthService.shared.currentUser?.effectiveId else {
+            #if DEBUG
+            // Use test data when no authenticated user
+            loadTestViewers()
+            #endif
+            return
+        }
+
+        #if DEBUG
+        // In DEBUG mode, show test data for demo purposes
+        loadTestViewers()
+        return
+        #endif
 
         isLoading = true
         defer { isLoading = false }
@@ -399,6 +411,31 @@ class ProfileViewersViewModel: ObservableObject {
             Logger.shared.error("Error loading profile viewers", category: .analytics, error: error)
         }
     }
+
+    #if DEBUG
+    /// Load test data for profile viewers (DEBUG mode only)
+    private func loadTestViewers() {
+        isLoading = true
+
+        // Simulate a small delay for realistic loading experience
+        Task {
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+
+            var viewersList: [ViewerInfo] = []
+            for (index, viewerData) in TestData.profileViewers.enumerated() {
+                viewersList.append(ViewerInfo(
+                    id: "test_viewer_\(index)",
+                    user: viewerData.user,
+                    timestamp: viewerData.timestamp
+                ))
+            }
+
+            viewers = viewersList
+            isLoading = false
+            Logger.shared.debug("Loaded \(viewersList.count) test profile viewers", category: .analytics)
+        }
+    }
+    #endif
 }
 
 #Preview {
