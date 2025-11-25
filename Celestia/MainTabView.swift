@@ -45,11 +45,17 @@ struct MainTabView: View {
                 }
                 .tag(3)
 
-                // Profile - Lazy load
+                // Viewers - Lazy load
                 LazyTabContent(tabIndex: 4, currentTab: selectedTab) {
-                    ProfileView()
+                    ProfileViewersView()
                 }
                 .tag(4)
+
+                // Profile - Lazy load
+                LazyTabContent(tabIndex: 5, currentTab: selectedTab) {
+                    ProfileView()
+                }
+                .tag(5)
             }
             .tabViewStyle(.automatic)
             .ignoresSafeArea(.keyboard)
@@ -142,14 +148,24 @@ struct MainTabView: View {
                     selectedTab = 3
                 }
 
-                // Profile
+                // Viewers
                 TabBarButton(
-                    icon: "person.fill",
-                    title: "Profile",
+                    icon: "eye.fill",
+                    title: "Viewers",
                     isSelected: selectedTab == 4,
                     badgeCount: 0
                 ) {
                     selectedTab = 4
+                }
+
+                // Profile
+                TabBarButton(
+                    icon: "person.fill",
+                    title: "Profile",
+                    isSelected: selectedTab == 5,
+                    badgeCount: 0
+                ) {
+                    selectedTab = 5
                 }
         }
         .padding(.horizontal, 8)
@@ -203,6 +219,8 @@ struct TabBarButton: View {
             return "Read and send messages"
         case "Saved":
             return "View saved profiles"
+        case "Viewers":
+            return "See who viewed your profile"
         case "Profile":
             return "Edit your profile and settings"
         default:
