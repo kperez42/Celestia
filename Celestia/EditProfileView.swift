@@ -1554,9 +1554,9 @@ struct EditProfileView: View {
                 Logger.shared.info("User photos in Firebase: \(user.photos)", category: .general)
 
                 // CRITICAL FIX: Force refresh current user from Firebase to get latest data
-                if let userId = user.id {
+                if user.id != nil {
                     Logger.shared.info("🔄 Refreshing user data from Firebase...", category: .general)
-                    try? await authService.fetchUser(userId: userId)
+                    await authService.fetchUser()
 
                     // Verify the refresh worked
                     if let refreshedUser = authService.currentUser {
