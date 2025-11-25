@@ -27,9 +27,9 @@ struct MainTabView: View {
                 FeedDiscoverView(selectedTab: $selectedTab)
                     .tag(0)
 
-                // Matches - Lazy load
+                // Likes - Lazy load
                 LazyTabContent(tabIndex: 1, currentTab: selectedTab) {
-                    MatchesView()
+                    LikesView()
                 }
                 .tag(1)
 
@@ -112,10 +112,10 @@ struct MainTabView: View {
                     selectedTab = 0
                 }
 
-                // Matches
+                // Likes
                 TabBarButton(
                     icon: "heart.fill",
-                    title: "Matches",
+                    title: "Likes",
                     isSelected: selectedTab == 1,
                     badgeCount: newMatchesCount
                 ) {

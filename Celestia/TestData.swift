@@ -422,6 +422,31 @@ struct TestData {
         }
     }
 
+    // MARK: - Test Likes Data
+
+    /// Users who liked the current user (for "Liked Me" tab)
+    static let usersWhoLikedMe: [User] = [
+        discoverUsers[0], // Sarah
+        discoverUsers[2], // Emma
+        discoverUsers[4]  // Jessica
+    ]
+
+    /// Users the current user liked (for "My Likes" tab)
+    static let usersILiked: [User] = [
+        discoverUsers[0], // Sarah - mutual
+        discoverUsers[1], // Mike
+        discoverUsers[2], // Emma - mutual
+        discoverUsers[3], // Alex
+        discoverUsers[4]  // Jessica - mutual
+    ]
+
+    /// Mutual likes (both liked each other) - for "Mutual Likes" tab
+    static let mutualLikes: [User] = [
+        discoverUsers[0], // Sarah
+        discoverUsers[2], // Emma
+        discoverUsers[4]  // Jessica
+    ]
+
     // MARK: - Helper to get current user for testing
 
     static let currentUser = User(
