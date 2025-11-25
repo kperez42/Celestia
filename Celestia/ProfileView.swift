@@ -1401,18 +1401,6 @@ struct ProfileView: View {
                         .font(.subheadline)
                         .fontWeight(.semibold)
                 }
-                
-                Divider()
-                
-                HStack {
-                    Text("Max distance")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Text("\(user.maxDistance) km")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                }
             }
         }
         .padding(20)
