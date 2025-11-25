@@ -170,7 +170,7 @@ struct LikesView: View {
 
     private var tabSelector: some View {
         HStack(spacing: 0) {
-            ForEach(Array(tabs.enumerated()), id: \.offset) { index, title in
+            ForEach(Array(tabs.enumerated()), id: \.0) { index, title in
                 Button {
                     withAnimation(.spring(response: 0.3)) {
                         selectedTab = index

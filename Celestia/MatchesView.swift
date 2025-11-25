@@ -450,7 +450,7 @@ struct MatchesView: View {
                 GridItem(.flexible(), spacing: 12),
                 GridItem(.flexible(), spacing: 12)
             ], spacing: 12) {
-                ForEach(Array(filteredAndSortedMatches.enumerated()), id: \.offset) { index, match in
+                ForEach(Array(filteredAndSortedMatches.enumerated()), id: \.0) { index, match in
                     if let user = getMatchedUser(match) {
                         MatchProfileCard(
                             match: match,
