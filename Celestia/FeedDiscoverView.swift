@@ -508,18 +508,9 @@ struct FeedDiscoverView: View {
 
     private func loadUsers() async {
         guard let currentUserId = authService.currentUser?.effectiveId else {
-            #if DEBUG
-            // Only use test data when NOT authenticated
-            await MainActor.run {
-                users = TestData.discoverUsers
-                loadMoreUsers()
-                isInitialLoad = false
-            }
-            #else
             await MainActor.run {
                 isInitialLoad = false
             }
-            #endif
             return
         }
 

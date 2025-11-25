@@ -564,19 +564,6 @@ class LikesViewModel: ObservableObject {
         defer { isLoading = false }
 
         guard let currentUserId = AuthService.shared.currentUser?.effectiveId else {
-            #if DEBUG
-            // Only use test data when NOT authenticated
-            usersWhoLikedMe = TestData.usersWhoLikedMe
-            usersILiked = TestData.usersILiked
-            mutualLikes = TestData.mutualLikes
-
-            // Cache test matches so Message button works
-            for (user, match) in TestData.testMatches {
-                if let userId = user.effectiveId {
-                    matchesCache[userId] = match
-                }
-            }
-            #endif
             return
         }
 
