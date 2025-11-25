@@ -163,6 +163,7 @@ struct ImprovedUserDetailSheet: View {
     
     // MARK: - Photo Carousel
     
+    // PERFORMANCE: Use CachedAsyncImage for smooth scrolling
     private var photoCarousel: some View {
         TabView(selection: $selectedPhotoIndex) {
             if photos.isEmpty {
@@ -170,7 +171,7 @@ struct ImprovedUserDetailSheet: View {
                     .tag(0)
             } else {
                 ForEach(photos.indices, id: \.self) { index in
-                    AsyncImage(url: URL(string: photos[index])) { phase in
+                    CachedAsyncImage(url: URL(string: photos[index])) { phase in
                         switch phase {
                         case .success(let image):
                             image

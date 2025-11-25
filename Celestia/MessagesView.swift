@@ -23,38 +23,52 @@ struct MessagesView: View {
     @State private var showingChat = false
     @State private var selectedMessageTab = 0
 
+    // PERFORMANCE: Memoized conversation lists to avoid O(n) on every render
+    @State private var cachedConversations: [(Match, User)] = []
+    @State private var cachedReceivedConversations: [(Match, User)] = []
+    @State private var cachedSentConversations: [(Match, User)] = []
+    @State private var cachedFilteredConversations: [(Match, User)] = []
+
     private let tabs = ["Received", "Sent"]
 
-    var conversations: [(Match, User)] {
-        matchService.matches.compactMap { match in
+    // PERFORMANCE: Use cached values
+    var conversations: [(Match, User)] { cachedConversations }
+    var receivedConversations: [(Match, User)] { cachedReceivedConversations }
+    var sentConversations: [(Match, User)] { cachedSentConversations }
+    var filteredConversations: [(Match, User)] { cachedFilteredConversations }
+
+    // PERFORMANCE: Update cached conversations only when dependencies change
+    private func updateCachedConversations() {
+        // Build base conversations
+        cachedConversations = matchService.matches.compactMap { match in
             guard let user = getMatchedUser(match) else { return nil }
             return (match, user)
         }
-    }
 
-    /// Conversations where the other person sent the last message (needs your reply)
-    var receivedConversations: [(Match, User)] {
         let currentUserId = authService.currentUser?.id ?? "current_user"
-        return conversations.filter { match, _ in
-            // If no last message, it's a new match - show in received
+
+        // Filter received (other person sent last message or new match)
+        cachedReceivedConversations = cachedConversations.filter { match, _ in
             guard let lastSenderId = match.lastMessageSenderId else { return true }
             return lastSenderId != currentUserId
         }
-    }
 
-    /// Conversations where you sent the last message (waiting for reply)
-    var sentConversations: [(Match, User)] {
-        let currentUserId = authService.currentUser?.id ?? "current_user"
-        return conversations.filter { match, _ in
+        // Filter sent (you sent last message)
+        cachedSentConversations = cachedConversations.filter { match, _ in
             guard let lastSenderId = match.lastMessageSenderId else { return false }
             return lastSenderId == currentUserId
         }
+
+        updateFilteredConversations()
     }
 
-    var filteredConversations: [(Match, User)] {
-        let baseConversations = selectedMessageTab == 0 ? receivedConversations : sentConversations
-        guard !searchDebouncer.debouncedText.isEmpty else { return baseConversations }
-        return baseConversations.filter { _, user in
+    private func updateFilteredConversations() {
+        let baseConversations = selectedMessageTab == 0 ? cachedReceivedConversations : cachedSentConversations
+        guard !searchDebouncer.debouncedText.isEmpty else {
+            cachedFilteredConversations = baseConversations
+            return
+        }
+        cachedFilteredConversations = baseConversations.filter { _, user in
             user.fullName.localizedCaseInsensitiveContains(searchDebouncer.debouncedText) ||
             user.location.localizedCaseInsensitiveContains(searchDebouncer.debouncedText)
         }
@@ -131,11 +145,26 @@ struct MessagesView: View {
             .navigationBarHidden(true)
             .task {
                 await loadData()
+                updateCachedConversations()
             }
             .refreshable {
                 HapticManager.shared.impact(.light)
                 await loadData()
+                updateCachedConversations()
                 HapticManager.shared.notification(.success)
+            }
+            // PERFORMANCE: Update cached conversations only when dependencies change
+            .onChange(of: matchService.matches.count) { _, _ in
+                updateCachedConversations()
+            }
+            .onChange(of: matchedUsers.count) { _, _ in
+                updateCachedConversations()
+            }
+            .onChange(of: selectedMessageTab) { _, _ in
+                updateFilteredConversations()
+            }
+            .onChange(of: searchDebouncer.debouncedText) { _, _ in
+                updateFilteredConversations()
             }
             .sheet(isPresented: $showingChat) {
                 if let selectedMatch = selectedMatch {
@@ -145,7 +174,7 @@ struct MessagesView: View {
                     }
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("OpenChatWithUser"))) { notification in
+            .onReceive(NotificationCenter.default.publisher(for: .openChatWithUser)) { notification in
                 // Open chat with specific user when notification is received
                 guard let userId = notification.userInfo?["userId"] as? String,
                       let user = notification.userInfo?["user"] as? User else {

@@ -112,6 +112,9 @@ struct ProfileView: View {
                                 // Details grid
                                 detailsCard(user: user)
 
+                                // Lifestyle card
+                                lifestyleCard(user: user)
+
                                 // Interests & Languages Section Header
                                 sectionHeader(title: "Interests & Languages", icon: "sparkles")
                                     .padding(.top, 8)
@@ -1090,6 +1093,25 @@ struct ProfileView: View {
             detailRow(icon: "person.fill", label: "Gender", value: user.gender)
             Divider()
             detailRow(icon: "heart.circle.fill", label: "Looking for", value: user.lookingFor)
+
+            // Height
+            if let height = user.height {
+                Divider()
+                detailRow(icon: "ruler", label: "Height", value: "\(height) cm (\(heightToFeetInches(height)))")
+            }
+
+            // Relationship goal
+            if let goal = user.relationshipGoal, goal != "Prefer not to say" {
+                Divider()
+                detailRow(icon: "heart.text.square", label: "Relationship goal", value: goal)
+            }
+
+            // Religion
+            if let religion = user.religion, religion != "Prefer not to say" {
+                Divider()
+                detailRow(icon: "sparkles", label: "Religion", value: religion)
+            }
+
             Divider()
             detailRow(icon: "calendar", label: "Member since", value: formatDate(user.timestamp))
         }
@@ -1098,6 +1120,84 @@ struct ProfileView: View {
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
         .padding(.horizontal, 20)
+    }
+
+    // MARK: - Lifestyle Card
+
+    @ViewBuilder
+    private func lifestyleCard(user: User) -> some View {
+        let hasLifestyle = (user.smoking != nil && user.smoking != "Prefer not to say") ||
+                           (user.drinking != nil && user.drinking != "Prefer not to say") ||
+                           (user.exercise != nil && user.exercise != "Prefer not to say") ||
+                           (user.diet != nil && user.diet != "Prefer not to say") ||
+                           (user.pets != nil && user.pets != "Prefer not to say")
+
+        if hasLifestyle {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 8) {
+                    Image(systemName: "leaf.fill")
+                        .font(.title3)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.green, .mint],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+
+                    Text("Lifestyle")
+                        .font(.title3.weight(.semibold))
+                        .foregroundColor(.primary)
+                }
+
+                VStack(spacing: 12) {
+                    if let smoking = user.smoking, smoking != "Prefer not to say" {
+                        detailRow(icon: "smoke", label: "Smoking", value: smoking)
+                    }
+                    if let drinking = user.drinking, drinking != "Prefer not to say" {
+                        if user.smoking != nil && user.smoking != "Prefer not to say" { Divider() }
+                        detailRow(icon: "wineglass", label: "Drinking", value: drinking)
+                    }
+                    if let exercise = user.exercise, exercise != "Prefer not to say" {
+                        if (user.smoking != nil && user.smoking != "Prefer not to say") ||
+                           (user.drinking != nil && user.drinking != "Prefer not to say") { Divider() }
+                        detailRow(icon: "figure.run", label: "Exercise", value: exercise)
+                    }
+                    if let diet = user.diet, diet != "Prefer not to say" {
+                        if (user.smoking != nil && user.smoking != "Prefer not to say") ||
+                           (user.drinking != nil && user.drinking != "Prefer not to say") ||
+                           (user.exercise != nil && user.exercise != "Prefer not to say") { Divider() }
+                        detailRow(icon: "fork.knife", label: "Diet", value: diet)
+                    }
+                    if let pets = user.pets, pets != "Prefer not to say" {
+                        if (user.smoking != nil && user.smoking != "Prefer not to say") ||
+                           (user.drinking != nil && user.drinking != "Prefer not to say") ||
+                           (user.exercise != nil && user.exercise != "Prefer not to say") ||
+                           (user.diet != nil && user.diet != "Prefer not to say") { Divider() }
+                        detailRow(icon: "pawprint.fill", label: "Pets", value: pets)
+                    }
+                }
+            }
+            .padding(20)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.green.opacity(0.1), lineWidth: 1)
+            )
+            .padding(.horizontal, 20)
+        }
+    }
+
+    // Helper function to convert cm to feet/inches
+    private func heightToFeetInches(_ cm: Int) -> String {
+        let totalInches = Double(cm) / 2.54
+        let feet = Int(totalInches / 12)
+        let inches = Int(totalInches.truncatingRemainder(dividingBy: 12))
+        return "\(feet)'\(inches)\""
     }
 
     private func detailRow(icon: String, label: String, value: String) -> some View {

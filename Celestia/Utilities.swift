@@ -12,10 +12,21 @@ import SwiftUI
 // MARK: - Date Utilities
 
 extension Date {
-    func timeAgoDisplay() -> String {
+    // PERFORMANCE: Cache formatters - creating them is expensive
+    private static let relativeFormatter: RelativeDateTimeFormatter = {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: self, relativeTo: Date())
+        return formatter
+    }()
+
+    private static let shortDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        return formatter
+    }()
+
+    func timeAgoDisplay() -> String {
+        Self.relativeFormatter.localizedString(for: self, relativeTo: Date())
     }
 
     func shortTimeAgo() -> String {
@@ -33,9 +44,7 @@ extension Date {
         } else if days < 7 {
             return "\(days)d"
         } else {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "MMM d"
-            return formatter.string(from: self)
+            return Self.shortDateFormatter.string(from: self)
         }
     }
 
@@ -251,6 +260,10 @@ extension Notification.Name {
     static let userDidUpdate = Notification.Name("userDidUpdate")
     static let newMatchReceived = Notification.Name("newMatchReceived")
     static let newMessageReceived = Notification.Name("newMessageReceived")
+
+    // Navigation notifications
+    static let openChatWithUser = Notification.Name("OpenChatWithUser")
+    static let navigateToMessages = Notification.Name("NavigateToMessages")
 }
 
 // MARK: - URL Schemes

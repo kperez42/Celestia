@@ -86,7 +86,7 @@ struct MainTabView: View {
             unreadListener?.remove()
             unreadListener = nil
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToMessages"))) { notification in
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToMessages)) { notification in
             // Navigate to Messages tab when a match occurs
             selectedTab = 2
             HapticManager.shared.notification(.success)

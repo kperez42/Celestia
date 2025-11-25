@@ -112,9 +112,9 @@ struct ImprovedUserCard: View {
     private var cardContent: some View {
         GeometryReader { geometry in
             ZStack {
-                // Background image or gradient
+                // Background image or gradient - PERFORMANCE: Use CachedAsyncImage for smooth scrolling
                 if let imageURL = URL(string: user.profileImageURL), !user.profileImageURL.isEmpty {
-                    AsyncImage(url: imageURL) { phase in
+                    CachedAsyncImage(url: imageURL) { phase in
                         switch phase {
                         case .success(let image):
                             image

@@ -225,11 +225,11 @@ struct ReportRowView: View {
                     .foregroundColor(.secondary)
             }
 
-            // Reported user
+            // Reported user - PERFORMANCE: Use CachedAsyncImage
             if let user = report.reportedUser {
                 HStack(spacing: 8) {
                     if let photoURL = user.photoURL {
-                        AsyncImage(url: URL(string: photoURL)) { image in
+                        CachedAsyncImage(url: URL(string: photoURL)) { image in
                             image.resizable()
                         } placeholder: {
                             Color.gray
@@ -306,6 +306,7 @@ struct ReportDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
+    // PERFORMANCE: Use CachedAsyncImage
     private func userInfoCard(_ user: ModerationReport.UserInfo) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Reported User")
@@ -313,7 +314,7 @@ struct ReportDetailView: View {
 
             HStack(spacing: 12) {
                 if let photoURL = user.photoURL {
-                    AsyncImage(url: URL(string: photoURL)) { image in
+                    CachedAsyncImage(url: URL(string: photoURL)) { image in
                         image.resizable()
                     } placeholder: {
                         Color.gray
@@ -537,7 +538,7 @@ struct SuspiciousProfileDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                // User info
+                // User info - PERFORMANCE: Use CachedAsyncImage
                 if let user = item.user {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Suspicious Profile")
@@ -545,7 +546,7 @@ struct SuspiciousProfileDetailView: View {
 
                         HStack(spacing: 12) {
                             if let photoURL = user.photoURL {
-                                AsyncImage(url: URL(string: photoURL)) { image in
+                                CachedAsyncImage(url: URL(string: photoURL)) { image in
                                     image.resizable()
                                 } placeholder: {
                                     Color.gray

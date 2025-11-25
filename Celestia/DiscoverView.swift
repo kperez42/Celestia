@@ -489,7 +489,7 @@ struct DiscoverView: View {
                     // Navigate to Messages tab (tab index 2)
                     if let matchedUserId = viewModel.matchedUser?.id {
                         NotificationCenter.default.post(
-                            name: Notification.Name("NavigateToMessages"),
+                            name: .navigateToMessages,
                             object: nil,
                             userInfo: ["matchedUserId": matchedUserId]
                         )

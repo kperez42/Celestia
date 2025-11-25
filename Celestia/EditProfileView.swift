@@ -252,7 +252,7 @@ struct EditProfileView: View {
     private var profilePhotoSection: some View {
         VStack(spacing: 15) {
             ZStack(alignment: .bottomTrailing) {
-                // Profile Image
+                // Profile Image - PERFORMANCE: Use CachedAsyncImage
                 Group {
                     if let profileImage = profileImage {
                         Image(uiImage: profileImage)
@@ -261,7 +261,7 @@ struct EditProfileView: View {
                     } else if let currentUser = authService.currentUser,
                               let imageURL = URL(string: currentUser.profileImageURL),
                               !currentUser.profileImageURL.isEmpty {
-                        AsyncImage(url: imageURL) { phase in
+                        CachedAsyncImage(url: imageURL) { phase in
                             switch phase {
                             case .success(let image):
                                 image
@@ -1548,6 +1548,13 @@ struct EditProfileView: View {
 
             do {
                 user.photos = photos
+
+                // Auto-set profileImageURL to first photo if empty
+                if user.profileImageURL.isEmpty, let firstPhoto = photos.first, !firstPhoto.isEmpty {
+                    user.profileImageURL = firstPhoto
+                    Logger.shared.info("📸 Auto-set profileImageURL to first uploaded photo", category: .general)
+                }
+
                 try await authService.updateUser(user)
 
                 Logger.shared.info("✅ Successfully saved \(successCount) photos to Firebase!", category: .general)
@@ -1615,9 +1622,9 @@ struct EditProfileView: View {
     // MARK: - Image Optimization
 
     private func optimizeImageForUpload(_ image: UIImage) -> UIImage {
-        // PERFORMANCE: Optimized for fast uploads with minimal quality loss
-        let maxDimension: CGFloat = 1024  // Reduced from 1200 for 30% faster uploads
-        let compressionQuality: CGFloat = 0.75  // Optimized balance of quality/size
+        // PERFORMANCE: Higher quality for better looking photos
+        let maxDimension: CGFloat = 1536  // Higher resolution for quality
+        let compressionQuality: CGFloat = 0.85  // Higher quality for better photos
 
         // Calculate new size maintaining aspect ratio
         let size = image.size
@@ -2055,8 +2062,8 @@ struct PhotoGridItem: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            // Photo
-            AsyncImage(url: URL(string: photoURL)) { phase in
+            // Photo - PERFORMANCE: Use CachedAsyncImage
+            CachedAsyncImage(url: URL(string: photoURL)) { phase in
                 switch phase {
                 case .success(let image):
                     image
