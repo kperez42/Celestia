@@ -265,7 +265,7 @@ class CameraManager: NSObject, ObservableObject {
                 Logger.shared.debug("Starting camera session", category: .general)
                 self.session.startRunning()
 
-                continuation.resume()
+                continuation.resume(returning: ())
             }
         }
     }
