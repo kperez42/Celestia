@@ -41,12 +41,10 @@ struct ProfileView: View {
     var body: some View {
         if isEmbedded {
             profileContent
-                .networkStatusBanner()
         } else {
             NavigationStack {
                 profileContent
             }
-            .networkStatusBanner()
         }
     }
 
