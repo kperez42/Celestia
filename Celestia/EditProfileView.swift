@@ -252,7 +252,7 @@ struct EditProfileView: View {
     private var profilePhotoSection: some View {
         VStack(spacing: 15) {
             ZStack(alignment: .bottomTrailing) {
-                // Profile Image
+                // Profile Image - PERFORMANCE: Use CachedAsyncImage
                 Group {
                     if let profileImage = profileImage {
                         Image(uiImage: profileImage)
@@ -261,7 +261,7 @@ struct EditProfileView: View {
                     } else if let currentUser = authService.currentUser,
                               let imageURL = URL(string: currentUser.profileImageURL),
                               !currentUser.profileImageURL.isEmpty {
-                        AsyncImage(url: imageURL) { phase in
+                        CachedAsyncImage(url: imageURL) { phase in
                             switch phase {
                             case .success(let image):
                                 image
@@ -2062,8 +2062,8 @@ struct PhotoGridItem: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            // Photo
-            AsyncImage(url: URL(string: photoURL)) { phase in
+            // Photo - PERFORMANCE: Use CachedAsyncImage
+            CachedAsyncImage(url: URL(string: photoURL)) { phase in
                 switch phase {
                 case .success(let image):
                     image

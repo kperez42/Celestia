@@ -50,9 +50,10 @@ struct ProfileEditView: View {
                                     .scaledToFill()
                                     .frame(width: 120, height: 120)
                                     .clipShape(Circle())
+                            // PERFORMANCE: Use CachedAsyncImage
                             } else if let profileURL = authService.currentUser?.profileImageURL,
                                       !profileURL.isEmpty {
-                                AsyncImage(url: URL(string: profileURL)) { image in
+                                CachedAsyncImage(url: URL(string: profileURL)) { image in
                                     image
                                         .resizable()
                                         .scaledToFill()
