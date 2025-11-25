@@ -64,7 +64,19 @@ class UserService: ObservableObject, UserServiceProtocol {
         
         // Apply filters
         if let lookingFor = lookingFor {
-            query = query.whereField("gender", isEqualTo: lookingFor)
+            // Convert lookingFor values to match gender field values
+            // lookingFor uses: "Men", "Women", "Everyone"
+            // gender uses: "Male", "Female", "Non-binary", "Other"
+            let genderToMatch: String
+            switch lookingFor {
+            case "Men":
+                genderToMatch = "Male"
+            case "Women":
+                genderToMatch = "Female"
+            default:
+                genderToMatch = lookingFor
+            }
+            query = query.whereField("gender", isEqualTo: genderToMatch)
         }
         
         if let ageRange = ageRange {
