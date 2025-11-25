@@ -44,6 +44,16 @@ class MessageService: ObservableObject, MessageServiceProtocol {
 
         Logger.shared.info("Starting paginated message loading for match: \(matchId)", category: .messaging)
 
+        #if DEBUG
+        // In DEBUG mode, load test messages instead of querying Firestore
+        let testMessages = TestData.messagesForMatch(matchId)
+        self.messages = testMessages.sorted { $0.timestamp < $1.timestamp }
+        self.hasMoreMessages = false
+        self.isLoading = false
+        Logger.shared.info("Loaded \(testMessages.count) test messages for match: \(matchId)", category: .messaging)
+        return
+        #endif
+
         Task {
             do {
                 // Step 1: Load initial batch of recent messages (most recent 50)
@@ -204,6 +214,25 @@ class MessageService: ObservableObject, MessageServiceProtocol {
         receiverId: String,
         text: String
     ) async throws {
+        #if DEBUG
+        // In DEBUG mode, add message locally without calling Firestore
+        let newMessage = Message(
+            id: UUID().uuidString,
+            matchId: matchId,
+            senderId: senderId,
+            receiverId: receiverId,
+            text: text,
+            timestamp: Date(),
+            isRead: false,
+            isDelivered: true
+        )
+        await MainActor.run {
+            self.messages.append(newMessage)
+        }
+        Logger.shared.info("DEBUG: Sent test message", category: .messaging)
+        return
+        #endif
+
         // SECURITY: Backend rate limit validation (prevents client bypass)
         // This is called BEFORE client-side check to ensure server-side enforcement
         do {
