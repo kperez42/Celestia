@@ -15,9 +15,10 @@ struct Match: Identifiable, Codable {
     var timestamp: Date
     var lastMessageTimestamp: Date?
     var lastMessage: String?
+    var lastMessageSenderId: String?
     var unreadCount: [String: Int]
     var isActive: Bool
-    
+
     init(
         id: String? = nil,
         user1Id: String,
@@ -25,6 +26,7 @@ struct Match: Identifiable, Codable {
         timestamp: Date = Date(),
         lastMessageTimestamp: Date? = nil,
         lastMessage: String? = nil,
+        lastMessageSenderId: String? = nil,
         unreadCount: [String: Int] = [:],
         isActive: Bool = true
     ) {
@@ -34,6 +36,7 @@ struct Match: Identifiable, Codable {
         self.timestamp = timestamp
         self.lastMessageTimestamp = lastMessageTimestamp
         self.lastMessage = lastMessage
+        self.lastMessageSenderId = lastMessageSenderId
         self.unreadCount = unreadCount
         self.isActive = isActive
     }
