@@ -169,14 +169,14 @@ struct FeedDiscoverView: View {
                             showUserDetail = true
                         }
                     )
-                    // PREMIUM: Staggered card entrance animation
+                    // PREMIUM: Staggered card entrance animation (optimized for smoothness)
                     .transition(.asymmetric(
-                        insertion: .scale(scale: 0.9).combined(with: .opacity),
-                        removal: .scale(scale: 0.95).combined(with: .opacity)
+                        insertion: .scale(scale: 0.95).combined(with: .opacity),
+                        removal: .scale(scale: 0.98).combined(with: .opacity)
                     ))
                     .animation(
-                        .spring(response: 0.5, dampingFraction: 0.7)
-                        .delay(Double(index % 10) * 0.05), // Stagger first 10 cards
+                        .spring(response: 0.35, dampingFraction: 0.8)
+                        .delay(Double(min(index, 4)) * 0.02), // Cap at 5 cards, 20ms stagger for snappy feel
                         value: displayedUsers.count
                     )
                     .onAppear {
@@ -321,11 +321,11 @@ struct FeedDiscoverView: View {
             LazyVStack(spacing: 16) {
                 ForEach(0..<3, id: \.self) { index in
                     ProfileFeedCardSkeleton()
-                        // PREMIUM: Staggered skeleton appearance
-                        .transition(.scale(scale: 0.95).combined(with: .opacity))
+                        // PREMIUM: Staggered skeleton appearance (optimized)
+                        .transition(.scale(scale: 0.97).combined(with: .opacity))
                         .animation(
-                            .spring(response: 0.4, dampingFraction: 0.7)
-                            .delay(Double(index) * 0.1),
+                            .spring(response: 0.3, dampingFraction: 0.8)
+                            .delay(Double(index) * 0.03),
                             value: isInitialLoad
                         )
                 }
@@ -482,7 +482,7 @@ struct FeedDiscoverView: View {
                         // Small delay to ensure Messages tab loads before opening chat
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                             NotificationCenter.default.post(
-                                name: Notification.Name("OpenChatWithUser"),
+                                name: .openChatWithUser,
                                 object: nil,
                                 userInfo: ["userId": matchedUserId, "user": matchedUser]
                             )
@@ -791,7 +791,7 @@ struct FeedDiscoverView: View {
                         // Small delay to ensure Messages tab loads before opening chat
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                             NotificationCenter.default.post(
-                                name: Notification.Name("OpenChatWithUser"),
+                                name: .openChatWithUser,
                                 object: nil,
                                 userInfo: ["userId": userId, "user": user]
                             )

@@ -251,6 +251,10 @@ extension Notification.Name {
     static let userDidUpdate = Notification.Name("userDidUpdate")
     static let newMatchReceived = Notification.Name("newMatchReceived")
     static let newMessageReceived = Notification.Name("newMessageReceived")
+
+    // Navigation notifications
+    static let openChatWithUser = Notification.Name("OpenChatWithUser")
+    static let navigateToMessages = Notification.Name("NavigateToMessages")
 }
 
 // MARK: - URL Schemes

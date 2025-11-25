@@ -50,7 +50,7 @@ struct UserDetailView: View {
         .alert("It's a Match! 🎉", isPresented: $showingMatched) {
             Button("Send Message") {
                 NotificationCenter.default.post(
-                    name: Notification.Name("NavigateToMessages"),
+                    name: .navigateToMessages,
                     object: nil,
                     userInfo: ["matchedUserId": user.id as Any]
                 )
