@@ -682,7 +682,7 @@ class SavedProfilesViewModel: ObservableObject {
     private init() {}
 
     func loadSavedProfiles(forceRefresh: Bool = false) async {
-        guard let currentUserId = AuthService.shared.currentUser?.id else { return }
+        guard let currentUserId = AuthService.shared.currentUser?.effectiveId else { return }
 
         // PERFORMANCE FIX: Check cache first (5-minute TTL)
         // Prevents 6+ database reads every time view appears
@@ -810,7 +810,7 @@ class SavedProfilesViewModel: ObservableObject {
     }
 
     func unsaveProfile(_ profile: SavedProfile) {
-        guard let currentUserId = AuthService.shared.currentUser?.id else { return }
+        guard let currentUserId = AuthService.shared.currentUser?.effectiveId else { return }
 
         // Set loading state
         unsavingProfileId = profile.id
@@ -859,7 +859,7 @@ class SavedProfilesViewModel: ObservableObject {
     }
 
     func clearAllSaved() {
-        guard let currentUserId = AuthService.shared.currentUser?.id else { return }
+        guard let currentUserId = AuthService.shared.currentUser?.effectiveId else { return }
 
         Task {
             do {
@@ -891,9 +891,10 @@ class SavedProfilesViewModel: ObservableObject {
     }
 
     func saveProfile(user: User, note: String? = nil) async {
-        guard let currentUserId = AuthService.shared.currentUser?.id,
+        guard let currentUserId = AuthService.shared.currentUser?.effectiveId,
               let savedUserId = user.effectiveId else {
-            Logger.shared.error("Cannot save profile: Missing user ID (id=\(user.id ?? "nil"), effectiveId=\(user.effectiveId ?? "nil"))", category: .general)
+            let currentUser = AuthService.shared.currentUser
+            Logger.shared.error("Cannot save profile: Missing user ID (currentUser.id=\(currentUser?.id ?? "nil"), currentUser.effectiveId=\(currentUser?.effectiveId ?? "nil"), savedUser.id=\(user.id ?? "nil"), savedUser.effectiveId=\(user.effectiveId ?? "nil"))", category: .general)
             return
         }
 

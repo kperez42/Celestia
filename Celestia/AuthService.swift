@@ -337,8 +337,11 @@ class AuthService: ObservableObject, AuthServiceProtocol {
 
             if snapshot.exists {
                 // FIXED: Try both decoding methods
-                if let data = snapshot.data() {
+                if var data = snapshot.data() {
                     Logger.shared.database("Raw Firestore data keys: \(data.keys.joined(separator: ", "))", level: .debug)
+
+                    // Include document ID in data (Firestore doesn't include it automatically)
+                    data["id"] = uid
 
                     // Try using the dictionary initializer first (more forgiving)
                     self.currentUser = User(dictionary: data)

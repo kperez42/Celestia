@@ -198,7 +198,9 @@ struct User: Identifiable, Codable, Equatable {
     
     // Initialize from dictionary (for legacy code)
     init(dictionary: [String: Any]) {
-        self.id = dictionary["id"] as? String
+        let dictId = dictionary["id"] as? String
+        self.id = dictId
+        self._manualId = dictId  // Also set manual ID for effectiveId to work
         self.email = dictionary["email"] as? String ?? ""
         self.fullName = dictionary["fullName"] as? String ?? dictionary["name"] as? String ?? ""
         self.age = dictionary["age"] as? Int ?? 18
