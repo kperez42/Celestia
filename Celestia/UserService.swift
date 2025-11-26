@@ -53,37 +53,45 @@ class UserService: ObservableObject, UserServiceProtocol {
             users = []
             lastDocument = nil
         }
-        
+
         isLoading = true
         defer { isLoading = false }
-        
+
+        Logger.shared.debug("UserService.fetchUsers called - lookingFor: \(lookingFor ?? "nil"), ageRange: \(ageRange?.description ?? "nil")", category: .database)
+
         var query = db.collection("users")
             .whereField("showMeInSearch", isEqualTo: true)
             .order(by: "lastActive", descending: true)
             .limit(to: limit)
-        
+
         // Apply filters
+        // IMPORTANT: Skip gender filter when lookingFor is "Everyone" to show all genders
         if let lookingFor = lookingFor, lookingFor != "Everyone" {
-            // Convert lookingFor values to gender values
-            let gender: String
+            // Convert lookingFor values to match gender field values
+            // lookingFor uses: "Men", "Women", "Everyone"
+            // gender uses: "Male", "Female", "Non-binary", "Other"
+            let genderToMatch: String
             switch lookingFor {
             case "Women":
-                gender = "Female"
+                genderToMatch = "Female"
             case "Men":
-                gender = "Male"
+                genderToMatch = "Male"
             default:
-                gender = lookingFor // Use as-is if already in correct format
+                genderToMatch = lookingFor // Use as-is if already in correct format
             }
-            query = query.whereField("gender", isEqualTo: gender)
+            Logger.shared.info("UserService: Filtering by gender = \(genderToMatch) (from lookingFor: \(lookingFor))", category: .database)
+            query = query.whereField("gender", isEqualTo: genderToMatch)
         }
 
         if let ageRange = ageRange {
+            Logger.shared.debug("UserService: Filtering by age range \(ageRange.lowerBound)-\(ageRange.upperBound)", category: .database)
             query = query
                 .whereField("age", isGreaterThanOrEqualTo: ageRange.lowerBound)
                 .whereField("age", isLessThanOrEqualTo: ageRange.upperBound)
         }
 
         if let country = country {
+            Logger.shared.debug("UserService: Filtering by country = \(country)", category: .database)
             query = query.whereField("country", isEqualTo: country)
         }
 
@@ -93,6 +101,7 @@ class UserService: ObservableObject, UserServiceProtocol {
         }
 
         do {
+            Logger.shared.info("UserService: Executing Firestore query...", category: .database)
             let snapshot = try await query.getDocuments()
             lastDocument = snapshot.documents.last
 
@@ -107,6 +116,14 @@ class UserService: ObservableObject, UserServiceProtocol {
                     guard let userId = user.id, !existingIds.contains(userId) else { return false }
                     return true
                 }
+
+            Logger.shared.info("UserService: Query returned \(snapshot.documents.count) documents, \(newUsers.count) valid users after filtering", category: .database)
+
+            if newUsers.isEmpty {
+                Logger.shared.warning("UserService: No users found! Check Firebase indexes and user data.", category: .database)
+            } else {
+                Logger.shared.info("UserService: Found users - \(newUsers.map { "\($0.fullName) (gender: \($0.gender))" }.joined(separator: ", "))", category: .database)
+            }
 
             users.append(contentsOf: newUsers)
             hasMoreUsers = newUsers.count >= limit
