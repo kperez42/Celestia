@@ -187,18 +187,22 @@ struct FeedDiscoverView: View {
                         },
                         onViewPhotos: {
                             selectedUser = user
-                            // PERFORMANCE: Start loading all photos immediately
-                            ImageCache.shared.prefetchUserPhotosHighPriority(user: user)
                             showPhotoGallery = true
                         },
                         onViewProfile: {
                             HapticManager.shared.impact(.light)
                             selectedUser = user
-                            // PERFORMANCE: Start loading all photos immediately
-                            ImageCache.shared.prefetchUserPhotosHighPriority(user: user)
                             showUserDetail = true
                         }
                     )
+                    .onAppear {
+                        // PERFORMANCE: Prefetch images as cards appear in viewport
+                        ImageCache.shared.prefetchUserPhotosHighPriority(user: user)
+
+                        if index == displayedUsers.count - preloadThreshold {
+                            loadMoreUsers()
+                        }
+                    }
                     // PREMIUM: Staggered card entrance animation (optimized for smoothness)
                     .transition(.asymmetric(
                         insertion: .scale(scale: 0.95).combined(with: .opacity),
@@ -209,11 +213,6 @@ struct FeedDiscoverView: View {
                         .delay(Double(min(index, 4)) * 0.02), // Cap at 5 cards, 20ms stagger for snappy feel
                         value: displayedUsers.count
                     )
-                    .onAppear {
-                        if index == displayedUsers.count - preloadThreshold {
-                            loadMoreUsers()
-                        }
-                    }
                 }
 
                 // PREMIUM: Loading indicator with animation
@@ -920,10 +919,10 @@ struct PhotoGalleryView: View {
                     // PERFORMANCE: Photo gallery with smooth swiping
                     TabView(selection: $selectedPhotoIndex) {
                         ForEach(validPhotos.indices, id: \.self) { index in
-                            // PERFORMANCE: Use high priority for current, normal for others
+                            // PERFORMANCE: Always immediate - images already cached from card prefetch
                             CachedCardImage(
                                 url: URL(string: validPhotos[index]),
-                                priority: index == selectedPhotoIndex ? .immediate : .high
+                                priority: .immediate
                             )
                             .aspectRatio(contentMode: .fit)
                             .onTapGesture {
@@ -935,8 +934,12 @@ struct PhotoGalleryView: View {
                     }
                     .tabViewStyle(.page(indexDisplayMode: .always))
                     .indexViewStyle(.page(backgroundDisplayMode: .always))
+                    .task {
+                        // PERFORMANCE: Ensure all photos cached on open
+                        ImageCache.shared.prefetchAdjacentPhotos(photos: validPhotos, currentIndex: selectedPhotoIndex)
+                    }
                     // PERFORMANCE: Preload adjacent photos when swiping
-                    .onChange(of: selectedPhotoIndex) { newIndex in
+                    .onChange(of: selectedPhotoIndex) { _, newIndex in
                         ImageCache.shared.prefetchAdjacentPhotos(photos: validPhotos, currentIndex: newIndex)
                     }
 

@@ -80,23 +80,11 @@ struct UserDetailView: View {
     private var photosCarousel: some View {
         TabView(selection: $selectedPhotoIndex) {
             ForEach(Array(validPhotos.enumerated()), id: \.offset) { index, photoURL in
-                // PERFORMANCE: Use immediate priority for current photo, high for others
-                ZStack {
-                    // PERFORMANCE: Skeleton background for instant visual feedback
-                    Rectangle()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.05)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-
-                    CachedCardImage(
-                        url: URL(string: photoURL),
-                        priority: .immediate  // PERFORMANCE: Always immediate for detail view
-                    )
-                }
+                // PERFORMANCE: Immediate priority - images already cached from aggressive prefetch
+                CachedCardImage(
+                    url: URL(string: photoURL),
+                    priority: .immediate
+                )
                 .onTapGesture {
                     selectedPhotoIndex = index
                     showFullScreenPhotos = true

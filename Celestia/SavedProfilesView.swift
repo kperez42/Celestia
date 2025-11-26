@@ -313,8 +313,6 @@ struct SavedProfilesView: View {
                             isUnsaving: viewModel.unsavingProfileId == saved.id,
                             onTap: {
                                 selectedUser = saved.user
-                                // PERFORMANCE: Start loading all photos immediately
-                                ImageCache.shared.prefetchUserPhotosHighPriority(user: saved.user)
                                 HapticManager.shared.impact(.light)
                             },
                             onUnsave: {
@@ -324,6 +322,10 @@ struct SavedProfilesView: View {
                                 HapticManager.shared.impact(.medium)
                             }
                         )
+                        .onAppear {
+                            // PERFORMANCE: Prefetch images as cards appear in viewport
+                            ImageCache.shared.prefetchUserPhotosHighPriority(user: saved.user)
+                        }
                         .transition(.asymmetric(
                             insertion: .scale(scale: 0.8).combined(with: .opacity),
                             removal: .scale(scale: 0.8).combined(with: .opacity)
@@ -358,11 +360,13 @@ struct SavedProfilesView: View {
                             profile: profile,
                             onTap: {
                                 selectedUser = profile.user
-                                // PERFORMANCE: Start loading all photos immediately
-                                ImageCache.shared.prefetchUserPhotosHighPriority(user: profile.user)
                                 HapticManager.shared.impact(.light)
                             }
                         )
+                        .onAppear {
+                            // PERFORMANCE: Prefetch images as cards appear in viewport
+                            ImageCache.shared.prefetchUserPhotosHighPriority(user: profile.user)
+                        }
                         .transition(.asymmetric(
                             insertion: .scale(scale: 0.8).combined(with: .opacity),
                             removal: .scale(scale: 0.8).combined(with: .opacity)

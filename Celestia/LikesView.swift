@@ -352,8 +352,6 @@ struct LikesView: View {
                         showMessage: showMessage,
                         onTap: {
                             selectedUser = user
-                            // PERFORMANCE: Start loading all photos immediately
-                            ImageCache.shared.prefetchUserPhotosHighPriority(user: user)
                             showUserDetail = true
                         },
                         onLikeBack: {
@@ -365,6 +363,10 @@ struct LikesView: View {
                             handleMessage(user: user)
                         }
                     )
+                    .onAppear {
+                        // PERFORMANCE: Prefetch images as cards appear in viewport
+                        ImageCache.shared.prefetchUserPhotosHighPriority(user: user)
+                    }
                 }
             }
             .padding(16)

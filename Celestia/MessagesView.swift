@@ -449,6 +449,10 @@ struct MessagesView: View {
                         selectedMatch = (match, user)
                         showingChat = true
                     }
+                    .onAppear {
+                        // PERFORMANCE: Prefetch user images as conversations appear
+                        ImageCache.shared.prefetchUserPhotosHighPriority(user: user)
+                    }
                     // PREMIUM: Staggered entrance animation
                     .transition(.asymmetric(
                         insertion: .move(edge: .trailing).combined(with: .opacity),
