@@ -621,6 +621,14 @@ struct FeedDiscoverView: View {
 
         Logger.shared.info("loadMoreUsers: Added \(newUsers.count) users to display. Total displayed: \(displayedUsers.count). Users: \(newUsers.map { $0.fullName }.joined(separator: ", "))", category: .general)
 
+        // PERFORMANCE: Eagerly prefetch images for newly displayed users BEFORE they appear on screen
+        // This ensures images are cached when users tap cards
+        Task {
+            for user in newUsers {
+                ImageCache.shared.prefetchUserPhotosHighPriority(user: user)
+            }
+        }
+
         // Prefetch images for next batch to ensure smooth scrolling
         let nextBatchStart = endIndex
         let nextBatchEnd = min(nextBatchStart + usersPerPage, users.count)
