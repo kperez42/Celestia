@@ -299,8 +299,3 @@ private class WeakListenerRef {
     }
 }
 
-// MARK: - Analytics Events Extension
-
-extension AnalyticsEventType {
-    static let listenersReconnected = AnalyticsEventType(rawValue: "listeners_reconnected")
-}
