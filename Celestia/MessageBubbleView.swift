@@ -142,8 +142,20 @@ struct MessageBubbleGradient: View {
                         Text(message.text)
                             .font(.subheadline)
                             .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .foregroundColor(isFromCurrentUser ? .white.opacity(0.9) : .primary)
+                            .padding(.vertical, 8)
+                            .foregroundColor(isFromCurrentUser ? .white : .primary)
+                            .background {
+                                if isFromCurrentUser {
+                                    LinearGradient(
+                                        colors: [Color.purple.opacity(0.9), Color.pink.opacity(0.9)],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                } else {
+                                    Color(.systemGray5)
+                                }
+                            }
+                            .cornerRadius(12)
                     }
                 } else {
                     // Text message
