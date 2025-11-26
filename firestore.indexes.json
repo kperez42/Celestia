@@ -840,6 +840,20 @@
       ]
     },
     {
+      "collectionGroup": "saved_profiles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "savedUserId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "savedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "purchases",
       "queryScope": "COLLECTION",
       "fields": [
