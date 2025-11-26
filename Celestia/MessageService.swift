@@ -259,6 +259,21 @@ class MessageService: ObservableObject, MessageServiceProtocol, ListenerLifecycl
                             continue
                         }
 
+                        // BUGFIX: Remove optimistic message if matching server message arrives
+                        // This prevents double messages when optimistic UI is used
+                        if let optimisticMessage = self.messages.first(where: { msg in
+                            msg.senderId == message.senderId &&
+                            msg.text == message.text &&
+                            abs(msg.timestamp.timeIntervalSince(message.timestamp)) < 2.0 &&
+                            msg.id != messageId
+                        }) {
+                            if let optimisticId = optimisticMessage.id {
+                                self.messageIdSet.remove(optimisticId)
+                                self.messages.removeAll { $0.id == optimisticId }
+                                Logger.shared.debug("Replaced optimistic message \(optimisticId) with server message \(messageId)", category: .messaging)
+                            }
+                        }
+
                         // AUDIT FIX: Use Set for O(1) duplicate detection instead of O(n) array contains
                         if !self.messageIdSet.contains(messageId) {
                             self.messageIdSet.insert(messageId)
