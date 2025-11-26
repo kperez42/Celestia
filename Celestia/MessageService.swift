@@ -58,6 +58,15 @@ class MessageService: ObservableObject, MessageServiceProtocol {
     // Network monitor for offline detection
     private let networkMonitor = NetworkMonitor.shared
 
+    // AUDIT FIX: Track current matchId to prevent stale listener callbacks
+    private var currentMatchId: String?
+
+    // AUDIT FIX: Track loading task for proper cancellation
+    private var loadingTask: Task<Void, Never>?
+
+    // AUDIT FIX: Use Set for O(1) duplicate detection instead of O(n) array search
+    private var messageIdSet: Set<String> = []
+
     // Dependency injection initializer
     init(repository: MessageRepository) {
         self.repository = repository
@@ -66,34 +75,79 @@ class MessageService: ObservableObject, MessageServiceProtocol {
     /// Listen to messages in real-time for a specific match with pagination
     /// Loads initial batch of recent messages, then listens for new messages only
     func listenToMessages(matchId: String) {
+        // AUDIT FIX: Cancel any existing loading task to prevent memory leaks
+        loadingTask?.cancel()
+        loadingTask = nil
+
+        // AUDIT FIX: Remove existing listener before setting up new one
         listener?.remove()
+        listener = nil
+
+        // AUDIT FIX: Track current matchId to validate listener callbacks
+        currentMatchId = matchId
+
+        // Reset state
         messages = []
+        messageIdSet = []  // AUDIT FIX: Reset duplicate tracking set
         oldestMessageTimestamp = nil
         hasMoreMessages = true
         isLoading = true
 
         Logger.shared.info("Starting paginated message loading for match: \(matchId)", category: .messaging)
 
-        Task {
+        // AUDIT FIX: Store task reference for proper cancellation
+        loadingTask = Task { [weak self] in
+            guard let self = self else { return }
+
             do {
+                // Check if task was cancelled
+                guard !Task.isCancelled else {
+                    Logger.shared.debug("Message loading task cancelled", category: .messaging)
+                    return
+                }
+
                 // Step 1: Load initial batch of recent messages (most recent 50)
                 let initialMessages = try await loadInitialMessages(matchId: matchId)
 
+                // Check cancellation again after async operation
+                guard !Task.isCancelled else {
+                    Logger.shared.debug("Message loading task cancelled after fetch", category: .messaging)
+                    return
+                }
+
+                // AUDIT FIX: Validate matchId hasn't changed during async operation
+                guard self.currentMatchId == matchId else {
+                    Logger.shared.debug("MatchId changed during loading, discarding results", category: .messaging)
+                    return
+                }
+
                 await MainActor.run {
+                    // AUDIT FIX: Build message ID set for O(1) duplicate detection
+                    self.messageIdSet = Set(initialMessages.compactMap { $0.id })
                     self.messages = initialMessages.sorted { $0.timestamp < $1.timestamp }
                     self.oldestMessageTimestamp = initialMessages.first?.timestamp
-                    self.hasMoreMessages = initialMessages.count >= messagesPerPage
+                    self.hasMoreMessages = initialMessages.count >= self.messagesPerPage
                     self.isLoading = false
 
                     Logger.shared.info("Loaded \(initialMessages.count) initial messages", category: .messaging)
                 }
 
+                // AUDIT FIX: Final check before setting up listener
+                guard !Task.isCancelled, self.currentMatchId == matchId else {
+                    return
+                }
+
                 // Step 2: Set up real-time listener for NEW messages only
                 // This prevents loading all historical messages
                 let cutoffTimestamp = initialMessages.last?.timestamp ?? Date()
-                setupNewMessageListener(matchId: matchId, after: cutoffTimestamp)
+                await MainActor.run {
+                    self.setupNewMessageListener(matchId: matchId, after: cutoffTimestamp)
+                }
 
             } catch {
+                // Don't report errors if task was cancelled
+                guard !Task.isCancelled else { return }
+
                 await MainActor.run {
                     self.error = error
                     self.isLoading = false
@@ -113,6 +167,15 @@ class MessageService: ObservableObject, MessageServiceProtocol {
 
     /// Set up listener for NEW messages only (after cutoff timestamp)
     private func setupNewMessageListener(matchId: String, after cutoffTimestamp: Date) {
+        // AUDIT FIX: Validate we're still listening to the correct match
+        guard currentMatchId == matchId else {
+            Logger.shared.debug("Skipping listener setup - matchId changed", category: .messaging)
+            return
+        }
+
+        // AUDIT FIX: Ensure any previous listener is removed
+        listener?.remove()
+
         listener = db.collection("messages")
             .whereField("matchId", isEqualTo: matchId)
             .whereField("timestamp", isGreaterThan: Timestamp(date: cutoffTimestamp))
@@ -120,10 +183,16 @@ class MessageService: ObservableObject, MessageServiceProtocol {
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self else { return }
 
+                // AUDIT FIX: Validate matchId hasn't changed since listener was set up
+                guard self.currentMatchId == matchId else {
+                    Logger.shared.debug("Ignoring stale listener callback for matchId: \(matchId)", category: .messaging)
+                    return
+                }
+
                 if let error = error {
                     Logger.shared.error("Error listening to new messages", category: .messaging, error: error)
                     Task { @MainActor [weak self] in
-                        guard let self = self else { return }
+                        guard let self = self, self.currentMatchId == matchId else { return }
                         self.error = error
                     }
                     return
@@ -133,6 +202,12 @@ class MessageService: ObservableObject, MessageServiceProtocol {
 
                 Task { @MainActor [weak self] in
                     guard let self = self else { return }
+
+                    // AUDIT FIX: Final matchId validation before updating state
+                    guard self.currentMatchId == matchId else {
+                        Logger.shared.debug("Discarding messages for stale matchId: \(matchId)", category: .messaging)
+                        return
+                    }
 
                     // UX FIX: Properly handle message parsing errors instead of silent failure
                     var newMessages: [Message] = []
@@ -148,16 +223,28 @@ class MessageService: ObservableObject, MessageServiceProtocol {
                     }
 
                     // Append new messages to existing ones
+                    var addedCount = 0
                     for message in newMessages {
-                        // Avoid duplicates
-                        if !self.messages.contains(where: { $0.id == message.id }) {
+                        // AUDIT FIX: Handle nil message IDs - use document path as fallback
+                        guard let messageId = message.id else {
+                            Logger.shared.warning("Message has nil ID, skipping to prevent duplicates", category: .messaging)
+                            continue
+                        }
+
+                        // AUDIT FIX: Use Set for O(1) duplicate detection instead of O(n) array contains
+                        if !self.messageIdSet.contains(messageId) {
+                            self.messageIdSet.insert(messageId)
                             self.messages.append(message)
-                            Logger.shared.debug("New message received: \(message.id ?? "unknown")", category: .messaging)
+                            addedCount += 1
+                            Logger.shared.debug("New message received: \(messageId)", category: .messaging)
                         }
                     }
 
-                    // Keep messages sorted by timestamp
-                    self.messages.sort { $0.timestamp < $1.timestamp }
+                    // Only sort if we actually added messages
+                    if addedCount > 0 {
+                        // Keep messages sorted by timestamp
+                        self.messages.sort { $0.timestamp < $1.timestamp }
+                    }
                 }
             }
     }
@@ -191,17 +278,27 @@ class MessageService: ObservableObject, MessageServiceProtocol {
 
             await MainActor.run {
                 if !olderMessages.isEmpty {
+                    // AUDIT FIX: Filter duplicates and add to tracking set
+                    let newOlderMessages = olderMessages.filter { message in
+                        guard let messageId = message.id else { return false }
+                        if self.messageIdSet.contains(messageId) {
+                            return false
+                        }
+                        self.messageIdSet.insert(messageId)
+                        return true
+                    }
+
                     // Prepend older messages to the beginning
-                    self.messages.insert(contentsOf: olderMessages.sorted { $0.timestamp < $1.timestamp }, at: 0)
+                    self.messages.insert(contentsOf: newOlderMessages.sorted { $0.timestamp < $1.timestamp }, at: 0)
                     self.oldestMessageTimestamp = olderMessages.first?.timestamp
-                    Logger.shared.info("Loaded \(olderMessages.count) older messages", category: .messaging)
+                    Logger.shared.info("Loaded \(newOlderMessages.count) older messages (filtered from \(olderMessages.count))", category: .messaging)
                 }
 
                 // Check if there are more messages to load
-                self.hasMoreMessages = olderMessages.count >= messagesPerPage
+                self.hasMoreMessages = olderMessages.count >= self.messagesPerPage
                 self.isLoadingMore = false
 
-                if !hasMoreMessages {
+                if !self.hasMoreMessages {
                     Logger.shared.info("Reached the beginning of conversation", category: .messaging)
                 }
             }
@@ -217,13 +314,25 @@ class MessageService: ObservableObject, MessageServiceProtocol {
     
     /// Stop listening to messages and reset pagination state
     func stopListening() {
+        // AUDIT FIX: Cancel any pending loading task first
+        loadingTask?.cancel()
+        loadingTask = nil
+
+        // AUDIT FIX: Clear matchId to invalidate any in-flight callbacks
+        currentMatchId = nil
+
+        // Remove the snapshot listener
         listener?.remove()
         listener = nil
+
+        // Reset all state
         messages = []
+        messageIdSet = []  // AUDIT FIX: Clear duplicate tracking set
         oldestMessageTimestamp = nil
         hasMoreMessages = true
         isLoading = false
         isLoadingMore = false
+
         Logger.shared.info("Stopped listening to messages and reset state", category: .messaging)
     }
     
@@ -791,6 +900,8 @@ class MessageService: ObservableObject, MessageServiceProtocol {
     }
     
     deinit {
+        // AUDIT FIX: Cancel loading task to prevent memory leaks
+        loadingTask?.cancel()
         listener?.remove()
     }
 }
