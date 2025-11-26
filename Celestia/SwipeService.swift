@@ -143,4 +143,15 @@ class SwipeService: ObservableObject, SwipeServiceProtocol {
             throw error
         }
     }
+
+    /// Check if user has already liked another user
+    func checkIfLiked(fromUserId: String, toUserId: String) async throws -> Bool {
+        return try await repository.checkLikeExists(fromUserId: fromUserId, toUserId: toUserId)
+    }
+
+    /// Unlike a user (remove the like)
+    func unlikeUser(fromUserId: String, toUserId: String) async throws {
+        try await repository.unlikeUser(fromUserId: fromUserId, toUserId: toUserId)
+        Logger.shared.info("User unliked: \(fromUserId) -> \(toUserId)", category: .matching)
+    }
 }

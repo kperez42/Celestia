@@ -14,10 +14,12 @@ struct UserDetailView: View {
 
     @State private var showingInterestSent = false
     @State private var showingMatched = false
+    @State private var showingUnliked = false
     @State private var isProcessing = false
     @State private var showingError = false
     @State private var errorMessage = ""
     @State private var isSaved = false
+    @State private var isLiked = false
     @ObservedObject private var savedProfilesVM = SavedProfilesViewModel.shared
 
     // Photo viewer state
@@ -72,6 +74,11 @@ struct UserDetailView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text(errorMessage.isEmpty ? "Failed to send like. Please try again." : errorMessage)
+        }
+        .alert("Unliked", isPresented: $showingUnliked) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("You unliked \(user.fullName)")
         }
     }
 
@@ -397,33 +404,39 @@ struct UserDetailView: View {
 
     private var likeButton: some View {
         Button {
-            sendInterest()
+            toggleLike()
         } label: {
             ZStack {
                 if isProcessing {
                     ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .progressViewStyle(CircularProgressViewStyle(tint: isLiked ? .pink : .white))
                         .scaleEffect(1.2)
                 } else {
-                    Image(systemName: "heart.fill")
+                    Image(systemName: isLiked ? "heart.fill" : "heart")
                         .font(.title)
-                        .foregroundColor(.white)
+                        .foregroundColor(isLiked ? .pink : .white)
                 }
             }
             .frame(width: 70, height: 70)
             .background(
-                LinearGradient(
-                    colors: [Color.purple, Color.pink],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+                Group {
+                    if isLiked {
+                        Color.white
+                    } else {
+                        LinearGradient(
+                            colors: [Color.purple, Color.pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    }
+                }
             )
             .clipShape(Circle())
-            .shadow(color: Color.purple.opacity(0.4), radius: 10)
+            .shadow(color: isLiked ? Color.pink.opacity(0.3) : Color.purple.opacity(0.4), radius: 10)
         }
         .disabled(isProcessing)
-        .accessibilityLabel("Like")
-        .accessibilityHint("Send interest to \(user.fullName)")
+        .accessibilityLabel(isLiked ? "Unlike" : "Like")
+        .accessibilityHint(isLiked ? "Remove like from \(user.fullName)" : "Send interest to \(user.fullName)")
     }
 
     // MARK: - Helper Properties
@@ -458,6 +471,19 @@ struct UserDetailView: View {
         Task {
             guard let currentUserId = authService.currentUser?.id,
                   let viewedUserId = user.id else { return }
+
+            // Check if user is already liked
+            do {
+                let alreadyLiked = try await SwipeService.shared.checkIfLiked(
+                    fromUserId: currentUserId,
+                    toUserId: viewedUserId
+                )
+                await MainActor.run {
+                    isLiked = alreadyLiked
+                }
+            } catch {
+                Logger.shared.error("Error checking like status", category: .matching, error: error)
+            }
 
             do {
                 try await AnalyticsManager.shared.trackProfileView(
@@ -513,6 +539,84 @@ struct UserDetailView: View {
                     showingError = true
                 }
                 Logger.shared.error("Error sending like from detail view", category: .matching, error: error)
+            }
+        }
+    }
+
+    func toggleLike() {
+        guard let currentUserID = authService.currentUser?.id,
+              let targetUserID = user.id,
+              !isProcessing else { return }
+
+        guard currentUserID != targetUserID else {
+            errorMessage = "You can't like your own profile!"
+            showingError = true
+            return
+        }
+
+        HapticManager.shared.impact(.medium)
+
+        if isLiked {
+            // Unlike the user
+            isProcessing = true
+            isLiked = false // Optimistic update
+
+            Task {
+                do {
+                    try await SwipeService.shared.unlikeUser(
+                        fromUserId: currentUserID,
+                        toUserId: targetUserID
+                    )
+
+                    await MainActor.run {
+                        isProcessing = false
+                        showingUnliked = true
+                        Logger.shared.info("Unliked \(user.fullName) from detail view", category: .matching)
+                    }
+                } catch {
+                    await MainActor.run {
+                        isProcessing = false
+                        isLiked = true // Revert on error
+                        errorMessage = error.localizedDescription
+                        showingError = true
+                    }
+                    Logger.shared.error("Error unliking from detail view", category: .matching, error: error)
+                }
+            }
+        } else {
+            // Like the user
+            isProcessing = true
+            isLiked = true // Optimistic update
+
+            Task {
+                do {
+                    let isMatch = try await SwipeService.shared.likeUser(
+                        fromUserId: currentUserID,
+                        toUserId: targetUserID,
+                        isSuperLike: false
+                    )
+
+                    await MainActor.run {
+                        isProcessing = false
+
+                        if isMatch {
+                            showingMatched = true
+                            HapticManager.shared.notification(.success)
+                            Logger.shared.info("Match created with \(user.fullName) from detail view", category: .matching)
+                        } else {
+                            showingInterestSent = true
+                            Logger.shared.info("Like sent to \(user.fullName) from detail view", category: .matching)
+                        }
+                    }
+                } catch {
+                    await MainActor.run {
+                        isProcessing = false
+                        isLiked = false // Revert on error
+                        errorMessage = error.localizedDescription
+                        showingError = true
+                    }
+                    Logger.shared.error("Error sending like from detail view", category: .matching, error: error)
+                }
             }
         }
     }

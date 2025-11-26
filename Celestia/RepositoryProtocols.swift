@@ -54,6 +54,10 @@ protocol SwipeRepository {
     func createPass(fromUserId: String, toUserId: String) async throws
     func checkMutualLike(fromUserId: String, toUserId: String) async throws -> Bool
     func hasSwipedOn(fromUserId: String, toUserId: String) async throws -> (liked: Bool, passed: Bool)
+    /// Check if a specific like exists
+    func checkLikeExists(fromUserId: String, toUserId: String) async throws -> Bool
+    /// Remove a like (unlike)
+    func unlikeUser(fromUserId: String, toUserId: String) async throws
     /// Get likes received with optional limit for pagination (default 500)
     func getLikesReceived(userId: String, limit: Int) async throws -> [String]
     /// Get likes sent with optional limit for pagination (default 500)

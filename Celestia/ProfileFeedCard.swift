@@ -11,7 +11,9 @@ struct ProfileFeedCard: View {
     let user: User
     let currentUser: User?  // NEW: For calculating shared interests
     let initialIsFavorited: Bool
+    let initialIsLiked: Bool
     let onLike: () -> Void
+    let onUnlike: () -> Void
     let onFavorite: () -> Void
     let onMessage: () -> Void
     let onViewPhotos: () -> Void
@@ -69,11 +71,18 @@ struct ProfileFeedCard: View {
         .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
         .onAppear {
             isFavorited = initialIsFavorited
+            isLiked = initialIsLiked
         }
         .onChange(of: initialIsFavorited) { newValue in
             // Update when parent changes favorites set (e.g., unsaved from another view)
             if !isProcessingSave {
                 isFavorited = newValue
+            }
+        }
+        .onChange(of: initialIsLiked) { newValue in
+            // Update when parent changes likes set (e.g., unliked from another view)
+            if !isProcessingLike {
+                isLiked = newValue
             }
         }
     }
@@ -175,18 +184,27 @@ struct ProfileFeedCard: View {
 
     private var actionButtons: some View {
         HStack(spacing: 12) {
-            // Like/Heart button
+            // Like/Heart button (toggle)
             ActionButton(
                 icon: isLiked ? "heart.fill" : "heart",
                 color: .pink,
-                label: "Like",
+                label: isLiked ? "Liked" : "Like",
                 isProcessing: isProcessingLike,
                 action: {
                     guard !isProcessingLike else { return }
                     HapticManager.shared.impact(.medium)
                     isProcessingLike = true
-                    isLiked = true  // Optimistic update
-                    onLike()
+
+                    if isLiked {
+                        // Unlike
+                        isLiked = false  // Optimistic update
+                        onUnlike()
+                    } else {
+                        // Like
+                        isLiked = true  // Optimistic update
+                        onLike()
+                    }
+
                     // Reset processing state after delay
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         isProcessingLike = false
@@ -444,7 +462,9 @@ struct ProfileFeedCardSkeleton: View {
                 ageRangeMax: 35
             ),
             initialIsFavorited: false,
+            initialIsLiked: false,
             onLike: {},
+            onUnlike: {},
             onFavorite: {},
             onMessage: {},
             onViewPhotos: {},
