@@ -8,7 +8,7 @@
 import Foundation
 import FirebaseFirestore
 
-struct Match: Identifiable, Codable {
+struct Match: Identifiable, Codable, Equatable {
     @DocumentID var id: String?
     var user1Id: String
     var user2Id: String
