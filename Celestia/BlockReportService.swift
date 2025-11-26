@@ -17,8 +17,17 @@ class BlockReportService: ObservableObject {
     @Published var blockedUserIds: Set<String> = []
     @Published var isLoading = false
 
+    // AUDIT FIX: Store listener reference for proper cleanup
+    private var blockedUsersListener: ListenerRegistration?
+
     private init() {
         loadBlockedUsers()
+    }
+
+    // AUDIT FIX: Clean up listener when no longer needed
+    func stopListening() {
+        blockedUsersListener?.remove()
+        blockedUsersListener = nil
     }
 
     // MARK: - Block User
@@ -86,9 +95,19 @@ class BlockReportService: ObservableObject {
     private func loadBlockedUsers() {
         guard let currentUserId = AuthService.shared.currentUser?.id else { return }
 
-        db.collection("blockedUsers")
+        // AUDIT FIX: Remove existing listener before creating new one
+        blockedUsersListener?.remove()
+
+        // AUDIT FIX: Store the listener reference so it can be cleaned up
+        blockedUsersListener = db.collection("blockedUsers")
             .whereField("blockerId", isEqualTo: currentUserId)
             .addSnapshotListener { [weak self] snapshot, error in
+                // AUDIT FIX: Log errors instead of silently ignoring them
+                if let error = error {
+                    Logger.shared.error("Error listening to blocked users", category: .general, error: error)
+                    return
+                }
+
                 guard let documents = snapshot?.documents else { return }
 
                 let blockedIds = Set(documents.compactMap { doc -> String? in
@@ -99,6 +118,11 @@ class BlockReportService: ObservableObject {
                     self?.blockedUserIds = blockedIds
                 }
             }
+    }
+
+    /// Restart listening after user logs in or changes
+    func restartListening() {
+        loadBlockedUsers()
     }
 
     // MARK: - Report User
