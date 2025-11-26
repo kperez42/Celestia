@@ -12,11 +12,19 @@ struct CurrentUserProfileCard: View {
     let user: User
     let onTap: () -> Void
 
+    // Get the best available photo URL (photos array first, then profileImageURL)
+    private var displayPhotoURL: String {
+        if let firstPhoto = user.photos.first, !firstPhoto.isEmpty {
+            return firstPhoto
+        }
+        return user.profileImageURL
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Profile Image with badge
             ZStack(alignment: .topTrailing) {
-                CachedCardImage(url: URL(string: user.profileImageURL))
+                CachedCardImage(url: URL(string: displayPhotoURL))
                     .frame(height: 300)
                     .clipped()
                     .cornerRadius(16, corners: [.topLeft, .topRight])

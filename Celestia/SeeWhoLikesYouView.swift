@@ -214,19 +214,14 @@ struct LikeCardView: View {
 
     var body: some View {
         Button(action: onTap) {
-            VStack(spacing: 0) {
-                // Profile image section
-                ZStack {
-                    // Profile image - cached for smooth scrolling
-                    if let imageURL = user.photos.first, let url = URL(string: imageURL) {
-                        CachedAsyncImage(url: url) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        } placeholder: {
-                            Color.gray.opacity(0.2)
-                        }
-                    } else {
+            ZStack {
+                // Profile image - cached for smooth scrolling
+                if let imageURL = user.photos.first, let url = URL(string: imageURL) {
+                    CachedAsyncImage(url: url) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } placeholder: {
                         Color.gray.opacity(0.2)
                     }
 

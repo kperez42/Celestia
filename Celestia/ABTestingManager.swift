@@ -18,7 +18,10 @@ class ABTestingManager: ObservableObject {
     @Published var userVariants: [String: String] = [:] // experimentId -> variantId
 
     private let db = Firestore.firestore()
-    private let analyticsService = AnalyticsServiceEnhanced.shared
+
+    // FIXED: Use lazy to avoid circular dependency crash during singleton initialization
+    // ABTestingManager <-> AnalyticsServiceEnhanced were causing deadlock
+    private lazy var analyticsService = AnalyticsServiceEnhanced.shared
 
     private init() {
         loadActiveExperiments()

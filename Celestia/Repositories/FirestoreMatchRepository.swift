@@ -225,12 +225,17 @@ class FirestoreMatchRepository: MatchRepository {
     }
 
     func updateMatchCounts(user1Id: String, user2Id: String) async throws {
-        try await db.collection("users").document(user1Id).updateData([
-            "matchCount": FieldValue.increment(Int64(1))
-        ])
+        // QUERY OPTIMIZATION: Use batched write for atomicity and reduced latency
+        // Both updates happen in a single network round-trip
+        let batch = db.batch()
 
-        try await db.collection("users").document(user2Id).updateData([
-            "matchCount": FieldValue.increment(Int64(1))
-        ])
+        let user1Ref = db.collection("users").document(user1Id)
+        let user2Ref = db.collection("users").document(user2Id)
+
+        batch.updateData(["matchCount": FieldValue.increment(Int64(1))], forDocument: user1Ref)
+        batch.updateData(["matchCount": FieldValue.increment(Int64(1))], forDocument: user2Ref)
+
+        try await batch.commit()
+        Logger.shared.debug("Updated match counts for both users atomically", category: .matching)
     }
 }

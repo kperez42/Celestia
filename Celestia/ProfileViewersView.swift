@@ -323,7 +323,9 @@ class ProfileViewersViewModel: ObservableObject {
     private let db = Firestore.firestore()
 
     func loadViewers() async {
-        guard let currentUserId = AuthService.shared.currentUser?.id else { return }
+        guard let currentUserId = AuthService.shared.currentUser?.effectiveId else {
+            return
+        }
 
         isLoading = true
         defer { isLoading = false }

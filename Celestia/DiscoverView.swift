@@ -489,7 +489,7 @@ struct DiscoverView: View {
                     // Navigate to Messages tab (tab index 2)
                     if let matchedUserId = viewModel.matchedUser?.id {
                         NotificationCenter.default.post(
-                            name: Notification.Name("NavigateToMessages"),
+                            name: .navigateToMessages,
                             object: nil,
                             userInfo: ["matchedUserId": matchedUserId]
                         )
@@ -634,8 +634,8 @@ struct UserCardView: View {
                 // Photo carousel (if multiple photos) or single image
                 if validPhotos.count > 1 {
                     TabView(selection: $selectedPhotoIndex) {
-                        ForEach(Array(validPhotos.enumerated()), id: \.offset) { index, photoURL in
-                            CachedCardImage(url: URL(string: photoURL))
+                        ForEach(validPhotos.indices, id: \.self) { index in
+                            CachedCardImage(url: URL(string: validPhotos[index]))
                                 .frame(width: geometry.size.width, height: geometry.size.height)
                                 .clipped()
                                 .tag(index)

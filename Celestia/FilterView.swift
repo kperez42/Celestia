@@ -16,8 +16,10 @@ struct FilterView: View {
     @State private var showAllCountries = true
     @State private var selectedCountry = ""
     @State private var lookingFor = "Everyone"
-    
-    let lookingForOptions = ["Male", "Female", "Everyone"]
+    @State private var isLoading = false
+    @State private var showSaveConfirmation = false
+
+    let lookingForOptions = ["Men", "Women", "Everyone"]
     
     var body: some View {
         NavigationStack {
@@ -75,11 +77,17 @@ struct FilterView: View {
                     } label: {
                         HStack {
                             Spacer()
-                            Text("Apply Filters")
-                                .fontWeight(.semibold)
+                            if isLoading {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle())
+                            } else {
+                                Text("Save & Apply")
+                                    .fontWeight(.semibold)
+                            }
                             Spacer()
                         }
                     }
+                    .disabled(isLoading)
                 }
             }
             .navigationTitle("Filters")
@@ -90,42 +98,76 @@ struct FilterView: View {
                         dismiss()
                     }
                 }
-                
+
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Reset") {
                         resetFilters()
                     }
                 }
             }
+            .onAppear {
+                loadCurrentPreferences()
+            }
+            .alert("Preferences Saved", isPresented: $showSaveConfirmation) {
+                Button("OK", role: .cancel) {
+                    dismiss()
+                }
+            } message: {
+                Text("Your preferences have been updated successfully.")
+            }
         }
     }
     
     private func applyFilters() {
         Task {
-            guard let currentUserId = authService.currentUser?.id else { return }
-            
+            guard var currentUser = authService.currentUser else { return }
+
+            isLoading = true
+
             let ageRangeInt = Int(ageRange.lowerBound)...Int(ageRange.upperBound)
             let country = showAllCountries ? nil : selectedCountry
-            
+
             do {
+                // Update user's preferences in their profile
+                currentUser.lookingFor = lookingFor
+                currentUser.ageRangeMin = Int(ageRange.lowerBound)
+                currentUser.ageRangeMax = Int(ageRange.upperBound)
+
+                // Save to Firebase
+                try await authService.updateUser(currentUser)
+
+                // Fetch users with new filters
                 try await userService.fetchUsers(
-                    excludingUserId: currentUserId,
+                    excludingUserId: currentUser.id ?? "",
                     lookingFor: lookingFor == "Everyone" ? nil : lookingFor,
                     ageRange: ageRangeInt,
                     country: country
                 )
-                dismiss()
+
+                await MainActor.run {
+                    isLoading = false
+                    showSaveConfirmation = true
+                }
             } catch {
                 Logger.shared.error("Error applying filters", category: .database, error: error)
+                await MainActor.run {
+                    isLoading = false
+                }
             }
         }
     }
+
+    private func loadCurrentPreferences() {
+        guard let currentUser = authService.currentUser else { return }
+
+        lookingFor = currentUser.lookingFor
+        ageRange = Double(currentUser.ageRangeMin)...Double(currentUser.ageRangeMax)
+    }
     
     private func resetFilters() {
-        ageRange = 18...99
+        loadCurrentPreferences()
         showAllCountries = true
         selectedCountry = ""
-        lookingFor = authService.currentUser?.lookingFor ?? "Everyone"
     }
 }
 

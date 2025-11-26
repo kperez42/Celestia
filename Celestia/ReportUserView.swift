@@ -27,8 +27,9 @@ struct ReportUserView: View {
                 Section {
                     VStack(alignment: .leading, spacing: 12) {
                         HStack(spacing: 16) {
+                            // PERFORMANCE: Use CachedAsyncImage
                             if let photoURL = URL(string: user.profileImageURL) {
-                                AsyncImage(url: photoURL) { image in
+                                CachedAsyncImage(url: photoURL) { image in
                                     image
                                         .resizable()
                                         .aspectRatio(contentMode: .fill)
@@ -251,8 +252,9 @@ struct BlockedUsersView: View {
                 List {
                     ForEach(blockedUsers) { user in
                         HStack(spacing: 16) {
+                            // PERFORMANCE: Use CachedAsyncImage
                             if let photoURL = URL(string: user.profileImageURL) {
-                                AsyncImage(url: photoURL) { image in
+                                CachedAsyncImage(url: photoURL) { image in
                                     image
                                         .resizable()
                                         .aspectRatio(contentMode: .fill)

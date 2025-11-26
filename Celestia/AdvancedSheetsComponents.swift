@@ -12,16 +12,14 @@ struct AdvancedFiltersSheet: View {
     @Binding var ageRange: ClosedRange<Int>
     @Binding var gender: String
     @Binding var verifiedOnly: Bool
-    
-    @State private var maxDistance: Double = 100
+
     @State private var selectedCountry = ""
     @State private var onlineOnly = false
     @State private var hasPhotos = true
     @State private var hasBio = false
-    @State private var sortBy: SortOption = .distance
-    
+    @State private var sortBy: SortOption = .newest
+
     enum SortOption: String, CaseIterable {
-        case distance = "Distance"
         case newest = "Newest Members"
         case active = "Recently Active"
         case popular = "Most Popular"
@@ -43,10 +41,7 @@ struct AdvancedFiltersSheet: View {
                         
                         // Age range
                         ageRangeSection
-                        
-                        // Distance
-                        distanceSection
-                        
+
                         // Location
                         locationSection
                         
@@ -178,36 +173,7 @@ struct AdvancedFiltersSheet: View {
         .background(Color.white)
         .cornerRadius(16)
     }
-    
-    // MARK: - Distance Section
-    
-    private var distanceSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            sectionHeader(icon: "location.fill", title: "Maximum Distance")
-            
-            HStack {
-                Text("\(Int(maxDistance)) km")
-                    .font(.title3)
-                    .fontWeight(.bold)
-                    .foregroundColor(.purple)
-                
-                Spacer()
-                
-                if maxDistance >= 500 {
-                    Text("Worldwide")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                }
-            }
-            
-            Slider(value: $maxDistance, in: 1...500, step: 1)
-                .accentColor(.purple)
-        }
-        .padding(16)
-        .background(Color.white)
-        .cornerRadius(16)
-    }
-    
+
     // MARK: - Location Section
     
     private var locationSection: some View {
@@ -359,12 +325,11 @@ struct AdvancedFiltersSheet: View {
         ageRange = 18...99
         gender = "Everyone"
         verifiedOnly = false
-        maxDistance = 100
         selectedCountry = ""
         onlineOnly = false
         hasPhotos = true
         hasBio = false
-        sortBy = .distance
+        sortBy = .newest
 
         let haptics = HapticManager.shared
         haptics.impact(.medium)

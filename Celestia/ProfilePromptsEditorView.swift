@@ -16,6 +16,11 @@ struct ProfilePromptsEditorView: View {
     @State private var editingPromptIndex: Int?
     @State private var searchText = ""
 
+    // Answer entry state
+    @State private var showingAnswerEntry = false
+    @State private var selectedQuestion: String = ""
+    @State private var answerText: String = ""
+
     let maxPrompts = 3
     let categories = ["All"] + PromptLibrary.categories.keys.sorted()
 
@@ -64,6 +69,9 @@ struct ProfilePromptsEditorView: View {
             }
             .sheet(isPresented: $showingPromptPicker) {
                 promptPickerView
+            }
+            .sheet(isPresented: $showingAnswerEntry) {
+                answerEntryView
             }
         }
     }
@@ -325,6 +333,105 @@ struct ProfilePromptsEditorView: View {
         }
     }
 
+    // MARK: - Answer Entry View
+
+    private var answerEntryView: some View {
+        NavigationStack {
+            VStack(spacing: 24) {
+                // Question display
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Your Prompt")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .textCase(.uppercase)
+
+                    Text(selectedQuestion)
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.purple)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+                .background(
+                    LinearGradient(
+                        colors: [Color.purple.opacity(0.08), Color.pink.opacity(0.06)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .cornerRadius(16)
+
+                // Answer text editor
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Your Answer")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .textCase(.uppercase)
+
+                    TextEditor(text: $answerText)
+                        .frame(minHeight: 120)
+                        .padding(12)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.purple.opacity(0.3), lineWidth: 1)
+                        )
+
+                    HStack {
+                        Text("\(answerText.count)/150 characters")
+                            .font(.caption)
+                            .foregroundColor(answerText.count > 150 ? .red : .secondary)
+
+                        Spacer()
+
+                        if answerText.count > 150 {
+                            Text("Too long!")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Spacer()
+
+                // Save button
+                Button {
+                    saveAnswer()
+                } label: {
+                    Text("Save Answer")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            LinearGradient(
+                                colors: answerText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || answerText.count > 150 ? [.gray] : [.purple, .pink],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .cornerRadius(16)
+                }
+                .disabled(answerText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || answerText.count > 150)
+            }
+            .padding()
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("Write Your Answer")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        showingAnswerEntry = false
+                        answerText = ""
+                    }
+                    .foregroundColor(.purple)
+                }
+            }
+        }
+    }
+
     // MARK: - Helpers
 
     private var filteredPrompts: [String] {
@@ -346,61 +453,45 @@ struct ProfilePromptsEditorView: View {
     }
 
     private func selectPrompt(_ question: String) {
+        selectedQuestion = question
+
+        // Pre-fill answer if editing existing prompt
+        if let index = editingPromptIndex {
+            answerText = prompts[index].answer
+        } else {
+            answerText = ""
+        }
+
         showingPromptPicker = false
 
-        // Show answer entry
+        // Show answer entry after a brief delay to allow prompt picker to dismiss
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            showAnswerEntry(for: question)
+            showingAnswerEntry = true
         }
     }
 
-    private func showAnswerEntry(for question: String) {
-        // This would open an alert or sheet for entering the answer
-        // For now, we'll use a simple approach
-        let alert = UIAlertController(
-            title: question,
-            message: "Share your answer (max 150 characters)",
-            preferredStyle: .alert
-        )
+    private func saveAnswer() {
+        let trimmedAnswer = String(answerText.trimmingCharacters(in: .whitespacesAndNewlines).prefix(150))
 
-        alert.addTextField { textField in
-            textField.placeholder = "Your answer..."
-            textField.autocapitalizationType = .sentences
+        guard !trimmedAnswer.isEmpty else { return }
 
-            if let index = editingPromptIndex {
-                textField.text = prompts[index].answer
-            }
+        if let index = editingPromptIndex {
+            // Edit existing prompt
+            prompts[index] = ProfilePrompt(
+                id: prompts[index].id,
+                question: selectedQuestion,
+                answer: trimmedAnswer
+            )
+        } else {
+            // Add new prompt
+            let newPrompt = ProfilePrompt(question: selectedQuestion, answer: trimmedAnswer)
+            prompts.append(newPrompt)
         }
 
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        alert.addAction(UIAlertAction(title: "Save", style: .default) { _ in
-            guard let answer = alert.textFields?.first?.text,
-                  !answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                return
-            }
-
-            let trimmedAnswer = String(answer.prefix(150))
-
-            if let index = editingPromptIndex {
-                // Edit existing prompt
-                prompts[index] = ProfilePrompt(
-                    id: prompts[index].id,
-                    question: question,
-                    answer: trimmedAnswer
-                )
-            } else {
-                // Add new prompt
-                let newPrompt = ProfilePrompt(question: question, answer: trimmedAnswer)
-                prompts.append(newPrompt)
-            }
-
-            HapticManager.shared.notification(.success)
-        })
-
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let rootViewController = windowScene.windows.first?.rootViewController {
-            rootViewController.present(alert, animated: true)
-        }
+        HapticManager.shared.notification(.success)
+        showingAnswerEntry = false
+        answerText = ""
+        editingPromptIndex = nil
     }
 }
 

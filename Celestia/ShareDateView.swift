@@ -610,7 +610,7 @@ struct MatchPickerView: View {
 
     private var matchList: some View {
         List {
-            ForEach(Array(matches.enumerated()), id: \.offset) { index, match in
+            ForEach(Array(matches.enumerated()), id: \.0) { index, match in
                 if let otherUser = getOtherUser(from: match) {
                     MatchPickerRow(user: otherUser) {
                         selectedMatch = otherUser
@@ -630,6 +630,7 @@ struct MatchPickerView: View {
 
     // MARK: - Helper Methods
 
+    // PERFORMANCE FIX: Use batch queries instead of N+1 queries
     private func loadMatches() async {
         guard let currentUserId = AuthService.shared.currentUser?.id else { return }
 
@@ -641,15 +642,49 @@ struct MatchPickerView: View {
             try await matchService.fetchMatches(userId: currentUserId)
             matches = matchService.matches
 
-            // Load user details for each match
-            for match in matches {
-                let otherUserId = match.user1Id == currentUserId ? match.user2Id : match.user1Id
-                if let user = try? await UserService.shared.fetchUser(userId: otherUserId) {
-                    matchUsers[match.id ?? ""] = user
+            // Collect all other user IDs
+            let otherUserIds = matches.map { match in
+                match.user1Id == currentUserId ? match.user2Id : match.user1Id
+            }
+
+            guard !otherUserIds.isEmpty else { return }
+
+            // Batch fetch users in groups of 10 (Firestore 'in' query limit)
+            let db = Firestore.firestore()
+            let uniqueUserIds = Array(Set(otherUserIds))
+
+            for i in stride(from: 0, to: uniqueUserIds.count, by: 10) {
+                let batchEnd = min(i + 10, uniqueUserIds.count)
+                let batchIds = Array(uniqueUserIds[i..<batchEnd])
+
+                guard !batchIds.isEmpty else { continue }
+
+                let batchSnapshot = try await db.collection("users")
+                    .whereField(FieldPath.documentID(), in: batchIds)
+                    .getDocuments()
+
+                let batchUsers = batchSnapshot.documents.compactMap { try? $0.data(as: User.self) }
+
+                // Map users to their match IDs
+                for user in batchUsers {
+                    guard let userId = user.id else { continue }
+                    // Find match that includes this user
+                    if let match = matches.first(where: {
+                        ($0.user1Id == userId || $0.user2Id == userId) && $0.user1Id != userId || $0.user2Id != userId
+                    }), let matchId = match.id {
+                        matchUsers[matchId] = user
+                    }
+                    // Also store by user ID for easier lookup
+                    for match in matches {
+                        let otherUserId = match.user1Id == currentUserId ? match.user2Id : match.user1Id
+                        if otherUserId == userId, let matchId = match.id {
+                            matchUsers[matchId] = user
+                        }
+                    }
                 }
             }
 
-            Logger.shared.info("Loaded \(matches.count) matches for date sharing", category: .general)
+            Logger.shared.info("Loaded \(matches.count) matches for date sharing using batch queries", category: .general)
         } catch {
             Logger.shared.error("Error loading matches for picker", category: .general, error: error)
         }
@@ -670,9 +705,9 @@ struct MatchPickerRow: View {
     var body: some View {
         Button(action: onSelect) {
             HStack(spacing: 16) {
-                // Profile Image
+                // Profile Image - PERFORMANCE: Use CachedAsyncImage
                 if let photoURL = user.photos.first, let url = URL(string: photoURL) {
-                    AsyncImage(url: url) { image in
+                    CachedAsyncImage(url: url) { image in
                         image
                             .resizable()
                             .scaledToFill()

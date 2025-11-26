@@ -16,7 +16,7 @@ class ImageUploadService {
     // Image constraints
     private let maxImageSize: Int = 10 * 1024 * 1024 // 10 MB
     private let maxDimension: CGFloat = 2048
-    private let compressionQuality: CGFloat = 0.7
+    private let compressionQuality: CGFloat = 0.85 // Higher quality for better photos
 
     private init() {}
 
@@ -120,8 +120,10 @@ class ImageUploadService {
         }
 
         // Check aspect ratio (prevent extremely distorted images)
+        // Modern phones have tall screens (9:19.5 = 0.46, 9:21 = 0.43)
+        // Allow ratios from 1:3 portrait (0.33) to 3:1 landscape (3.0)
         let aspectRatio = image.size.width / image.size.height
-        if aspectRatio < 0.5 || aspectRatio > 2.0 {
+        if aspectRatio < 0.33 || aspectRatio > 3.0 {
             throw CelestiaError.invalidImageFormat
         }
     }

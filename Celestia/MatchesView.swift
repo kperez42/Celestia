@@ -29,14 +29,24 @@ struct MatchesView: View {
     @State private var showMatchDetail = false
     @State private var errorMessage: String = ""
 
+    // PERFORMANCE: Memoized filtered/sorted matches to avoid O(n log n) on every render
+    @State private var cachedFilteredMatches: [Match] = []
+    @State private var lastMatchesHash: Int = 0
+
     enum SortOption: String, CaseIterable {
         case recent = "Most Recent"
         case unread = "Unread First"
         case alphabetical = "A-Z"
         case newMatches = "New Matches"
     }
-    
-    var filteredAndSortedMatches: [Match] {
+
+    // PERFORMANCE: Use cached value, update only when dependencies change
+    private var filteredAndSortedMatches: [Match] {
+        cachedFilteredMatches
+    }
+
+    // PERFORMANCE: Compute filtered matches only when needed
+    private func updateFilteredMatches() {
         var matches = matchService.matches
 
         // Apply search filter using debounced text
@@ -47,7 +57,7 @@ struct MatchesView: View {
                        user.location.localizedCaseInsensitiveContains(searchDebouncer.debouncedText)
             }
         }
-        
+
         // Apply unread filter
         if showOnlyUnread {
             #if DEBUG
@@ -66,7 +76,7 @@ struct MatchesView: View {
         #else
         let currentUserId = authService.currentUser?.id ?? ""
         #endif
-        return matches.sorted { match1, match2 in
+        cachedFilteredMatches = matches.sorted { match1, match2 in
             switch sortOption {
             case .recent:
                 let time1 = match1.lastMessageTimestamp ?? match1.timestamp
@@ -139,13 +149,31 @@ struct MatchesView: View {
             .accessibilityIdentifier(AccessibilityIdentifier.matchesView)
             .task {
                 await loadMatches()
+                updateFilteredMatches()
                 VoiceOverAnnouncement.screenChanged(to: "Matches view. \(matchService.matches.count) matches available.")
             }
             .refreshable {
                 HapticManager.shared.impact(.light)
                 await loadMatches()
+                updateFilteredMatches()
                 HapticManager.shared.notification(.success)
                 VoiceOverAnnouncement.announce("Matches refreshed. \(matchService.matches.count) matches available.")
+            }
+            // PERFORMANCE: Update cached matches only when dependencies change
+            .onChange(of: matchService.matches.count) { _, _ in
+                updateFilteredMatches()
+            }
+            .onChange(of: searchDebouncer.debouncedText) { _, _ in
+                updateFilteredMatches()
+            }
+            .onChange(of: sortOption) { _, _ in
+                updateFilteredMatches()
+            }
+            .onChange(of: showOnlyUnread) { _, _ in
+                updateFilteredMatches()
+            }
+            .onChange(of: matchedUsers.count) { _, _ in
+                updateFilteredMatches()
             }
             .sheet(isPresented: Binding(
                 get: { selectedMatch != nil },
@@ -422,7 +450,7 @@ struct MatchesView: View {
                 GridItem(.flexible(), spacing: 12),
                 GridItem(.flexible(), spacing: 12)
             ], spacing: 12) {
-                ForEach(Array(filteredAndSortedMatches.enumerated()), id: \.offset) { index, match in
+                ForEach(Array(filteredAndSortedMatches.enumerated()), id: \.0) { index, match in
                     if let user = getMatchedUser(match) {
                         MatchProfileCard(
                             match: match,
@@ -641,18 +669,7 @@ struct MatchesView: View {
     // MARK: - Helper Functions
 
     private func loadMatches() async {
-        // Check if we should use test data (no user ID or DEBUG mode)
         guard let userId = authService.currentUser?.id else {
-            // Load test data when no authenticated user
-            #if DEBUG
-            await MainActor.run {
-                matchService.matches = TestData.testMatches.map { $0.match }
-                for (user, match) in TestData.testMatches {
-                    let otherUserId = match.user2Id
-                    matchedUsers[otherUserId] = user
-                }
-            }
-            #endif
             return
         }
 

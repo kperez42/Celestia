@@ -162,7 +162,8 @@ struct ImprovedUserDetailSheet: View {
     }
     
     // MARK: - Photo Carousel
-    
+
+    // PERFORMANCE: Use CachedAsyncImage for smooth scrolling
     private var photoCarousel: some View {
         TabView(selection: $selectedPhotoIndex) {
             if photos.isEmpty {
@@ -170,15 +171,20 @@ struct ImprovedUserDetailSheet: View {
                     .tag(0)
             } else {
                 ForEach(photos.indices, id: \.self) { index in
-                    AsyncImage(url: URL(string: photos[index])) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        default:
-                            placeholderPhoto
-                        }
+                    GeometryReader { geometry in
+                        CachedAsyncImage(
+                            url: URL(string: photos[index]),
+                            content: { image in
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: geometry.size.width, height: geometry.size.height)
+                                    .clipped()
+                            },
+                            placeholder: {
+                                placeholderPhoto
+                            }
+                        )
                     }
                     .tag(index)
                 }
@@ -186,6 +192,7 @@ struct ImprovedUserDetailSheet: View {
         }
         .frame(height: 500)
         .tabViewStyle(.page(indexDisplayMode: .always))
+        .indexViewStyle(.page(backgroundDisplayMode: .always))
     }
     
     private var placeholderPhoto: some View {

@@ -70,10 +70,11 @@ struct AdminUserInvestigationView: View {
 
     // MARK: - Profile Header
 
+    // PERFORMANCE: Use CachedAsyncImage
     private func userProfileHeader(_ user: User) -> some View {
         HStack(spacing: 16) {
             // Profile photo
-            AsyncImage(url: URL(string: user.profileImageURL)) { image in
+            CachedAsyncImage(url: URL(string: user.profileImageURL)) { image in
                 image
                     .resizable()
                     .scaledToFill()

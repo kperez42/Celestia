@@ -151,6 +151,16 @@ class NetworkMonitor: ObservableObject {
                     "offline_duration": timeSinceLastChange
                 ])
 
+                // RECONNECTION FIX: Post notification so all services can reconnect listeners
+                NotificationCenter.default.post(
+                    name: .networkConnectionRestored,
+                    object: nil,
+                    userInfo: [
+                        "connectionType": connectionType.description,
+                        "offlineDuration": timeSinceLastChange
+                    ]
+                )
+
                 // Process pending offline operations when connection is restored
                 Task {
                     await OfflineOperationQueue.shared.processPendingOperations()
@@ -162,6 +172,15 @@ class NetworkMonitor: ObservableObject {
                 AnalyticsManager.shared.logEvent(.networkDisconnected, parameters: [
                     "online_duration": timeSinceLastChange
                 ])
+
+                // RECONNECTION FIX: Post notification so services can pause listeners
+                NotificationCenter.default.post(
+                    name: .networkConnectionLost,
+                    object: nil,
+                    userInfo: [
+                        "onlineDuration": timeSinceLastChange
+                    ]
+                )
             }
         }
 

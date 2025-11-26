@@ -4,12 +4,14 @@
 //
 
 import SwiftUI
+import FirebaseFirestore
 
 struct InterestsView: View {
     @EnvironmentObject var authService: AuthService
     @StateObject private var interestService = InterestService.shared
     @StateObject private var userService = UserService.shared
-    
+
+    private let db = Firestore.firestore()
     @State private var users: [String: User] = [:]
     @State private var showMatchAnimation = false
     @State private var matchedUser: User?
@@ -187,21 +189,45 @@ struct InterestsView: View {
     
     // MARK: - Helper Functions
     
+    // PERFORMANCE FIX: Use batch queries instead of N+1 queries
     private func loadData() async {
         guard let userId = authService.currentUser?.id else { return }
-        
+
         do {
             try await interestService.fetchReceivedInterests(userId: userId)
-            
-            for interest in interestService.receivedInterests {
-                if users[interest.fromUserId] == nil {
-                    if let user = try await userService.fetchUser(userId: interest.fromUserId) {
-                        await MainActor.run {
-                            users[interest.fromUserId] = user
+
+            // Collect user IDs that need fetching (not already cached)
+            let userIdsToFetch = interestService.receivedInterests
+                .map { $0.fromUserId }
+                .filter { users[$0] == nil }
+
+            guard !userIdsToFetch.isEmpty else { return }
+
+            // Batch fetch users in groups of 10 (Firestore 'in' query limit)
+            let uniqueUserIds = Array(Set(userIdsToFetch))
+
+            for i in stride(from: 0, to: uniqueUserIds.count, by: 10) {
+                let batchEnd = min(i + 10, uniqueUserIds.count)
+                let batchIds = Array(uniqueUserIds[i..<batchEnd])
+
+                guard !batchIds.isEmpty else { continue }
+
+                let batchSnapshot = try await db.collection("users")
+                    .whereField(FieldPath.documentID(), in: batchIds)
+                    .getDocuments()
+
+                let batchUsers = batchSnapshot.documents.compactMap { try? $0.data(as: User.self) }
+
+                await MainActor.run {
+                    for user in batchUsers {
+                        if let userId = user.id {
+                            users[userId] = user
                         }
                     }
                 }
             }
+
+            Logger.shared.debug("Loaded \(uniqueUserIds.count) users using batch queries", category: .matching)
         } catch {
             Logger.shared.error("Error loading interests", category: .matching, error: error)
         }
@@ -255,22 +281,17 @@ struct BasicInterestCard: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // User image
-            AsyncImage(url: URL(string: user.profileImageURL)) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                case .failure(_), .empty:
-                    LinearGradient(
-                        colors: [Color.purple.opacity(0.6), Color.pink.opacity(0.5)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                @unknown default:
-                    Color.gray
-                }
+            // User image - cached for smooth scrolling
+            CachedAsyncImage(url: URL(string: user.profileImageURL)) { image in
+                image
+                    .resizable()
+                    .scaledToFill()
+            } placeholder: {
+                LinearGradient(
+                    colors: [Color.purple.opacity(0.6), Color.pink.opacity(0.5)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
             }
             .frame(height: 180)
             .clipped()
