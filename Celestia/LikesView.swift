@@ -18,6 +18,11 @@ struct LikesView: View {
     @State private var showUserDetail = false
     @State private var showChatWithUser: User?
 
+    // Direct messaging state
+    @State private var showDirectChat = false
+    @State private var chatMatch: Match?
+    @State private var chatUser: User?
+
     private let tabs = ["Liked Me", "My Likes", "Mutual Likes"]
 
     var body: some View {
@@ -65,12 +70,63 @@ struct LikesView: View {
             .sheet(item: $showChatWithUser) { user in
                 // Find match for this user to open chat
                 if let match = viewModel.findMatchForUser(user) {
-                    ChatView(match: match, otherUser: user)
-                        .environmentObject(authService)
+                    NavigationStack {
+                        ChatView(match: match, otherUser: user)
+                            .environmentObject(authService)
+                    }
+                }
+            }
+            .sheet(isPresented: $showDirectChat) {
+                if let match = chatMatch, let user = chatUser {
+                    NavigationStack {
+                        ChatView(match: match, otherUser: user)
+                            .environmentObject(authService)
+                    }
                 }
             }
         }
         .networkStatusBanner()
+    }
+
+    // MARK: - Message Handling
+
+    private func handleMessage(user: User) {
+        guard let currentUserId = authService.currentUser?.effectiveId,
+              let userId = user.effectiveId else {
+            return
+        }
+
+        HapticManager.shared.impact(.medium)
+
+        Task {
+            do {
+                // Check if a match already exists
+                var existingMatch = try await MatchService.shared.fetchMatch(user1Id: currentUserId, user2Id: userId)
+
+                if existingMatch == nil {
+                    // No match exists - create one to enable messaging
+                    Logger.shared.info("Creating conversation with \(user.fullName) from LikesView", category: .messaging)
+
+                    // Create the match
+                    await MatchService.shared.createMatch(user1Id: currentUserId, user2Id: userId)
+
+                    // Fetch the newly created match
+                    existingMatch = try await MatchService.shared.fetchMatch(user1Id: currentUserId, user2Id: userId)
+                }
+
+                await MainActor.run {
+                    if let match = existingMatch {
+                        // Open chat directly
+                        chatMatch = match
+                        chatUser = user
+                        showDirectChat = true
+                        Logger.shared.info("Opening chat with \(user.fullName)", category: .messaging)
+                    }
+                }
+            } catch {
+                Logger.shared.error("Error starting conversation from LikesView", category: .messaging, error: error)
+            }
+        }
     }
 
     // MARK: - Header
@@ -287,6 +343,8 @@ struct LikesView: View {
                         showMessage: showMessage,
                         onTap: {
                             selectedUser = user
+                            // PERFORMANCE: Start loading all photos immediately
+                            ImageCache.shared.prefetchUserPhotosHighPriority(user: user)
                             showUserDetail = true
                         },
                         onLikeBack: {
@@ -295,7 +353,7 @@ struct LikesView: View {
                             }
                         },
                         onMessage: {
-                            showChatWithUser = user
+                            handleMessage(user: user)
                         }
                     )
                 }
@@ -421,56 +479,26 @@ struct LikeProfileCard: View {
                         .lineLimit(1)
                 }
 
-                // Action buttons
+                // Action buttons with snappy animations
                 if showLikeBack || showMessage {
                     HStack(spacing: 8) {
                         if showLikeBack {
-                            Button {
-                                HapticManager.shared.impact(.medium)
+                            LikeActionButton(
+                                icon: "heart.fill",
+                                text: "Like",
+                                colors: [.pink, .red]
+                            ) {
                                 onLikeBack?()
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "heart.fill")
-                                        .font(.system(size: 12))
-                                    Text("Like")
-                                        .font(.system(size: 12, weight: .semibold))
-                                }
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 8)
-                                .background(
-                                    LinearGradient(
-                                        colors: [.pink, .red],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                                .cornerRadius(8)
                             }
                         }
 
                         if showMessage {
-                            Button {
-                                HapticManager.shared.impact(.medium)
+                            LikeActionButton(
+                                icon: "message.fill",
+                                text: "Message",
+                                colors: [.purple, .blue]
+                            ) {
                                 onMessage?()
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "message.fill")
-                                        .font(.system(size: 12))
-                                    Text("Message")
-                                        .font(.system(size: 12, weight: .semibold))
-                                }
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 8)
-                                .background(
-                                    LinearGradient(
-                                        colors: [.purple, .blue],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                                .cornerRadius(8)
                             }
                         }
                     }
@@ -546,6 +574,71 @@ struct LikeCardSkeleton: View {
         .opacity(isAnimating ? 0.5 : 1.0)
         .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isAnimating)
         .onAppear { isAnimating = true }
+    }
+}
+
+// MARK: - Like Action Button
+
+/// Snappy animated button for like/message actions in likes view
+struct LikeActionButton: View {
+    let icon: String
+    let text: String
+    let colors: [Color]
+    let action: () -> Void
+
+    @State private var isPressed = false
+    @State private var isAnimating = false
+
+    var body: some View {
+        Button {
+            HapticManager.shared.impact(.medium)
+            // Snappy animation
+            withAnimation(.spring(response: 0.2, dampingFraction: 0.5)) {
+                isAnimating = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+                    isAnimating = false
+                }
+            }
+            action()
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 12))
+                    .scaleEffect(isAnimating ? 1.3 : 1.0)
+                Text(text)
+                    .font(.system(size: 12, weight: .semibold))
+            }
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .background(
+                LinearGradient(
+                    colors: colors,
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            .cornerRadius(8)
+            .scaleEffect(isPressed ? 0.95 : (isAnimating ? 1.05 : 1.0))
+        }
+        .buttonStyle(PlainButtonStyle())
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    if !isPressed {
+                        withAnimation(.easeOut(duration: 0.1)) {
+                            isPressed = true
+                        }
+                    }
+                }
+                .onEnded { _ in
+                    withAnimation(.easeOut(duration: 0.1)) {
+                        isPressed = false
+                    }
+                }
+        )
     }
 }
 

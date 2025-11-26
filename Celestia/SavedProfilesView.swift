@@ -303,6 +303,8 @@ struct SavedProfilesView: View {
                             isUnsaving: viewModel.unsavingProfileId == saved.id,
                             onTap: {
                                 selectedUser = saved.user
+                                // PERFORMANCE: Start loading all photos immediately
+                                ImageCache.shared.prefetchUserPhotosHighPriority(user: saved.user)
                                 HapticManager.shared.impact(.light)
                             },
                             onUnsave: {
@@ -346,6 +348,8 @@ struct SavedProfilesView: View {
                             profile: profile,
                             onTap: {
                                 selectedUser = profile.user
+                                // PERFORMANCE: Start loading all photos immediately
+                                ImageCache.shared.prefetchUserPhotosHighPriority(user: profile.user)
                                 HapticManager.shared.impact(.light)
                             }
                         )

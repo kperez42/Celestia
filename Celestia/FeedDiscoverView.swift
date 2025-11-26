@@ -29,6 +29,11 @@ struct FeedDiscoverView: View {
     @State private var showOwnProfileDetail = false
     @State private var showEditProfile = false
 
+    // Direct messaging state
+    @State private var showDirectChat = false
+    @State private var chatMatch: Match?
+    @State private var chatUser: User?
+
     // Action feedback toast
     @State private var showActionToast = false
     @State private var toastMessage = ""
@@ -109,6 +114,14 @@ struct FeedDiscoverView: View {
                     EditProfileView()
                         .environmentObject(authService)
                 }
+                .sheet(isPresented: $showDirectChat) {
+                    if let match = chatMatch, let user = chatUser {
+                        NavigationStack {
+                            ChatView(match: match, otherUser: user)
+                                .environmentObject(authService)
+                        }
+                    }
+                }
         }
     }
 
@@ -169,11 +182,15 @@ struct FeedDiscoverView: View {
                         },
                         onViewPhotos: {
                             selectedUser = user
+                            // PERFORMANCE: Start loading all photos immediately
+                            ImageCache.shared.prefetchUserPhotosHighPriority(user: user)
                             showPhotoGallery = true
                         },
                         onViewProfile: {
                             HapticManager.shared.impact(.light)
                             selectedUser = user
+                            // PERFORMANCE: Start loading all photos immediately
+                            ImageCache.shared.prefetchUserPhotosHighPriority(user: user)
                             showUserDetail = true
                         }
                     )
@@ -802,42 +819,58 @@ struct FeedDiscoverView: View {
             return
         }
 
-        // Check if users have matched
+        // Prevent messaging yourself
+        guard currentUserId != userId else {
+            showToast(
+                message: "You can't message yourself!",
+                icon: "exclamationmark.triangle.fill",
+                color: .orange
+            )
+            return
+        }
+
+        HapticManager.shared.impact(.medium)
+
         Task {
             do {
-                let hasMatched = try await MatchService.shared.hasMatched(user1Id: currentUserId, user2Id: userId)
+                // Check if a match already exists
+                var existingMatch = try await MatchService.shared.fetchMatch(user1Id: currentUserId, user2Id: userId)
+
+                if existingMatch == nil {
+                    // No match exists - create one to enable messaging
+                    Logger.shared.info("Creating conversation with \(user.fullName)", category: .messaging)
+
+                    // Create the match
+                    await MatchService.shared.createMatch(user1Id: currentUserId, user2Id: userId)
+
+                    // Fetch the newly created match
+                    existingMatch = try await MatchService.shared.fetchMatch(user1Id: currentUserId, user2Id: userId)
+                }
 
                 await MainActor.run {
-                    if hasMatched {
-                        // Navigate to Messages tab and open chat with this user
-                        selectedTab = 2
-                        HapticManager.shared.impact(.medium)
+                    if let match = existingMatch {
+                        // Open chat directly
+                        chatMatch = match
+                        chatUser = user
+                        showDirectChat = true
 
-                        // Small delay to ensure Messages tab loads before opening chat
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            NotificationCenter.default.post(
-                                name: .openChatWithUser,
-                                object: nil,
-                                userInfo: ["userId": userId, "user": user]
-                            )
-                        }
-
-                        Logger.shared.debug("Navigate to messages for user: \(user.fullName)", category: .messaging)
-                    } else {
-                        // Not matched yet - show info
                         let truncatedName = user.fullName.count > 20 ? String(user.fullName.prefix(20)) + "..." : user.fullName
+                        Logger.shared.info("Opening chat with \(truncatedName)", category: .messaging)
+                    } else {
+                        // Shouldn't happen, but handle gracefully
                         showToast(
-                            message: "Like \(truncatedName) first to message",
-                            icon: "heart.fill",
-                            color: .pink
+                            message: "Unable to start conversation. Try again.",
+                            icon: "exclamationmark.triangle.fill",
+                            color: .red
                         )
+                        Logger.shared.error("Failed to create or fetch match for messaging", category: .messaging)
                     }
                 }
             } catch {
-                Logger.shared.error("Error checking match status", category: .matching, error: error)
+                Logger.shared.error("Error starting conversation", category: .messaging, error: error)
                 await MainActor.run {
                     showToast(
-                        message: "Unable to check match status",
+                        message: "Unable to start conversation. Try again.",
                         icon: "exclamationmark.triangle.fill",
                         color: .red
                     )
@@ -854,10 +887,12 @@ struct PhotoGalleryView: View {
     let user: User
 
     @State private var selectedPhotoIndex = 0
+    @State private var showZoomableViewer = false
 
     // Filter out empty photo URLs
     private var validPhotos: [String] {
-        user.photos.filter { !$0.isEmpty }
+        let photos = user.photos.filter { !$0.isEmpty }
+        return photos.isEmpty ? [user.profileImageURL].filter { !$0.isEmpty } : photos
     }
 
     var body: some View {
@@ -866,28 +901,52 @@ struct PhotoGalleryView: View {
                 Color.black.ignoresSafeArea()
 
                 if validPhotos.isEmpty {
-                    // Show profile image if no photos
+                    // No photos available
                     VStack(spacing: 16) {
-                        CachedCardImage(url: URL(string: user.profileImageURL))
-                            .scaledToFit()
-                            .cornerRadius(12)
-                            .padding()
+                        Image(systemName: "photo.on.rectangle.angled")
+                            .font(.system(size: 60))
+                            .foregroundColor(.white.opacity(0.5))
 
-                        Text("No additional photos")
+                        Text("No photos available")
                             .font(.headline)
                             .foregroundColor(.white.opacity(0.7))
                     }
                 } else {
-                    // Photo gallery
+                    // PERFORMANCE: Photo gallery with smooth swiping
                     TabView(selection: $selectedPhotoIndex) {
                         ForEach(validPhotos.indices, id: \.self) { index in
-                            CachedCardImage(url: URL(string: validPhotos[index]))
-                                .scaledToFit()
-                                .tag(index)
+                            // PERFORMANCE: Use high priority for current, normal for others
+                            CachedCardImage(
+                                url: URL(string: validPhotos[index]),
+                                priority: index == selectedPhotoIndex ? .immediate : .high
+                            )
+                            .aspectRatio(contentMode: .fit)
+                            .onTapGesture {
+                                HapticManager.shared.impact(.light)
+                                showZoomableViewer = true
+                            }
+                            .tag(index)
                         }
                     }
                     .tabViewStyle(.page(indexDisplayMode: .always))
                     .indexViewStyle(.page(backgroundDisplayMode: .always))
+                    // PERFORMANCE: Preload adjacent photos when swiping
+                    .onChange(of: selectedPhotoIndex) { newIndex in
+                        ImageCache.shared.prefetchAdjacentPhotos(photos: validPhotos, currentIndex: newIndex)
+                    }
+
+                    // Photo counter overlay
+                    VStack {
+                        Spacer()
+                        Text("\(selectedPhotoIndex + 1) / \(validPhotos.count)")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color.black.opacity(0.6))
+                            .cornerRadius(20)
+                            .padding(.bottom, 60)
+                    }
                 }
             }
             .navigationTitle("\(user.fullName)'s Photos")
@@ -895,13 +954,26 @@ struct PhotoGalleryView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
+                        HapticManager.shared.impact(.light)
                         dismiss()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
                             .foregroundColor(.white)
                     }
                 }
             }
+            .fullScreenCover(isPresented: $showZoomableViewer) {
+                FullScreenPhotoViewer(
+                    photos: validPhotos,
+                    selectedIndex: $selectedPhotoIndex,
+                    isPresented: $showZoomableViewer
+                )
+            }
+        }
+        // PERFORMANCE: Preload adjacent photos on appear
+        .onAppear {
+            ImageCache.shared.prefetchAdjacentPhotos(photos: validPhotos, currentIndex: selectedPhotoIndex)
         }
     }
 }

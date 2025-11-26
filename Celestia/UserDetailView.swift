@@ -76,23 +76,35 @@ struct UserDetailView: View {
     private var photosCarousel: some View {
         TabView(selection: $selectedPhotoIndex) {
             ForEach(Array(validPhotos.enumerated()), id: \.offset) { index, photoURL in
-                CachedCardImage(url: URL(string: photoURL))
-                    .onTapGesture {
-                        selectedPhotoIndex = index
-                        showFullScreenPhotos = true
-                        HapticManager.shared.impact(.light)
-                    }
-                    .tag(index)
+                // PERFORMANCE: Use immediate priority for current photo, high for others
+                CachedCardImage(
+                    url: URL(string: photoURL),
+                    priority: index == selectedPhotoIndex ? .immediate : .high
+                )
+                .onTapGesture {
+                    selectedPhotoIndex = index
+                    showFullScreenPhotos = true
+                    HapticManager.shared.impact(.light)
+                }
+                .tag(index)
             }
         }
         .frame(height: 450)
         .tabViewStyle(.page)
+        // PERFORMANCE: Preload adjacent photos when swiping
+        .onChange(of: selectedPhotoIndex) { newIndex in
+            ImageCache.shared.prefetchAdjacentPhotos(photos: validPhotos, currentIndex: newIndex)
+        }
         .fullScreenCover(isPresented: $showFullScreenPhotos) {
             FullScreenPhotoViewer(
                 photos: validPhotos,
                 selectedIndex: $selectedPhotoIndex,
                 isPresented: $showFullScreenPhotos
             )
+        }
+        // PERFORMANCE: Preload adjacent photos on appear
+        .onAppear {
+            ImageCache.shared.prefetchAdjacentPhotos(photos: validPhotos, currentIndex: selectedPhotoIndex)
         }
     }
 
@@ -701,15 +713,22 @@ struct FullScreenPhotoViewer: View {
             // Black background
             Color.black.ignoresSafeArea()
 
-            // Photo carousel
+            // PERFORMANCE: Photo carousel with smooth swiping
             TabView(selection: $selectedIndex) {
                 ForEach(Array(photos.enumerated()), id: \.offset) { index, photoURL in
-                    ZoomablePhotoView(url: URL(string: photoURL))
-                        .tag(index)
+                    ZoomablePhotoView(
+                        url: URL(string: photoURL),
+                        isCurrentPhoto: index == selectedIndex
+                    )
+                    .tag(index)
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .automatic))
             .indexViewStyle(.page(backgroundDisplayMode: .always))
+            // PERFORMANCE: Preload adjacent photos when index changes
+            .onChange(of: selectedIndex) { newIndex in
+                ImageCache.shared.prefetchAdjacentPhotos(photos: photos, currentIndex: newIndex)
+            }
 
             // Close button and counter overlay
             VStack {
@@ -745,6 +764,10 @@ struct FullScreenPhotoViewer: View {
             }
         }
         .statusBarHidden()
+        // PERFORMANCE: Preload adjacent photos on appear
+        .onAppear {
+            ImageCache.shared.prefetchAdjacentPhotos(photos: photos, currentIndex: selectedIndex)
+        }
     }
 }
 
@@ -752,15 +775,22 @@ struct FullScreenPhotoViewer: View {
 
 struct ZoomablePhotoView: View {
     let url: URL?
+    let isCurrentPhoto: Bool
 
     @State private var scale: CGFloat = 1.0
     @State private var lastScale: CGFloat = 1.0
     @State private var offset: CGSize = .zero
     @State private var lastOffset: CGSize = .zero
 
+    init(url: URL?, isCurrentPhoto: Bool = true) {
+        self.url = url
+        self.isCurrentPhoto = isCurrentPhoto
+    }
+
     var body: some View {
         GeometryReader { geometry in
-            CachedCardImage(url: url)
+            // PERFORMANCE: Use immediate priority for current photo, high for others
+            CachedCardImage(url: url, priority: isCurrentPhoto ? .immediate : .high)
                 .aspectRatio(contentMode: .fit)
                 .frame(width: geometry.size.width, height: geometry.size.height)
                 .scaleEffect(scale)
@@ -775,7 +805,7 @@ struct ZoomablePhotoView: View {
                         .onEnded { _ in
                             lastScale = 1.0
                             if scale < 1 {
-                                withAnimation(.spring(response: 0.3)) {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                     scale = 1
                                     offset = .zero
                                 }
@@ -797,7 +827,7 @@ struct ZoomablePhotoView: View {
                     : nil
                 )
                 .onTapGesture(count: 2) {
-                    withAnimation(.spring(response: 0.3)) {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
                         if scale > 1 {
                             scale = 1
                             offset = .zero
