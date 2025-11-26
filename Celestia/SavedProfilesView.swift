@@ -517,16 +517,16 @@ struct SavedProfileCard: View {
     let onTap: () -> Void
     let onUnsave: () -> Void
 
-    @State private var isPressed = false
-
     var body: some View {
         Button(action: onTap) {
-            ZStack(alignment: .topTrailing) {
-                VStack(spacing: 0) {
-                    // Profile image with smooth loading
+            VStack(spacing: 0) {
+                // Profile image section
+                ZStack(alignment: .topLeading) {
                     Group {
                         if let imageURL = savedProfile.user.photos.first, let url = URL(string: imageURL) {
                             CachedCardImage(url: url)
+                                .frame(height: 200)
+                                .clipped()
                         } else {
                             LinearGradient(
                                 colors: [.purple.opacity(0.6), .pink.opacity(0.5)],
@@ -538,140 +538,80 @@ struct SavedProfileCard: View {
                                     .font(.system(size: 50))
                                     .foregroundColor(.white.opacity(0.5))
                             }
-                        }
-                    }
-                    .frame(height: 200)
-                    .clipped()
-                    .overlay(alignment: .topLeading) {
-                        OnlineStatusIndicator(user: savedProfile.user)
-                            .padding(.top, 8)
-                            .padding(.leading, 8)
-                    }
-                    .overlay {
-                        if isUnsaving {
-                            ZStack {
-                                Color.black.opacity(0.6)
-
-                                VStack(spacing: 12) {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                        .scaleEffect(1.3)
-
-                                    Text("Removing...")
-                                        .font(.caption)
-                                        .fontWeight(.medium)
-                                        .foregroundColor(.white)
-                                }
-                            }
-                            .transition(.opacity)
+                            .frame(height: 200)
                         }
                     }
 
-                    // User info with enhanced styling
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 6) {
-                            Text(savedProfile.user.fullName)
-                                .font(.headline)
-                                .fontWeight(.semibold)
-                                .lineLimit(1)
-                                .truncationMode(.tail)
+                    // Online status indicator
+                    OnlineStatusIndicator(user: savedProfile.user)
+                        .padding(.top, 8)
+                        .padding(.leading, 8)
 
-                            Text("\(savedProfile.user.age)")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
+                    // Loading overlay when unsaving
+                    if isUnsaving {
+                        ZStack {
+                            Color.black.opacity(0.6)
 
-                            if savedProfile.user.isVerified {
-                                Image(systemName: "checkmark.seal.fill")
+                            VStack(spacing: 12) {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(1.3)
+
+                                Text("Removing...")
                                     .font(.caption)
-                                    .foregroundColor(.blue)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.white)
                             }
                         }
-
-                        HStack(spacing: 4) {
-                            Image(systemName: "mappin.circle.fill")
-                                .font(.caption2)
-                                .foregroundColor(.purple)
-
-                            Text(savedProfile.user.location)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .lineLimit(1)
-                        }
-
-                        HStack(spacing: 4) {
-                            Image(systemName: "clock.fill")
-                                .font(.caption2)
-                                .foregroundColor(.orange)
-
-                            Text("Saved \(savedProfile.savedAt.timeAgo())")
-                                .font(.caption)
-                                .foregroundColor(.orange)
-                                .fontWeight(.medium)
-                        }
-                    }
-                    .padding(14)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.white)
-                    .opacity(isUnsaving ? 0.5 : 1.0)
-                }
-
-                // Unsave button
-                Button(action: {
-                    HapticManager.shared.impact(.medium)
-                    onUnsave()
-                }) {
-                    ZStack {
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [.purple, .pink],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 36, height: 36)
-                            .shadow(color: .purple.opacity(0.4), radius: 8, y: 4)
-
-                        if isUnsaving {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .scaleEffect(0.7)
-                        } else {
-                            Image(systemName: "bookmark.fill")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(.white)
-                        }
+                        .frame(height: 200)
+                        .transition(.opacity)
                     }
                 }
-                .buttonStyle(.plain)
-                .disabled(isUnsaving)
-                .padding(10)
+                .frame(height: 200)
+                .frame(maxWidth: .infinity)
+                .clipped()
+                .cornerRadius(16, corners: [.topLeft, .topRight])
+
+                // User info section with white background - matching Likes page
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text(savedProfile.user.fullName)
+                            .font(.system(size: 17, weight: .semibold))
+                            .lineLimit(1)
+
+                        Text("\(savedProfile.user.age)")
+                            .font(.system(size: 17))
+                            .foregroundColor(.secondary)
+
+                        Spacer()
+
+                        if savedProfile.user.isVerified {
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(.system(size: 16))
+                                .foregroundColor(.blue)
+                        }
+                    }
+
+                    HStack(spacing: 4) {
+                        Image(systemName: "mappin.circle.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(.pink)
+                        Text(savedProfile.user.location)
+                            .font(.system(size: 13))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.white)
+                .opacity(isUnsaving ? 0.5 : 1.0)
             }
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.white)
-                    .shadow(color: .black.opacity(0.08), radius: 15, y: 5)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(
-                        LinearGradient(
-                            colors: [.purple.opacity(0.1), .pink.opacity(0.05)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
-            )
+            .background(Color.white)
+            .cornerRadius(16)
+            .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
         }
-        .buttonStyle(.plain)
-        .scaleEffect(isPressed ? 0.97 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in isPressed = true }
-                .onEnded { _ in isPressed = false }
-        )
+        .buttonStyle(ScaleButtonStyle())
         .disabled(isUnsaving)
     }
 }
@@ -730,128 +670,80 @@ struct SavedYouCard: View {
     let profile: SavedYouProfile
     let onTap: () -> Void
 
-    @State private var isPressed = false
-
     var body: some View {
         Button(action: onTap) {
             VStack(spacing: 0) {
-                // Profile image
-                Group {
-                    if let imageURL = profile.user.photos.first, let url = URL(string: imageURL) {
-                        CachedCardImage(url: url)
-                    } else {
-                        LinearGradient(
-                            colors: [.blue.opacity(0.6), .purple.opacity(0.5)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                        .overlay {
-                            Image(systemName: "person.fill")
-                                .font(.system(size: 50))
-                                .foregroundColor(.white.opacity(0.5))
+                // Profile image section
+                ZStack(alignment: .topLeading) {
+                    Group {
+                        if let imageURL = profile.user.photos.first, let url = URL(string: imageURL) {
+                            CachedCardImage(url: url)
+                                .frame(height: 200)
+                                .clipped()
+                        } else {
+                            LinearGradient(
+                                colors: [.blue.opacity(0.6), .purple.opacity(0.5)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                            .overlay {
+                                Image(systemName: "person.fill")
+                                    .font(.system(size: 50))
+                                    .foregroundColor(.white.opacity(0.5))
+                            }
+                            .frame(height: 200)
                         }
                     }
-                }
-                .frame(height: 200)
-                .clipped()
-                .overlay(alignment: .topLeading) {
+
+                    // Online status indicator
                     OnlineStatusIndicator(user: profile.user)
                         .padding(.top, 8)
                         .padding(.leading, 8)
                 }
-                .overlay(alignment: .topTrailing) {
-                    // "Saved You" badge
-                    HStack(spacing: 4) {
-                        Image(systemName: "bookmark.fill")
-                            .font(.caption2)
-                        Text("Saved You")
-                            .font(.caption2)
-                            .fontWeight(.semibold)
-                    }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        Capsule()
-                            .fill(LinearGradient(
-                                colors: [.blue, .purple],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            ))
-                    )
-                    .padding(8)
-                }
+                .frame(height: 200)
+                .frame(maxWidth: .infinity)
+                .clipped()
+                .cornerRadius(16, corners: [.topLeft, .topRight])
 
-                // User info
+                // User info section with white background - matching Likes page
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 6) {
+                    HStack {
                         Text(profile.user.fullName)
-                            .font(.headline)
-                            .fontWeight(.semibold)
+                            .font(.system(size: 17, weight: .semibold))
                             .lineLimit(1)
 
                         Text("\(profile.user.age)")
-                            .font(.subheadline)
+                            .font(.system(size: 17))
                             .foregroundColor(.secondary)
+
+                        Spacer()
 
                         if profile.user.isVerified {
                             Image(systemName: "checkmark.seal.fill")
-                                .font(.caption)
+                                .font(.system(size: 16))
                                 .foregroundColor(.blue)
                         }
                     }
 
                     HStack(spacing: 4) {
                         Image(systemName: "mappin.circle.fill")
-                            .font(.caption2)
-                            .foregroundColor(.purple)
-
+                            .font(.system(size: 12))
+                            .foregroundColor(.pink)
                         Text(profile.user.location)
-                            .font(.caption)
+                            .font(.system(size: 13))
                             .foregroundColor(.secondary)
                             .lineLimit(1)
                     }
-
-                    HStack(spacing: 4) {
-                        Image(systemName: "clock.fill")
-                            .font(.caption2)
-                            .foregroundColor(.blue)
-
-                        Text(profile.savedAt.timeAgo())
-                            .font(.caption)
-                            .foregroundColor(.blue)
-                            .fontWeight(.medium)
-                    }
                 }
-                .padding(14)
+                .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.white)
             }
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.white)
-                    .shadow(color: .black.opacity(0.08), radius: 15, y: 5)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(
-                        LinearGradient(
-                            colors: [.blue.opacity(0.2), .purple.opacity(0.1)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
-            )
+            .background(Color.white)
+            .cornerRadius(16)
+            .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
         }
-        .buttonStyle(.plain)
-        .scaleEffect(isPressed ? 0.97 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in isPressed = true }
-                .onEnded { _ in isPressed = false }
-        )
+        .buttonStyle(ScaleButtonStyle())
     }
 }
 
