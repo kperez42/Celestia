@@ -20,29 +20,29 @@ class ImageOptimizer {
     // MARK: - Image Sizes
 
     enum ImageSize {
-        case thumbnail      // 150x150 - Grid views, small previews
-        case small          // 375x375 - List items
-        case medium         // 750x750 - Profile cards
-        case large          // 1500x1500 - Full screen view
+        case thumbnail      // 200x200 - Grid views, small previews
+        case small          // 500x500 - List items
+        case medium         // 1000x1000 - Profile cards
+        case large          // 2000x2000 - Full screen view
         case original       // Original size - Upload/storage
 
         var maxDimension: CGFloat {
             switch self {
-            case .thumbnail: return 150
-            case .small: return 375
-            case .medium: return 750
-            case .large: return 1500
+            case .thumbnail: return 200
+            case .small: return 500
+            case .medium: return 1000
+            case .large: return 2000
             case .original: return .infinity
             }
         }
 
         var compressionQuality: CGFloat {
             switch self {
-            case .thumbnail: return 0.7
-            case .small: return 0.75
-            case .medium: return 0.8
-            case .large: return 0.85
-            case .original: return 0.9
+            case .thumbnail: return 0.8
+            case .small: return 0.85
+            case .medium: return 0.88
+            case .large: return 0.92
+            case .original: return 0.95
             }
         }
     }
@@ -56,7 +56,7 @@ class ImageOptimizer {
     // MARK: - Compression
 
     /// Compress image with specified quality
-    func compress(_ image: UIImage, quality: CGFloat = 0.8) -> Data? {
+    func compress(_ image: UIImage, quality: CGFloat = 0.9) -> Data? {
         guard let data = image.jpegData(compressionQuality: quality) else {
             Logger.shared.error("Failed to compress image", category: .general)
             return nil
@@ -201,7 +201,7 @@ class ImageOptimizer {
         Logger.shared.warning("WebP conversion not implemented (requires library)", category: .general)
 
         // Fallback to JPEG
-        return compress(image, quality: 0.85)
+        return compress(image, quality: 0.92)
     }
 
     // MARK: - Blur Effect
