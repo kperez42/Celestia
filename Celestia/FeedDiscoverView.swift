@@ -169,11 +169,15 @@ struct FeedDiscoverView: View {
                         },
                         onViewPhotos: {
                             selectedUser = user
+                            // PERFORMANCE: Start loading all photos immediately
+                            ImageCache.shared.prefetchUserPhotosHighPriority(user: user)
                             showPhotoGallery = true
                         },
                         onViewProfile: {
                             HapticManager.shared.impact(.light)
                             selectedUser = user
+                            // PERFORMANCE: Start loading all photos immediately
+                            ImageCache.shared.prefetchUserPhotosHighPriority(user: user)
                             showUserDetail = true
                         }
                     )
@@ -854,10 +858,12 @@ struct PhotoGalleryView: View {
     let user: User
 
     @State private var selectedPhotoIndex = 0
+    @State private var showZoomableViewer = false
 
     // Filter out empty photo URLs
     private var validPhotos: [String] {
-        user.photos.filter { !$0.isEmpty }
+        let photos = user.photos.filter { !$0.isEmpty }
+        return photos.isEmpty ? [user.profileImageURL].filter { !$0.isEmpty } : photos
     }
 
     var body: some View {
@@ -866,28 +872,52 @@ struct PhotoGalleryView: View {
                 Color.black.ignoresSafeArea()
 
                 if validPhotos.isEmpty {
-                    // Show profile image if no photos
+                    // No photos available
                     VStack(spacing: 16) {
-                        CachedCardImage(url: URL(string: user.profileImageURL))
-                            .scaledToFit()
-                            .cornerRadius(12)
-                            .padding()
+                        Image(systemName: "photo.on.rectangle.angled")
+                            .font(.system(size: 60))
+                            .foregroundColor(.white.opacity(0.5))
 
-                        Text("No additional photos")
+                        Text("No photos available")
                             .font(.headline)
                             .foregroundColor(.white.opacity(0.7))
                     }
                 } else {
-                    // Photo gallery
+                    // PERFORMANCE: Photo gallery with smooth swiping
                     TabView(selection: $selectedPhotoIndex) {
                         ForEach(validPhotos.indices, id: \.self) { index in
-                            CachedCardImage(url: URL(string: validPhotos[index]))
-                                .scaledToFit()
-                                .tag(index)
+                            // PERFORMANCE: Use high priority for current, normal for others
+                            CachedCardImage(
+                                url: URL(string: validPhotos[index]),
+                                priority: index == selectedPhotoIndex ? .immediate : .high
+                            )
+                            .aspectRatio(contentMode: .fit)
+                            .onTapGesture {
+                                HapticManager.shared.impact(.light)
+                                showZoomableViewer = true
+                            }
+                            .tag(index)
                         }
                     }
                     .tabViewStyle(.page(indexDisplayMode: .always))
                     .indexViewStyle(.page(backgroundDisplayMode: .always))
+                    // PERFORMANCE: Preload adjacent photos when swiping
+                    .onChange(of: selectedPhotoIndex) { newIndex in
+                        ImageCache.shared.prefetchAdjacentPhotos(photos: validPhotos, currentIndex: newIndex)
+                    }
+
+                    // Photo counter overlay
+                    VStack {
+                        Spacer()
+                        Text("\(selectedPhotoIndex + 1) / \(validPhotos.count)")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color.black.opacity(0.6))
+                            .cornerRadius(20)
+                            .padding(.bottom, 60)
+                    }
                 }
             }
             .navigationTitle("\(user.fullName)'s Photos")
@@ -895,13 +925,26 @@ struct PhotoGalleryView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
+                        HapticManager.shared.impact(.light)
                         dismiss()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
                             .foregroundColor(.white)
                     }
                 }
             }
+            .fullScreenCover(isPresented: $showZoomableViewer) {
+                FullScreenPhotoViewer(
+                    photos: validPhotos,
+                    selectedIndex: $selectedPhotoIndex,
+                    isPresented: $showZoomableViewer
+                )
+            }
+        }
+        // PERFORMANCE: Preload adjacent photos on appear
+        .onAppear {
+            ImageCache.shared.prefetchAdjacentPhotos(photos: validPhotos, currentIndex: selectedPhotoIndex)
         }
     }
 }

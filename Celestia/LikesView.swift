@@ -287,6 +287,8 @@ struct LikesView: View {
                         showMessage: showMessage,
                         onTap: {
                             selectedUser = user
+                            // PERFORMANCE: Start loading all photos immediately
+                            ImageCache.shared.prefetchUserPhotosHighPriority(user: user)
                             showUserDetail = true
                         },
                         onLikeBack: {
@@ -421,56 +423,26 @@ struct LikeProfileCard: View {
                         .lineLimit(1)
                 }
 
-                // Action buttons
+                // Action buttons with snappy animations
                 if showLikeBack || showMessage {
                     HStack(spacing: 8) {
                         if showLikeBack {
-                            Button {
-                                HapticManager.shared.impact(.medium)
+                            LikeActionButton(
+                                icon: "heart.fill",
+                                text: "Like",
+                                colors: [.pink, .red]
+                            ) {
                                 onLikeBack?()
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "heart.fill")
-                                        .font(.system(size: 12))
-                                    Text("Like")
-                                        .font(.system(size: 12, weight: .semibold))
-                                }
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 8)
-                                .background(
-                                    LinearGradient(
-                                        colors: [.pink, .red],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                                .cornerRadius(8)
                             }
                         }
 
                         if showMessage {
-                            Button {
-                                HapticManager.shared.impact(.medium)
+                            LikeActionButton(
+                                icon: "message.fill",
+                                text: "Message",
+                                colors: [.purple, .blue]
+                            ) {
                                 onMessage?()
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "message.fill")
-                                        .font(.system(size: 12))
-                                    Text("Message")
-                                        .font(.system(size: 12, weight: .semibold))
-                                }
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 8)
-                                .background(
-                                    LinearGradient(
-                                        colors: [.purple, .blue],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                                .cornerRadius(8)
                             }
                         }
                     }
@@ -546,6 +518,71 @@ struct LikeCardSkeleton: View {
         .opacity(isAnimating ? 0.5 : 1.0)
         .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isAnimating)
         .onAppear { isAnimating = true }
+    }
+}
+
+// MARK: - Like Action Button
+
+/// Snappy animated button for like/message actions in likes view
+struct LikeActionButton: View {
+    let icon: String
+    let text: String
+    let colors: [Color]
+    let action: () -> Void
+
+    @State private var isPressed = false
+    @State private var isAnimating = false
+
+    var body: some View {
+        Button {
+            HapticManager.shared.impact(.medium)
+            // Snappy animation
+            withAnimation(.spring(response: 0.2, dampingFraction: 0.5)) {
+                isAnimating = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+                    isAnimating = false
+                }
+            }
+            action()
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 12))
+                    .scaleEffect(isAnimating ? 1.3 : 1.0)
+                Text(text)
+                    .font(.system(size: 12, weight: .semibold))
+            }
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .background(
+                LinearGradient(
+                    colors: colors,
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            .cornerRadius(8)
+            .scaleEffect(isPressed ? 0.95 : (isAnimating ? 1.05 : 1.0))
+        }
+        .buttonStyle(PlainButtonStyle())
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    if !isPressed {
+                        withAnimation(.easeOut(duration: 0.1)) {
+                            isPressed = true
+                        }
+                    }
+                }
+                .onEnded { _ in
+                    withAnimation(.easeOut(duration: 0.1)) {
+                        isPressed = false
+                    }
+                }
+        )
     }
 }
 

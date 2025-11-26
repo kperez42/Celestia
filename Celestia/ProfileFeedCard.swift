@@ -280,16 +280,17 @@ struct ActionButton: View {
     let action: () -> Void
 
     @State private var isAnimating = false
+    @State private var isPressed = false
 
     var body: some View {
         Button(action: {
             action()
-            // Trigger scale animation
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+            // PERFORMANCE: Snappy bounce animation
+            withAnimation(.spring(response: 0.2, dampingFraction: 0.5, blendDuration: 0)) {
                 isAnimating = true
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
                     isAnimating = false
                 }
             }
@@ -297,8 +298,9 @@ struct ActionButton: View {
             VStack(spacing: 6) {
                 ZStack {
                     Circle()
-                        .fill(color.opacity(isProcessing ? 0.25 : (label == "Saved" ? 0.25 : 0.15)))
+                        .fill(color.opacity(isProcessing ? 0.25 : (isPressed || label == "Saved" ? 0.25 : 0.15)))
                         .frame(width: 56, height: 56)
+                        .scaleEffect(isAnimating ? 1.2 : (isPressed ? 0.95 : 1.0))
 
                     if isProcessing {
                         ProgressView()
@@ -307,21 +309,36 @@ struct ActionButton: View {
                     } else {
                         Image(systemName: icon)
                             .font(.title3)
-                            .fontWeight(label == "Saved" ? .semibold : .regular)
+                            .fontWeight(label == "Saved" ? .bold : .medium)
                             .foregroundColor(color)
+                            .scaleEffect(isAnimating ? 1.3 : 1.0)
                     }
                 }
-                .scaleEffect(isAnimating ? 1.15 : 1.0)
 
                 Text(label)
                     .font(.caption2)
-                    .fontWeight(label == "Saved" ? .semibold : .regular)
+                    .fontWeight(label == "Saved" ? .semibold : .medium)
                     .foregroundColor(label == "Saved" ? color : (isProcessing ? color.opacity(0.6) : .secondary))
             }
         }
+        .buttonStyle(ResponsiveButtonStyle(isPressed: $isPressed))
         .disabled(isProcessing)
         .opacity(isProcessing ? 0.7 : 1.0)
         .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - Responsive Button Style
+
+/// Custom button style for immediate visual feedback
+struct ResponsiveButtonStyle: ButtonStyle {
+    @Binding var isPressed: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .onChange(of: configuration.isPressed) { newValue in
+                isPressed = newValue
+            }
     }
 }
 

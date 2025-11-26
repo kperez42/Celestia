@@ -139,8 +139,19 @@ class ImageCache {
     /// Track in-flight requests to prevent duplicate network calls
     private var inFlightRequests: [String: Task<UIImage?, Never>] = [:]
 
+    /// PERFORMANCE: High-priority URLSession for immediate loads
+    private lazy var highPrioritySession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.httpMaximumConnectionsPerHost = 6
+        config.timeoutIntervalForRequest = 15
+        config.timeoutIntervalForResource = 30
+        config.networkServiceType = .responsiveData
+        return URLSession(configuration: config)
+    }()
+
     /// Load image with deduplication - prevents multiple network requests for same URL
-    func loadImageAsync(for url: URL) async -> UIImage? {
+    /// PERFORMANCE: Supports priority levels for faster user-initiated loads
+    func loadImageAsync(for url: URL, priority: ImageLoadPriority = .normal) async -> UIImage? {
         let cacheKey = url.absoluteString
 
         // Check cache first
@@ -153,10 +164,12 @@ class ImageCache {
             return await existingTask.value
         }
 
-        // Create new task for this request
-        let task = Task<UIImage?, Never> {
+        // Create new task for this request with appropriate priority
+        let task = Task<UIImage?, Never>(priority: priority.taskPriority) {
             do {
-                let (data, _) = try await URLSession.shared.data(from: url)
+                // Use high-priority session for immediate/high priority requests
+                let session = (priority == .immediate || priority == .high) ? highPrioritySession : URLSession.shared
+                let (data, _) = try await session.data(from: url)
 
                 guard !Task.isCancelled else { return nil }
 
@@ -194,7 +207,7 @@ class ImageCache {
 
             // Start prefetch with low priority
             Task.detached(priority: .utility) {
-                _ = await self.loadImageAsync(for: url)
+                _ = await self.loadImageAsync(for: url, priority: .low)
             }
         }
     }
@@ -211,6 +224,61 @@ class ImageCache {
             }
         }
         prefetchImages(urls: urls)
+    }
+
+    // MARK: - High Priority Prefetching (User Interaction)
+
+    /// PERFORMANCE: Immediately prefetch all photos for a user when they tap on a card
+    /// This ensures photos are ready before the gallery opens
+    func prefetchUserPhotosHighPriority(user: User) {
+        // Collect all photo URLs
+        var photoURLs: [String] = user.photos.filter { !$0.isEmpty }
+        if photoURLs.isEmpty && !user.profileImageURL.isEmpty {
+            photoURLs = [user.profileImageURL]
+        }
+
+        Logger.shared.debug("High-priority prefetching \(photoURLs.count) photos for \(user.fullName)", category: .storage)
+
+        // Start loading all photos with high priority
+        for (index, urlString) in photoURLs.enumerated() {
+            guard let url = URL(string: urlString) else { continue }
+
+            let cacheKey = url.absoluteString
+
+            // Skip if already cached
+            if image(for: cacheKey) != nil { continue }
+
+            // First image gets immediate priority, others get high
+            let priority: ImageLoadPriority = (index == 0) ? .immediate : .high
+
+            Task(priority: priority.taskPriority) {
+                _ = await self.loadImageAsync(for: url, priority: priority)
+            }
+        }
+    }
+
+    /// PERFORMANCE: Prefetch adjacent images in a gallery for smooth swiping
+    /// Call this when the user is viewing a photo to preload neighbors
+    func prefetchAdjacentPhotos(photos: [String], currentIndex: Int) {
+        // Prefetch next 2 and previous 1 photos with high priority
+        let indicesToPrefetch = [
+            currentIndex - 1,
+            currentIndex + 1,
+            currentIndex + 2
+        ].filter { $0 >= 0 && $0 < photos.count && $0 != currentIndex }
+
+        for index in indicesToPrefetch {
+            let urlString = photos[index]
+            guard !urlString.isEmpty, let url = URL(string: urlString) else { continue }
+
+            let cacheKey = url.absoluteString
+            if image(for: cacheKey) != nil { continue }
+
+            // Adjacent photos get high priority
+            Task(priority: .userInitiated) {
+                _ = await self.loadImageAsync(for: url, priority: .high)
+            }
+        }
     }
 
     func getCacheSize() async -> Int64 {
@@ -700,8 +768,10 @@ struct CachedProfileImage: View {
 // MARK: - Card Image Variant
 
 /// Cached async image optimized for card layouts (discover, matches)
+/// PERFORMANCE: Ultra-fast loading with instant cache display and smooth transitions
 struct CachedCardImage: View {
     let url: URL?
+    let priority: ImageLoadPriority
 
     @State private var image: UIImage?
     @State private var isLoading = false
@@ -711,16 +781,20 @@ struct CachedCardImage: View {
     @State private var loadTask: Task<Void, Never>?
     // PERFORMANCE: Track if we've checked cache to avoid re-checking
     @State private var hasCheckedCache = false
+    // PERFORMANCE: Smooth fade-in animation state
+    @State private var imageOpacity: Double = 0
 
     // PERFORMANCE: Check cache immediately on init for instant display
-    init(url: URL?) {
+    init(url: URL?, priority: ImageLoadPriority = .normal) {
         self.url = url
+        self.priority = priority
         // Pre-load from cache synchronously if available
         if let url = url {
             let cacheKey = url.absoluteString
             if let cachedImage = ImageCache.shared.image(for: cacheKey) {
                 _image = State(initialValue: cachedImage)
                 _hasCheckedCache = State(initialValue: true)
+                _imageOpacity = State(initialValue: 1.0) // No animation needed for cached
             }
         }
     }
@@ -731,6 +805,15 @@ struct CachedCardImage: View {
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
+                    .opacity(imageOpacity)
+                    .onAppear {
+                        // Smooth fade-in for newly loaded images
+                        if imageOpacity < 1.0 {
+                            withAnimation(.easeOut(duration: 0.15)) {
+                                imageOpacity = 1.0
+                            }
+                        }
+                    }
             } else if loadError != nil {
                 // Error state with elegant retry button
                 VStack(spacing: 12) {
@@ -774,7 +857,7 @@ struct CachedCardImage: View {
                     )
                 )
             } else {
-                // Loading state with brand gradient
+                // Loading state with brand gradient - optimized shimmer
                 ZStack {
                     LinearGradient(
                         colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.05)],
@@ -785,6 +868,7 @@ struct CachedCardImage: View {
                     if isLoading {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .purple))
+                            .scaleEffect(1.2)
                     }
                 }
                 .onAppear {
@@ -813,19 +897,20 @@ struct CachedCardImage: View {
         // Check cache first (double-check in case init didn't catch it)
         if let cachedImage = ImageCache.shared.image(for: cacheKey) {
             self.image = cachedImage
+            self.imageOpacity = 1.0 // Instant display for cached
             return
         }
 
         // Cancel previous task if any
         loadTask?.cancel()
 
-        // Load using deduplicated method
+        // Load using deduplicated method with priority
         isLoading = true
         loadError = nil
 
-        loadTask = Task {
+        loadTask = Task(priority: priority.taskPriority) {
             // Use deduplicated loading to prevent multiple network requests
-            let loadedImage = await ImageCache.shared.loadImageAsync(for: url)
+            let loadedImage = await ImageCache.shared.loadImageAsync(for: url, priority: priority)
 
             guard !Task.isCancelled else {
                 await MainActor.run { self.isLoading = false }
@@ -836,11 +921,32 @@ struct CachedCardImage: View {
                 if let loadedImage = loadedImage {
                     self.image = loadedImage
                     self.isLoading = false
+                    // Trigger smooth fade-in animation
+                    self.imageOpacity = 0
                 } else {
                     self.isLoading = false
                     self.loadError = NSError(domain: "ImageCache", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to load image"])
                 }
             }
+        }
+    }
+}
+
+// MARK: - Image Load Priority
+
+/// Priority levels for image loading - higher priority loads faster
+enum ImageLoadPriority {
+    case low        // Prefetch, background loading
+    case normal     // Default card loading
+    case high       // User interaction (tapped card)
+    case immediate  // Full screen viewer, current photo
+
+    var taskPriority: TaskPriority {
+        switch self {
+        case .low: return .utility
+        case .normal: return .medium
+        case .high: return .userInitiated
+        case .immediate: return .high
         }
     }
 }
