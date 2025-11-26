@@ -69,8 +69,21 @@ struct FeedDiscoverView: View {
                         .environmentObject(authService)
                 }
                 .sheet(item: $selectedUserForDetail) { user in
-                    UserDetailView(user: user)
-                        .environmentObject(authService)
+                    UserDetailView(
+                        user: user,
+                        initialIsLiked: likedUsers.contains(user.effectiveId ?? ""),
+                        onLikeChanged: { isLiked in
+                            // Sync like state with feed cards
+                            if let userId = user.effectiveId {
+                                if isLiked {
+                                    likedUsers.insert(userId)
+                                } else {
+                                    likedUsers.remove(userId)
+                                }
+                            }
+                        }
+                    )
+                    .environmentObject(authService)
                 }
                 .sheet(item: $selectedUserForPhotos) { user in
                     PhotoGalleryView(user: user)

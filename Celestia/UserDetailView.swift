@@ -9,6 +9,9 @@ import SwiftUI
 
 struct UserDetailView: View {
     let user: User
+    let initialIsLiked: Bool
+    var onLikeChanged: ((Bool) -> Void)?  // Callback to sync like state with parent
+
     @EnvironmentObject var authService: AuthService
     @Environment(\.dismiss) var dismiss
 
@@ -27,6 +30,12 @@ struct UserDetailView: View {
     // Photo viewer state
     @State private var selectedPhotoIndex: Int = 0
     @State private var showFullScreenPhotos = false
+
+    init(user: User, initialIsLiked: Bool = false, onLikeChanged: ((Bool) -> Void)? = nil) {
+        self.user = user
+        self.initialIsLiked = initialIsLiked
+        self.onLikeChanged = onLikeChanged
+    }
 
     // Filter out empty photo URLs
     private var validPhotos: [String] {
@@ -495,21 +504,29 @@ struct UserDetailView: View {
     private func handleOnAppear() {
         isSaved = savedProfilesVM.savedProfiles.contains(where: { $0.user.id == user.id })
 
+        // Use initial like state from parent if callback is provided (synced)
+        // Otherwise fetch from backend
+        if onLikeChanged != nil {
+            isLiked = initialIsLiked
+        }
+
         Task {
             guard let currentUserId = authService.currentUser?.id,
                   let viewedUserId = user.id else { return }
 
-            // Check if user is already liked
-            do {
-                let alreadyLiked = try await SwipeService.shared.checkIfLiked(
-                    fromUserId: currentUserId,
-                    toUserId: viewedUserId
-                )
-                await MainActor.run {
-                    isLiked = alreadyLiked
+            // If no callback provided, fetch like status from backend
+            if onLikeChanged == nil {
+                do {
+                    let alreadyLiked = try await SwipeService.shared.checkIfLiked(
+                        fromUserId: currentUserId,
+                        toUserId: viewedUserId
+                    )
+                    await MainActor.run {
+                        isLiked = alreadyLiked
+                    }
+                } catch {
+                    Logger.shared.error("Error checking like status", category: .matching, error: error)
                 }
-            } catch {
-                Logger.shared.error("Error checking like status", category: .matching, error: error)
             }
 
             do {
@@ -587,6 +604,7 @@ struct UserDetailView: View {
             // Unlike the user
             isProcessing = true
             isLiked = false // Optimistic update
+            onLikeChanged?(false) // Sync with parent
 
             Task {
                 do {
@@ -604,6 +622,7 @@ struct UserDetailView: View {
                     await MainActor.run {
                         isProcessing = false
                         isLiked = true // Revert on error
+                        onLikeChanged?(true) // Revert parent state
                         errorMessage = error.localizedDescription
                         showingError = true
                     }
@@ -614,6 +633,7 @@ struct UserDetailView: View {
             // Like the user
             isProcessing = true
             isLiked = true // Optimistic update
+            onLikeChanged?(true) // Sync with parent
 
             Task {
                 do {
@@ -639,6 +659,7 @@ struct UserDetailView: View {
                     await MainActor.run {
                         isProcessing = false
                         isLiked = false // Revert on error
+                        onLikeChanged?(false) // Revert parent state
                         errorMessage = error.localizedDescription
                         showingError = true
                     }
