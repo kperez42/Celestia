@@ -18,6 +18,11 @@ struct LikesView: View {
     @State private var showUserDetail = false
     @State private var showChatWithUser: User?
 
+    // Direct messaging state
+    @State private var showDirectChat = false
+    @State private var chatMatch: Match?
+    @State private var chatUser: User?
+
     private let tabs = ["Liked Me", "My Likes", "Mutual Likes"]
 
     var body: some View {
@@ -65,12 +70,63 @@ struct LikesView: View {
             .sheet(item: $showChatWithUser) { user in
                 // Find match for this user to open chat
                 if let match = viewModel.findMatchForUser(user) {
-                    ChatView(match: match, otherUser: user)
-                        .environmentObject(authService)
+                    NavigationStack {
+                        ChatView(match: match, otherUser: user)
+                            .environmentObject(authService)
+                    }
+                }
+            }
+            .sheet(isPresented: $showDirectChat) {
+                if let match = chatMatch, let user = chatUser {
+                    NavigationStack {
+                        ChatView(match: match, otherUser: user)
+                            .environmentObject(authService)
+                    }
                 }
             }
         }
         .networkStatusBanner()
+    }
+
+    // MARK: - Message Handling
+
+    private func handleMessage(user: User) {
+        guard let currentUserId = authService.currentUser?.effectiveId,
+              let userId = user.effectiveId else {
+            return
+        }
+
+        HapticManager.shared.impact(.medium)
+
+        Task {
+            do {
+                // Check if a match already exists
+                var existingMatch = try await MatchService.shared.fetchMatch(user1Id: currentUserId, user2Id: userId)
+
+                if existingMatch == nil {
+                    // No match exists - create one to enable messaging
+                    Logger.shared.info("Creating conversation with \(user.fullName) from LikesView", category: .messaging)
+
+                    // Create the match
+                    await MatchService.shared.createMatch(user1Id: currentUserId, user2Id: userId)
+
+                    // Fetch the newly created match
+                    existingMatch = try await MatchService.shared.fetchMatch(user1Id: currentUserId, user2Id: userId)
+                }
+
+                await MainActor.run {
+                    if let match = existingMatch {
+                        // Open chat directly
+                        chatMatch = match
+                        chatUser = user
+                        showDirectChat = true
+                        Logger.shared.info("Opening chat with \(user.fullName)", category: .messaging)
+                    }
+                }
+            } catch {
+                Logger.shared.error("Error starting conversation from LikesView", category: .messaging, error: error)
+            }
+        }
     }
 
     // MARK: - Header
@@ -297,7 +353,7 @@ struct LikesView: View {
                             }
                         },
                         onMessage: {
-                            showChatWithUser = user
+                            handleMessage(user: user)
                         }
                     )
                 }
