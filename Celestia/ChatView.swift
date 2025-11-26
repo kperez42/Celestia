@@ -714,7 +714,7 @@ struct ChatView: View {
         guard let currentUserId = authService.currentUser?.id else { return }
         guard let receiverId = otherUser.id else { return }
 
-        // Check rate limit
+        // Check rate limit locally for immediate feedback
         guard RateLimiter.shared.canSendMessage() else {
             errorToastMessage = "Slow down! You're sending messages too quickly."
             showErrorToast = true
@@ -722,29 +722,31 @@ struct ChatView: View {
             return
         }
 
-        // Haptic feedback
+        // Haptic feedback - instant response
         HapticManager.shared.impact(.light)
 
         // Capture and sanitize values before clearing
         let text = InputSanitizer.standard(messageText)
         let imageToSend = selectedImage
 
-        // Set sending preview
-        sendingMessagePreview = hasText ? text : (hasImage ? "📷 Photo" : "")
-        sendingImagePreview = imageToSend
-
-        // Clear input and dismiss keyboard immediately for better UX
+        // PERFORMANCE: Clear input immediately for snappy UX
+        // Message appears instantly via optimistic UI in MessageService
         messageText = ""
         selectedImage = nil
         selectedImageItem = nil
         isInputFocused = false
 
-        isSending = true
+        // Only show sending indicator for images (which take longer)
+        if hasImage {
+            sendingMessagePreview = hasText ? text : "📷 Photo"
+            sendingImagePreview = imageToSend
+            isSending = true
+        }
 
         Task {
             do {
                 if let image = imageToSend {
-                    // Upload image first
+                    // Upload image first (this is the slow part)
                     let imageURL = try await ImageUploadService.shared.uploadChatImage(image, matchId: matchId)
 
                     // Send image message (with optional caption)
@@ -755,8 +757,16 @@ struct ChatView: View {
                         imageURL: imageURL,
                         caption: text.isEmpty ? nil : text
                     )
+
+                    // Clear image preview on success
+                    await MainActor.run {
+                        sendingMessagePreview = nil
+                        sendingImagePreview = nil
+                        isSending = false
+                    }
                 } else {
-                    // Send text-only message
+                    // PERFORMANCE: Text messages use optimistic UI
+                    // The message appears instantly in the list
                     try await messageService.sendMessage(
                         matchId: matchId,
                         senderId: currentUserId,
@@ -764,13 +774,12 @@ struct ChatView: View {
                         text: text
                     )
                 }
-                HapticManager.shared.notification(.success)
 
-                // Clear sending preview on success
-                await MainActor.run {
-                    sendingMessagePreview = nil
-                    sendingImagePreview = nil
+                // Success haptic only for image messages (text is already shown)
+                if hasImage {
+                    HapticManager.shared.notification(.success)
                 }
+
             } catch {
                 Logger.shared.error("Error sending message", category: .messaging, error: error)
                 HapticManager.shared.notification(.error)
@@ -779,6 +788,7 @@ struct ChatView: View {
                 await MainActor.run {
                     sendingMessagePreview = nil
                     sendingImagePreview = nil
+                    isSending = false
                     failedMessage = (text: text, image: imageToSend)
                     errorToastMessage = "Failed to send message. Tap retry to try again."
                     showErrorToast = true
@@ -790,7 +800,6 @@ struct ChatView: View {
                     }
                 }
             }
-            isSending = false
         }
     }
 
