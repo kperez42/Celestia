@@ -14,14 +14,17 @@ struct LikesView: View {
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
 
     @State private var selectedTab = 0
-    @State private var selectedUser: User?
-    @State private var showUserDetail = false
+    @State private var selectedUserForDetail: User?
     @State private var showChatWithUser: User?
 
-    // Direct messaging state
-    @State private var showDirectChat = false
-    @State private var chatMatch: Match?
-    @State private var chatUser: User?
+    // Direct messaging state - using dedicated struct for item-based presentation
+    @State private var chatPresentation: ChatPresentation?
+
+    struct ChatPresentation: Identifiable {
+        let id = UUID()
+        let match: Match
+        let user: User
+    }
 
     private let tabs = ["Liked Me", "My Likes", "Mutual Likes"]
 
@@ -70,11 +73,9 @@ struct LikesView: View {
                 await viewModel.loadAllLikes()
                 HapticManager.shared.notification(.success)
             }
-            .sheet(isPresented: $showUserDetail) {
-                if let user = selectedUser {
-                    UserDetailView(user: user)
-                        .environmentObject(authService)
-                }
+            .sheet(item: $selectedUserForDetail) { user in
+                UserDetailView(user: user)
+                    .environmentObject(authService)
             }
             .sheet(item: $showChatWithUser) { user in
                 // Find match for this user to open chat
@@ -85,12 +86,10 @@ struct LikesView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showDirectChat) {
-                if let match = chatMatch, let user = chatUser {
-                    NavigationStack {
-                        ChatView(match: match, otherUser: user)
-                            .environmentObject(authService)
-                    }
+            .sheet(item: $chatPresentation) { presentation in
+                NavigationStack {
+                    ChatView(match: presentation.match, otherUser: presentation.user)
+                        .environmentObject(authService)
                 }
             }
         }
@@ -125,10 +124,8 @@ struct LikesView: View {
 
                 await MainActor.run {
                     if let match = existingMatch {
-                        // Open chat directly
-                        chatMatch = match
-                        chatUser = user
-                        showDirectChat = true
+                        // Open chat directly using item-based presentation
+                        chatPresentation = ChatPresentation(match: match, user: user)
                         Logger.shared.info("Opening chat with \(user.fullName)", category: .messaging)
                     }
                 }
@@ -351,8 +348,7 @@ struct LikesView: View {
                         showLikeBack: showLikeBack,
                         showMessage: showMessage,
                         onTap: {
-                            selectedUser = user
-                            showUserDetail = true
+                            selectedUserForDetail = user
                         },
                         onLikeBack: {
                             Task {
