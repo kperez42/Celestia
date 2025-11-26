@@ -297,9 +297,9 @@ struct TabBarButton: View {
             .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
         }
         .buttonStyle(PlainButtonStyle())
-        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
-        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isSelected)
-        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: badgeCount)
+        .animation(.spring(response: 0.2, dampingFraction: 0.8), value: isPressed)
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isSelected)
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: badgeCount)
     }
 }
 
