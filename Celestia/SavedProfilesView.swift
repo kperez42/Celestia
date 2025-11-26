@@ -93,10 +93,10 @@ struct SavedProfilesView: View {
         HStack(spacing: 0) {
             ForEach(0..<tabs.count, id: \.self) { index in
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    HapticManager.shared.impact(.light)
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
                         selectedTab = index
                     }
-                    HapticManager.shared.impact(.light)
                 } label: {
                     VStack(spacing: 8) {
                         HStack(spacing: 6) {
@@ -767,27 +767,31 @@ class SavedProfilesViewModel: ObservableObject {
     // Singleton instance for shared state across views
     static let shared = SavedProfilesViewModel()
 
-    @Published var savedProfiles: [SavedProfile] = []
+    @Published var savedProfiles: [SavedProfile] = [] {
+        didSet {
+            // PERFORMANCE: Update cached filtered arrays when savedProfiles changes
+            updateCachedProfiles()
+        }
+    }
     @Published var savedYouProfiles: [SavedYouProfile] = []
     @Published var isLoading = false
     @Published var errorMessage = ""
     @Published var unsavingProfileId: String?
 
+    // PERFORMANCE: Cache filtered arrays to avoid O(n) filtering on every tab switch
+    @Published private(set) var recentProfiles: [SavedProfile] = []
+
     var savedThisWeek: Int {
-        // CODE QUALITY FIX: Removed force unwrapping - handle date calculation failure safely
-        guard let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) else {
-            // If date calculation fails, return total count as fallback
-            return savedProfiles.count
-        }
-        return savedProfiles.filter { $0.savedAt >= weekAgo }.count
+        recentProfiles.count
     }
 
-    /// Profiles saved in the last 7 days
-    var recentProfiles: [SavedProfile] {
+    /// Update cached filtered arrays (called when savedProfiles changes)
+    private func updateCachedProfiles() {
         guard let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) else {
-            return savedProfiles
+            recentProfiles = savedProfiles
+            return
         }
-        return savedProfiles.filter { $0.savedAt >= weekAgo }
+        recentProfiles = savedProfiles.filter { $0.savedAt >= weekAgo }
     }
 
     private let db = Firestore.firestore()
