@@ -5,9 +5,14 @@
 //  Core service for managing user verification (photo, ID, background checks)
 //  Coordinates between different verification types and maintains verification status
 //
+//  SECURITY: Verification status is persisted to Firestore (server-side) as source of truth.
+//  Local UserDefaults is only used as a cache and is validated against server on load.
+//
 
 import Foundation
 import UIKit
+import FirebaseFirestore
+import FirebaseAuth
 
 // MARK: - Verification Service
 
@@ -25,6 +30,7 @@ class VerificationService: ObservableObject {
     @Published var idVerified: Bool = false
     @Published var backgroundCheckCompleted: Bool = false
     @Published var trustScore: Int = 0 // 0-100
+    @Published var isLoadingVerification: Bool = false
 
     // MARK: - Private Properties
 
@@ -32,37 +38,67 @@ class VerificationService: ObservableObject {
     private let idVerifier = IDVerificationManager.shared
     private let backgroundChecker = BackgroundCheckManager.shared
     private let defaults = UserDefaults.standard
+    private let db = Firestore.firestore()
 
-    // MARK: - Keys
+    // MARK: - Keys (Cache only - source of truth is Firestore)
 
-    private enum Keys {
-        static let photoVerified = "verification_photo_verified"
-        static let idVerified = "verification_id_verified"
-        static let backgroundCheckCompleted = "verification_background_check"
-        static let verificationStatus = "verification_status"
-        static let trustScore = "verification_trust_score"
+    private enum CacheKeys {
+        static let photoVerified = "cache_verification_photo"
+        static let idVerified = "cache_verification_id"
+        static let backgroundCheckCompleted = "cache_verification_background"
+        static let lastSyncTimestamp = "cache_verification_sync_timestamp"
+    }
+
+    // MARK: - Firestore Fields
+
+    private enum FirestoreFields {
+        static let photoVerified = "photoVerified"
+        static let photoVerifiedAt = "photoVerifiedAt"
+        static let idVerified = "idVerified"
+        static let idVerifiedAt = "idVerifiedAt"
+        static let backgroundCheckCompleted = "backgroundCheckCompleted"
+        static let backgroundCheckAt = "backgroundCheckAt"
+        static let isVerified = "isVerified"  // Main verification badge field
+        static let verificationStatus = "verificationStatus"
+        static let verificationMethods = "verificationMethods"
+        static let trustScore = "trustScore"
     }
 
     // MARK: - Initialization
 
     private init() {
-        loadVerificationStatus()
-        updateTrustScore()
+        // SECURITY: Load cached values for immediate UI, then validate against server
+        loadCachedStatus()
+
         Logger.shared.info("VerificationService initialized", category: .general)
+
+        // Sync with server in background
+        Task {
+            await syncVerificationStatusFromServer()
+        }
     }
 
     // MARK: - Photo Verification
 
     /// Start photo verification flow
+    /// SECURITY: Verification result is persisted to Firestore (server-side)
     func startPhotoVerification(profilePhotos: [UIImage]) async throws -> PhotoVerificationResult {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            throw VerificationError.notAuthenticated
+        }
+
         Logger.shared.info("Starting photo verification", category: .general)
 
         // Perform verification
         let result = try await photoVerifier.verifyUser(profilePhotos: profilePhotos)
 
         if result.isVerified {
+            // SECURITY FIX: Persist verification to Firestore (server-side source of truth)
+            try await persistPhotoVerification(userId: userId, confidence: result.confidence)
+
+            // Update local state after successful server persistence
             photoVerified = true
-            defaults.set(true, forKey: Keys.photoVerified)
+            updateLocalCache()
             updateVerificationStatus()
             updateTrustScore()
 
@@ -72,7 +108,7 @@ class VerificationService: ObservableObject {
                 "confidence": result.confidence
             ])
 
-            Logger.shared.info("Photo verification completed successfully", category: .general)
+            Logger.shared.info("Photo verification completed and persisted to server", category: .general)
         } else {
             Logger.shared.warning("Photo verification failed: \(result.failureReason ?? "Unknown")", category: .general)
         }
@@ -80,18 +116,43 @@ class VerificationService: ObservableObject {
         return result
     }
 
+    /// Persist photo verification to Firestore
+    private func persistPhotoVerification(userId: String, confidence: Double) async throws {
+        let updateData: [String: Any] = [
+            FirestoreFields.photoVerified: true,
+            FirestoreFields.photoVerifiedAt: FieldValue.serverTimestamp(),
+            FirestoreFields.verificationMethods: FieldValue.arrayUnion(["photo"])
+        ]
+
+        try await db.collection("users").document(userId).updateData(updateData)
+
+        // Update the main isVerified field based on new status
+        try await updateServerVerificationStatus(userId: userId)
+
+        Logger.shared.info("Photo verification persisted to Firestore", category: .general)
+    }
+
     // MARK: - ID Verification
 
     /// Start ID verification flow
+    /// SECURITY: Verification result is persisted to Firestore (server-side)
     func startIDVerification(idImage: UIImage, selfieImage: UIImage) async throws -> IDVerificationResult {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            throw VerificationError.notAuthenticated
+        }
+
         Logger.shared.info("Starting ID verification", category: .general)
 
         // Perform verification
         let result = try await idVerifier.verifyID(idImage: idImage, selfieImage: selfieImage)
 
         if result.isVerified {
+            // SECURITY FIX: Persist verification to Firestore (server-side source of truth)
+            try await persistIDVerification(userId: userId, documentType: result.documentType, confidence: result.confidence)
+
+            // Update local state after successful server persistence
             idVerified = true
-            defaults.set(true, forKey: Keys.idVerified)
+            updateLocalCache()
             updateVerificationStatus()
             updateTrustScore()
 
@@ -101,7 +162,7 @@ class VerificationService: ObservableObject {
                 "document_type": result.documentType.rawValue
             ])
 
-            Logger.shared.info("ID verification completed successfully", category: .general)
+            Logger.shared.info("ID verification completed and persisted to server", category: .general)
         } else {
             Logger.shared.warning("ID verification failed: \(result.failureReason ?? "Unknown")", category: .general)
         }
@@ -109,12 +170,33 @@ class VerificationService: ObservableObject {
         return result
     }
 
+    /// Persist ID verification to Firestore
+    private func persistIDVerification(userId: String, documentType: DocumentType, confidence: Double) async throws {
+        let updateData: [String: Any] = [
+            FirestoreFields.idVerified: true,
+            FirestoreFields.idVerifiedAt: FieldValue.serverTimestamp(),
+            FirestoreFields.verificationMethods: FieldValue.arrayUnion(["id_\(documentType.rawValue)"])
+        ]
+
+        try await db.collection("users").document(userId).updateData(updateData)
+
+        // Update the main isVerified field based on new status
+        try await updateServerVerificationStatus(userId: userId)
+
+        Logger.shared.info("ID verification persisted to Firestore", category: .general)
+    }
+
     // MARK: - Background Check
 
     /// Request background check (premium feature)
+    /// SECURITY: Verification result is persisted to Firestore (server-side)
     func requestBackgroundCheck(consent: Bool) async throws -> BackgroundCheckResult {
         guard consent else {
             throw VerificationError.consentRequired
+        }
+
+        guard let userId = Auth.auth().currentUser?.uid else {
+            throw VerificationError.notAuthenticated
         }
 
         Logger.shared.info("Starting background check", category: .general)
@@ -123,8 +205,12 @@ class VerificationService: ObservableObject {
         let result = try await backgroundChecker.performBackgroundCheck()
 
         if result.isClean {
+            // SECURITY FIX: Persist verification to Firestore (server-side source of truth)
+            try await persistBackgroundCheck(userId: userId)
+
+            // Update local state after successful server persistence
             backgroundCheckCompleted = true
-            defaults.set(true, forKey: Keys.backgroundCheckCompleted)
+            updateLocalCache()
             updateVerificationStatus()
             updateTrustScore()
 
@@ -134,12 +220,28 @@ class VerificationService: ObservableObject {
                 "clean": result.isClean
             ])
 
-            Logger.shared.info("Background check completed", category: .general)
+            Logger.shared.info("Background check completed and persisted to server", category: .general)
         } else {
             Logger.shared.warning("Background check found issues", category: .general)
         }
 
         return result
+    }
+
+    /// Persist background check to Firestore
+    private func persistBackgroundCheck(userId: String) async throws {
+        let updateData: [String: Any] = [
+            FirestoreFields.backgroundCheckCompleted: true,
+            FirestoreFields.backgroundCheckAt: FieldValue.serverTimestamp(),
+            FirestoreFields.verificationMethods: FieldValue.arrayUnion(["background_check"])
+        ]
+
+        try await db.collection("users").document(userId).updateData(updateData)
+
+        // Update the main isVerified field based on new status
+        try await updateServerVerificationStatus(userId: userId)
+
+        Logger.shared.info("Background check persisted to Firestore", category: .general)
     }
 
     // MARK: - Verification Status
@@ -155,8 +257,53 @@ class VerificationService: ObservableObject {
             verificationStatus = .unverified
         }
 
-        defaults.set(verificationStatus.rawValue, forKey: Keys.verificationStatus)
-        Logger.shared.debug("Verification status updated: \(verificationStatus.rawValue)", category: .general)
+        Logger.shared.debug("Local verification status updated: \(verificationStatus.rawValue)", category: .general)
+    }
+
+    /// Update verification status on server (source of truth)
+    /// SECURITY: This determines the isVerified badge shown to other users
+    private func updateServerVerificationStatus(userId: String) async throws {
+        // Fetch current verification state from server
+        let doc = try await db.collection("users").document(userId).getDocument()
+        let data = doc.data() ?? [:]
+
+        let serverPhotoVerified = data[FirestoreFields.photoVerified] as? Bool ?? false
+        let serverIdVerified = data[FirestoreFields.idVerified] as? Bool ?? false
+        let serverBackgroundCheck = data[FirestoreFields.backgroundCheckCompleted] as? Bool ?? false
+
+        // Calculate verification status
+        let newStatus: VerificationStatus
+        let isVerified: Bool
+
+        if serverPhotoVerified && serverIdVerified && serverBackgroundCheck {
+            newStatus = .fullyVerified
+            isVerified = true
+        } else if serverPhotoVerified && serverIdVerified {
+            newStatus = .verified
+            isVerified = true
+        } else if serverPhotoVerified {
+            newStatus = .photoVerified
+            isVerified = true  // Photo verification grants basic verified badge
+        } else {
+            newStatus = .unverified
+            isVerified = false
+        }
+
+        // Calculate trust score
+        var score = 20 // Base score
+        if serverPhotoVerified { score += 30 }
+        if serverIdVerified { score += 30 }
+        if serverBackgroundCheck { score += 20 }
+        let newTrustScore = min(100, score)
+
+        // Update server with calculated values
+        try await db.collection("users").document(userId).updateData([
+            FirestoreFields.isVerified: isVerified,
+            FirestoreFields.verificationStatus: newStatus.rawValue,
+            FirestoreFields.trustScore: newTrustScore
+        ])
+
+        Logger.shared.info("Server verification status updated: \(newStatus.rawValue), isVerified: \(isVerified)", category: .general)
     }
 
     // MARK: - Trust Score
@@ -183,9 +330,7 @@ class VerificationService: ObservableObject {
         }
 
         trustScore = min(100, score)
-        defaults.set(trustScore, forKey: Keys.trustScore)
-
-        Logger.shared.debug("Trust score updated: \(trustScore)", category: .general)
+        Logger.shared.debug("Local trust score updated: \(trustScore)", category: .general)
     }
 
     // MARK: - Verification Badge
@@ -203,36 +348,129 @@ class VerificationService: ObservableObject {
         }
     }
 
-    // MARK: - Load/Save
+    // MARK: - Server Sync (Source of Truth)
 
-    private func loadVerificationStatus() {
-        photoVerified = defaults.bool(forKey: Keys.photoVerified)
-        idVerified = defaults.bool(forKey: Keys.idVerified)
-        backgroundCheckCompleted = defaults.bool(forKey: Keys.backgroundCheckCompleted)
-        trustScore = defaults.integer(forKey: Keys.trustScore)
-
-        if let statusRaw = defaults.string(forKey: Keys.verificationStatus),
-           let status = VerificationStatus(rawValue: statusRaw) {
-            verificationStatus = status
+    /// Sync verification status from Firestore (server-side source of truth)
+    /// SECURITY: This validates that client-side cache matches server state
+    func syncVerificationStatusFromServer() async {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            Logger.shared.debug("No user logged in, skipping verification sync", category: .general)
+            return
         }
+
+        isLoadingVerification = true
+        defer { isLoadingVerification = false }
+
+        do {
+            let doc = try await db.collection("users").document(userId).getDocument()
+            let data = doc.data() ?? [:]
+
+            // SECURITY: Server values override local cache
+            let serverPhotoVerified = data[FirestoreFields.photoVerified] as? Bool ?? false
+            let serverIdVerified = data[FirestoreFields.idVerified] as? Bool ?? false
+            let serverBackgroundCheck = data[FirestoreFields.backgroundCheckCompleted] as? Bool ?? false
+            let serverTrustScore = data[FirestoreFields.trustScore] as? Int ?? 0
+
+            // Check for client-side spoofing attempt
+            if photoVerified && !serverPhotoVerified {
+                Logger.shared.warning("SECURITY: Client claimed photoVerified=true but server says false. Reverting.", category: .security)
+            }
+            if idVerified && !serverIdVerified {
+                Logger.shared.warning("SECURITY: Client claimed idVerified=true but server says false. Reverting.", category: .security)
+            }
+            if backgroundCheckCompleted && !serverBackgroundCheck {
+                Logger.shared.warning("SECURITY: Client claimed backgroundCheck=true but server says false. Reverting.", category: .security)
+            }
+
+            // Update local state from server
+            photoVerified = serverPhotoVerified
+            idVerified = serverIdVerified
+            backgroundCheckCompleted = serverBackgroundCheck
+            trustScore = serverTrustScore
+
+            // Update local verification status
+            updateVerificationStatus()
+
+            // Update cache to match server
+            updateLocalCache()
+
+            Logger.shared.info("Verification status synced from server: \(verificationStatus.rawValue)", category: .general)
+
+        } catch {
+            Logger.shared.error("Failed to sync verification status from server", category: .general, error: error)
+            // On error, keep using cached values but log the discrepancy
+        }
+    }
+
+    // MARK: - Local Cache Management
+
+    /// Load cached verification status for immediate UI display
+    /// SECURITY: This is only a cache - server is authoritative
+    private func loadCachedStatus() {
+        photoVerified = defaults.bool(forKey: CacheKeys.photoVerified)
+        idVerified = defaults.bool(forKey: CacheKeys.idVerified)
+        backgroundCheckCompleted = defaults.bool(forKey: CacheKeys.backgroundCheckCompleted)
+
+        updateVerificationStatus()
+        updateTrustScore()
+
+        Logger.shared.debug("Loaded cached verification status (will validate against server)", category: .general)
+    }
+
+    /// Update local cache to match current state
+    private func updateLocalCache() {
+        defaults.set(photoVerified, forKey: CacheKeys.photoVerified)
+        defaults.set(idVerified, forKey: CacheKeys.idVerified)
+        defaults.set(backgroundCheckCompleted, forKey: CacheKeys.backgroundCheckCompleted)
+        defaults.set(Date().timeIntervalSince1970, forKey: CacheKeys.lastSyncTimestamp)
+    }
+
+    /// Clear local cache (forces re-sync from server)
+    func clearCache() {
+        defaults.removeObject(forKey: CacheKeys.photoVerified)
+        defaults.removeObject(forKey: CacheKeys.idVerified)
+        defaults.removeObject(forKey: CacheKeys.backgroundCheckCompleted)
+        defaults.removeObject(forKey: CacheKeys.lastSyncTimestamp)
+
+        Logger.shared.info("Verification cache cleared", category: .general)
     }
 
     // MARK: - Reset (for testing)
 
-    func resetVerification() {
-        photoVerified = false
-        idVerified = false
-        backgroundCheckCompleted = false
-        verificationStatus = .unverified
-        trustScore = 0
+    /// Reset verification status (removes from server and cache)
+    /// WARNING: This should only be used for testing
+    func resetVerification() async {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            Logger.shared.warning("Cannot reset verification: no user logged in", category: .general)
+            return
+        }
 
-        defaults.removeObject(forKey: Keys.photoVerified)
-        defaults.removeObject(forKey: Keys.idVerified)
-        defaults.removeObject(forKey: Keys.backgroundCheckCompleted)
-        defaults.removeObject(forKey: Keys.verificationStatus)
-        defaults.removeObject(forKey: Keys.trustScore)
+        do {
+            // Reset on server first
+            try await db.collection("users").document(userId).updateData([
+                FirestoreFields.photoVerified: false,
+                FirestoreFields.idVerified: false,
+                FirestoreFields.backgroundCheckCompleted: false,
+                FirestoreFields.isVerified: false,
+                FirestoreFields.verificationStatus: VerificationStatus.unverified.rawValue,
+                FirestoreFields.trustScore: 0,
+                FirestoreFields.verificationMethods: []
+            ])
 
-        Logger.shared.info("Verification status reset", category: .general)
+            // Then reset local state
+            photoVerified = false
+            idVerified = false
+            backgroundCheckCompleted = false
+            verificationStatus = .unverified
+            trustScore = 0
+
+            // Clear cache
+            clearCache()
+
+            Logger.shared.info("Verification status reset on server and locally", category: .general)
+        } catch {
+            Logger.shared.error("Failed to reset verification on server", category: .general, error: error)
+        }
     }
 }
 
@@ -316,6 +554,8 @@ enum VerificationError: LocalizedError {
     case invalidID
     case faceNotDetected
     case facesMismatch
+    case notAuthenticated
+    case serverPersistFailed
 
     var errorDescription: String? {
         switch self {
@@ -333,6 +573,10 @@ enum VerificationError: LocalizedError {
             return "Face not detected in photo"
         case .facesMismatch:
             return "Faces do not match"
+        case .notAuthenticated:
+            return "You must be logged in to verify your identity"
+        case .serverPersistFailed:
+            return "Failed to save verification status. Please try again."
         }
     }
 }
