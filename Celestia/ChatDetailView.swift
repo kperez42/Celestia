@@ -12,8 +12,9 @@ struct ChatDetailView: View {
     @StateObject private var viewModel: ChatViewModel
     @EnvironmentObject var authService: AuthService
     @State private var messageText = ""
+    @State private var isSending = false  // BUGFIX: Track sending state to prevent double-send
     @FocusState private var isInputFocused: Bool
-    
+
     init(otherUser: User) {
         self.otherUser = otherUser
         _viewModel = StateObject(wrappedValue: ChatViewModel(currentUserId: "", otherUserId: otherUser.id ?? ""))
@@ -64,12 +65,12 @@ struct ChatDetailView: View {
                     Image(systemName: "arrow.up.circle.fill")
                         .font(.system(size: 32))
                         .foregroundStyle(
-                            messageText.isEmpty ?
+                            (messageText.isEmpty || isSending) ?
                             LinearGradient(colors: [.gray, .gray], startPoint: .leading, endPoint: .trailing) :
                             LinearGradient.brandPrimary
                         )
                 }
-                .disabled(messageText.isEmpty)
+                .disabled(messageText.isEmpty || isSending)
             }
             .padding()
             .background(Color(.systemBackground))
@@ -86,9 +87,23 @@ struct ChatDetailView: View {
     
     private func sendMessage() {
         guard !messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        
-        viewModel.sendMessage(text: messageText)
+
+        // BUGFIX: Prevent double-send from rapid taps
+        guard !isSending else { return }
+
+        isSending = true
+        let textToSend = messageText
         messageText = ""
+
+        Task {
+            await viewModel.sendMessage(text: textToSend)
+
+            // Reset after a small delay to ensure message is processed
+            try? await Task.sleep(nanoseconds: 500_000_000) // 500ms
+            await MainActor.run {
+                isSending = false
+            }
+        }
     }
 }
 

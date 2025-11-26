@@ -36,6 +36,18 @@ struct CelestiaApp: App {
                 Logger.shared.info("Firestore persistence initialized (100MB cache limit)", category: .database)
             }
         }
+
+        // MEMORY FIX: Reduce startup memory pressure by deferring heavy service initialization
+        // This helps reduce malloc errors during Firebase initialization
+        Task.detached(priority: .background) {
+            // Allow Firebase core services to initialize first
+            try? await Task.sleep(nanoseconds: 500_000_000) // 500ms delay
+
+            // Pre-warm AnalyticsServiceEnhanced singleton on background to distribute memory allocations
+            await MainActor.run {
+                _ = AnalyticsServiceEnhanced.shared
+            }
+        }
     }
 
     var body: some Scene {

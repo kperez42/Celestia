@@ -133,11 +133,16 @@ struct ChatView: View {
             ReportUserView(user: otherUser)
         }
         .onChange(of: messageService.messages.count) {
-            // Check conversation safety whenever new messages arrive
-            checkConversationSafety()
+            // SWIFTUI FIX: Defer safety check to avoid modifying state during view update
+            // This prevents "Modifying state during view update" warnings
+            Task {
+                try? await Task.sleep(nanoseconds: 1_000_000) // 1ms delay
+                checkConversationSafety()
+            }
         }
         .task {
-            // Initial safety check
+            // SWIFTUI FIX: Defer initial safety check
+            try? await Task.sleep(nanoseconds: 1_000_000)
             checkConversationSafety()
         }
         .overlay(alignment: .top) {
@@ -725,6 +730,10 @@ struct ChatView: View {
         // Haptic feedback - instant response
         HapticManager.shared.impact(.light)
 
+        // BUGFIX: Set isSending immediately to prevent double-send from rapid taps
+        // Previous bug: isSending was only set for images, allowing double-tap for text
+        isSending = true
+
         // Capture and sanitize values before clearing
         let text = InputSanitizer.standard(messageText)
         let imageToSend = selectedImage
@@ -736,11 +745,10 @@ struct ChatView: View {
         selectedImageItem = nil
         isInputFocused = false
 
-        // Only show sending indicator for images (which take longer)
+        // Track sending state for UI preview (images show preview while uploading)
         if hasImage {
             sendingMessagePreview = hasText ? text : "📷 Photo"
             sendingImagePreview = imageToSend
-            isSending = true
         }
 
         Task {
@@ -773,6 +781,11 @@ struct ChatView: View {
                         receiverId: receiverId,
                         text: text
                     )
+                }
+
+                // BUGFIX: Reset isSending for both text and image messages
+                await MainActor.run {
+                    isSending = false
                 }
 
                 // Success haptic only for image messages (text is already shown)
