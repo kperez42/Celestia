@@ -383,6 +383,8 @@ struct LikeProfileCard: View {
             ZStack(alignment: .topTrailing) {
                 profileImage
                     .frame(height: 200)
+                    .frame(maxWidth: .infinity)
+                    .clipped()
 
                 // Verified badge
                 if user.isVerified {
@@ -393,6 +395,7 @@ struct LikeProfileCard: View {
                         .padding(8)
                 }
             }
+            .cornerRadius(16, corners: [.topLeft, .topRight])
 
             // User info
             VStack(alignment: .leading, spacing: 8) {
@@ -490,12 +493,14 @@ struct LikeProfileCard: View {
         Group {
             if let imageURL = URL(string: user.profileImageURL), !user.profileImageURL.isEmpty {
                 CachedCardImage(url: imageURL)
+                    .frame(height: 200)
+                    .clipped()
             } else {
                 placeholderImage
+                    .frame(height: 200)
             }
         }
         .frame(maxWidth: .infinity)
-        .clipped()
     }
 
     private var placeholderImage: some View {
