@@ -224,71 +224,79 @@ struct LikeCardView: View {
                     } placeholder: {
                         Color.gray.opacity(0.2)
                     }
-                } else {
-                    Color.gray.opacity(0.2)
-                }
 
-                // Online Status Indicator - Top Left (only if not blurred)
-                if !isBlurred {
-                    VStack {
-                        HStack {
-                            OnlineStatusIndicator(user: user)
-                                .padding(.top, 8)
-                                .padding(.leading, 8)
+                    // Online Status Indicator - Top Left (only if not blurred)
+                    if !isBlurred {
+                        VStack {
+                            HStack {
+                                OnlineStatusIndicator(user: user)
+                                    .padding(.top, 8)
+                                    .padding(.leading, 8)
+                                Spacer()
+                            }
                             Spacer()
                         }
-                        Spacer()
                     }
-                }
 
-                // Blur overlay for non-premium
-                if isBlurred {
-                    Rectangle()
-                        .fill(.ultraThinMaterial)
-                        .blur(radius: 20)
+                    // Blur overlay for non-premium
+                    if isBlurred {
+                        Rectangle()
+                            .fill(.ultraThinMaterial)
+                            .blur(radius: 20)
 
-                    VStack {
-                        Image(systemName: "lock.fill")
-                            .font(.title)
-                            .foregroundColor(.white)
-
-                        Text("Premium")
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.white)
-                    }
-                }
-
-                // Name overlay (bottom)
-                VStack {
-                    Spacer()
-
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(isBlurred ? "••••••" : user.fullName)
-                                .font(.title3)
-                                .fontWeight(.bold)
+                        VStack {
+                            Image(systemName: "lock.fill")
+                                .font(.title)
                                 .foregroundColor(.white)
 
-                            Text(isBlurred ? "••" : "\(user.age)")
-                                .font(.subheadline)
-                                .foregroundColor(.white.opacity(0.9))
+                            Text("Premium")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
                         }
-                        Spacer()
                     }
-                    .padding()
-                    .background(
-                        LinearGradient(
-                            colors: [.clear, .black.opacity(0.7)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
                 }
+                .frame(height: 220)
+                .clipped()
+                .cornerRadius(16, corners: [.topLeft, .topRight])
+
+                // Info section with white background
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(isBlurred ? "••••••" : user.fullName)
+                        .font(.headline)
+                        .fontWeight(.bold)
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+
+                    HStack(spacing: 4) {
+                        Text(isBlurred ? "••" : "\(user.age)")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+
+                        if !isBlurred && !user.location.isEmpty {
+                            Text("•")
+                                .foregroundColor(.secondary)
+
+                            Text(user.location)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 12)
+                .background(Color(.systemBackground))
+                .cornerRadius(16, corners: [.bottomLeft, .bottomRight])
             }
-            .frame(height: 250)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .background(Color(.systemBackground))
+            .cornerRadius(16)
             .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.gray.opacity(0.1), lineWidth: 1)
+            )
         }
         .buttonStyle(ScaleButtonStyle())
     }
