@@ -42,6 +42,10 @@ struct UserDetailView: View {
         .overlay(alignment: .bottom) {
             actionButtons
         }
+        .task {
+            // PERFORMANCE: Start prefetching immediately in parallel with view load
+            ImageCache.shared.prefetchAdjacentPhotos(photos: validPhotos, currentIndex: selectedPhotoIndex)
+        }
         .onAppear(perform: handleOnAppear)
         .onChange(of: savedProfilesVM.savedProfiles) { _ in
             isSaved = savedProfilesVM.savedProfiles.contains(where: { $0.user.id == user.id })
@@ -92,7 +96,7 @@ struct UserDetailView: View {
         .frame(height: 450)
         .tabViewStyle(.page)
         // PERFORMANCE: Preload adjacent photos when swiping
-        .onChange(of: selectedPhotoIndex) { newIndex in
+        .onChange(of: selectedPhotoIndex) { _, newIndex in
             ImageCache.shared.prefetchAdjacentPhotos(photos: validPhotos, currentIndex: newIndex)
         }
         .fullScreenCover(isPresented: $showFullScreenPhotos) {
@@ -101,10 +105,6 @@ struct UserDetailView: View {
                 selectedIndex: $selectedPhotoIndex,
                 isPresented: $showFullScreenPhotos
             )
-        }
-        // PERFORMANCE: Preload adjacent photos on appear
-        .onAppear {
-            ImageCache.shared.prefetchAdjacentPhotos(photos: validPhotos, currentIndex: selectedPhotoIndex)
         }
     }
 

@@ -231,6 +231,8 @@ class DiscoverViewModel: ObservableObject {
 
     /// Show user detail sheet
     func showUserDetail(_ user: User) {
+        // PERFORMANCE: Prefetch all user photos immediately for instant detail view
+        ImageCache.shared.prefetchUserPhotosHighPriority(user: user)
         selectedUser = user
         showingUserDetail = true
     }

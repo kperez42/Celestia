@@ -122,7 +122,9 @@ struct ActivityRow: View {
 
     var body: some View {
         Button {
-            if user != nil {
+            if let user = user {
+                // PERFORMANCE: Prefetch images for instant detail view
+                ImageCache.shared.prefetchUserPhotosHighPriority(user: user)
                 showUserDetail = true
                 HapticManager.shared.impact(.light)
             }
