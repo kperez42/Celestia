@@ -21,8 +21,18 @@ class AuthService: ObservableObject, AuthServiceProtocol {
     @Published var referralErrorMessage: String?
     @Published var isInitialized = false
 
+    /// Indicates if re-authentication is needed for sensitive operations
+    @Published var requiresReauthentication = false
+
     // Singleton for backward compatibility
     static let shared = AuthService()
+
+    // AUTH STATE LISTENER: Track auth state changes (sign out on other devices, token expiration)
+    private var authStateListenerHandle: AuthStateDidChangeListenerHandle?
+    private var idTokenListenerHandle: IDTokenDidChangeListenerHandle?
+
+    // Continuation for async initialization
+    private var initializationContinuation: CheckedContinuation<Void, Never>?
 
     // Public initializer for dependency injection (used in testing and ViewModels)
     init() {
@@ -33,11 +43,73 @@ class AuthService: ObservableObject, AuthServiceProtocol {
         Logger.shared.auth("Current user session: \(Auth.auth().currentUser != nil ? "authenticated" : "none")", level: .debug)
         Logger.shared.auth("Email verified: \(isEmailVerified)", level: .info)
 
+        // SESSION HANDLING: Set up auth state listener for reactive state management
+        setupAuthStateListener()
+        setupIDTokenListener()
+
         // FIXED: Initialize on MainActor and track completion
         Task { @MainActor in
             await fetchUser()
             self.isInitialized = true
+            self.initializationContinuation?.resume()
+            self.initializationContinuation = nil
             Logger.shared.auth("AuthService initialization complete", level: .info)
+        }
+    }
+
+    deinit {
+        // Clean up listeners
+        if let handle = authStateListenerHandle {
+            Auth.auth().removeStateDidChangeListener(handle)
+        }
+        if let handle = idTokenListenerHandle {
+            Auth.auth().removeIDTokenDidChangeListener(handle)
+        }
+    }
+
+    // MARK: - Auth State Listeners
+
+    /// Set up listener for auth state changes (sign-in, sign-out, token refresh)
+    private func setupAuthStateListener() {
+        authStateListenerHandle = Auth.auth().addStateDidChangeListener { [weak self] _, user in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+
+                let previousSession = self.userSession
+                self.userSession = user
+                self.isEmailVerified = user?.isEmailVerified ?? false
+
+                if user == nil && previousSession != nil {
+                    // User was signed out (possibly from another device or session expired)
+                    Logger.shared.auth("Auth state changed: User signed out externally", level: .warning)
+                    self.currentUser = nil
+                    self.isInitialized = false
+                    self.requiresReauthentication = false
+
+                    // Post notification for UI to handle sign-out
+                    NotificationCenter.default.post(name: .userSessionExpired, object: nil)
+                } else if user != nil && previousSession == nil {
+                    // User signed in
+                    Logger.shared.auth("Auth state changed: User signed in", level: .info)
+                    await self.fetchUser()
+                }
+            }
+        }
+    }
+
+    /// Set up listener for ID token changes (refresh, expiration)
+    private func setupIDTokenListener() {
+        idTokenListenerHandle = Auth.auth().addIDTokenDidChangeListener { [weak self] _, user in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+
+                if user != nil {
+                    Logger.shared.auth("ID token refreshed", level: .debug)
+                } else if self.userSession != nil {
+                    // Token expired but we thought we were authenticated
+                    Logger.shared.auth("ID token expired - session may be invalid", level: .warning)
+                }
+            }
         }
     }
 
@@ -47,15 +119,24 @@ class AuthService: ObservableObject, AuthServiceProtocol {
         // If already initialized, return immediately
         guard !isInitialized else { return }
 
-        // Poll until initialized (with timeout)
-        var attempts = 0
-        while !isInitialized && attempts < 50 { // 5 seconds max (50 * 100ms)
-            try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
-            attempts += 1
-        }
+        // Use async/await pattern instead of polling
+        await withCheckedContinuation { continuation in
+            if isInitialized {
+                continuation.resume()
+            } else {
+                // Store continuation to be resumed when initialization completes
+                self.initializationContinuation = continuation
 
-        if !isInitialized {
-            Logger.shared.warning("AuthService initialization timeout", category: .authentication)
+                // Timeout fallback using Task
+                Task {
+                    try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
+                    if !self.isInitialized {
+                        Logger.shared.warning("AuthService initialization timeout", category: .authentication)
+                        self.initializationContinuation?.resume()
+                        self.initializationContinuation = nil
+                    }
+                }
+            }
         }
     }
 
@@ -312,14 +393,31 @@ class AuthService: ObservableObject, AuthServiceProtocol {
             self.currentUser = nil
             self.isEmailVerified = false
             self.isInitialized = false // FIXED: Reset initialization state
+            self.requiresReauthentication = false
             Logger.shared.auth("User signed out successfully", level: .info)
 
             // Clear user cache on logout
             Task {
                 await UserService.shared.clearCache()
             }
-        } catch {
-            Logger.shared.error("Error signing out", category: .authentication, error: error)
+        } catch let error as NSError {
+            // ERROR RECOVERY: Even if sign-out fails on server, clear local state
+            // This prevents user from being stuck in a signed-in state
+            Logger.shared.error("Error signing out on server - clearing local state", category: .authentication, error: error)
+
+            self.userSession = nil
+            self.currentUser = nil
+            self.isEmailVerified = false
+            self.isInitialized = false
+            self.requiresReauthentication = false
+
+            // Clear cache even on error
+            Task {
+                await UserService.shared.clearCache()
+            }
+
+            // Log analytics for monitoring
+            FirebaseErrorMapper.logError(error, context: "Sign Out")
         }
     }
     
@@ -420,22 +518,162 @@ class AuthService: ObservableObject, AuthServiceProtocol {
 
     @MainActor
     func deleteAccount() async throws {
-        guard let user = Auth.auth().currentUser else { return }
+        guard let user = Auth.auth().currentUser else {
+            throw CelestiaError.notAuthenticated
+        }
         let uid = user.uid
 
         // SECURITY FIX: Never log UIDs
         Logger.shared.auth("Deleting user account", level: .info)
 
-        // Delete user data from Firestore
-        try await Firestore.firestore().collection("users").document(uid).delete()
+        do {
+            // Delete user data from Firestore first
+            try await Firestore.firestore().collection("users").document(uid).delete()
 
-        // Delete auth account
-        try await user.delete()
+            // Delete auth account (may require recent authentication)
+            try await user.delete()
 
-        self.userSession = nil
-        self.currentUser = nil
+            self.userSession = nil
+            self.currentUser = nil
+            self.requiresReauthentication = false
 
-        Logger.shared.auth("Account deleted successfully", level: .info)
+            Logger.shared.auth("Account deleted successfully", level: .info)
+        } catch let error as NSError {
+            // Handle requiresRecentLogin error
+            if error.domain == "FIRAuthErrorDomain" && error.code == 17014 {
+                Logger.shared.auth("Account deletion requires re-authentication", level: .warning)
+                self.requiresReauthentication = true
+                throw CelestiaError.requiresRecentLogin
+            }
+            throw error
+        }
+    }
+
+    // MARK: - Re-authentication
+
+    /// Re-authenticate user with password for sensitive operations
+    /// Required before: deleteAccount, changeEmail, changePassword
+    @MainActor
+    func reauthenticate(withPassword password: String) async throws {
+        guard let user = Auth.auth().currentUser,
+              let email = user.email else {
+            throw CelestiaError.notAuthenticated
+        }
+
+        // Sanitize password input
+        let sanitizedPassword = InputSanitizer.basic(password)
+        guard !sanitizedPassword.isEmpty else {
+            throw CelestiaError.invalidCredentials
+        }
+
+        Logger.shared.auth("Re-authenticating user for sensitive operation", level: .info)
+
+        do {
+            let credential = EmailAuthProvider.credential(withEmail: email, password: sanitizedPassword)
+            try await user.reauthenticate(with: credential)
+
+            self.requiresReauthentication = false
+            Logger.shared.auth("Re-authentication successful", level: .info)
+        } catch let error as NSError {
+            FirebaseErrorMapper.logError(error, context: "Re-authentication")
+            errorMessage = FirebaseErrorMapper.getUserFriendlyMessage(for: error)
+            throw error
+        }
+    }
+
+    /// Check if a sensitive operation requires re-authentication
+    /// Returns true if the user's last authentication was too long ago
+    @MainActor
+    func checkReauthenticationRequired() async -> Bool {
+        guard let user = Auth.auth().currentUser else { return true }
+
+        // Try to get fresh ID token - this will fail if session is too old
+        do {
+            _ = try await user.getIDTokenResult(forcingRefresh: true)
+            return false
+        } catch {
+            Logger.shared.auth("Token refresh failed - re-authentication may be required", level: .warning)
+            return true
+        }
+    }
+
+    // MARK: - Change Password
+
+    /// Change user's password (requires recent authentication)
+    @MainActor
+    func changePassword(currentPassword: String, newPassword: String) async throws {
+        guard let user = Auth.auth().currentUser else {
+            throw CelestiaError.notAuthenticated
+        }
+
+        // Validate new password
+        let sanitizedNewPassword = InputSanitizer.basic(newPassword)
+        let passwordValidation = ValidationHelper.validatePassword(sanitizedNewPassword)
+        guard passwordValidation.isValid else {
+            errorMessage = passwordValidation.errorMessage ?? "Invalid password."
+            throw CelestiaError.weakPassword
+        }
+
+        Logger.shared.auth("Changing user password", level: .info)
+
+        do {
+            // Re-authenticate first
+            try await reauthenticate(withPassword: currentPassword)
+
+            // Update password
+            try await user.updatePassword(to: sanitizedNewPassword)
+
+            Logger.shared.auth("Password changed successfully", level: .info)
+        } catch let error as NSError {
+            if error.domain == "FIRAuthErrorDomain" && error.code == 17014 {
+                self.requiresReauthentication = true
+                throw CelestiaError.requiresRecentLogin
+            }
+            FirebaseErrorMapper.logError(error, context: "Change Password")
+            errorMessage = FirebaseErrorMapper.getUserFriendlyMessage(for: error)
+            throw error
+        }
+    }
+
+    // MARK: - Change Email
+
+    /// Change user's email address (requires recent authentication and email verification)
+    @MainActor
+    func changeEmail(currentPassword: String, newEmail: String) async throws {
+        guard let user = Auth.auth().currentUser else {
+            throw CelestiaError.notAuthenticated
+        }
+
+        // Validate new email
+        let sanitizedNewEmail = InputSanitizer.email(newEmail)
+        let emailValidation = ValidationHelper.validateEmail(sanitizedNewEmail)
+        guard emailValidation.isValid else {
+            errorMessage = emailValidation.errorMessage ?? "Invalid email address."
+            throw CelestiaError.invalidEmail
+        }
+
+        Logger.shared.auth("Changing user email", level: .info)
+
+        do {
+            // Re-authenticate first
+            try await reauthenticate(withPassword: currentPassword)
+
+            // Send verification to new email before changing
+            try await user.sendEmailVerification(beforeUpdatingEmail: sanitizedNewEmail)
+
+            Logger.shared.auth("Verification email sent to new address", level: .info)
+
+            // Note: Email won't actually change until user verifies the new address
+            // Firebase handles this automatically
+        } catch let error as NSError {
+            if error.domain == "FIRAuthErrorDomain" && error.code == 17014 {
+                self.requiresReauthentication = true
+                throw CelestiaError.requiresRecentLogin
+            }
+            FirebaseErrorMapper.logError(error, context: "Change Email")
+            errorMessage = FirebaseErrorMapper.getUserFriendlyMessage(for: error)
+            throw error
+        }
     }
 
     // MARK: - Email Verification
@@ -538,4 +776,14 @@ class AuthService: ObservableObject, AuthServiceProtocol {
             throw error
         }
     }
+}
+
+// MARK: - Notification Names for Auth Events
+
+extension Notification.Name {
+    /// Posted when user session expires (signed out on another device, token expired)
+    static let userSessionExpired = Notification.Name("userSessionExpired")
+
+    /// Posted when re-authentication is required for a sensitive operation
+    static let reauthenticationRequired = Notification.Name("reauthenticationRequired")
 }

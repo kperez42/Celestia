@@ -10,7 +10,7 @@ import Firebase
 import FirebaseFirestore
 
 @MainActor
-class MatchService: ObservableObject, MatchServiceProtocol {
+class MatchService: ObservableObject, MatchServiceProtocol, ListenerLifecycleAware {
     @Published var matches: [Match] = []
     @Published var isLoading = false
     @Published var error: Error?
@@ -24,9 +24,36 @@ class MatchService: ObservableObject, MatchServiceProtocol {
     private let db = Firestore.firestore()
     private var listener: ListenerRegistration?
 
+    // LIFECYCLE: Track current user for reconnection
+    private var currentUserId: String?
+
+    // MARK: - ListenerLifecycleAware Conformance
+
+    nonisolated var listenerId: String { "MatchService" }
+
+    var areListenersActive: Bool {
+        listener != nil
+    }
+
+    func reconnectListeners() {
+        guard let userId = currentUserId else {
+            Logger.shared.debug("MatchService: No userId for reconnection", category: .general)
+            return
+        }
+        Logger.shared.info("MatchService: Reconnecting listeners for user: \(userId)", category: .general)
+        listenToMatches(userId: userId)
+    }
+
+    func pauseListeners() {
+        Logger.shared.info("MatchService: Pausing listeners", category: .general)
+        stopListening()
+    }
+
     // Dependency injection initializer
     init(repository: MatchRepository) {
         self.repository = repository
+        // Register with lifecycle manager for automatic reconnection handling
+        ListenerLifecycleManager.shared.register(self)
     }
     
     /// Fetch all matches for a user
@@ -44,6 +71,9 @@ class MatchService: ObservableObject, MatchServiceProtocol {
     
     /// Listen to matches in real-time
     func listenToMatches(userId: String) {
+        // LIFECYCLE: Store userId for reconnection
+        currentUserId = userId
+
         listener?.remove()
 
         // Use OR filter for optimized single listener (fixes race condition)
@@ -196,5 +226,9 @@ class MatchService: ObservableObject, MatchServiceProtocol {
     
     deinit {
         listener?.remove()
+        // LIFECYCLE: Unregister from lifecycle manager
+        Task { @MainActor in
+            ListenerLifecycleManager.shared.unregister(id: "MatchService")
+        }
     }
 }

@@ -6,7 +6,8 @@
 //
 
 import SwiftUI
-import FirebaseFirestore
+// AUDIT FIX: Removed FirebaseFirestore import - no longer needed
+// Unread counts now come from matchService.matches (Match.unreadCount)
 
 struct MainTabView: View {
     @EnvironmentObject var authService: AuthService
@@ -17,7 +18,13 @@ struct MainTabView: View {
     @State private var previousTab = 0
     @State private var unreadCount = 0
     @State private var newMatchesCount = 0
-    @State private var unreadListener: ListenerRegistration?
+
+    // AUDIT FIX: Removed separate unreadListener
+    // Now using Match.unreadCount from matchService which:
+    // 1. Only counts from active matches
+    // 2. Is already in sync with server state
+    // 3. Excludes blocked/unmatched users
+    // 4. Uses already-fetched data (no extra query)
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -62,9 +69,20 @@ struct MainTabView: View {
             previousTab = oldValue
             HapticManager.shared.selection()
         }
-        .onChange(of: matchService.matches.count) { _, _ in
-            // Update new matches count when matches change (real-time from listener)
-            newMatchesCount = matchService.matches.filter { $0.lastMessage == nil }.count
+        .onChange(of: matchService.matches) { _, newMatches in
+            // AUDIT FIX: Calculate both counts from authoritative Match data
+            guard let userId = authService.currentUser?.id else { return }
+
+            // Update new matches count (matches without any messages yet)
+            newMatchesCount = newMatches.filter { $0.lastMessage == nil }.count
+
+            // AUDIT FIX: Calculate unread count from Match.unreadCount
+            // This is the authoritative source, updated when messages are sent/read
+            unreadCount = newMatches.reduce(0) { total, match in
+                total + (match.unreadCount[userId] ?? 0)
+            }
+
+            Logger.shared.debug("Badge counts updated - unread: \(unreadCount), newMatches: \(newMatchesCount)", category: .messaging)
         }
         .task {
             // PERFORMANCE FIX: Use real-time listeners instead of polling
@@ -74,17 +92,23 @@ struct MainTabView: View {
             // Allow the UI to render first before setting up listeners
             try? await Task.sleep(nanoseconds: 500_000_000) // 500ms delay
 
-            // Set up real-time listener for matches (already exists in service)
+            // Set up real-time listener for matches
+            // AUDIT FIX: This single listener now handles both:
+            // - Match updates (for newMatchesCount)
+            // - Unread counts (from Match.unreadCount field)
             matchService.listenToMatches(userId: userId)
 
-            // Set up real-time listener for unread messages
-            setupUnreadMessagesListener(userId: userId)
+            // AUDIT FIX: Calculate initial counts immediately
+            newMatchesCount = matchService.matches.filter { $0.lastMessage == nil }.count
+            unreadCount = matchService.matches.reduce(0) { total, match in
+                total + (match.unreadCount[userId] ?? 0)
+            }
         }
         .onDisappear {
             // PERFORMANCE: Clean up listeners when view disappears
             matchService.stopListening()
-            unreadListener?.remove()
-            unreadListener = nil
+            // AUDIT FIX: Removed separate unreadListener cleanup
+            // Match listener already handles unread counts
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToMessages)) { notification in
             // Navigate to Messages tab when a match occurs
@@ -160,26 +184,12 @@ struct MainTabView: View {
     
     // MARK: - Helper Functions
 
-    /// Set up real-time listener for unread message count
-    /// PERFORMANCE FIX: Replaces inefficient 10-second polling with real-time updates
-    private func setupUnreadMessagesListener(userId: String) {
-        unreadListener?.remove()
-
-        unreadListener = Firestore.firestore().collection("messages")
-            .whereField("receiverId", isEqualTo: userId)
-            .whereField("isRead", isEqualTo: false)
-            .addSnapshotListener { snapshot, error in
-                if let error = error {
-                    Logger.shared.error("Error listening to unread messages", category: .messaging, error: error)
-                    return
-                }
-
-                Task { @MainActor in
-                    unreadCount = snapshot?.documents.count ?? 0
-                    Logger.shared.debug("Unread count updated: \(unreadCount)", category: .messaging)
-                }
-            }
-    }
+    // AUDIT FIX: Removed setupUnreadMessagesListener()
+    // Now using Match.unreadCount from matchService.matches which is:
+    // - Already fetched by listenToMatches()
+    // - The authoritative source for unread counts
+    // - Properly filtered by active matches only
+    // - Updated in real-time when messages are read
 }
 
 // MARK: - Tab Bar Button

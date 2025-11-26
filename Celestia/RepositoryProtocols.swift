@@ -54,9 +54,22 @@ protocol SwipeRepository {
     func createPass(fromUserId: String, toUserId: String) async throws
     func checkMutualLike(fromUserId: String, toUserId: String) async throws -> Bool
     func hasSwipedOn(fromUserId: String, toUserId: String) async throws -> (liked: Bool, passed: Bool)
-    func getLikesReceived(userId: String) async throws -> [String]
-    func getLikesSent(userId: String) async throws -> [String]
+    /// Get likes received with optional limit for pagination (default 500)
+    func getLikesReceived(userId: String, limit: Int) async throws -> [String]
+    /// Get likes sent with optional limit for pagination (default 500)
+    func getLikesSent(userId: String, limit: Int) async throws -> [String]
     func deleteSwipe(fromUserId: String, toUserId: String) async throws
+}
+
+// Default implementation for optional limit parameters
+extension SwipeRepository {
+    func getLikesReceived(userId: String) async throws -> [String] {
+        try await getLikesReceived(userId: userId, limit: 500)
+    }
+
+    func getLikesSent(userId: String) async throws -> [String] {
+        try await getLikesSent(userId: userId, limit: 500)
+    }
 }
 
 // MARK: - Interest Repository Protocol
