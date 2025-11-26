@@ -9,6 +9,9 @@ import SwiftUI
 
 struct UserDetailView: View {
     let user: User
+    let initialIsLiked: Bool
+    var onLikeChanged: ((Bool) -> Void)?  // Callback to sync like state with parent
+
     @EnvironmentObject var authService: AuthService
     @Environment(\.dismiss) var dismiss
 
@@ -27,6 +30,12 @@ struct UserDetailView: View {
     // Photo viewer state
     @State private var selectedPhotoIndex: Int = 0
     @State private var showFullScreenPhotos = false
+
+    init(user: User, initialIsLiked: Bool = false, onLikeChanged: ((Bool) -> Void)? = nil) {
+        self.user = user
+        self.initialIsLiked = initialIsLiked
+        self.onLikeChanged = onLikeChanged
+    }
 
     // Filter out empty photo URLs
     private var validPhotos: [String] {
@@ -495,21 +504,29 @@ struct UserDetailView: View {
     private func handleOnAppear() {
         isSaved = savedProfilesVM.savedProfiles.contains(where: { $0.user.id == user.id })
 
+        // Use initial like state from parent if callback is provided (synced)
+        // Otherwise fetch from backend
+        if onLikeChanged != nil {
+            isLiked = initialIsLiked
+        }
+
         Task {
             guard let currentUserId = authService.currentUser?.id,
                   let viewedUserId = user.id else { return }
 
-            // Check if user is already liked
-            do {
-                let alreadyLiked = try await SwipeService.shared.checkIfLiked(
-                    fromUserId: currentUserId,
-                    toUserId: viewedUserId
-                )
-                await MainActor.run {
-                    isLiked = alreadyLiked
+            // If no callback provided, fetch like status from backend
+            if onLikeChanged == nil {
+                do {
+                    let alreadyLiked = try await SwipeService.shared.checkIfLiked(
+                        fromUserId: currentUserId,
+                        toUserId: viewedUserId
+                    )
+                    await MainActor.run {
+                        isLiked = alreadyLiked
+                    }
+                } catch {
+                    Logger.shared.error("Error checking like status", category: .matching, error: error)
                 }
-            } catch {
-                Logger.shared.error("Error checking like status", category: .matching, error: error)
             }
 
             do {
@@ -587,6 +604,7 @@ struct UserDetailView: View {
             // Unlike the user
             isProcessing = true
             isLiked = false // Optimistic update
+            onLikeChanged?(false) // Sync with parent
 
             Task {
                 do {
@@ -604,6 +622,7 @@ struct UserDetailView: View {
                     await MainActor.run {
                         isProcessing = false
                         isLiked = true // Revert on error
+                        onLikeChanged?(true) // Revert parent state
                         errorMessage = error.localizedDescription
                         showingError = true
                     }
@@ -614,6 +633,7 @@ struct UserDetailView: View {
             // Like the user
             isProcessing = true
             isLiked = true // Optimistic update
+            onLikeChanged?(true) // Sync with parent
 
             Task {
                 do {
@@ -639,6 +659,7 @@ struct UserDetailView: View {
                     await MainActor.run {
                         isProcessing = false
                         isLiked = false // Revert on error
+                        onLikeChanged?(false) // Revert parent state
                         errorMessage = error.localizedDescription
                         showingError = true
                     }
@@ -884,66 +905,125 @@ struct FullScreenPhotoViewer: View {
     @State private var lastOffset: CGSize = .zero
     @GestureState private var dragOffset: CGSize = .zero
 
+    // Swipe-down to dismiss state
+    @State private var dismissDragOffset: CGFloat = 0
+    @State private var isDismissing = false
+
+    // Threshold for dismissing (150 points down)
+    private let dismissThreshold: CGFloat = 150
+
     var body: some View {
-        ZStack {
-            // Black background
-            Color.black.ignoresSafeArea()
+        GeometryReader { geometry in
+            ZStack {
+                // Black background with opacity based on drag
+                Color.black
+                    .opacity(backgroundOpacity)
+                    .ignoresSafeArea()
 
-            // PERFORMANCE: Photo carousel with smooth swiping
-            TabView(selection: $selectedIndex) {
-                ForEach(Array(photos.enumerated()), id: \.offset) { index, photoURL in
-                    ZoomablePhotoView(
-                        url: URL(string: photoURL),
-                        isCurrentPhoto: index == selectedIndex
-                    )
-                    .tag(index)
-                }
-            }
-            .tabViewStyle(.page(indexDisplayMode: .automatic))
-            .indexViewStyle(.page(backgroundDisplayMode: .always))
-            // PERFORMANCE: Preload adjacent photos when index changes
-            .onChange(of: selectedIndex) { newIndex in
-                ImageCache.shared.prefetchAdjacentPhotos(photos: photos, currentIndex: newIndex)
-            }
-
-            // Close button and counter overlay
-            VStack {
-                HStack {
-                    // Close button
-                    Button {
-                        HapticManager.shared.impact(.light)
-                        isPresented = false
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.title3.weight(.semibold))
-                            .foregroundColor(.white)
-                            .frame(width: 40, height: 40)
-                            .background(Color.black.opacity(0.5))
-                            .clipShape(Circle())
+                // PERFORMANCE: Photo carousel with smooth swiping
+                TabView(selection: $selectedIndex) {
+                    ForEach(Array(photos.enumerated()), id: \.offset) { index, photoURL in
+                        ZoomablePhotoView(
+                            url: URL(string: photoURL),
+                            isCurrentPhoto: index == selectedIndex
+                        )
+                        .tag(index)
                     }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .automatic))
+                .indexViewStyle(.page(backgroundDisplayMode: .always))
+                // Apply dismiss offset and scale
+                .offset(y: dismissDragOffset)
+                .scaleEffect(dismissScale)
+                // PERFORMANCE: Preload adjacent photos when index changes
+                .onChange(of: selectedIndex) { newIndex in
+                    ImageCache.shared.prefetchAdjacentPhotos(photos: photos, currentIndex: newIndex)
+                }
+
+                // Close button and counter overlay
+                VStack {
+                    HStack {
+                        // Close button
+                        Button {
+                            HapticManager.shared.impact(.light)
+                            isPresented = false
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.title3.weight(.semibold))
+                                .foregroundColor(.white)
+                                .frame(width: 40, height: 40)
+                                .background(Color.black.opacity(0.5))
+                                .clipShape(Circle())
+                        }
+
+                        Spacer()
+
+                        // Photo counter
+                        Text("\(selectedIndex + 1) / \(photos.count)")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.black.opacity(0.5))
+                            .cornerRadius(20)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 60)
 
                     Spacer()
-
-                    // Photo counter
-                    Text("\(selectedIndex + 1) / \(photos.count)")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.black.opacity(0.5))
-                        .cornerRadius(20)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 60)
-
-                Spacer()
+                .opacity(controlsOpacity)
             }
+            // Swipe-down to dismiss gesture
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        // Only allow downward drag for dismiss
+                        if value.translation.height > 0 {
+                            dismissDragOffset = value.translation.height
+                        }
+                    }
+                    .onEnded { value in
+                        if value.translation.height > dismissThreshold {
+                            // Dismiss with animation
+                            isDismissing = true
+                            HapticManager.shared.impact(.light)
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                dismissDragOffset = geometry.size.height
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                isPresented = false
+                            }
+                        } else {
+                            // Snap back
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                dismissDragOffset = 0
+                            }
+                        }
+                    }
+            )
         }
         .statusBarHidden()
         // PERFORMANCE: Preload adjacent photos on appear
         .onAppear {
             ImageCache.shared.prefetchAdjacentPhotos(photos: photos, currentIndex: selectedIndex)
         }
+    }
+
+    // Computed properties for smooth dismiss animation
+    private var backgroundOpacity: Double {
+        let progress = min(dismissDragOffset / dismissThreshold, 1.0)
+        return 1.0 - (progress * 0.5)
+    }
+
+    private var dismissScale: CGFloat {
+        let progress = min(dismissDragOffset / dismissThreshold, 1.0)
+        return 1.0 - (progress * 0.1)
+    }
+
+    private var controlsOpacity: Double {
+        let progress = min(dismissDragOffset / dismissThreshold, 1.0)
+        return 1.0 - progress
     }
 }
 
