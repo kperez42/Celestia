@@ -51,10 +51,6 @@ struct SavedProfilesView: View {
         .task {
             await viewModel.loadSavedProfiles()
             await viewModel.loadSavedYouProfiles()
-            // Success haptic when profiles load
-            if !viewModel.savedProfiles.isEmpty {
-                HapticManager.shared.notification(.success)
-            }
         }
         .onAppear {
             // Refresh data when tab becomes visible, but only if not currently loading
