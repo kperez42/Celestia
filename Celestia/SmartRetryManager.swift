@@ -351,6 +351,8 @@ class SmartRetryManager: ObservableObject {
                 return true
             case .rateLimitExceeded:
                 return true
+            case .tlsError:
+                return false // TLS errors are certificate issues, not retryable
             case .unauthorized, .invalidURL, .invalidResponse, .httpError:
                 return false
             }
