@@ -25,7 +25,24 @@ class AnalyticsServiceEnhanced: ObservableObject {
     // FIXED: Use lazy to avoid circular dependency crash during singleton initialization
     private lazy var abTesting = ABTestingManager.shared
 
-    private init() {}
+    // MEMORY FIX: Batch analytics events to reduce Firestore writes and memory pressure
+    private var eventBatch: [[String: Any]] = []
+    private var batchTimer: Timer?
+    private let batchSize = 20 // Write after 20 events
+    private let batchInterval: TimeInterval = 30.0 // Or after 30 seconds
+
+    // MEMORY FIX: Track recent events to deduplicate rapid-fire identical events
+    private var recentEvents: [(event: String, timestamp: Date)] = []
+    private let deduplicationWindow: TimeInterval = 1.0 // 1 second window
+
+    // MEMORY FIX: Monitor system memory pressure
+    private var isMemoryPressureHigh = false
+    private var memoryPressureSource: DispatchSourceMemoryPressure?
+
+    private init() {
+        setupMemoryPressureMonitoring()
+        startBatchTimer()
+    }
 
     // MARK: - Profile View Heatmap
 
@@ -523,20 +540,125 @@ class AnalyticsServiceEnhanced: ObservableObject {
         return recommendations
     }
 
+    // MARK: - Memory Management
+
+    /// Sets up memory pressure monitoring to disable Firestore analytics writes when memory is low
+    private func setupMemoryPressureMonitoring() {
+        let source = DispatchSource.makeMemoryPressureSource(eventMask: [.warning, .critical], queue: .main)
+
+        source.setEventHandler { [weak self] in
+            guard let self = self else { return }
+            let event = source.mask
+
+            if event.contains(.critical) || event.contains(.warning) {
+                self.isMemoryPressureHigh = true
+                Logger.shared.warning("Memory pressure high - disabling Firestore analytics writes", category: .performance)
+                // Flush existing batch immediately to free memory
+                Task { await self.flushEventBatch() }
+            } else {
+                self.isMemoryPressureHigh = false
+                Logger.shared.info("Memory pressure normalized - re-enabling Firestore analytics", category: .performance)
+            }
+        }
+
+        source.resume()
+        self.memoryPressureSource = source
+    }
+
+    /// Starts the batch timer to periodically flush analytics events
+    private func startBatchTimer() {
+        batchTimer = Timer.scheduledTimer(withTimeInterval: batchInterval, repeats: true) { [weak self] _ in
+            Task { [weak self] in
+                await self?.flushEventBatch()
+            }
+        }
+    }
+
+    /// Flushes the batched analytics events to Firestore
+    private func flushEventBatch() async {
+        guard !eventBatch.isEmpty else { return }
+
+        // Don't write to Firestore if memory pressure is high
+        guard !isMemoryPressureHigh else {
+            Logger.shared.warning("Skipping Firestore analytics write due to memory pressure", category: .performance)
+            eventBatch.removeAll(keepingCapacity: true)
+            return
+        }
+
+        let eventsToWrite = eventBatch
+        eventBatch.removeAll(keepingCapacity: true)
+
+        // Write in batch to reduce Firestore operations
+        let batch = db.batch()
+        for eventData in eventsToWrite {
+            let docRef = db.collection("analytics_events").document()
+            batch.setData(eventData, forDocument: docRef)
+        }
+
+        do {
+            try await batch.commit()
+            Logger.shared.debug("Flushed \(eventsToWrite.count) analytics events to Firestore", category: .analytics)
+        } catch {
+            Logger.shared.error("Failed to flush analytics batch", category: .analytics, error: error)
+        }
+    }
+
+    /// Checks if an event was recently logged (for deduplication)
+    private func isDuplicateEvent(_ event: String) -> Bool {
+        let now = Date()
+
+        // Clean up old events from deduplication cache
+        recentEvents.removeAll { now.timeIntervalSince($0.timestamp) > deduplicationWindow }
+
+        // Check if this event was logged recently
+        let isDuplicate = recentEvents.contains { $0.event == event }
+
+        if !isDuplicate {
+            recentEvents.append((event, now))
+        }
+
+        return isDuplicate
+    }
+
     // MARK: - Analytics Tracking
 
     func trackEvent(_ event: AnalyticsEvent, properties: [String: Any] = [:]) {
+        // Always log to Firebase Analytics (lightweight, in-memory)
         Analytics.logEvent(event.rawValue, parameters: properties)
 
-        // Also log to Firestore for custom analytics
+        // MEMORY FIX: Deduplicate rapid-fire identical events
+        if isDuplicateEvent(event.rawValue) {
+            Logger.shared.debug("Skipping duplicate analytics event: \(event.rawValue)", category: .analytics)
+            return
+        }
+
+        // MEMORY FIX: Batch Firestore writes instead of writing each event individually
+        // This reduces network calls, Task allocations, and memory pressure
+        let eventData: [String: Any] = [
+            "event": event.rawValue,
+            "properties": properties,
+            "userId": AuthService.shared.currentUser?.id ?? "",
+            "timestamp": FieldValue.serverTimestamp(),
+            "variant": abTesting.getCurrentVariant(for: "main_experiment")
+        ]
+
+        eventBatch.append(eventData)
+
+        // Flush if batch size reached
+        if eventBatch.count >= batchSize {
+            Task {
+                await flushEventBatch()
+            }
+        }
+    }
+
+    deinit {
+        // Flush remaining events before deallocating
+        batchTimer?.invalidate()
+        memoryPressureSource?.cancel()
+
         Task {
-            try? await db.collection("analytics_events").addDocument(data: [
-                "event": event.rawValue,
-                "properties": properties,
-                "userId": AuthService.shared.currentUser?.id ?? "",
-                "timestamp": FieldValue.serverTimestamp(),
-                "variant": abTesting.getCurrentVariant(for: "main_experiment")
-            ])
+            await flushEventBatch()
         }
     }
 
