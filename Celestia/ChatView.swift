@@ -177,20 +177,31 @@ struct ChatView: View {
             )
 
             // Profile image
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [Color.purple.opacity(0.7), Color.pink.opacity(0.6)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .frame(width: 40, height: 40)
-                .overlay(
-                    Text(otherUserData.fullName.prefix(1))
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(.white)
-                )
+            Button {
+                showingUserProfile = true
+                HapticManager.shared.impact(.light)
+            } label: {
+                if let photoURL = otherUserData.photos.first, let url = URL(string: photoURL) {
+                    CachedCardImage(url: url, priority: .immediate)
+                        .frame(width: 40, height: 40)
+                        .clipShape(Circle())
+                } else {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.purple.opacity(0.7), Color.pink.opacity(0.6)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 40, height: 40)
+                        .overlay(
+                            Text(otherUserData.fullName.prefix(1))
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(.white)
+                        )
+                }
+            }
 
             // Name and status
             VStack(alignment: .leading, spacing: 2) {
@@ -198,16 +209,12 @@ struct ChatView: View {
                     Text(otherUserData.fullName)
                         .font(.headline)
                         .foregroundColor(.primary)
+                        .lineLimit(1)
 
                     if otherUserData.isVerified {
                         Image(systemName: "checkmark.seal.fill")
                             .font(.system(size: 12))
                             .foregroundColor(.blue)
-                    }
-
-                    // Safety score badge
-                    if let safetyReport = conversationSafetyReport {
-                        safetyScoreBadge(report: safetyReport)
                     }
                 }
 
