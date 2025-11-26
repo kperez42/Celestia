@@ -813,6 +813,7 @@ struct CachedCardImage: View {
             loadTask?.cancel()
             loadTask = nil
         }
+        }
     }
 
     private func loadImage() {
