@@ -43,7 +43,9 @@ class FirebaseManager: ObservableObject {
             guard let self = self else { return }
 
             Task { @MainActor in
-                if let data = snapshot?.data() {
+                if var data = snapshot?.data() {
+                    // Include document ID in data (Firestore doesn't include it automatically)
+                    data["id"] = uid
                     self.currentUser = User(dictionary: data)
                 }
             }

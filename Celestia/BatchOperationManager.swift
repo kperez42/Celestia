@@ -101,6 +101,16 @@ class BatchOperationManager {
     // In-memory cache of pending operations (for performance)
     private var pendingOperations: [String: BatchOperationLog] = [:]
 
+    // AUDIT FIX: Track partially succeeded document IDs for each operation
+    private var partialSuccessTracking: [String: Set<String>] = [:]
+
+    // AUDIT FIX: Network monitor for connectivity check
+    private let networkMonitor = NetworkMonitor.shared
+
+    // AUDIT FIX: Track recently completed operations for true idempotency
+    private var recentlyCompletedOperations: [String: Date] = [:]
+    private let idempotencyWindowSeconds: TimeInterval = 300 // 5 minutes
+
     private init() {
         // On initialization, recover any pending operations
         Task {
@@ -115,16 +125,31 @@ class BatchOperationManager {
         userId: String,
         messageDocuments: [DocumentSnapshot]
     ) async throws {
-        // Generate idempotency key
+        // AUDIT FIX: Check network connectivity first
+        guard networkMonitor.isConnected else {
+            Logger.shared.warning("Cannot mark messages as read - offline", category: .messaging)
+            throw CelestiaError.noInternetConnection
+        }
+
+        // AUDIT FIX: Generate truly idempotent key using document IDs
+        let documentIds = messageDocuments.map { $0.documentID }
         let operationId = generateIdempotencyKey(
             operation: "markAsRead",
             matchId: matchId,
-            userId: userId
+            userId: userId,
+            documentIds: documentIds
         )
 
-        // Check if operation already completed
+        // AUDIT FIX: Check in-memory idempotency cache first (faster)
+        if wasRecentlyCompleted(operationId) {
+            Logger.shared.info("Operation \(operationId) recently completed (idempotent)", category: .messaging)
+            return
+        }
+
+        // Check Firestore for operation completion
         if await isOperationCompleted(operationId) {
             Logger.shared.info("Operation \(operationId) already completed (idempotent)", category: .messaging)
+            markOperationCompleted(operationId)
             return
         }
 
@@ -174,16 +199,31 @@ class BatchOperationManager {
         userId: String,
         messageDocuments: [DocumentSnapshot]
     ) async throws {
-        // Generate idempotency key
+        // AUDIT FIX: Check network connectivity first
+        guard networkMonitor.isConnected else {
+            Logger.shared.warning("Cannot mark messages as delivered - offline", category: .messaging)
+            throw CelestiaError.noInternetConnection
+        }
+
+        // AUDIT FIX: Generate truly idempotent key using document IDs
+        let documentIds = messageDocuments.map { $0.documentID }
         let operationId = generateIdempotencyKey(
             operation: "markAsDelivered",
             matchId: matchId,
-            userId: userId
+            userId: userId,
+            documentIds: documentIds
         )
 
-        // Check if operation already completed
+        // AUDIT FIX: Check in-memory idempotency cache first (faster)
+        if wasRecentlyCompleted(operationId) {
+            Logger.shared.info("Operation \(operationId) recently completed (idempotent)", category: .messaging)
+            return
+        }
+
+        // Check Firestore for operation completion
         if await isOperationCompleted(operationId) {
             Logger.shared.info("Operation \(operationId) already completed (idempotent)", category: .messaging)
+            markOperationCompleted(operationId)
             return
         }
 
@@ -227,16 +267,31 @@ class BatchOperationManager {
         matchId: String,
         messageDocuments: [DocumentSnapshot]
     ) async throws {
-        // Generate idempotency key
+        // AUDIT FIX: Check network connectivity first
+        guard networkMonitor.isConnected else {
+            Logger.shared.warning("Cannot delete messages - offline", category: .messaging)
+            throw CelestiaError.noInternetConnection
+        }
+
+        // AUDIT FIX: Generate truly idempotent key using document IDs
+        let documentIds = messageDocuments.map { $0.documentID }
         let operationId = generateIdempotencyKey(
             operation: "deleteMessages",
             matchId: matchId,
-            userId: nil
+            userId: nil,
+            documentIds: documentIds
         )
 
-        // Check if operation already completed
+        // AUDIT FIX: Check in-memory idempotency cache first (faster)
+        if wasRecentlyCompleted(operationId) {
+            Logger.shared.info("Operation \(operationId) recently completed (idempotent)", category: .messaging)
+            return
+        }
+
+        // Check Firestore for operation completion
         if await isOperationCompleted(operationId) {
             Logger.shared.info("Operation \(operationId) already completed (idempotent)", category: .messaging)
+            markOperationCompleted(operationId)
             return
         }
 
@@ -295,8 +350,15 @@ class BatchOperationManager {
                 currentLog.status = .completed
                 await updateOperationLog(currentLog)
 
+                // AUDIT FIX: Mark in idempotency cache
+                markOperationCompleted(currentLog.id)
+
                 // Clean up from pending operations cache
                 pendingOperations.removeValue(forKey: currentLog.id)
+                partialSuccessTracking.removeValue(forKey: currentLog.id)
+
+                // AUDIT FIX: Post notification for UI update
+                postStatusChangeNotification(for: currentLog)
 
                 Logger.shared.info(
                     "Batch operation \(currentLog.id) completed successfully on attempt \(attempt + 1)",
@@ -355,10 +417,40 @@ class BatchOperationManager {
 
     // MARK: - Idempotency
 
-    private func generateIdempotencyKey(operation: String, matchId: String, userId: String?) -> String {
-        // Create deterministic key based on operation parameters
-        let components = [operation, matchId, userId ?? ""].joined(separator: "_")
-        return "\(components)_\(Date().timeIntervalSince1970)"
+    /// AUDIT FIX: Generate truly idempotent key based on operation parameters only (no timestamp)
+    /// Uses message document IDs to create a unique but deterministic key
+    private func generateIdempotencyKey(
+        operation: String,
+        matchId: String,
+        userId: String?,
+        documentIds: [String]
+    ) -> String {
+        // Sort document IDs for consistent ordering
+        let sortedDocIds = documentIds.sorted().joined(separator: ",")
+        let components = [operation, matchId, userId ?? "", sortedDocIds].joined(separator: "_")
+
+        // Hash the components for a shorter, consistent key
+        let hash = components.hashValue
+        return "\(operation)_\(matchId)_\(abs(hash))"
+    }
+
+    /// AUDIT FIX: Check if operation was recently completed (true idempotency)
+    private func wasRecentlyCompleted(_ operationId: String) -> Bool {
+        cleanupExpiredIdempotencyRecords()
+        return recentlyCompletedOperations[operationId] != nil
+    }
+
+    /// AUDIT FIX: Mark operation as completed for idempotency window
+    private func markOperationCompleted(_ operationId: String) {
+        recentlyCompletedOperations[operationId] = Date()
+    }
+
+    /// AUDIT FIX: Clean up expired idempotency records
+    private func cleanupExpiredIdempotencyRecords() {
+        let now = Date()
+        recentlyCompletedOperations = recentlyCompletedOperations.filter { (_, completedAt) in
+            now.timeIntervalSince(completedAt) < idempotencyWindowSeconds
+        }
     }
 
     private func isOperationCompleted(_ operationId: String) async -> Bool {
@@ -436,6 +528,14 @@ class BatchOperationManager {
     private func recoverPendingOperations() async {
         Logger.shared.info("Recovering pending batch operations...", category: .messaging)
 
+        // AUDIT FIX: Wait for network before attempting recovery
+        guard networkMonitor.isConnected else {
+            Logger.shared.info("Offline - deferring recovery until network available", category: .messaging)
+            // Schedule retry when network becomes available
+            scheduleRecoveryOnNetworkRestore()
+            return
+        }
+
         do {
             // Find operations that are pending or in-progress
             let snapshot = try await db.collection("batch_operation_logs")
@@ -454,7 +554,7 @@ class BatchOperationManager {
                     continue
                 }
 
-                let operationLog = BatchOperationLog(
+                var operationLog = BatchOperationLog(
                     id: doc.documentID,
                     operationType: operationType,
                     documentRefs: documentRefs,
@@ -469,16 +569,128 @@ class BatchOperationManager {
                 // Only retry if we haven't exhausted retries
                 if retryCount < maxRetries {
                     Logger.shared.info("Retrying pending operation: \(operationLog.id)", category: .messaging)
-                    // Note: In production, you'd reconstruct the actual batch operation here
-                    // For now, we just log it for manual intervention
+
+                    // AUDIT FIX: Actually retry the operation
+                    do {
+                        try await retryOperation(operationLog)
+                        Logger.shared.info("Successfully recovered operation: \(operationLog.id)", category: .messaging)
+                    } catch {
+                        operationLog.retryCount += 1
+                        if operationLog.retryCount >= maxRetries {
+                            operationLog.status = .retriesExhausted
+                            Logger.shared.error("Recovery failed for operation \(operationLog.id) - retries exhausted", category: .messaging, error: error)
+                        } else {
+                            operationLog.status = .failed
+                            Logger.shared.warning("Recovery attempt failed for operation \(operationLog.id), will retry", category: .messaging)
+                        }
+                        await updateOperationLog(operationLog)
+                    }
                 } else {
                     Logger.shared.warning("Operation \(operationLog.id) exhausted retries during recovery", category: .messaging)
+                    operationLog.status = .retriesExhausted
+                    await updateOperationLog(operationLog)
                 }
             }
 
         } catch {
             Logger.shared.error("Failed to recover pending operations", category: .messaging, error: error)
         }
+    }
+
+    /// AUDIT FIX: Schedule recovery when network is restored
+    private var networkObserver: NSObjectProtocol?
+
+    private func scheduleRecoveryOnNetworkRestore() {
+        // Remove existing observer if any
+        if let observer = networkObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+
+        networkObserver = NotificationCenter.default.addObserver(
+            forName: .networkConnectionRestored,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                // Remove observer after triggering
+                if let observer = self?.networkObserver {
+                    NotificationCenter.default.removeObserver(observer)
+                    self?.networkObserver = nil
+                }
+                await self?.recoverPendingOperations()
+            }
+        }
+    }
+
+    /// AUDIT FIX: Retry a specific operation by reconstructing the batch from document refs
+    private func retryOperation(_ log: BatchOperationLog) async throws {
+        let batch = db.batch()
+
+        for refPath in log.documentRefs {
+            let docRef = db.document(refPath)
+
+            switch log.operationType {
+            case "markAsRead":
+                batch.updateData([
+                    "isRead": true,
+                    "isDelivered": true,
+                    "readAt": FieldValue.serverTimestamp()
+                ], forDocument: docRef)
+
+            case "markAsDelivered":
+                batch.updateData([
+                    "isDelivered": true,
+                    "deliveredAt": FieldValue.serverTimestamp()
+                ], forDocument: docRef)
+
+            case "deleteMessages":
+                batch.deleteDocument(docRef)
+
+            default:
+                Logger.shared.warning("Unknown operation type for recovery: \(log.operationType)", category: .messaging)
+                continue
+            }
+        }
+
+        try await batch.commit()
+
+        // Update log to completed
+        var completedLog = log
+        completedLog.status = .completed
+        await updateOperationLog(completedLog)
+        markOperationCompleted(log.id)
+        postStatusChangeNotification(for: completedLog)
+    }
+
+    // MARK: - Notifications
+
+    /// AUDIT FIX: Post notification when read/delivered status changes
+    private func postStatusChangeNotification(for log: BatchOperationLog) {
+        let notificationName: Notification.Name
+        var userInfo: [String: Any] = [
+            "matchId": log.matchId ?? "",
+            "operationId": log.id
+        ]
+
+        switch log.operationType {
+        case "markAsRead":
+            notificationName = .messagesMarkedAsRead
+            userInfo["documentCount"] = log.documentRefs.count
+        case "markAsDelivered":
+            notificationName = .messagesMarkedAsDelivered
+            userInfo["documentCount"] = log.documentRefs.count
+        case "deleteMessages":
+            notificationName = .messagesDeleted
+            userInfo["documentCount"] = log.documentRefs.count
+        default:
+            return // Unknown operation type
+        }
+
+        NotificationCenter.default.post(
+            name: notificationName,
+            object: nil,
+            userInfo: userInfo
+        )
     }
 
     // MARK: - Cleanup
@@ -506,4 +718,17 @@ class BatchOperationManager {
             Logger.shared.error("Failed to cleanup old operation logs", category: .messaging, error: error)
         }
     }
+}
+
+// MARK: - Notification Names for Batch Operations
+
+extension Notification.Name {
+    /// Posted when messages are successfully marked as read
+    static let messagesMarkedAsRead = Notification.Name("messagesMarkedAsRead")
+    /// Posted when messages are successfully marked as delivered
+    static let messagesMarkedAsDelivered = Notification.Name("messagesMarkedAsDelivered")
+    /// Posted when messages are successfully deleted
+    static let messagesDeleted = Notification.Name("messagesDeleted")
+    /// Posted when a batch operation fails after all retries
+    static let batchOperationFailed = Notification.Name("batchOperationFailed")
 }

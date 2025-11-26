@@ -47,6 +47,7 @@ struct EditProfileView: View {
     @State private var userId: String = ""
 
     // Advanced profile fields
+    @State private var educationLevel: String?
     @State private var height: Int?
     @State private var religion: String?
     @State private var relationshipGoal: String?
@@ -56,15 +57,20 @@ struct EditProfileView: View {
     @State private var exercise: String?
     @State private var diet: String?
 
+    // Preference fields
+    @State private var ageRangeMin: Int
+    @State private var ageRangeMax: Int
+
     let genderOptions = ["Male", "Female", "Non-binary", "Other"]
     let lookingForOptions = ["Men", "Women", "Everyone"]
+    let educationOptions = ["Prefer not to say", "High School", "Some College", "Associate's", "Bachelor's", "Master's", "Doctorate", "Trade School"]
     let religionOptions = ["Prefer not to say", "Agnostic", "Atheist", "Buddhist", "Catholic", "Christian", "Hindu", "Jewish", "Muslim", "Spiritual", "Other"]
-    let relationshipGoalOptions = ["Prefer not to say", "Casual dating", "Relationship", "Long-term partner", "Marriage", "Open to anything"]
-    let smokingOptions = ["Prefer not to say", "Non-smoker", "Social smoker", "Regular smoker", "Trying to quit"]
-    let drinkingOptions = ["Prefer not to say", "Non-drinker", "Social drinker", "Regular drinker"]
-    let petsOptions = ["Prefer not to say", "No pets", "Dog", "Cat", "Dog & Cat", "Other pets"]
-    let exerciseOptions = ["Prefer not to say", "Never", "Sometimes", "Often", "Daily"]
-    let dietOptions = ["Prefer not to say", "Anything", "Vegetarian", "Vegan", "Pescatarian", "Halal", "Kosher", "Other"]
+    let relationshipGoalOptions = ["Prefer not to say", "Casual Dating", "Long-term Relationship", "Marriage", "Friendship", "Not Sure Yet"]
+    let smokingOptions = ["Prefer not to say", "Never", "Socially", "Regularly", "Trying to Quit"]
+    let drinkingOptions = ["Prefer not to say", "Never", "Rarely", "Socially", "Regularly"]
+    let petsOptions = ["Prefer not to say", "No Pets", "Dog", "Cat", "Both", "Other Pets", "Want Pets"]
+    let exerciseOptions = ["Prefer not to say", "Never", "Rarely", "Sometimes", "Often", "Daily"]
+    let dietOptions = ["Prefer not to say", "No Restrictions", "Vegan", "Vegetarian", "Pescatarian", "Kosher", "Halal"]
     let predefinedLanguages = [
         "English", "Spanish", "French", "German", "Italian", "Portuguese",
         "Russian", "Chinese", "Japanese", "Korean", "Arabic", "Hindi"
@@ -97,6 +103,7 @@ struct EditProfileView: View {
         _photos = State(initialValue: user?.photos ?? [])
 
         // Initialize advanced profile fields
+        _educationLevel = State(initialValue: user?.educationLevel)
         _height = State(initialValue: user?.height)
         _religion = State(initialValue: user?.religion)
         _relationshipGoal = State(initialValue: user?.relationshipGoal)
@@ -105,6 +112,10 @@ struct EditProfileView: View {
         _pets = State(initialValue: user?.pets)
         _exercise = State(initialValue: user?.exercise)
         _diet = State(initialValue: user?.diet)
+
+        // Initialize preference fields
+        _ageRangeMin = State(initialValue: user?.ageRangeMin ?? 18)
+        _ageRangeMax = State(initialValue: user?.ageRangeMax ?? 99)
     }
     
     var body: some View {
@@ -252,7 +263,7 @@ struct EditProfileView: View {
     private var profilePhotoSection: some View {
         VStack(spacing: 15) {
             ZStack(alignment: .bottomTrailing) {
-                // Profile Image
+                // Profile Image - PERFORMANCE: Use CachedAsyncImage
                 Group {
                     if let profileImage = profileImage {
                         Image(uiImage: profileImage)
@@ -261,16 +272,17 @@ struct EditProfileView: View {
                     } else if let currentUser = authService.currentUser,
                               let imageURL = URL(string: currentUser.profileImageURL),
                               !currentUser.profileImageURL.isEmpty {
-                        AsyncImage(url: imageURL) { phase in
-                            switch phase {
-                            case .success(let image):
+                        CachedAsyncImage(
+                            url: imageURL,
+                            content: { image in
                                 image
                                     .resizable()
                                     .scaledToFill()
-                            default:
+                            },
+                            placeholder: {
                                 placeholderImage
                             }
-                        }
+                        )
                     } else {
                         placeholderImage
                     }
@@ -830,7 +842,7 @@ struct EditProfileView: View {
     // MARK: - Preferences Section
 
     private var preferencesSection: some View {
-        VStack(spacing: 15) {
+        VStack(spacing: 20) {
             SectionHeader(icon: "heart.fill", title: "Dating Preferences", color: .pink)
 
             VStack(alignment: .leading, spacing: 8) {
@@ -846,6 +858,58 @@ struct EditProfileView: View {
                 }
                 .pickerStyle(.segmented)
             }
+
+            // Age Range Preference
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("Age Range")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+
+                    Spacer()
+
+                    Text("\(ageRangeMin) - \(ageRangeMax) years")
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundColor(.pink)
+                }
+
+                HStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Min: \(ageRangeMin)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        Slider(value: Binding(
+                            get: { Double(ageRangeMin) },
+                            set: {
+                                let newValue = Int($0)
+                                ageRangeMin = min(newValue, ageRangeMax - 1)
+                            }
+                        ), in: 18...98, step: 1)
+                        .tint(.pink)
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Max: \(ageRangeMax)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        Slider(value: Binding(
+                            get: { Double(ageRangeMax) },
+                            set: {
+                                let newValue = Int($0)
+                                ageRangeMax = max(newValue, ageRangeMin + 1)
+                            }
+                        ), in: 19...99, step: 1)
+                        .tint(.pink)
+                    }
+                }
+            }
+            .padding()
+            .background(Color.pink.opacity(0.05))
+            .cornerRadius(12)
         }
         .padding(20)
         .background(Color.white)
@@ -884,6 +948,27 @@ struct EditProfileView: View {
                         .font(.caption)
                         .foregroundColor(.gray)
                 }
+            }
+
+            // Education
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Education")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+
+                Picker("Education", selection: Binding(
+                    get: { educationLevel ?? "Prefer not to say" },
+                    set: { educationLevel = $0 == "Prefer not to say" ? nil : $0 }
+                )) {
+                    ForEach(educationOptions, id: \.self) { option in
+                        Text(option).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
             }
 
             // Relationship Goal
@@ -1342,6 +1427,7 @@ struct EditProfileView: View {
                 user.photos = photos
 
                 // Update advanced profile fields
+                user.educationLevel = educationLevel
                 user.height = height
                 user.religion = religion
                 user.relationshipGoal = relationshipGoal
@@ -1350,6 +1436,10 @@ struct EditProfileView: View {
                 user.pets = pets
                 user.exercise = exercise
                 user.diet = diet
+
+                // Update preference fields
+                user.ageRangeMin = ageRangeMin
+                user.ageRangeMax = ageRangeMax
 
                 try await authService.updateUser(user)
                 
@@ -1548,15 +1638,22 @@ struct EditProfileView: View {
 
             do {
                 user.photos = photos
+
+                // Auto-set profileImageURL to first photo if empty
+                if user.profileImageURL.isEmpty, let firstPhoto = photos.first, !firstPhoto.isEmpty {
+                    user.profileImageURL = firstPhoto
+                    Logger.shared.info("📸 Auto-set profileImageURL to first uploaded photo", category: .general)
+                }
+
                 try await authService.updateUser(user)
 
                 Logger.shared.info("✅ Successfully saved \(successCount) photos to Firebase!", category: .general)
                 Logger.shared.info("User photos in Firebase: \(user.photos)", category: .general)
 
                 // CRITICAL FIX: Force refresh current user from Firebase to get latest data
-                if let userId = user.id {
+                if user.id != nil {
                     Logger.shared.info("🔄 Refreshing user data from Firebase...", category: .general)
-                    try? await authService.fetchUser(userId: userId)
+                    await authService.fetchUser()
 
                     // Verify the refresh worked
                     if let refreshedUser = authService.currentUser {
@@ -1615,9 +1712,9 @@ struct EditProfileView: View {
     // MARK: - Image Optimization
 
     private func optimizeImageForUpload(_ image: UIImage) -> UIImage {
-        // PERFORMANCE: Optimized for fast uploads with minimal quality loss
-        let maxDimension: CGFloat = 1024  // Reduced from 1200 for 30% faster uploads
-        let compressionQuality: CGFloat = 0.75  // Optimized balance of quality/size
+        // PERFORMANCE: Higher quality for better looking photos
+        let maxDimension: CGFloat = 1536  // Higher resolution for quality
+        let compressionQuality: CGFloat = 0.85  // Higher quality for better photos
 
         // Calculate new size maintaining aspect ratio
         let size = image.size
@@ -2055,30 +2152,22 @@ struct PhotoGridItem: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            // Photo
-            AsyncImage(url: URL(string: photoURL)) { phase in
-                switch phase {
-                case .success(let image):
+            // Photo - PERFORMANCE: Use CachedAsyncImage
+            CachedAsyncImage(
+                url: URL(string: photoURL),
+                content: { image in
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                case .failure:
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.2))
-                        .overlay {
-                            Image(systemName: "photo")
-                                .foregroundColor(.gray)
-                        }
-                case .empty:
+                },
+                placeholder: {
                     Rectangle()
                         .fill(Color.gray.opacity(0.1))
                         .overlay {
                             ProgressView()
                         }
-                @unknown default:
-                    EmptyView()
                 }
-            }
+            )
             .frame(height: 120)
             .clipShape(RoundedRectangle(cornerRadius: 12))
 

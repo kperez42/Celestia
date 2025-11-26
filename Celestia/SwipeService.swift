@@ -128,6 +128,11 @@ class SwipeService: ObservableObject, SwipeServiceProtocol {
         return try await repository.getLikesReceived(userId: userId)
     }
 
+    /// Get all users the current user has liked
+    func getLikesSent(userId: String) async throws -> [String] {
+        return try await repository.getLikesSent(userId: userId)
+    }
+
     /// Delete a swipe (for rewind functionality)
     func deleteSwipe(fromUserId: String, toUserId: String) async throws {
         do {

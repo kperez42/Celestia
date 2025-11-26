@@ -13,6 +13,25 @@ import FirebaseFirestore
 // MARK: - Date Extensions
 
 extension Date {
+    // PERFORMANCE: Cached DateFormatters by style to avoid expensive recreation
+    private static var cachedFormatters: [DateFormatter.Style: DateFormatter] = [:]
+    private static let formatterLock = NSLock()
+
+    private static func formatter(for style: DateFormatter.Style) -> DateFormatter {
+        formatterLock.lock()
+        defer { formatterLock.unlock() }
+
+        if let cached = cachedFormatters[style] {
+            return cached
+        }
+
+        let formatter = DateFormatter()
+        formatter.dateStyle = style
+        formatter.timeStyle = .short
+        cachedFormatters[style] = formatter
+        return formatter
+    }
+
     /// Returns a human-readable "time ago" string
     func timeAgo() -> String {
         let interval = Date().timeIntervalSince(self)
@@ -56,13 +75,10 @@ extension Date {
             return "1mo+"
         }
     }
-    
-    /// Format date for display
+
+    /// Format date for display (uses cached formatter for performance)
     func formatted(style: DateFormatter.Style = .medium) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = style
-        formatter.timeStyle = .short
-        return formatter.string(from: self)
+        Self.formatter(for: style).string(from: self)
     }
     
     /// Check if date is today
@@ -313,12 +329,28 @@ extension Array where Element: Identifiable {
 // MARK: - Double Extensions
 
 extension Double {
-    /// Format as currency
-    func asCurrency(locale: Locale = .current) -> String {
+    // PERFORMANCE: Cached NumberFormatters by locale to avoid expensive recreation
+    private static var currencyFormatters: [Locale: NumberFormatter] = [:]
+    private static let currencyFormatterLock = NSLock()
+
+    private static func currencyFormatter(for locale: Locale) -> NumberFormatter {
+        currencyFormatterLock.lock()
+        defer { currencyFormatterLock.unlock() }
+
+        if let cached = currencyFormatters[locale] {
+            return cached
+        }
+
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
         formatter.locale = locale
-        return formatter.string(from: NSNumber(value: self)) ?? "$\(self)"
+        currencyFormatters[locale] = formatter
+        return formatter
+    }
+
+    /// Format as currency (uses cached formatter for performance)
+    func asCurrency(locale: Locale = .current) -> String {
+        Self.currencyFormatter(for: locale).string(from: NSNumber(value: self)) ?? "$\(self)"
     }
     
     /// Round to decimal places

@@ -21,22 +21,59 @@ struct MessagesView: View {
     @State private var showSearch = false
     @State private var selectedMatch: (Match, User)?
     @State private var showingChat = false
-    
-    var conversations: [(Match, User)] {
-        matchService.matches.compactMap { match in
+    @State private var selectedMessageTab = 0
+
+    // PERFORMANCE: Memoized conversation lists to avoid O(n) on every render
+    @State private var cachedConversations: [(Match, User)] = []
+    @State private var cachedReceivedConversations: [(Match, User)] = []
+    @State private var cachedSentConversations: [(Match, User)] = []
+    @State private var cachedFilteredConversations: [(Match, User)] = []
+
+    private let tabs = ["Received", "Sent"]
+
+    // PERFORMANCE: Use cached values
+    var conversations: [(Match, User)] { cachedConversations }
+    var receivedConversations: [(Match, User)] { cachedReceivedConversations }
+    var sentConversations: [(Match, User)] { cachedSentConversations }
+    var filteredConversations: [(Match, User)] { cachedFilteredConversations }
+
+    // PERFORMANCE: Update cached conversations only when dependencies change
+    private func updateCachedConversations() {
+        // Build base conversations
+        cachedConversations = matchService.matches.compactMap { match in
             guard let user = getMatchedUser(match) else { return nil }
             return (match, user)
         }
+
+        let currentUserId = authService.currentUser?.id ?? "current_user"
+
+        // Filter received (other person sent last message or new match)
+        cachedReceivedConversations = cachedConversations.filter { match, _ in
+            guard let lastSenderId = match.lastMessageSenderId else { return true }
+            return lastSenderId != currentUserId
+        }
+
+        // Filter sent (you sent last message)
+        cachedSentConversations = cachedConversations.filter { match, _ in
+            guard let lastSenderId = match.lastMessageSenderId else { return false }
+            return lastSenderId == currentUserId
+        }
+
+        updateFilteredConversations()
     }
-    
-    var filteredConversations: [(Match, User)] {
-        guard !searchDebouncer.debouncedText.isEmpty else { return conversations }
-        return conversations.filter { _, user in
+
+    private func updateFilteredConversations() {
+        let baseConversations = selectedMessageTab == 0 ? cachedReceivedConversations : cachedSentConversations
+        guard !searchDebouncer.debouncedText.isEmpty else {
+            cachedFilteredConversations = baseConversations
+            return
+        }
+        cachedFilteredConversations = baseConversations.filter { _, user in
             user.fullName.localizedCaseInsensitiveContains(searchDebouncer.debouncedText) ||
             user.location.localizedCaseInsensitiveContains(searchDebouncer.debouncedText)
         }
     }
-    
+
     var totalUnread: Int {
         #if DEBUG
         let userId = authService.currentUser?.id ?? "current_user"
@@ -55,20 +92,52 @@ struct MessagesView: View {
                 VStack(spacing: 0) {
                     // Header
                     headerView
-                    
+
+                    // Tab selector
+                    messageTabSelector
+
                     // Search bar
                     if showSearch {
                         searchBar
                             .transition(.move(edge: .top).combined(with: .opacity))
                     }
-                    
+
                     // Content
                     if matchService.isLoading && conversations.isEmpty {
                         loadingView
                     } else if conversations.isEmpty {
                         emptyStateView
                     } else {
-                        conversationsListView
+                        TabView(selection: $selectedMessageTab) {
+                            // Received tab
+                            Group {
+                                if receivedConversations.isEmpty {
+                                    tabEmptyStateView(
+                                        icon: "arrow.down.circle",
+                                        title: "No Messages to Reply",
+                                        subtitle: "When someone messages you, they'll appear here"
+                                    )
+                                } else {
+                                    conversationsListView
+                                }
+                            }
+                            .tag(0)
+
+                            // Sent tab
+                            Group {
+                                if sentConversations.isEmpty {
+                                    tabEmptyStateView(
+                                        icon: "arrow.up.circle",
+                                        title: "No Sent Messages",
+                                        subtitle: "Messages you've sent waiting for replies will appear here"
+                                    )
+                                } else {
+                                    conversationsListView
+                                }
+                            }
+                            .tag(1)
+                        }
+                        .tabViewStyle(.page(indexDisplayMode: .never))
                     }
                 }
             }
@@ -76,11 +145,26 @@ struct MessagesView: View {
             .navigationBarHidden(true)
             .task {
                 await loadData()
+                updateCachedConversations()
             }
             .refreshable {
                 HapticManager.shared.impact(.light)
                 await loadData()
+                updateCachedConversations()
                 HapticManager.shared.notification(.success)
+            }
+            // PERFORMANCE: Update cached conversations only when dependencies change
+            .onChange(of: matchService.matches.count) { _, _ in
+                updateCachedConversations()
+            }
+            .onChange(of: matchedUsers.count) { _, _ in
+                updateCachedConversations()
+            }
+            .onChange(of: selectedMessageTab) { _, _ in
+                updateFilteredConversations()
+            }
+            .onChange(of: searchDebouncer.debouncedText) { _, _ in
+                updateFilteredConversations()
             }
             .sheet(isPresented: $showingChat) {
                 if let selectedMatch = selectedMatch {
@@ -90,7 +174,7 @@ struct MessagesView: View {
                     }
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("OpenChatWithUser"))) { notification in
+            .onReceive(NotificationCenter.default.publisher(for: .openChatWithUser)) { notification in
                 // Open chat with specific user when notification is received
                 guard let userId = notification.userInfo?["userId"] as? String,
                       let user = notification.userInfo?["user"] as? User else {
@@ -162,26 +246,43 @@ struct MessagesView: View {
                                 .font(.largeTitle.weight(.bold))
                                 .foregroundColor(.white)
                             
-                            if !conversations.isEmpty {
-                                HStack(spacing: 6) {
-                                    Text("\(conversations.count)")
+                            HStack(spacing: 8) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "arrow.down.circle.fill")
+                                        .font(.caption)
+                                    Text("\(receivedConversations.count)")
                                         .fontWeight(.semibold)
-                                    Text("chats")
-                                    
-                                    if totalUnread > 0 {
-                                        Text("•")
-                                        HStack(spacing: 4) {
-                                            Circle()
-                                                .fill(Color.white)
-                                                .frame(width: 6, height: 6)
-                                            Text("\(totalUnread) unread")
-                                                .fontWeight(.semibold)
-                                        }
+                                }
+
+                                if sentConversations.count > 0 {
+                                    Circle()
+                                        .fill(Color.white.opacity(0.5))
+                                        .frame(width: 4, height: 4)
+
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "arrow.up.circle.fill")
+                                            .font(.caption)
+                                        Text("\(sentConversations.count) sent")
+                                            .fontWeight(.semibold)
                                     }
                                 }
-                                .font(.subheadline)
-                                .foregroundColor(.white.opacity(0.95))
+
+                                if totalUnread > 0 {
+                                    Circle()
+                                        .fill(Color.white.opacity(0.5))
+                                        .frame(width: 4, height: 4)
+
+                                    HStack(spacing: 4) {
+                                        Circle()
+                                            .fill(Color.white)
+                                            .frame(width: 6, height: 6)
+                                        Text("\(totalUnread) unread")
+                                            .fontWeight(.semibold)
+                                    }
+                                }
                             }
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.95))
                         }
                     }
                     
@@ -236,7 +337,64 @@ struct MessagesView: View {
         }
         .frame(height: 140)
     }
-    
+
+    // MARK: - Tab Selector
+
+    private var messageTabSelector: some View {
+        HStack(spacing: 0) {
+            ForEach(0..<tabs.count, id: \.self) { index in
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        selectedMessageTab = index
+                    }
+                    HapticManager.shared.impact(.light)
+                } label: {
+                    VStack(spacing: 8) {
+                        HStack(spacing: 6) {
+                            Text(tabs[index])
+                                .font(.subheadline)
+                                .fontWeight(selectedMessageTab == index ? .bold : .medium)
+
+                            // Show count badge
+                            let count = index == 0 ? receivedConversations.count : sentConversations.count
+                            if count > 0 {
+                                Text("\(count)")
+                                    .font(.caption2)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(selectedMessageTab == index ? .white : .purple)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(
+                                        Capsule()
+                                            .fill(selectedMessageTab == index ? Color.purple : Color.purple.opacity(0.2))
+                                    )
+                            }
+                        }
+                        .foregroundColor(selectedMessageTab == index ? .primary : .secondary)
+
+                        // Indicator line
+                        Rectangle()
+                            .fill(
+                                selectedMessageTab == index ?
+                                LinearGradient(
+                                    colors: [.purple, .pink],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                ) :
+                                LinearGradient(colors: [Color.clear], startPoint: .leading, endPoint: .trailing)
+                            )
+                            .frame(height: 3)
+                            .cornerRadius(1.5)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(.horizontal)
+        .padding(.top, 8)
+        .background(Color(.systemBackground))
+    }
+
     // MARK: - Search Bar
     
     private var searchBar: some View {
@@ -399,39 +557,61 @@ struct MessagesView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-    
+
+    // MARK: - Tab Empty State
+
+    private func tabEmptyStateView(icon: String, title: String, subtitle: String) -> some View {
+        VStack(spacing: 20) {
+            Spacer()
+
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.purple.opacity(0.15), Color.pink.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 100, height: 100)
+
+                Image(systemName: icon)
+                    .font(.system(size: 40))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+
+            VStack(spacing: 8) {
+                Text(title)
+                    .font(.title3)
+                    .fontWeight(.semibold)
+
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+            }
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     // MARK: - Helper Functions
     
     private func loadData() async {
         // Track performance for messages loading
         let loadStart = Date()
 
-        // Check if we should use test data (no user ID or DEBUG mode)
         guard let userId = authService.currentUser?.id else {
-            // Load test data when no authenticated user
-            #if DEBUG
-            await MainActor.run {
-                matchService.matches = TestData.testMatches.map { $0.match }
-                for (user, match) in TestData.testMatches {
-                    let otherUserId = match.user2Id
-                    matchedUsers[otherUserId] = user
-                }
-            }
-            #endif
             return
         }
-
-        #if DEBUG
-        // Use test data in debug mode even with authenticated user
-        await MainActor.run {
-            matchService.matches = TestData.testMatches.map { $0.match }
-            for (user, match) in TestData.testMatches {
-                let otherUserId = match.user2Id
-                matchedUsers[otherUserId] = user
-            }
-        }
-        return
-        #endif
 
         do {
             try await matchService.fetchMatches(userId: userId)
@@ -468,13 +648,7 @@ struct MessagesView: View {
     }
     
     private func getMatchedUser(_ match: Match) -> User? {
-        #if DEBUG
-        // In debug mode, use "current_user" as default if not authenticated
-        let currentUserId = authService.currentUser?.id ?? "current_user"
-        #else
         guard let currentUserId = authService.currentUser?.id else { return nil }
-        #endif
-
         let otherUserId = match.user1Id == currentUserId ? match.user2Id : match.user1Id
         return matchedUsers[otherUserId]
     }

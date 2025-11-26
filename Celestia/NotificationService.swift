@@ -13,7 +13,7 @@ import FirebaseFirestore
 // MARK: - Notification Service
 
 @MainActor
-class NotificationService: ObservableObject {
+class NotificationService: ObservableObject, ListenerLifecycleAware {
 
     // MARK: - Singleton
 
@@ -26,14 +26,42 @@ class NotificationService: ObservableObject {
     private let messageService = MessageService.shared
     private var listener: ListenerRegistration?
 
+    // LIFECYCLE: Track current user for reconnection
+    private var currentUserId: String?
+
     // MARK: - Published Properties
 
     @Published var notificationHistory: [NotificationData] = []
+
+    // MARK: - ListenerLifecycleAware Conformance
+
+    nonisolated var listenerId: String { "NotificationService" }
+
+    var areListenersActive: Bool {
+        listener != nil
+    }
+
+    func reconnectListeners() {
+        guard let userId = currentUserId else {
+            Logger.shared.debug("NotificationService: No userId for reconnection", category: .general)
+            return
+        }
+        Logger.shared.info("NotificationService: Reconnecting listeners for user: \(userId)", category: .general)
+        listenToNotifications(userId: userId)
+    }
+
+    func pauseListeners() {
+        Logger.shared.info("NotificationService: Pausing listeners", category: .general)
+        listener?.remove()
+        listener = nil
+    }
 
     // MARK: - Initialization
 
     private init() {
         Logger.shared.info("NotificationService initialized", category: .general)
+        // Register with lifecycle manager for automatic reconnection handling
+        ListenerLifecycleManager.shared.register(self)
     }
 
     // MARK: - Public Methods
@@ -410,6 +438,9 @@ extension NotificationService {
 
     /// Listen to notifications for a user from Firestore
     func listenToNotifications(userId: String) {
+        // LIFECYCLE: Store userId for reconnection
+        currentUserId = userId
+
         // Remove existing listener
         listener?.remove()
 

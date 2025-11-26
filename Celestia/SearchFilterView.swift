@@ -496,7 +496,7 @@ struct MultiSelectMenu<T: Hashable>: View {
             if !selections.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack {
-                        ForEach(Array(selections.enumerated()), id: \.offset) { _, item in
+                        ForEach(Array(selections.enumerated()), id: \.0) { _, item in
                             HStack(spacing: 4) {
                                 Text(displayName(item))
                                     .font(.caption)

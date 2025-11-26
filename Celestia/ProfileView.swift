@@ -14,6 +14,9 @@ struct ProfileView: View {
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
 
+    // When true, ProfileView is embedded in another NavigationStack (no nested nav)
+    var isEmbedded: Bool = false
+
     @State private var showingEditProfile = false
     @State private var showingSettings = false
     @State private var showingPremiumUpgrade = false
@@ -27,6 +30,7 @@ struct ProfileView: View {
     @State private var showingShareSheet = false
     @State private var isRefreshing = false
     @State private var hasAnimatedStats = false
+    @State private var showingProfileViewers = false
 
     // Static date formatter for performance
     private static let memberSinceDateFormatter: DateFormatter = {
@@ -34,9 +38,20 @@ struct ProfileView: View {
         formatter.dateStyle = .medium
         return formatter
     }()
-    
+
     var body: some View {
-        NavigationStack {
+        if isEmbedded {
+            profileContent
+                .networkStatusBanner()
+        } else {
+            NavigationStack {
+                profileContent
+            }
+            .networkStatusBanner()
+        }
+    }
+
+    private var profileContent: some View {
             ZStack {
                 Color(.systemGroupedBackground)
                     .ignoresSafeArea()
@@ -97,6 +112,9 @@ struct ProfileView: View {
                                 // Details grid
                                 detailsCard(user: user)
 
+                                // Lifestyle card
+                                lifestyleCard(user: user)
+
                                 // Interests & Languages Section Header
                                 sectionHeader(title: "Interests & Languages", icon: "sparkles")
                                     .padding(.top, 8)
@@ -145,8 +163,9 @@ struct ProfileView: View {
                     profileLoadingView
                 }
             }
-            .navigationTitle("")
-            .navigationBarHidden(true)
+            .navigationTitle(isEmbedded ? "Your Profile" : "")
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarHidden(!isEmbedded)
             .accessibilityIdentifier(AccessibilityIdentifier.profileView)
             .sheet(isPresented: $showingEditProfile, onDismiss: {
                 // CACHE FIX: Force refresh profile data when returning from edit
@@ -182,6 +201,10 @@ struct ProfileView: View {
                 ProfileInsightsView()
                     .environmentObject(authService)
             }
+            .sheet(isPresented: $showingProfileViewers) {
+                ProfileViewersView()
+                    .environmentObject(authService)
+            }
             .confirmationDialog("Are you sure you want to sign out?", isPresented: $showingLogoutConfirmation, titleVisibility: .visible) {
                 Button("Sign Out", role: .destructive) {
                     HapticManager.shared.notification(.warning)
@@ -212,8 +235,6 @@ struct ProfileView: View {
                 context: .profile(userId: authService.currentUser?.id ?? ""),
                 userName: authService.currentUser?.fullName ?? "User"
             )
-        }
-        .networkStatusBanner() // UX: Show offline status
     }
 
     // MARK: - Tip Action Handler
@@ -542,20 +563,28 @@ struct ProfileView: View {
                 label: "Matches",
                 color: .pink
             )
-            
+
             Divider()
                 .frame(height: 40)
-            
-            statCard(
-                icon: "eye.fill",
-                value: "\(user.profileViews)",
-                label: "Views",
-                color: .blue
-            )
-            
+
+            // Tappable Views stat - opens Profile Viewers page
+            Button {
+                showingProfileViewers = true
+                HapticManager.shared.impact(.light)
+            } label: {
+                statCard(
+                    icon: "eye.fill",
+                    value: "\(user.profileViews)",
+                    label: "Views",
+                    color: .blue
+                )
+            }
+            .accessibilityLabel("Profile Views")
+            .accessibilityHint("Tap to see who viewed your profile")
+
             Divider()
                 .frame(height: 40)
-            
+
             statCard(
                 icon: "hand.thumbsup.fill",
                 value: "\(user.likesReceived)",
@@ -1064,6 +1093,31 @@ struct ProfileView: View {
             detailRow(icon: "person.fill", label: "Gender", value: user.gender)
             Divider()
             detailRow(icon: "heart.circle.fill", label: "Looking for", value: user.lookingFor)
+
+            // Height
+            if let height = user.height {
+                Divider()
+                detailRow(icon: "ruler", label: "Height", value: "\(height) cm (\(heightToFeetInches(height)))")
+            }
+
+            // Education
+            if let education = user.educationLevel, education != "Prefer not to say" {
+                Divider()
+                detailRow(icon: "graduationcap.fill", label: "Education", value: education)
+            }
+
+            // Relationship goal
+            if let goal = user.relationshipGoal, goal != "Prefer not to say" {
+                Divider()
+                detailRow(icon: "heart.text.square", label: "Relationship goal", value: goal)
+            }
+
+            // Religion
+            if let religion = user.religion, religion != "Prefer not to say" {
+                Divider()
+                detailRow(icon: "sparkles", label: "Religion", value: religion)
+            }
+
             Divider()
             detailRow(icon: "calendar", label: "Member since", value: formatDate(user.timestamp))
         }
@@ -1072,6 +1126,84 @@ struct ProfileView: View {
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
         .padding(.horizontal, 20)
+    }
+
+    // MARK: - Lifestyle Card
+
+    @ViewBuilder
+    private func lifestyleCard(user: User) -> some View {
+        let hasLifestyle = (user.smoking != nil && user.smoking != "Prefer not to say") ||
+                           (user.drinking != nil && user.drinking != "Prefer not to say") ||
+                           (user.exercise != nil && user.exercise != "Prefer not to say") ||
+                           (user.diet != nil && user.diet != "Prefer not to say") ||
+                           (user.pets != nil && user.pets != "Prefer not to say")
+
+        if hasLifestyle {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 8) {
+                    Image(systemName: "leaf.fill")
+                        .font(.title3)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.green, .mint],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+
+                    Text("Lifestyle")
+                        .font(.title3.weight(.semibold))
+                        .foregroundColor(.primary)
+                }
+
+                VStack(spacing: 12) {
+                    if let smoking = user.smoking, smoking != "Prefer not to say" {
+                        detailRow(icon: "smoke", label: "Smoking", value: smoking)
+                    }
+                    if let drinking = user.drinking, drinking != "Prefer not to say" {
+                        if user.smoking != nil && user.smoking != "Prefer not to say" { Divider() }
+                        detailRow(icon: "wineglass", label: "Drinking", value: drinking)
+                    }
+                    if let exercise = user.exercise, exercise != "Prefer not to say" {
+                        if (user.smoking != nil && user.smoking != "Prefer not to say") ||
+                           (user.drinking != nil && user.drinking != "Prefer not to say") { Divider() }
+                        detailRow(icon: "figure.run", label: "Exercise", value: exercise)
+                    }
+                    if let diet = user.diet, diet != "Prefer not to say" {
+                        if (user.smoking != nil && user.smoking != "Prefer not to say") ||
+                           (user.drinking != nil && user.drinking != "Prefer not to say") ||
+                           (user.exercise != nil && user.exercise != "Prefer not to say") { Divider() }
+                        detailRow(icon: "fork.knife", label: "Diet", value: diet)
+                    }
+                    if let pets = user.pets, pets != "Prefer not to say" {
+                        if (user.smoking != nil && user.smoking != "Prefer not to say") ||
+                           (user.drinking != nil && user.drinking != "Prefer not to say") ||
+                           (user.exercise != nil && user.exercise != "Prefer not to say") ||
+                           (user.diet != nil && user.diet != "Prefer not to say") { Divider() }
+                        detailRow(icon: "pawprint.fill", label: "Pets", value: pets)
+                    }
+                }
+            }
+            .padding(20)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.green.opacity(0.1), lineWidth: 1)
+            )
+            .padding(.horizontal, 20)
+        }
+    }
+
+    // Helper function to convert cm to feet/inches
+    private func heightToFeetInches(_ cm: Int) -> String {
+        let totalInches = Double(cm) / 2.54
+        let feet = Int(totalInches / 12)
+        let inches = Int(totalInches.truncatingRemainder(dividingBy: 12))
+        return "\(feet)'\(inches)\""
     }
 
     private func detailRow(icon: String, label: String, value: String) -> some View {
@@ -1272,18 +1404,6 @@ struct ProfileView: View {
                         .foregroundColor(.secondary)
                     Spacer()
                     Text("\(user.ageRangeMin) - \(user.ageRangeMax)")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                }
-                
-                Divider()
-                
-                HStack {
-                    Text("Max distance")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Text("\(user.maxDistance) km")
                         .font(.subheadline)
                         .fontWeight(.semibold)
                 }
@@ -1550,18 +1670,32 @@ struct PhotoViewerView: View {
     let photos: [String]
     @Binding var selectedIndex: Int
     @Environment(\.dismiss) var dismiss
-    
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            
+
             TabView(selection: $selectedIndex) {
                 ForEach(photos.indices, id: \.self) { index in
                     if let url = URL(string: photos[index]) {
-                        CachedAsyncImage(url: url) { image in
-                            image
-                                .resizable()
-                                .scaledToFit()
+                        GeometryReader { geometry in
+                            CachedAsyncImage(
+                                url: url,
+                                content: { image in
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fit)
+                                        .frame(width: geometry.size.width, height: geometry.size.height)
+                                },
+                                placeholder: {
+                                    ZStack {
+                                        Color.clear
+                                        ProgressView()
+                                            .tint(.white)
+                                            .scaleEffect(1.5)
+                                    }
+                                }
+                            )
                         }
                         .tag(index)
                     } else {
@@ -1575,7 +1709,8 @@ struct PhotoViewerView: View {
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .always))
-            
+            .indexViewStyle(.page(backgroundDisplayMode: .always))
+
             VStack {
                 HStack {
                     Spacer()

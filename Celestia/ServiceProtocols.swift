@@ -101,6 +101,7 @@ protocol SwipeServiceProtocol {
     func passUser(fromUserId: String, toUserId: String) async throws
     func hasSwipedOn(fromUserId: String, toUserId: String) async throws -> (liked: Bool, passed: Bool)
     func getLikesReceived(userId: String) async throws -> [String]
+    func getLikesSent(userId: String) async throws -> [String]
 }
 
 // MARK: - Network Manager Protocol

@@ -15,11 +15,17 @@ struct SavedProfilesView: View {
     @State private var selectedUser: User?
     @State private var showUserDetail = false
     @State private var showClearAllConfirmation = false
+    @State private var selectedTab = 0
+
+    private let tabs = ["All Saved", "Recent", "Saved You"]
 
     var body: some View {
         VStack(spacing: 0) {
             // Custom gradient header (like Messages and Matches)
             headerView
+
+            // Tab selector
+            tabSelector
 
             // Main content
             ZStack {
@@ -33,12 +39,13 @@ struct SavedProfilesView: View {
                 } else if !viewModel.errorMessage.isEmpty {
                     errorStateView
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
-                } else if viewModel.savedProfiles.isEmpty {
-                    emptyStateView
-                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 } else {
-                    profilesGrid
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    TabView(selection: $selectedTab) {
+                        allSavedTab.tag(0)
+                        recentTab.tag(1)
+                        savedYouTab.tag(2)
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
                 }
             }
             .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.isLoading)
@@ -48,6 +55,7 @@ struct SavedProfilesView: View {
         .navigationBarHidden(true)
         .task {
             await viewModel.loadSavedProfiles()
+            await viewModel.loadSavedYouProfiles()
             // Success haptic when profiles load
             if !viewModel.savedProfiles.isEmpty {
                 HapticManager.shared.notification(.success)
@@ -71,6 +79,104 @@ struct SavedProfilesView: View {
             }
         } message: {
             Text("This will permanently remove all \(viewModel.savedProfiles.count) saved profiles. This action cannot be undone.")
+        }
+    }
+
+    // MARK: - Tab Selector
+
+    private var tabSelector: some View {
+        HStack(spacing: 0) {
+            ForEach(0..<tabs.count, id: \.self) { index in
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        selectedTab = index
+                    }
+                    HapticManager.shared.impact(.light)
+                } label: {
+                    VStack(spacing: 8) {
+                        HStack(spacing: 6) {
+                            Text(tabs[index])
+                                .font(.subheadline)
+                                .fontWeight(selectedTab == index ? .bold : .medium)
+
+                            // Show count badge
+                            let count = countForTab(index)
+                            if count > 0 {
+                                Text("\(count)")
+                                    .font(.caption2)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(selectedTab == index ? .white : .orange)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(
+                                        Capsule()
+                                            .fill(selectedTab == index ? Color.orange : Color.orange.opacity(0.2))
+                                    )
+                            }
+                        }
+                        .foregroundColor(selectedTab == index ? .primary : .secondary)
+
+                        // Indicator line
+                        Rectangle()
+                            .fill(
+                                selectedTab == index ?
+                                LinearGradient(
+                                    colors: [.orange, .pink],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                ) :
+                                LinearGradient(colors: [Color.clear], startPoint: .leading, endPoint: .trailing)
+                            )
+                            .frame(height: 3)
+                            .cornerRadius(1.5)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(.horizontal)
+        .padding(.top, 8)
+        .background(Color(.systemBackground))
+    }
+
+    private func countForTab(_ index: Int) -> Int {
+        switch index {
+        case 0: return viewModel.savedProfiles.count
+        case 1: return viewModel.recentProfiles.count
+        case 2: return viewModel.savedYouProfiles.count
+        default: return 0
+        }
+    }
+
+    // MARK: - Tab Content
+
+    private var allSavedTab: some View {
+        Group {
+            if viewModel.savedProfiles.isEmpty {
+                emptyStateView(message: "No saved profiles yet", hint: "Tap the bookmark icon on any profile to save it")
+            } else {
+                profilesGrid(profiles: viewModel.savedProfiles)
+            }
+        }
+    }
+
+    private var recentTab: some View {
+        Group {
+            if viewModel.recentProfiles.isEmpty {
+                emptyStateView(message: "No recent saves", hint: "Profiles saved this week will appear here")
+            } else {
+                profilesGrid(profiles: viewModel.recentProfiles)
+            }
+        }
+    }
+
+    private var savedYouTab: some View {
+        Group {
+            if viewModel.savedYouProfiles.isEmpty {
+                emptyStateView(message: "No one saved you yet", hint: "When someone saves your profile, they'll appear here")
+            } else {
+                savedYouGrid(profiles: viewModel.savedYouProfiles)
+            }
         }
     }
 
@@ -124,21 +230,42 @@ struct SavedProfilesView: View {
                                 .font(.largeTitle.weight(.bold))
                                 .foregroundColor(.white)
 
-                            if !viewModel.savedProfiles.isEmpty {
-                                HStack(spacing: 6) {
+                            HStack(spacing: 8) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "bookmark.fill")
+                                        .font(.caption)
                                     Text("\(viewModel.savedProfiles.count)")
                                         .fontWeight(.semibold)
-                                    Text(viewModel.savedProfiles.count == 1 ? "profile" : "profiles")
+                                }
 
-                                    if viewModel.savedThisWeek > 0 {
-                                        Text("•")
-                                        Text("\(viewModel.savedThisWeek) this week")
+                                if viewModel.recentProfiles.count > 0 {
+                                    Circle()
+                                        .fill(Color.white.opacity(0.5))
+                                        .frame(width: 4, height: 4)
+
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "clock")
+                                            .font(.caption)
+                                        Text("\(viewModel.recentProfiles.count) recent")
                                             .fontWeight(.semibold)
                                     }
                                 }
-                                .font(.subheadline)
-                                .foregroundColor(.white.opacity(0.95))
+
+                                if viewModel.savedYouProfiles.count > 0 {
+                                    Circle()
+                                        .fill(Color.white.opacity(0.5))
+                                        .frame(width: 4, height: 4)
+
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "person.2.fill")
+                                            .font(.caption)
+                                        Text("\(viewModel.savedYouProfiles.count) saved you")
+                                            .fontWeight(.semibold)
+                                    }
+                                }
                             }
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.95))
                         }
                     }
 
@@ -170,16 +297,12 @@ struct SavedProfilesView: View {
 
     // MARK: - Profiles Grid
 
-    private var profilesGrid: some View {
+    private func profilesGrid(profiles: [SavedProfile]) -> some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 20) {
-                // Stats header with animation
-                statsHeader
-                    .transition(.move(edge: .top).combined(with: .opacity))
-
                 // Saved profiles grid with staggered animation
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                    ForEach(Array(viewModel.savedProfiles.enumerated()), id: \.element.id) { index, saved in
+                    ForEach(Array(profiles.enumerated()), id: \.element.id) { index, saved in
                         SavedProfileCard(
                             savedProfile: saved,
                             isUnsaving: viewModel.unsavingProfileId == saved.id,
@@ -201,7 +324,7 @@ struct SavedProfilesView: View {
                         .animation(
                             .spring(response: 0.4, dampingFraction: 0.7)
                             .delay(Double(index) * 0.05),
-                            value: viewModel.savedProfiles.count
+                            value: profiles.count
                         )
                     }
                 }
@@ -217,80 +340,41 @@ struct SavedProfilesView: View {
         }
     }
 
-    // MARK: - Stats Header
+    // MARK: - Saved You Grid (simpler cards for people who saved your profile)
 
-    private var statsHeader: some View {
-        HStack(spacing: 20) {
-            // Total saved count
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) {
-                    Image(systemName: "bookmark.fill")
-                        .font(.title2)
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.purple, .pink],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
+    private func savedYouGrid(profiles: [SavedYouProfile]) -> some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 20) {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                    ForEach(Array(profiles.enumerated()), id: \.element.id) { index, profile in
+                        SavedYouCard(
+                            profile: profile,
+                            onTap: {
+                                selectedUser = profile.user
+                                HapticManager.shared.impact(.light)
+                            }
                         )
-
-                    Text("\(viewModel.savedProfiles.count)")
-                        .font(.system(size: 32, weight: .bold))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.purple, .pink],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.8).combined(with: .opacity),
+                            removal: .scale(scale: 0.8).combined(with: .opacity)
+                        ))
+                        .animation(
+                            .spring(response: 0.4, dampingFraction: 0.7)
+                            .delay(Double(index) * 0.05),
+                            value: profiles.count
                         )
-                        .contentTransition(.numericText())
+                    }
                 }
-
-                Text("Saved Profiles")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.secondary)
+                .padding(.horizontal)
             }
-
-            Spacer()
-
-            // This week count
-            VStack(alignment: .trailing, spacing: 6) {
-                HStack(spacing: 6) {
-                    Text("\(viewModel.savedThisWeek)")
-                        .font(.title2.bold())
-                        .foregroundColor(.blue)
-                        .contentTransition(.numericText())
-
-                    Image(systemName: "calendar")
-                        .font(.title3)
-                        .foregroundColor(.blue)
-                }
-
-                Text("This Week")
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(.secondary)
-            }
+            .padding(.top)
+            .padding(.bottom, 20)
         }
-        .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.white)
-                .shadow(color: .purple.opacity(0.1), radius: 20, x: 0, y: 10)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(
-                    LinearGradient(
-                        colors: [.purple.opacity(0.1), .pink.opacity(0.05)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-        )
-        .padding(.horizontal)
+        .refreshable {
+            HapticManager.shared.impact(.light)
+            await viewModel.loadSavedYouProfiles()
+            HapticManager.shared.notification(.success)
+        }
     }
 
     // MARK: - Loading View
@@ -377,29 +461,23 @@ struct SavedProfilesView: View {
 
     // MARK: - Empty State
 
-    private var emptyStateView: some View {
+    private func emptyStateView(message: String, hint: String) -> some View {
         VStack(spacing: 24) {
             Image(systemName: "bookmark.slash")
                 .font(.system(size: 80))
                 .foregroundColor(.gray.opacity(0.5))
 
             VStack(spacing: 8) {
-                Text("No Saved Profiles")
+                Text(message)
                     .font(.title2)
                     .fontWeight(.bold)
 
-                Text("Profiles you bookmark will appear here for easy access later")
+                Text(hint)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
             }
-
-            Text("💡 Tip: Tap the bookmark icon on any profile to save it")
-                .font(.caption)
-                .foregroundColor(.purple)
-                .padding(.horizontal, 40)
-                .multilineTextAlignment(.center)
 
             // CTA button to go back to discovering
             Button {
@@ -465,7 +543,6 @@ struct SavedProfileCard: View {
                     .frame(height: 200)
                     .clipped()
                     .overlay(alignment: .topLeading) {
-                        // Online Status Indicator
                         OnlineStatusIndicator(user: savedProfile.user)
                             .padding(.top, 8)
                             .padding(.leading, 8)
@@ -538,7 +615,7 @@ struct SavedProfileCard: View {
                     .opacity(isUnsaving ? 0.5 : 1.0)
                 }
 
-                // Enhanced unsave button with animation
+                // Unsave button
                 Button(action: {
                     HapticManager.shared.impact(.medium)
                     onUnsave()
@@ -558,7 +635,7 @@ struct SavedProfileCard: View {
                         if isUnsaving {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .scaleEffect(0.8)
+                                .scaleEffect(0.7)
                         } else {
                             Image(systemName: "bookmark.fill")
                                 .font(.system(size: 14, weight: .semibold))
@@ -568,8 +645,6 @@ struct SavedProfileCard: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(isUnsaving)
-                .scaleEffect(isPressed ? 0.85 : 1.0)
-                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
                 .padding(10)
             }
             .background(
@@ -641,6 +716,145 @@ struct SavedProfileCardSkeleton: View {
     }
 }
 
+// MARK: - Saved You Profile Model (people who saved your profile)
+
+struct SavedYouProfile: Identifiable, Equatable {
+    let id: String
+    let user: User
+    let savedAt: Date
+}
+
+// MARK: - Saved You Card (simpler card for people who saved your profile)
+
+struct SavedYouCard: View {
+    let profile: SavedYouProfile
+    let onTap: () -> Void
+
+    @State private var isPressed = false
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 0) {
+                // Profile image
+                Group {
+                    if let imageURL = profile.user.photos.first, let url = URL(string: imageURL) {
+                        CachedCardImage(url: url)
+                    } else {
+                        LinearGradient(
+                            colors: [.blue.opacity(0.6), .purple.opacity(0.5)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        .overlay {
+                            Image(systemName: "person.fill")
+                                .font(.system(size: 50))
+                                .foregroundColor(.white.opacity(0.5))
+                        }
+                    }
+                }
+                .frame(height: 200)
+                .clipped()
+                .overlay(alignment: .topLeading) {
+                    OnlineStatusIndicator(user: profile.user)
+                        .padding(.top, 8)
+                        .padding(.leading, 8)
+                }
+                .overlay(alignment: .topTrailing) {
+                    // "Saved You" badge
+                    HStack(spacing: 4) {
+                        Image(systemName: "bookmark.fill")
+                            .font(.caption2)
+                        Text("Saved You")
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(LinearGradient(
+                                colors: [.blue, .purple],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ))
+                    )
+                    .padding(8)
+                }
+
+                // User info
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        Text(profile.user.fullName)
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                            .lineLimit(1)
+
+                        Text("\(profile.user.age)")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+
+                        if profile.user.isVerified {
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                        }
+                    }
+
+                    HStack(spacing: 4) {
+                        Image(systemName: "mappin.circle.fill")
+                            .font(.caption2)
+                            .foregroundColor(.purple)
+
+                        Text(profile.user.location)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock.fill")
+                            .font(.caption2)
+                            .foregroundColor(.blue)
+
+                        Text(profile.savedAt.timeAgo())
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                            .fontWeight(.medium)
+                    }
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.white)
+            }
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color.white)
+                    .shadow(color: .black.opacity(0.08), radius: 15, y: 5)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(
+                        LinearGradient(
+                            colors: [.blue.opacity(0.2), .purple.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+        .scaleEffect(isPressed ? 0.97 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in isPressed = true }
+                .onEnded { _ in isPressed = false }
+        )
+    }
+}
+
 // MARK: - Saved Profile Model
 
 struct SavedProfile: Identifiable, Equatable {
@@ -648,6 +862,13 @@ struct SavedProfile: Identifiable, Equatable {
     let user: User
     let savedAt: Date
     let note: String?
+
+    init(id: String, user: User, savedAt: Date, note: String?) {
+        self.id = id
+        self.user = user
+        self.savedAt = savedAt
+        self.note = note
+    }
 }
 
 // MARK: - View Model
@@ -658,6 +879,7 @@ class SavedProfilesViewModel: ObservableObject {
     static let shared = SavedProfilesViewModel()
 
     @Published var savedProfiles: [SavedProfile] = []
+    @Published var savedYouProfiles: [SavedYouProfile] = []
     @Published var isLoading = false
     @Published var errorMessage = ""
     @Published var unsavingProfileId: String?
@@ -671,6 +893,14 @@ class SavedProfilesViewModel: ObservableObject {
         return savedProfiles.filter { $0.savedAt >= weekAgo }.count
     }
 
+    /// Profiles saved in the last 7 days
+    var recentProfiles: [SavedProfile] {
+        guard let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) else {
+            return savedProfiles
+        }
+        return savedProfiles.filter { $0.savedAt >= weekAgo }
+    }
+
     private let db = Firestore.firestore()
 
     // PERFORMANCE: Cache management to reduce database reads
@@ -682,7 +912,7 @@ class SavedProfilesViewModel: ObservableObject {
     private init() {}
 
     func loadSavedProfiles(forceRefresh: Bool = false) async {
-        guard let currentUserId = AuthService.shared.currentUser?.id else { return }
+        guard let currentUserId = AuthService.shared.currentUser?.effectiveId else { return }
 
         // PERFORMANCE FIX: Check cache first (5-minute TTL)
         // Prevents 6+ database reads every time view appears
@@ -742,7 +972,8 @@ class SavedProfilesViewModel: ObservableObject {
             // Chunk user IDs into groups of 10 (Firestore whereIn limit)
             let chunkedUserIds = userIds.chunked(into: 10)
 
-            for chunk in chunkedUserIds {
+            // Only query Firestore if there are remaining user IDs to fetch
+            for chunk in chunkedUserIds where !chunk.isEmpty {
                 let usersSnapshot = try await db.collection("users")
                     .whereField(FieldPath.documentID(), in: chunk)
                     .getDocuments()
@@ -797,8 +1028,65 @@ class SavedProfilesViewModel: ObservableObject {
         Logger.shared.info("SavedProfiles cache cleared", category: .performance)
     }
 
+    /// Load profiles of people who saved your profile
+    func loadSavedYouProfiles() async {
+        guard let currentUserId = AuthService.shared.currentUser?.effectiveId else {
+            return
+        }
+
+        do {
+            // Query for profiles where savedUserId is the current user (others saved you)
+            let snapshot = try await db.collection("saved_profiles")
+                .whereField("savedUserId", isEqualTo: currentUserId)
+                .order(by: "savedAt", descending: true)
+                .getDocuments()
+
+            var metadata: [(id: String, userId: String, savedAt: Date)] = []
+            for doc in snapshot.documents {
+                let data = doc.data()
+                if let userId = data["userId"] as? String,
+                   let savedAt = (data["savedAt"] as? Timestamp)?.dateValue() {
+                    metadata.append((id: doc.documentID, userId: userId, savedAt: savedAt))
+                }
+            }
+
+            guard !metadata.isEmpty else {
+                savedYouProfiles = []
+                return
+            }
+
+            // Batch fetch users
+            let userIds = metadata.map { $0.userId }
+            var fetchedUsers: [String: User] = [:]
+
+            for chunk in userIds.chunked(into: 10) {
+                let usersSnapshot = try await db.collection("users")
+                    .whereField(FieldPath.documentID(), in: chunk)
+                    .getDocuments()
+
+                for userDoc in usersSnapshot.documents {
+                    if let user = try? userDoc.data(as: User.self), let userId = user.id {
+                        fetchedUsers[userId] = user
+                    }
+                }
+            }
+
+            var profiles: [SavedYouProfile] = []
+            for meta in metadata {
+                if let user = fetchedUsers[meta.userId] {
+                    profiles.append(SavedYouProfile(id: meta.id, user: user, savedAt: meta.savedAt))
+                }
+            }
+
+            savedYouProfiles = profiles
+            Logger.shared.info("Loaded \(profiles.count) users who saved your profile", category: .general)
+        } catch {
+            Logger.shared.error("Error loading saved you profiles", category: .general, error: error)
+        }
+    }
+
     func unsaveProfile(_ profile: SavedProfile) {
-        guard let currentUserId = AuthService.shared.currentUser?.id else { return }
+        guard let currentUserId = AuthService.shared.currentUser?.effectiveId else { return }
 
         // Set loading state
         unsavingProfileId = profile.id
@@ -847,7 +1135,7 @@ class SavedProfilesViewModel: ObservableObject {
     }
 
     func clearAllSaved() {
-        guard let currentUserId = AuthService.shared.currentUser?.id else { return }
+        guard let currentUserId = AuthService.shared.currentUser?.effectiveId else { return }
 
         Task {
             do {
@@ -855,38 +1143,69 @@ class SavedProfilesViewModel: ObservableObject {
                     .whereField("userId", isEqualTo: currentUserId)
                     .getDocuments()
 
-                // Delete all saved profiles
-                let batch = db.batch()
-                for doc in snapshot.documents {
-                    batch.deleteDocument(doc.reference)
+                guard !snapshot.documents.isEmpty else {
+                    savedProfiles = []
+                    return
                 }
-                try await batch.commit()
 
-                // Clear local state
+                // BATCH FIX: Firestore batch limit is 500 documents
+                // Chunk large deletions to avoid exceeding the limit
+                let batchSize = 500
+                let totalCount = snapshot.documents.count
+                var deletedCount = 0
+
+                for chunk in snapshot.documents.chunked(into: batchSize) {
+                    let batch = db.batch()
+                    for doc in chunk {
+                        batch.deleteDocument(doc.reference)
+                    }
+                    try await batch.commit()
+                    deletedCount += chunk.count
+
+                    Logger.shared.debug("Deleted batch of \(chunk.count) saved profiles, total: \(deletedCount)/\(totalCount)", category: .general)
+                }
+
+                // ATOMICITY FIX: Only clear local state after ALL batches succeed
                 savedProfiles = []
 
-                Logger.shared.info("Cleared all saved profiles", category: .general)
+                // PERFORMANCE: Invalidate cache
+                lastFetchTime = nil
+
+                Logger.shared.info("Cleared all \(totalCount) saved profiles", category: .general)
 
                 // Track analytics
                 AnalyticsServiceEnhanced.shared.trackEvent(
                     .savedProfilesCleared,
-                    properties: ["count": snapshot.documents.count]
+                    properties: ["count": totalCount]
                 )
             } catch {
+                // ERROR HANDLING: Show user feedback on failure
+                errorMessage = "Failed to clear saved profiles. Please try again."
                 Logger.shared.error("Error clearing saved profiles", category: .general, error: error)
+
+                // Auto-clear error after 3 seconds
+                Task {
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    await MainActor.run {
+                        if errorMessage == "Failed to clear saved profiles. Please try again." {
+                            errorMessage = ""
+                        }
+                    }
+                }
             }
         }
     }
 
     func saveProfile(user: User, note: String? = nil) async {
-        guard let currentUserId = AuthService.shared.currentUser?.id,
-              let savedUserId = user.id else {
-            Logger.shared.error("Cannot save profile: Missing user ID", category: .general)
+        guard let currentUserId = AuthService.shared.currentUser?.effectiveId,
+              let savedUserId = user.effectiveId else {
+            let currentUser = AuthService.shared.currentUser
+            Logger.shared.error("Cannot save profile: Missing user ID (currentUser.id=\(currentUser?.id ?? "nil"), currentUser.effectiveId=\(currentUser?.effectiveId ?? "nil"), savedUser.id=\(user.id ?? "nil"), savedUser.effectiveId=\(user.effectiveId ?? "nil"))", category: .general)
             return
         }
 
         // Check if already saved to prevent duplicates
-        if savedProfiles.contains(where: { $0.user.id == savedUserId }) {
+        if savedProfiles.contains(where: { $0.user.effectiveId == savedUserId }) {
             Logger.shared.info("Profile already saved: \(user.fullName)", category: .general)
             return
         }

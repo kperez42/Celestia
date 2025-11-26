@@ -18,9 +18,15 @@ class PendingMessageQueue: ObservableObject {
     // CONCURRENCY FIX: Prevent race condition between timer and manual processQueue calls
     @Published private(set) var isProcessing = false
 
+    /// Track message IDs that are being dequeued asynchronously (to prevent race conditions)
+    private var pendingDequeuIds: Set<String> = []
+
     private let persistenceKey = "com.celestia.pendingMessageQueue"
     private var processingTimer: Timer?
     private let db = Firestore.firestore()
+
+    // AUDIT FIX: Add network monitor for connectivity check
+    private let networkMonitor = NetworkMonitor.shared
 
     private init() {
         loadQueue()
@@ -34,6 +40,9 @@ class PendingMessageQueue: ObservableObject {
         pendingMessages.append(message)
         queueSize = pendingMessages.count
         saveQueue()
+
+        // AUDIT FIX: Ensure background timer is running
+        ensureTimerRunning()
 
         Logger.shared.info("Message queued for validation: \(message.id)", category: .messaging)
 
@@ -86,9 +95,98 @@ class PendingMessageQueue: ObservableObject {
     /// Clear all messages (for testing or logout)
     func clearQueue() {
         pendingMessages.removeAll()
+        pendingDequeuIds.removeAll()
         queueSize = 0
         saveQueue()
         Logger.shared.info("Pending message queue cleared", category: .messaging)
+    }
+
+    // MARK: - User Actions (AUDIT FIX: Add user-facing methods)
+
+    /// Allow user to retry a failed message
+    func retryMessage(_ messageId: String) {
+        guard let index = pendingMessages.firstIndex(where: { $0.id == messageId }) else {
+            Logger.shared.warning("Cannot retry - message not found: \(messageId)", category: .messaging)
+            return
+        }
+
+        // Reset status and attempt count for retry
+        pendingMessages[index].status = .pendingValidation
+        pendingMessages[index].validationAttempts = 0
+        pendingMessages[index].failureReason = nil
+        pendingMessages[index].lastValidationAttempt = nil
+
+        // Remove from dequeue tracking if it was scheduled for removal
+        pendingDequeuIds.remove(messageId)
+
+        saveQueue()
+        Logger.shared.info("Message marked for retry: \(messageId)", category: .messaging)
+
+        // Provide haptic feedback
+        HapticManager.shared.impact(.light)
+
+        // Trigger immediate processing
+        Task {
+            await processQueue()
+        }
+    }
+
+    /// Allow user to cancel/delete a pending message
+    func cancelMessage(_ messageId: String) {
+        // Remove from dequeue tracking
+        pendingDequeuIds.remove(messageId)
+
+        // Remove from queue
+        let messageText = pendingMessages.first { $0.id == messageId }?.text
+        pendingMessages.removeAll { $0.id == messageId }
+        queueSize = pendingMessages.count
+        saveQueue()
+
+        Logger.shared.info("Message cancelled by user: \(messageId)", category: .messaging)
+
+        // Provide haptic feedback
+        HapticManager.shared.impact(.light)
+
+        // Notify UI
+        NotificationCenter.default.post(
+            name: .pendingMessageCancelled,
+            object: nil,
+            userInfo: [
+                "messageId": messageId,
+                "messageText": messageText ?? ""
+            ]
+        )
+    }
+
+    /// Retry all failed messages
+    func retryAllFailed() {
+        var retriedCount = 0
+
+        for i in 0..<pendingMessages.count {
+            if pendingMessages[i].status == .failed || pendingMessages[i].status == .validationFailed {
+                pendingMessages[i].status = .pendingValidation
+                pendingMessages[i].validationAttempts = 0
+                pendingMessages[i].failureReason = nil
+                pendingMessages[i].lastValidationAttempt = nil
+                pendingDequeuIds.remove(pendingMessages[i].id)
+                retriedCount += 1
+            }
+        }
+
+        if retriedCount > 0 {
+            saveQueue()
+            Logger.shared.info("Marked \(retriedCount) messages for retry", category: .messaging)
+            HapticManager.shared.impact(.medium)
+
+            Task {
+                await processQueue()
+            }
+        }
+    }
+
+    /// Get count of messages that can be retried
+    var retryableCount: Int {
+        pendingMessages.filter { $0.status == .failed || $0.status == .validationFailed }.count
     }
 
     // MARK: - Queue Processing
@@ -98,6 +196,17 @@ class PendingMessageQueue: ObservableObject {
         // CONCURRENCY FIX: Prevent race condition between timer and manual calls
         guard !isProcessing else {
             Logger.shared.debug("Queue processing already in progress, skipping", category: .messaging)
+            return
+        }
+
+        // AUDIT FIX: Check network connectivity before processing
+        guard networkMonitor.isConnected else {
+            Logger.shared.debug("Offline - skipping pending message queue processing", category: .messaging)
+            return
+        }
+
+        // AUDIT FIX: Skip if queue is empty (optimization)
+        guard !pendingMessages.isEmpty else {
             return
         }
 
@@ -112,14 +221,22 @@ class PendingMessageQueue: ObservableObject {
             // 1. Pending validation
             // 2. Ready for retry (timing)
             // 3. Not expired
+            // 4. Not already being dequeued (AUDIT FIX: prevent race condition)
             return message.status == .pendingValidation &&
                    message.isReadyForRetry &&
-                   !message.isExpired
+                   !message.isExpired &&
+                   !pendingDequeuIds.contains(message.id)
         }
 
         Logger.shared.info("Found \(messagesToProcess.count) messages ready for validation", category: .messaging)
 
         for message in messagesToProcess {
+            // AUDIT FIX: Check network is still connected before each message
+            guard networkMonitor.isConnected else {
+                Logger.shared.info("Lost connection during queue processing, pausing", category: .messaging)
+                break
+            }
+
             await processMessage(message)
         }
 
@@ -163,9 +280,13 @@ class PendingMessageQueue: ObservableObject {
                     object: nil,
                     userInfo: [
                         "messageId": message.id,
-                        "violations": violations
+                        "violations": violations,
+                        "messageText": message.text  // AUDIT FIX: Include message text for UI display
                     ]
                 )
+
+                // AUDIT FIX: Add haptic feedback for validation failure
+                HapticManager.shared.notification(.error)
 
                 // Track analytics
                 AnalyticsManager.shared.logEvent(.messageRejected, parameters: [
@@ -173,13 +294,8 @@ class PendingMessageQueue: ObservableObject {
                     "violations": violations
                 ])
 
-                // Remove from queue after a delay (so user can see the error)
-                Task {
-                    try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
-                    await MainActor.run {
-                        self.dequeue(message.id)
-                    }
-                }
+                // AUDIT FIX: Mark for deferred removal to prevent race condition
+                scheduleDequeue(message.id, delay: 5.0)
             }
 
         } catch let error as BackendAPIError {
@@ -198,17 +314,16 @@ class PendingMessageQueue: ObservableObject {
                     object: nil,
                     userInfo: [
                         "messageId": message.id,
-                        "reason": "Service temporarily unavailable"
+                        "reason": "Service temporarily unavailable",
+                        "messageText": message.text  // AUDIT FIX: Include message text for UI display
                     ]
                 )
 
-                // Remove from queue after delay
-                Task {
-                    try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
-                    await MainActor.run {
-                        self.dequeue(message.id)
-                    }
-                }
+                // AUDIT FIX: Add haptic feedback for failure
+                HapticManager.shared.notification(.error)
+
+                // AUDIT FIX: Mark for deferred removal to prevent race condition
+                scheduleDequeue(message.id, delay: 5.0)
             }
 
         } catch {
@@ -269,16 +384,51 @@ class PendingMessageQueue: ObservableObject {
         }
     }
 
+    /// AUDIT FIX: Schedule deferred removal to prevent race conditions
+    private func scheduleDequeue(_ messageId: String, delay: TimeInterval) {
+        // Track that this message is being dequeued
+        pendingDequeuIds.insert(messageId)
+
+        Task {
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            await MainActor.run {
+                self.pendingDequeuIds.remove(messageId)
+                self.dequeue(messageId)
+            }
+        }
+    }
+
     /// Remove expired and permanently failed messages
     private func cleanupQueue() {
         let beforeCount = pendingMessages.count
+
+        // AUDIT FIX: Notify users about expired messages before removing them
+        let expiredMessages = pendingMessages.filter { $0.isExpired && $0.status == .pendingValidation }
+        for expiredMessage in expiredMessages {
+            // Don't re-notify if already being dequeued
+            guard !pendingDequeuIds.contains(expiredMessage.id) else { continue }
+
+            NotificationCenter.default.post(
+                name: .pendingMessageExpired,
+                object: nil,
+                userInfo: [
+                    "messageId": expiredMessage.id,
+                    "messageText": expiredMessage.text
+                ]
+            )
+            Logger.shared.warning("Message expired and removed: \(expiredMessage.id)", category: .messaging)
+        }
 
         // Remove expired messages
         pendingMessages.removeAll { $0.isExpired }
 
         // Remove sent or permanently failed messages (after grace period)
+        // AUDIT FIX: Skip messages being dequeued asynchronously
         pendingMessages.removeAll { message in
-            if message.status == .sent || message.status == .failed {
+            // Skip if being handled by scheduleDequeue
+            guard !pendingDequeuIds.contains(message.id) else { return false }
+
+            if message.status == .sent || message.status == .failed || message.status == .validationFailed {
                 // Keep for 5 seconds so UI can show status
                 if let lastAttempt = message.lastValidationAttempt,
                    Date().timeIntervalSince(lastAttempt) > 5 {
@@ -301,21 +451,49 @@ class PendingMessageQueue: ObservableObject {
 
     /// Start background timer to periodically process queue
     private func startBackgroundProcessing() {
+        // AUDIT FIX: Only start timer if queue has messages
+        guard !pendingMessages.isEmpty else {
+            Logger.shared.debug("Queue empty - not starting background timer", category: .messaging)
+            return
+        }
+
+        startTimerIfNeeded()
+    }
+
+    /// AUDIT FIX: Smart timer management - only run when there are messages
+    private func startTimerIfNeeded() {
+        guard processingTimer == nil else { return }
+
         // Process every 30 seconds
         processingTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                await self?.processQueue()
+                guard let self = self else { return }
+
+                // AUDIT FIX: Stop timer if queue is empty
+                if self.pendingMessages.isEmpty {
+                    self.stopBackgroundProcessing()
+                    return
+                }
+
+                await self.processQueue()
             }
         }
 
         Logger.shared.info("Background message queue processing started", category: .messaging)
     }
 
+    /// Ensure timer is running when messages are added
+    private func ensureTimerRunning() {
+        if !pendingMessages.isEmpty && processingTimer == nil {
+            startTimerIfNeeded()
+        }
+    }
+
     /// Stop background processing (for cleanup)
     func stopBackgroundProcessing() {
         processingTimer?.invalidate()
         processingTimer = nil
-        Logger.shared.info("Background message queue processing stopped", category: .messaging)
+        Logger.shared.debug("Background message queue processing stopped", category: .messaging)
     }
 
     // MARK: - Persistence
@@ -360,7 +538,22 @@ class PendingMessageQueue: ObservableObject {
 // MARK: - Notification Names
 
 extension Notification.Name {
+    /// Posted when a pending message is successfully sent
     static let pendingMessageSent = Notification.Name("pendingMessageSent")
+
+    /// Posted when a message is rejected by content validation
+    /// userInfo: messageId, violations, messageText
     static let pendingMessageRejected = Notification.Name("pendingMessageRejected")
+
+    /// Posted when a message fails to send after max retries
+    /// userInfo: messageId, reason, messageText
     static let pendingMessageFailed = Notification.Name("pendingMessageFailed")
+
+    /// AUDIT FIX: Posted when a message expires before being validated
+    /// userInfo: messageId, messageText
+    static let pendingMessageExpired = Notification.Name("pendingMessageExpired")
+
+    /// AUDIT FIX: Posted when a user cancels a pending message
+    /// userInfo: messageId, messageText
+    static let pendingMessageCancelled = Notification.Name("pendingMessageCancelled")
 }

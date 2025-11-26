@@ -11,9 +11,18 @@ import FirebaseFirestore
 struct User: Identifiable, Codable, Equatable {
     @DocumentID var id: String?
 
+    // Manual ID for test data (bypasses @DocumentID restrictions)
+    // This is used when creating test users in DEBUG mode
+    private var _manualId: String?
+
+    // Computed property that returns manual ID if set, otherwise @DocumentID value
+    var effectiveId: String? {
+        _manualId ?? id
+    }
+
     // Equatable implementation - compare by id
     static func == (lhs: User, rhs: User) -> Bool {
-        return lhs.id == rhs.id
+        return lhs.effectiveId == rhs.effectiveId
     }
     
     // Basic Info
@@ -189,7 +198,9 @@ struct User: Identifiable, Codable, Equatable {
     
     // Initialize from dictionary (for legacy code)
     init(dictionary: [String: Any]) {
-        self.id = dictionary["id"] as? String
+        let dictId = dictionary["id"] as? String
+        self.id = dictId
+        self._manualId = dictId  // Also set manual ID for effectiveId to work
         self.email = dictionary["email"] as? String ?? ""
         self.fullName = dictionary["fullName"] as? String ?? dictionary["name"] as? String ?? ""
         self.age = dictionary["age"] as? Int ?? 18
@@ -304,6 +315,7 @@ struct User: Identifiable, Codable, Equatable {
         maxDistance: Int = 100
     ) {
         self.id = id
+        self._manualId = id  // Store manual ID for test users
         self.email = email
         self.fullName = fullName
         self.age = age

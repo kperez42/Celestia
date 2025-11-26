@@ -67,6 +67,7 @@ class UserService: ObservableObject, UserServiceProtocol {
         // Apply filters
         // IMPORTANT: Skip gender filter when lookingFor is "Everyone" to show all genders
         if let lookingFor = lookingFor, lookingFor != "Everyone" {
+        if let lookingFor = lookingFor {
             // Convert lookingFor values to match gender field values
             // lookingFor uses: "Men", "Women", "Everyone"
             // gender uses: "Male", "Female", "Non-binary", "Other"
@@ -78,6 +79,12 @@ class UserService: ObservableObject, UserServiceProtocol {
                 genderToMatch = "Male"
             default:
                 genderToMatch = lookingFor // Use as-is if already in correct format
+            case "Men":
+                genderToMatch = "Male"
+            case "Women":
+                genderToMatch = "Female"
+            default:
+                genderToMatch = lookingFor
             }
             Logger.shared.info("UserService: Filtering by gender = \(genderToMatch) (from lookingFor: \(lookingFor))", category: .database)
             query = query.whereField("gender", isEqualTo: genderToMatch)
@@ -125,9 +132,18 @@ class UserService: ObservableObject, UserServiceProtocol {
                 Logger.shared.info("UserService: Found users - \(newUsers.map { "\($0.fullName) (gender: \($0.gender))" }.joined(separator: ", "))", category: .database)
             }
 
+            Logger.shared.info("UserService: Query returned \(snapshot.documents.count) documents, \(newUsers.count) valid users after filtering", category: .database)
+
+            if newUsers.isEmpty {
+                Logger.shared.warning("UserService: No users found! Check Firebase indexes and user data.", category: .database)
+            } else {
+                Logger.shared.info("UserService: Found users - \(newUsers.map { "\($0.fullName) (gender: \($0.gender))" }.joined(separator: ", "))", category: .database)
+            }
+
             users.append(contentsOf: newUsers)
             hasMoreUsers = newUsers.count >= limit
         } catch {
+            Logger.shared.error("UserService: Firestore query failed", category: .database, error: error)
             self.error = error
             throw error
         }

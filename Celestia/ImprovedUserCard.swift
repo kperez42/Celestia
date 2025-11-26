@@ -112,20 +112,21 @@ struct ImprovedUserCard: View {
     private var cardContent: some View {
         GeometryReader { geometry in
             ZStack {
-                // Background image or gradient
+                // Background image or gradient - PERFORMANCE: Use CachedAsyncImage for smooth scrolling
                 if let imageURL = URL(string: user.profileImageURL), !user.profileImageURL.isEmpty {
-                    AsyncImage(url: imageURL) { phase in
-                        switch phase {
-                        case .success(let image):
+                    CachedAsyncImage(
+                        url: imageURL,
+                        content: { image in
                             image
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
                                 .frame(width: geometry.size.width, height: geometry.size.height)
                                 .clipped()
-                        default:
+                        },
+                        placeholder: {
                             placeholderGradient
                         }
-                    }
+                    )
                 } else {
                     placeholderGradient
                         .overlay {
@@ -250,6 +251,60 @@ struct ImprovedUserCard: View {
             // Quick info chips
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
+                    // Education
+                    if let education = user.educationLevel, education != "Prefer not to say" {
+                        InfoChip(icon: "graduationcap.fill", text: education)
+                            .accessibilityLabel("Education: \(education)")
+                    }
+
+                    // Height
+                    if let height = user.height {
+                        InfoChip(icon: "ruler", text: "\(height) cm")
+                            .accessibilityLabel("Height: \(height) centimeters")
+                    }
+
+                    // Relationship Goal
+                    if let goal = user.relationshipGoal, goal != "Prefer not to say" {
+                        InfoChip(icon: "heart.circle", text: goal)
+                            .accessibilityLabel("Looking for: \(goal)")
+                    }
+
+                    // Religion
+                    if let religion = user.religion, religion != "Prefer not to say" {
+                        InfoChip(icon: "sparkles", text: religion)
+                            .accessibilityLabel("Religion: \(religion)")
+                    }
+
+                    // Smoking
+                    if let smoking = user.smoking, smoking != "Prefer not to say" {
+                        InfoChip(icon: "smoke", text: smoking)
+                            .accessibilityLabel("Smoking: \(smoking)")
+                    }
+
+                    // Drinking
+                    if let drinking = user.drinking, drinking != "Prefer not to say" {
+                        InfoChip(icon: "wineglass", text: drinking)
+                            .accessibilityLabel("Drinking: \(drinking)")
+                    }
+
+                    // Exercise
+                    if let exercise = user.exercise, exercise != "Prefer not to say" {
+                        InfoChip(icon: "figure.run", text: exercise)
+                            .accessibilityLabel("Exercise: \(exercise)")
+                    }
+
+                    // Diet
+                    if let diet = user.diet, diet != "Prefer not to say" {
+                        InfoChip(icon: "fork.knife", text: diet)
+                            .accessibilityLabel("Diet: \(diet)")
+                    }
+
+                    // Pets
+                    if let pets = user.pets, pets != "Prefer not to say" {
+                        InfoChip(icon: "pawprint.fill", text: pets)
+                            .accessibilityLabel("Pets: \(pets)")
+                    }
+
                     // Languages
                     if !user.languages.isEmpty {
                         ForEach(user.languages.prefix(3), id: \.self) { language in
@@ -269,7 +324,7 @@ struct ImprovedUserCard: View {
             }
             .padding(.top, 8)
             .accessibilityElement(children: .contain)
-            .accessibilityLabel("Languages and interests")
+            .accessibilityLabel("Profile details, languages and interests")
             
             // Tap to view more
             HStack {
@@ -329,6 +384,22 @@ struct ImprovedUserCard: View {
 
         if user.isPremium {
             components.append("premium member")
+        }
+
+        if let education = user.educationLevel, education != "Prefer not to say" {
+            components.append("Education: \(education)")
+        }
+
+        if let height = user.height {
+            components.append("Height: \(height) centimeters")
+        }
+
+        if let goal = user.relationshipGoal, goal != "Prefer not to say" {
+            components.append("Looking for: \(goal)")
+        }
+
+        if let religion = user.religion, religion != "Prefer not to say" {
+            components.append("Religion: \(religion)")
         }
 
         if !user.bio.isEmpty {

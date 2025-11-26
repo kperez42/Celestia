@@ -48,6 +48,9 @@ enum AnalyticsEvent: String {
     case networkDisconnected = "network_disconnected"
     case performance = "performance"
 
+    // Listener Lifecycle
+    case listenersReconnected = "listeners_reconnected"
+
     // Reporting
     case reportSubmitted = "report_submitted"
     case userBlocked = "user_blocked"

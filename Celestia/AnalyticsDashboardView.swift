@@ -479,7 +479,7 @@ struct RecommendationsTab: View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 16) {
                 if let insights = analyticsService.userInsights {
-                    ForEach(Array(insights.recommendations.enumerated()), id: \.offset) { index, recommendation in
+                    ForEach(Array(insights.recommendations.enumerated()), id: \.0) { index, recommendation in
                         RecommendationCard(recommendation: recommendation, index: index)
                     }
                 }

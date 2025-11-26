@@ -26,7 +26,8 @@ struct FeedDiscoverView: View {
     @State private var matchedUser: User?
     @State private var favorites: Set<String> = []
     @State private var errorMessage: String = ""
-    @State private var showOwnProfile = false
+    @State private var showOwnProfileDetail = false
+    @State private var showEditProfile = false
 
     // Action feedback toast
     @State private var showActionToast = false
@@ -70,6 +71,7 @@ struct FeedDiscoverView: View {
                     }
                 }
                 .onAppear {
+                    Logger.shared.debug("FeedDiscoverView appeared - users.count: \(users.count), currentUser.lookingFor: \(authService.currentUser?.lookingFor ?? "nil")", category: .general)
                     if users.isEmpty {
                         Task {
                             await loadUsers()
@@ -79,6 +81,13 @@ struct FeedDiscoverView: View {
                     }
                 }
                 .onChange(of: filters.hasActiveFilters) { _ in
+                    Logger.shared.debug("Filters changed - reloading users", category: .general)
+                    Task {
+                        await reloadWithFilters()
+                    }
+                }
+                .onChange(of: authService.currentUser?.lookingFor) { oldValue, newValue in
+                    Logger.shared.debug("lookingFor changed from \(oldValue ?? "nil") to \(newValue ?? "nil") - reloading users", category: .general)
                     Task {
                         await reloadWithFilters()
                     }
@@ -86,8 +95,18 @@ struct FeedDiscoverView: View {
                 .onChange(of: savedProfilesViewModel.savedProfiles) { _ in
                     syncFavorites()
                 }
-                .navigationDestination(isPresented: $showOwnProfile) {
-                    ProfileView()
+                .sheet(isPresented: $showOwnProfileDetail) {
+                    if let currentUser = authService.currentUser {
+                        CurrentUserDetailView(
+                            user: currentUser,
+                            onEditProfile: {
+                                showEditProfile = true
+                            }
+                        )
+                    }
+                }
+                .sheet(isPresented: $showEditProfile) {
+                    EditProfileView()
                         .environmentObject(authService)
                 }
         }
@@ -128,17 +147,17 @@ struct FeedDiscoverView: View {
                 // Current user's profile card
                 if let currentUser = authService.currentUser {
                     CurrentUserProfileCard(user: currentUser) {
-                        showOwnProfile = true
+                        showOwnProfileDetail = true
                     }
                     .transition(.scale(scale: 0.95).combined(with: .opacity))
                     .animation(.spring(response: 0.5, dampingFraction: 0.7), value: authService.currentUser)
                 }
 
-                ForEach(Array(displayedUsers.enumerated()), id: \.element.id) { index, user in
+                ForEach(Array(displayedUsers.enumerated()), id: \.element.effectiveId) { index, user in
                     ProfileFeedCard(
                         user: user,
                         currentUser: authService.currentUser,  // NEW: Pass current user for shared interests
-                        initialIsFavorited: favorites.contains(user.id ?? ""),
+                        initialIsFavorited: favorites.contains(user.effectiveId ?? ""),
                         onLike: {
                             handleLike(user: user)
                         },
@@ -158,14 +177,14 @@ struct FeedDiscoverView: View {
                             showUserDetail = true
                         }
                     )
-                    // PREMIUM: Staggered card entrance animation
+                    // PREMIUM: Staggered card entrance animation (optimized for smoothness)
                     .transition(.asymmetric(
-                        insertion: .scale(scale: 0.9).combined(with: .opacity),
-                        removal: .scale(scale: 0.95).combined(with: .opacity)
+                        insertion: .scale(scale: 0.95).combined(with: .opacity),
+                        removal: .scale(scale: 0.98).combined(with: .opacity)
                     ))
                     .animation(
-                        .spring(response: 0.5, dampingFraction: 0.7)
-                        .delay(Double(index % 10) * 0.05), // Stagger first 10 cards
+                        .spring(response: 0.35, dampingFraction: 0.8)
+                        .delay(Double(min(index, 4)) * 0.02), // Cap at 5 cards, 20ms stagger for snappy feel
                         value: displayedUsers.count
                     )
                     .onAppear {
@@ -298,7 +317,7 @@ struct FeedDiscoverView: View {
     // MARK: - Helper Methods
 
     private func syncFavorites() {
-        let userIds = savedProfilesViewModel.savedProfiles.compactMap { $0.user.id }
+        let userIds = savedProfilesViewModel.savedProfiles.compactMap { $0.user.effectiveId }
         favorites = Set(userIds)
         Logger.shared.debug("Favorites set synced: \(favorites.count) profiles", category: .general)
     }
@@ -310,11 +329,11 @@ struct FeedDiscoverView: View {
             LazyVStack(spacing: 16) {
                 ForEach(0..<3, id: \.self) { index in
                     ProfileFeedCardSkeleton()
-                        // PREMIUM: Staggered skeleton appearance
-                        .transition(.scale(scale: 0.95).combined(with: .opacity))
+                        // PREMIUM: Staggered skeleton appearance (optimized)
+                        .transition(.scale(scale: 0.97).combined(with: .opacity))
                         .animation(
-                            .spring(response: 0.4, dampingFraction: 0.7)
-                            .delay(Double(index) * 0.1),
+                            .spring(response: 0.3, dampingFraction: 0.8)
+                            .delay(Double(index) * 0.03),
                             value: isInitialLoad
                         )
                 }
@@ -471,7 +490,7 @@ struct FeedDiscoverView: View {
                         // Small delay to ensure Messages tab loads before opening chat
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                             NotificationCenter.default.post(
-                                name: Notification.Name("OpenChatWithUser"),
+                                name: .openChatWithUser,
                                 object: nil,
                                 userInfo: ["userId": matchedUserId, "user": matchedUser]
                             )
@@ -496,17 +515,8 @@ struct FeedDiscoverView: View {
     // MARK: - Data Loading
 
     private func loadUsers() async {
-        #if DEBUG
-        // Use test data in debug builds for easier testing
-        await MainActor.run {
-            users = TestData.discoverUsers
-            loadMoreUsers()
-            isInitialLoad = false
-        }
-        return
-        #endif
-
-        guard let currentUserId = authService.currentUser?.id else {
+        guard let currentUserId = authService.currentUser?.effectiveId else {
+            Logger.shared.error("loadUsers called but no currentUser", category: .database)
             await MainActor.run {
                 isInitialLoad = false
             }
@@ -514,7 +524,6 @@ struct FeedDiscoverView: View {
         }
 
         isLoading = true
-        defer { isLoading = false }
 
         do {
             // Fetch from Firestore with filters
@@ -536,10 +545,13 @@ struct FeedDiscoverView: View {
                 return nil
             }()
 
+            let lookingForValue = authService.currentUser?.lookingFor
+            Logger.shared.info("FeedDiscoverView: Loading users with filters - lookingFor: \(lookingForValue ?? "nil"), ageRange: \(ageRange?.description ?? "nil")", category: .database)
+
             // Fetch users from Firestore using UserService
             try await UserService.shared.fetchUsers(
                 excludingUserId: currentUserId,
-                lookingFor: authService.currentUser?.lookingFor,
+                lookingFor: lookingForValue,
                 ageRange: ageRange ?? 18...99,
                 limit: 50,
                 reset: true
@@ -547,30 +559,54 @@ struct FeedDiscoverView: View {
 
             await MainActor.run {
                 users = UserService.shared.users
+                Logger.shared.info("FeedDiscoverView: Loaded \(users.count) users", category: .database)
                 errorMessage = ""  // Clear any previous errors
                 isInitialLoad = false  // Hide skeleton and show content
+                isLoading = false  // BUGFIX: Set to false before calling loadMoreUsers()
                 loadMoreUsers()
+
+                // Prefetch images for smooth scrolling
+                ImageCache.shared.prefetchUserImages(users: Array(users.prefix(10)))
             }
         } catch {
             Logger.shared.error("Error loading users", category: .database, error: error)
             await MainActor.run {
                 errorMessage = "Failed to load users. Please check your connection and try again."
                 isInitialLoad = false  // Show error state instead of skeleton
+                isLoading = false
             }
         }
     }
 
     private func loadMoreUsers() {
-        guard !isLoading else { return }
+        guard !isLoading else {
+            Logger.shared.debug("loadMoreUsers: Skipped - already loading", category: .general)
+            return
+        }
 
         let startIndex = currentPage * usersPerPage
         let endIndex = min(startIndex + usersPerPage, users.count)
 
-        guard startIndex < users.count else { return }
+        Logger.shared.debug("loadMoreUsers: currentPage=\(currentPage), startIndex=\(startIndex), endIndex=\(endIndex), users.count=\(users.count)", category: .general)
+
+        guard startIndex < users.count else {
+            Logger.shared.debug("loadMoreUsers: No more users to load", category: .general)
+            return
+        }
 
         let newUsers = Array(users[startIndex..<endIndex])
         displayedUsers.append(contentsOf: newUsers)
         currentPage += 1
+
+        Logger.shared.info("loadMoreUsers: Added \(newUsers.count) users to display. Total displayed: \(displayedUsers.count). Users: \(newUsers.map { $0.fullName }.joined(separator: ", "))", category: .general)
+
+        // Prefetch images for next batch to ensure smooth scrolling
+        let nextBatchStart = endIndex
+        let nextBatchEnd = min(nextBatchStart + usersPerPage, users.count)
+        if nextBatchStart < users.count {
+            let upcomingUsers = Array(users[nextBatchStart..<nextBatchEnd])
+            ImageCache.shared.prefetchUserImages(users: upcomingUsers)
+        }
     }
 
     private func refreshFeed() async {
@@ -581,6 +617,7 @@ struct FeedDiscoverView: View {
     }
 
     private func reloadWithFilters() async {
+        Logger.shared.info("reloadWithFilters: Clearing displayedUsers and reloading", category: .general)
         currentPage = 0
         displayedUsers = []
         await loadUsers()
@@ -606,8 +643,8 @@ struct FeedDiscoverView: View {
     }
 
     private func handleLike(user: User) {
-        guard let currentUserId = authService.currentUser?.id,
-              let userId = user.id else {
+        guard let currentUserId = authService.currentUser?.effectiveId,
+              let userId = user.effectiveId else {
             showToast(
                 message: "Unable to like. Please try again.",
                 icon: "exclamationmark.triangle.fill",
@@ -691,7 +728,7 @@ struct FeedDiscoverView: View {
     }
 
     private func handleFavorite(user: User) {
-        guard let userId = user.id else {
+        guard let userId = user.effectiveId else {
             showToast(
                 message: "Unable to save profile",
                 icon: "exclamationmark.triangle.fill",
@@ -712,7 +749,7 @@ struct FeedDiscoverView: View {
             )
 
             // Remove from SavedProfilesViewModel
-            if let savedProfile = savedProfilesViewModel.savedProfiles.first(where: { $0.user.id == userId }) {
+            if let savedProfile = savedProfilesViewModel.savedProfiles.first(where: { $0.user.effectiveId == userId }) {
                 savedProfilesViewModel.unsaveProfile(savedProfile)
             }
         } else {
@@ -734,7 +771,7 @@ struct FeedDiscoverView: View {
 
                 // Check if save succeeded (will be in savedProfiles array)
                 await MainActor.run {
-                    let saveSucceeded = savedProfilesViewModel.savedProfiles.contains(where: { $0.user.id == userId })
+                    let saveSucceeded = savedProfilesViewModel.savedProfiles.contains(where: { $0.user.effectiveId == userId })
                     if !saveSucceeded {
                         // Revert optimistic update on failure
                         favorites.remove(userId)
@@ -755,8 +792,8 @@ struct FeedDiscoverView: View {
     }
 
     private func handleMessage(user: User) {
-        guard let currentUserId = authService.currentUser?.id,
-              let userId = user.id else {
+        guard let currentUserId = authService.currentUser?.effectiveId,
+              let userId = user.effectiveId else {
             showToast(
                 message: "Unable to send message. Please try again.",
                 icon: "exclamationmark.triangle.fill",
@@ -779,7 +816,7 @@ struct FeedDiscoverView: View {
                         // Small delay to ensure Messages tab loads before opening chat
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                             NotificationCenter.default.post(
-                                name: Notification.Name("OpenChatWithUser"),
+                                name: .openChatWithUser,
                                 object: nil,
                                 userInfo: ["userId": userId, "user": user]
                             )
@@ -843,8 +880,8 @@ struct PhotoGalleryView: View {
                 } else {
                     // Photo gallery
                     TabView(selection: $selectedPhotoIndex) {
-                        ForEach(Array(validPhotos.enumerated()), id: \.offset) { index, photoURL in
-                            CachedCardImage(url: URL(string: photoURL))
+                        ForEach(validPhotos.indices, id: \.self) { index in
+                            CachedCardImage(url: URL(string: validPhotos[index]))
                                 .scaledToFit()
                                 .tag(index)
                         }

@@ -61,27 +61,61 @@ class FirestoreSwipeRepository: SwipeRepository {
     }
 
     func hasSwipedOn(fromUserId: String, toUserId: String) async throws -> (liked: Bool, passed: Bool) {
-        let likeDoc = try await db.collection("likes")
-            .document("\(fromUserId)_\(toUserId)")
-            .getDocument()
+        // QUERY OPTIMIZATION: Batch both document reads in parallel
+        let swipeId = "\(fromUserId)_\(toUserId)"
 
-        let passDoc = try await db.collection("passes")
-            .document("\(fromUserId)_\(toUserId)")
-            .getDocument()
+        async let likeDoc = db.collection("likes").document(swipeId).getDocument()
+        async let passDoc = db.collection("passes").document(swipeId).getDocument()
 
-        let hasLiked = likeDoc.exists && (likeDoc.data()?["isActive"] as? Bool == true)
-        let hasPassed = passDoc.exists && (passDoc.data()?["isActive"] as? Bool == true)
+        let (like, pass) = try await (likeDoc, passDoc)
+
+        let hasLiked = like.exists && (like.data()?["isActive"] as? Bool == true)
+        let hasPassed = pass.exists && (pass.data()?["isActive"] as? Bool == true)
 
         return (hasLiked, hasPassed)
     }
 
-    func getLikesReceived(userId: String) async throws -> [String] {
+    /// Get user IDs who have liked this user
+    /// - Parameters:
+    ///   - userId: The user receiving likes
+    ///   - limit: Maximum number of results (default 500 for performance)
+    /// - Returns: Array of user IDs who liked this user
+    func getLikesReceived(userId: String, limit: Int = 500) async throws -> [String] {
+        Logger.shared.debug("Querying likes received for userId: \(userId)", category: .matching)
+
+        // QUERY OPTIMIZATION: Added limit to prevent unbounded queries
+        // For users with many likes, this prevents timeout and excessive bandwidth
         let snapshot = try await db.collection("likes")
             .whereField("toUserId", isEqualTo: userId)
             .whereField("isActive", isEqualTo: true)
+            .order(by: "timestamp", descending: true)
+            .limit(to: limit)
             .getDocuments()
 
+        Logger.shared.debug("Found \(snapshot.documents.count) likes received", category: .matching)
+
         return snapshot.documents.compactMap { $0.data()["fromUserId"] as? String }
+    }
+
+    /// Get user IDs this user has liked
+    /// - Parameters:
+    ///   - userId: The user who sent likes
+    ///   - limit: Maximum number of results (default 500 for performance)
+    /// - Returns: Array of user IDs this user has liked
+    func getLikesSent(userId: String, limit: Int = 500) async throws -> [String] {
+        Logger.shared.debug("Querying likes sent for userId: \(userId)", category: .matching)
+
+        // QUERY OPTIMIZATION: Added limit to prevent unbounded queries
+        let snapshot = try await db.collection("likes")
+            .whereField("fromUserId", isEqualTo: userId)
+            .whereField("isActive", isEqualTo: true)
+            .order(by: "timestamp", descending: true)
+            .limit(to: limit)
+            .getDocuments()
+
+        Logger.shared.debug("Found \(snapshot.documents.count) likes sent", category: .matching)
+
+        return snapshot.documents.compactMap { $0.data()["toUserId"] as? String }
     }
 
     /// Delete a swipe (like or pass) for rewind functionality

@@ -21,7 +21,9 @@ class AnalyticsServiceEnhanced: ObservableObject {
     @Published var isLoading = false
 
     private let db = Firestore.firestore()
-    private let abTesting = ABTestingManager.shared
+
+    // FIXED: Use lazy to avoid circular dependency crash during singleton initialization
+    private lazy var abTesting = ABTestingManager.shared
 
     private init() {}
 
