@@ -521,7 +521,7 @@ struct SavedProfileCard: View {
         Button(action: onTap) {
             VStack(spacing: 0) {
                 // Profile image section
-                ZStack(alignment: .topLeading) {
+                ZStack {
                     Group {
                         if let imageURL = savedProfile.user.photos.first, let url = URL(string: imageURL) {
                             CachedCardImage(url: url)
@@ -541,11 +541,6 @@ struct SavedProfileCard: View {
                             .frame(height: 200)
                         }
                     }
-
-                    // Online status indicator
-                    OnlineStatusIndicator(user: savedProfile.user)
-                        .padding(.top, 8)
-                        .padding(.leading, 8)
 
                     // Loading overlay when unsaving
                     if isUnsaving {
@@ -674,31 +669,24 @@ struct SavedYouCard: View {
         Button(action: onTap) {
             VStack(spacing: 0) {
                 // Profile image section
-                ZStack(alignment: .topLeading) {
-                    Group {
-                        if let imageURL = profile.user.photos.first, let url = URL(string: imageURL) {
-                            CachedCardImage(url: url)
-                                .frame(height: 200)
-                                .clipped()
-                        } else {
-                            LinearGradient(
-                                colors: [.blue.opacity(0.6), .purple.opacity(0.5)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                            .overlay {
-                                Image(systemName: "person.fill")
-                                    .font(.system(size: 50))
-                                    .foregroundColor(.white.opacity(0.5))
-                            }
+                Group {
+                    if let imageURL = profile.user.photos.first, let url = URL(string: imageURL) {
+                        CachedCardImage(url: url)
                             .frame(height: 200)
+                            .clipped()
+                    } else {
+                        LinearGradient(
+                            colors: [.blue.opacity(0.6), .purple.opacity(0.5)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        .overlay {
+                            Image(systemName: "person.fill")
+                                .font(.system(size: 50))
+                                .foregroundColor(.white.opacity(0.5))
                         }
+                        .frame(height: 200)
                     }
-
-                    // Online status indicator
-                    OnlineStatusIndicator(user: profile.user)
-                        .padding(.top, 8)
-                        .padding(.leading, 8)
                 }
                 .frame(height: 200)
                 .frame(maxWidth: .infinity)
