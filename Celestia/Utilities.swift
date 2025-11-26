@@ -26,7 +26,12 @@ extension Date {
     }()
 
     func timeAgoDisplay() -> String {
-        Self.relativeFormatter.localizedString(for: self, relativeTo: Date())
+        let seconds = Date().timeIntervalSince(self)
+        // Show "1 sec ago" minimum instead of "0 seconds ago"
+        if seconds < 1 {
+            return "1 sec ago"
+        }
+        return Self.relativeFormatter.localizedString(for: self, relativeTo: Date())
     }
 
     func shortTimeAgo() -> String {
