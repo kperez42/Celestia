@@ -239,8 +239,9 @@ class ImageCache {
 
         Logger.shared.debug("High-priority prefetching \(photoURLs.count) photos for \(user.fullName)", category: .storage)
 
-        // Start loading all photos with high priority
-        for (index, urlString) in photoURLs.enumerated() {
+        // PERFORMANCE: Load ALL photos with immediate priority for instant gallery opening
+        // This ensures when user taps camera icon, all photos are already cached
+        for urlString in photoURLs {
             guard let url = URL(string: urlString) else { continue }
 
             let cacheKey = url.absoluteString
@@ -248,8 +249,8 @@ class ImageCache {
             // Skip if already cached
             if image(for: cacheKey) != nil { continue }
 
-            // First image gets immediate priority, others get high
-            let priority: ImageLoadPriority = (index == 0) ? .immediate : .high
+            // ALL images get immediate priority to eliminate white screens in photo gallery
+            let priority: ImageLoadPriority = .immediate
 
             Task(priority: priority.taskPriority) {
                 _ = await self.loadImageAsync(for: url, priority: priority)
