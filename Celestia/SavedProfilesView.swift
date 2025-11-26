@@ -56,14 +56,6 @@ struct SavedProfilesView: View {
                 HapticManager.shared.notification(.success)
             }
         }
-        .onAppear {
-            // BUGFIX: Refresh data when tab becomes visible
-            // LazyTabContent caches views, so .task only runs once
-            Task {
-                await viewModel.loadSavedProfiles()
-                await viewModel.loadSavedYouProfiles()
-            }
-        }
         .sheet(item: $selectedUser) { user in
             UserDetailView(user: user)
                 .environmentObject(authService)
