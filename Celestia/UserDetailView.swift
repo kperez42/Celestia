@@ -20,6 +20,8 @@ struct UserDetailView: View {
     @State private var errorMessage = ""
     @State private var isSaved = false
     @State private var isLiked = false
+    @State private var showingChat = false
+    @State private var chatMatch: Match?
     @ObservedObject private var savedProfilesVM = SavedProfilesViewModel.shared
 
     // Photo viewer state
@@ -79,6 +81,14 @@ struct UserDetailView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text("You unliked \(user.fullName)")
+        }
+        .sheet(isPresented: $showingChat) {
+            if let match = chatMatch {
+                NavigationStack {
+                    ChatView(match: match, otherUser: user)
+                        .environmentObject(authService)
+                }
+            }
         }
     }
 
@@ -352,9 +362,10 @@ struct UserDetailView: View {
     // MARK: - Action Buttons
 
     private var actionButtons: some View {
-        HStack(spacing: 20) {
+        HStack(spacing: 16) {
             dismissButton
             saveButton
+            messageButton
             likeButton
         }
         .padding(.bottom, 30)
@@ -402,6 +413,22 @@ struct UserDetailView: View {
         .accessibilityHint("Bookmark this profile for later")
     }
 
+    private var messageButton: some View {
+        Button {
+            openChat()
+        } label: {
+            Image(systemName: "message.fill")
+                .font(.title2)
+                .foregroundColor(.blue)
+                .frame(width: 60, height: 60)
+                .background(Color.white)
+                .clipShape(Circle())
+                .shadow(color: Color.black.opacity(0.1), radius: 5)
+        }
+        .accessibilityLabel("Message")
+        .accessibilityHint("Start a conversation with \(user.fullName)")
+    }
+
     private var likeButton: some View {
         Button {
             toggleLike()
@@ -410,14 +437,14 @@ struct UserDetailView: View {
                 if isProcessing {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: isLiked ? .pink : .white))
-                        .scaleEffect(1.2)
+                        .scaleEffect(1.0)
                 } else {
                     Image(systemName: isLiked ? "heart.fill" : "heart")
-                        .font(.title)
+                        .font(.title2)
                         .foregroundColor(isLiked ? .pink : .white)
                 }
             }
-            .frame(width: 70, height: 70)
+            .frame(width: 60, height: 60)
             .background(
                 Group {
                     if isLiked {
@@ -432,7 +459,7 @@ struct UserDetailView: View {
                 }
             )
             .clipShape(Circle())
-            .shadow(color: isLiked ? Color.pink.opacity(0.3) : Color.purple.opacity(0.4), radius: 10)
+            .shadow(color: Color.black.opacity(0.1), radius: 5)
         }
         .disabled(isProcessing)
         .accessibilityLabel(isLiked ? "Unlike" : "Like")
@@ -617,6 +644,51 @@ struct UserDetailView: View {
                     }
                     Logger.shared.error("Error sending like from detail view", category: .matching, error: error)
                 }
+            }
+        }
+    }
+
+    func openChat() {
+        guard let currentUserId = authService.currentUser?.id,
+              let targetUserId = user.id else { return }
+
+        // Prevent messaging yourself
+        guard currentUserId != targetUserId else {
+            errorMessage = "You can't message yourself!"
+            showingError = true
+            return
+        }
+
+        HapticManager.shared.impact(.medium)
+
+        Task {
+            do {
+                // Check if a match already exists
+                var existingMatch = try await MatchService.shared.fetchMatch(user1Id: currentUserId, user2Id: targetUserId)
+
+                if existingMatch == nil {
+                    // No match exists - create one to enable messaging
+                    Logger.shared.info("Creating conversation with \(user.fullName)", category: .messaging)
+                    await MatchService.shared.createMatch(user1Id: currentUserId, user2Id: targetUserId)
+                    existingMatch = try await MatchService.shared.fetchMatch(user1Id: currentUserId, user2Id: targetUserId)
+                }
+
+                await MainActor.run {
+                    if let match = existingMatch {
+                        chatMatch = match
+                        showingChat = true
+                        Logger.shared.info("Opening chat with \(user.fullName) from detail view", category: .messaging)
+                    } else {
+                        errorMessage = "Unable to start conversation. Try again."
+                        showingError = true
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = "Unable to start conversation. Try again."
+                    showingError = true
+                }
+                Logger.shared.error("Error starting conversation from detail view", category: .messaging, error: error)
             }
         }
     }
