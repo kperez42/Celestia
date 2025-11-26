@@ -53,15 +53,17 @@ class UserService: ObservableObject, UserServiceProtocol {
             users = []
             lastDocument = nil
         }
-        
+
         isLoading = true
         defer { isLoading = false }
-        
+
+        Logger.shared.debug("UserService.fetchUsers called - lookingFor: \(lookingFor ?? "nil"), ageRange: \(ageRange?.description ?? "nil")", category: .database)
+
         var query = db.collection("users")
             .whereField("showMeInSearch", isEqualTo: true)
             .order(by: "lastActive", descending: true)
             .limit(to: limit)
-        
+
         // Apply filters
         if let lookingFor = lookingFor {
             // Convert lookingFor values to match gender field values
@@ -76,34 +78,47 @@ class UserService: ObservableObject, UserServiceProtocol {
             default:
                 genderToMatch = lookingFor
             }
+            Logger.shared.info("UserService: Filtering by gender = \(genderToMatch) (from lookingFor: \(lookingFor))", category: .database)
             query = query.whereField("gender", isEqualTo: genderToMatch)
         }
-        
+
         if let ageRange = ageRange {
+            Logger.shared.debug("UserService: Filtering by age range \(ageRange.lowerBound)-\(ageRange.upperBound)", category: .database)
             query = query
                 .whereField("age", isGreaterThanOrEqualTo: ageRange.lowerBound)
                 .whereField("age", isLessThanOrEqualTo: ageRange.upperBound)
         }
-        
+
         if let country = country {
+            Logger.shared.debug("UserService: Filtering by country = \(country)", category: .database)
             query = query.whereField("country", isEqualTo: country)
         }
-        
+
         // Pagination
         if let lastDoc = lastDocument {
             query = query.start(afterDocument: lastDoc)
         }
-        
+
         do {
+            Logger.shared.info("UserService: Executing Firestore query...", category: .database)
             let snapshot = try await query.getDocuments()
             lastDocument = snapshot.documents.last
 
             let newUsers = snapshot.documents.compactMap { try? $0.data(as: User.self) }
                 .filter { $0.id != excludingUserId }
 
+            Logger.shared.info("UserService: Query returned \(snapshot.documents.count) documents, \(newUsers.count) valid users after filtering", category: .database)
+
+            if newUsers.isEmpty {
+                Logger.shared.warning("UserService: No users found! Check Firebase indexes and user data.", category: .database)
+            } else {
+                Logger.shared.info("UserService: Found users - \(newUsers.map { "\($0.fullName) (gender: \($0.gender))" }.joined(separator: ", "))", category: .database)
+            }
+
             users.append(contentsOf: newUsers)
             hasMoreUsers = newUsers.count >= limit
         } catch {
+            Logger.shared.error("UserService: Firestore query failed", category: .database, error: error)
             self.error = error
             throw error
         }

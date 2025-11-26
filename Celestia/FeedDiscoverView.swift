@@ -71,6 +71,7 @@ struct FeedDiscoverView: View {
                     }
                 }
                 .onAppear {
+                    Logger.shared.debug("FeedDiscoverView appeared - users.count: \(users.count), currentUser.lookingFor: \(authService.currentUser?.lookingFor ?? "nil")", category: .general)
                     if users.isEmpty {
                         Task {
                             await loadUsers()
@@ -80,6 +81,13 @@ struct FeedDiscoverView: View {
                     }
                 }
                 .onChange(of: filters.hasActiveFilters) { _ in
+                    Logger.shared.debug("Filters changed - reloading users", category: .general)
+                    Task {
+                        await reloadWithFilters()
+                    }
+                }
+                .onChange(of: authService.currentUser?.lookingFor) { oldValue, newValue in
+                    Logger.shared.debug("lookingFor changed from \(oldValue ?? "nil") to \(newValue ?? "nil") - reloading users", category: .general)
                     Task {
                         await reloadWithFilters()
                     }
@@ -508,6 +516,7 @@ struct FeedDiscoverView: View {
 
     private func loadUsers() async {
         guard let currentUserId = authService.currentUser?.effectiveId else {
+            Logger.shared.error("loadUsers called but no currentUser", category: .database)
             await MainActor.run {
                 isInitialLoad = false
             }
@@ -537,10 +546,13 @@ struct FeedDiscoverView: View {
                 return nil
             }()
 
+            let lookingForValue = authService.currentUser?.lookingFor
+            Logger.shared.info("FeedDiscoverView: Loading users with filters - lookingFor: \(lookingForValue ?? "nil"), ageRange: \(ageRange?.description ?? "nil")", category: .database)
+
             // Fetch users from Firestore using UserService
             try await UserService.shared.fetchUsers(
                 excludingUserId: currentUserId,
-                lookingFor: authService.currentUser?.lookingFor,
+                lookingFor: lookingForValue,
                 ageRange: ageRange ?? 18...99,
                 limit: 50,
                 reset: true
@@ -548,6 +560,7 @@ struct FeedDiscoverView: View {
 
             await MainActor.run {
                 users = UserService.shared.users
+                Logger.shared.info("FeedDiscoverView: Loaded \(users.count) users", category: .database)
                 errorMessage = ""  // Clear any previous errors
                 isInitialLoad = false  // Hide skeleton and show content
                 loadMoreUsers()
