@@ -64,6 +64,8 @@ enum CelestiaError: LocalizedError, Identifiable {
     case inappropriateContent
     case inappropriateContentWithReasons([String])
     case batchOperationFailed(operationId: String, underlyingError: Error)
+    case messageDeliveryFailed(retryable: Bool)
+    case messageQueuedForDelivery
 
     // Rate Limiting
     case rateLimitExceeded
@@ -183,6 +185,10 @@ enum CelestiaError: LocalizedError, Identifiable {
             return "Content violation: " + reasons.joined(separator: ", ")
         case .batchOperationFailed(let operationId, let underlyingError):
             return "Operation \(operationId) failed after multiple retries: \(underlyingError.localizedDescription)"
+        case .messageDeliveryFailed(let retryable):
+            return retryable ? "Message delivery failed. It will be retried automatically." : "Message could not be delivered."
+        case .messageQueuedForDelivery:
+            return "Message queued. It will be sent when connection is restored."
 
         // Rate Limiting
         case .rateLimitExceeded:
@@ -267,6 +273,10 @@ enum CelestiaError: LocalizedError, Identifiable {
             return "Complete your profile in Settings."
         case .batchOperationFailed:
             return "The operation will be retried automatically. If the problem persists, contact support."
+        case .messageDeliveryFailed(let retryable):
+            return retryable ? "Check your internet connection. The message will be sent automatically when connected." : "Please try sending the message again."
+        case .messageQueuedForDelivery:
+            return "Your message is saved and will be sent automatically when you're back online."
         case .tooManyRequests, .rateLimitExceeded, .rateLimitExceededWithTime:
             return "Please wait a moment before trying again."
         case .unauthorized, .permissionDenied:
@@ -292,8 +302,10 @@ enum CelestiaError: LocalizedError, Identifiable {
             return "crown"
         case .imageUploadFailed, .uploadFailed, .imageTooBig, .invalidImageFormat, .storageQuotaExceeded:
             return "photo"
-        case .messageNotSent, .batchOperationFailed:
+        case .messageNotSent, .batchOperationFailed, .messageDeliveryFailed:
             return "message.badge.exclamationmark"
+        case .messageQueuedForDelivery:
+            return "clock.arrow.circlepath"
         case .userBlocked:
             return "hand.raised"
         case .inappropriateContent, .inappropriateContentWithReasons:

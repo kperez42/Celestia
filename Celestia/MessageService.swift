@@ -9,6 +9,29 @@ import Foundation
 import Firebase
 import FirebaseFirestore
 
+/// Message delivery status for UI feedback
+enum MessageDeliveryStatus: String, Codable {
+    case pending        // Message is queued/pending
+    case sending        // Actively being sent
+    case sent           // Successfully sent to server
+    case delivered      // Confirmed delivered to recipient
+    case failed         // Failed to send (can retry)
+    case failedPermanent // Permanent failure (cannot retry)
+}
+
+/// Configuration for message retry logic
+struct MessageRetryConfig {
+    static let maxRetries = 3
+    static let baseDelaySeconds: Double = 1.0
+    static let maxDelaySeconds: Double = 30.0
+
+    /// Calculate exponential backoff delay
+    static func delay(for attempt: Int) -> TimeInterval {
+        let delay = baseDelaySeconds * pow(2.0, Double(attempt))
+        return min(delay, maxDelaySeconds)
+    }
+}
+
 @MainActor
 class MessageService: ObservableObject, MessageServiceProtocol {
     @Published var messages: [Message] = []
@@ -16,6 +39,10 @@ class MessageService: ObservableObject, MessageServiceProtocol {
     @Published var isLoadingMore = false
     @Published var hasMoreMessages = true
     @Published var error: Error?
+
+    /// Track pending/failed message IDs for UI feedback
+    @Published var pendingMessageIds: Set<String> = []
+    @Published var failedMessageIds: Set<String> = []
 
     // Dependency injection: Repository for data access
     private let repository: MessageRepository
@@ -27,6 +54,9 @@ class MessageService: ObservableObject, MessageServiceProtocol {
     private var listener: ListenerRegistration?
     private var oldestMessageTimestamp: Date?
     private let messagesPerPage = 50
+
+    // Network monitor for offline detection
+    private let networkMonitor = NetworkMonitor.shared
 
     // Dependency injection initializer
     init(repository: MessageRepository) {
@@ -197,13 +227,33 @@ class MessageService: ObservableObject, MessageServiceProtocol {
         Logger.shared.info("Stopped listening to messages and reset state", category: .messaging)
     }
     
-    /// Send a text message
+    /// Send a text message with retry logic for network failures
     func sendMessage(
         matchId: String,
         senderId: String,
         receiverId: String,
         text: String
     ) async throws {
+        // Generate a local ID for tracking before sending
+        let localMessageId = UUID().uuidString
+        pendingMessageIds.insert(localMessageId)
+
+        defer {
+            pendingMessageIds.remove(localMessageId)
+        }
+
+        // Check if offline - queue for later delivery
+        guard networkMonitor.isConnected else {
+            Logger.shared.info("Offline - queueing message for later delivery", category: .messaging)
+            await queueMessageForOfflineDelivery(
+                matchId: matchId,
+                senderId: senderId,
+                receiverId: receiverId,
+                text: text
+            )
+            return
+        }
+
         // SECURITY: Backend rate limit validation (prevents client bypass)
         // This is called BEFORE client-side check to ensure server-side enforcement
         do {
@@ -314,18 +364,173 @@ class MessageService: ObservableObject, MessageServiceProtocol {
             text: sanitizedText
         )
 
-        // Add message to Firestore
-        _ = try db.collection("messages").addDocument(from: message)
+        // Send message with retry logic for network failures
+        try await sendMessageWithRetry(message: message, matchId: matchId, receiverId: receiverId, senderId: senderId)
 
-        // Update match with last message info
-        try await db.collection("matches").document(matchId).updateData([
-            "lastMessage": sanitizedText,
-            "lastMessageTimestamp": FieldValue.serverTimestamp(),
-            "unreadCount.\(receiverId)": FieldValue.increment(Int64(1))
+        Logger.shared.info("Message sent successfully", category: .messaging)
+    }
+
+    /// Internal helper to send message to Firestore with exponential backoff retry
+    private func sendMessageWithRetry(
+        message: Message,
+        matchId: String,
+        receiverId: String,
+        senderId: String,
+        attempt: Int = 0
+    ) async throws {
+        do {
+            // Add message to Firestore
+            _ = try db.collection("messages").addDocument(from: message)
+
+            // Update match with last message info
+            try await db.collection("matches").document(matchId).updateData([
+                "lastMessage": message.text,
+                "lastMessageTimestamp": FieldValue.serverTimestamp(),
+                "unreadCount.\(receiverId)": FieldValue.increment(Int64(1))
+            ])
+
+            // Send notification to receiver
+            await sendMessageNotificationWithFallback(message: message, senderId: senderId, matchId: matchId)
+
+            // Notify success
+            NotificationCenter.default.post(
+                name: .messageDeliveryStatusChanged,
+                object: nil,
+                userInfo: [
+                    "status": MessageDeliveryStatus.sent,
+                    "messageText": message.text
+                ]
+            )
+
+        } catch {
+            // Check if this is a retryable network error
+            let isRetryable = isRetryableError(error)
+
+            if isRetryable && attempt < MessageRetryConfig.maxRetries {
+                let delay = MessageRetryConfig.delay(for: attempt)
+                Logger.shared.warning("Message send failed (attempt \(attempt + 1)/\(MessageRetryConfig.maxRetries + 1)), retrying in \(delay)s", category: .messaging)
+
+                // Wait before retry with exponential backoff
+                try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+
+                // Check if still connected before retry
+                guard networkMonitor.isConnected else {
+                    Logger.shared.info("Lost connection during retry - queueing message", category: .messaging)
+                    await queueMessageForOfflineDelivery(
+                        matchId: matchId,
+                        senderId: senderId,
+                        receiverId: receiverId,
+                        text: message.text
+                    )
+                    return
+                }
+
+                // Retry
+                try await sendMessageWithRetry(
+                    message: message,
+                    matchId: matchId,
+                    receiverId: receiverId,
+                    senderId: senderId,
+                    attempt: attempt + 1
+                )
+            } else {
+                // Max retries exceeded or non-retryable error
+                Logger.shared.error("Message send failed after \(attempt + 1) attempts", category: .messaging, error: error)
+
+                // Queue for later if it's a network issue
+                if isRetryable {
+                    await queueMessageForOfflineDelivery(
+                        matchId: matchId,
+                        senderId: senderId,
+                        receiverId: receiverId,
+                        text: message.text
+                    )
+
+                    // Notify that message is queued (not failed permanently)
+                    NotificationCenter.default.post(
+                        name: .messageDeliveryStatusChanged,
+                        object: nil,
+                        userInfo: [
+                            "status": MessageDeliveryStatus.pending,
+                            "messageText": message.text
+                        ]
+                    )
+                } else {
+                    // Permanent failure
+                    NotificationCenter.default.post(
+                        name: .messageDeliveryStatusChanged,
+                        object: nil,
+                        userInfo: [
+                            "status": MessageDeliveryStatus.failedPermanent,
+                            "messageText": message.text,
+                            "error": error.localizedDescription
+                        ]
+                    )
+                    throw error
+                }
+            }
+        }
+    }
+
+    /// Check if an error is retryable (network-related)
+    private func isRetryableError(_ error: Error) -> Bool {
+        let nsError = error as NSError
+
+        // Check for common network error domains and codes
+        if nsError.domain == NSURLErrorDomain {
+            switch nsError.code {
+            case NSURLErrorNotConnectedToInternet,
+                 NSURLErrorNetworkConnectionLost,
+                 NSURLErrorTimedOut,
+                 NSURLErrorCannotFindHost,
+                 NSURLErrorCannotConnectToHost,
+                 NSURLErrorDNSLookupFailed,
+                 NSURLErrorDataNotAllowed:
+                return true
+            default:
+                return false
+            }
+        }
+
+        // Firebase-specific network errors
+        if nsError.domain == "FIRFirestoreErrorDomain" {
+            // Code 14 = UNAVAILABLE (network issues)
+            // Code 4 = DEADLINE_EXCEEDED (timeout)
+            return nsError.code == 14 || nsError.code == 4
+        }
+
+        return false
+    }
+
+    /// Queue a message for delivery when connection is restored
+    private func queueMessageForOfflineDelivery(
+        matchId: String,
+        senderId: String,
+        receiverId: String,
+        text: String,
+        imageURL: String? = nil
+    ) async {
+        await MainActor.run {
+            MessageQueueManager.shared.queueMessage(
+                matchId: matchId,
+                senderId: senderId,
+                receiverId: receiverId,
+                text: text,
+                imageURL: imageURL
+            )
+        }
+
+        Logger.shared.info("Message queued for offline delivery", category: .messaging)
+
+        // Track analytics
+        AnalyticsManager.shared.logEvent(.queuedMessage, parameters: [
+            "reason": "offline",
+            "match_id": matchId
         ])
+    }
 
-        // Send notification to receiver
-        // UX FIX: Properly handle sender fetch errors instead of silent failure
+    /// Helper to send notification with fallback for sender name
+    private func sendMessageNotificationWithFallback(message: Message, senderId: String, matchId: String) async {
         do {
             let senderSnapshot = try await db.collection("users").document(senderId).getDocument()
             if let senderName = senderSnapshot.data()?["fullName"] as? String {
@@ -352,11 +557,9 @@ class MessageService: ObservableObject, MessageServiceProtocol {
                 matchId: matchId
             )
         }
-
-        Logger.shared.info("Message sent successfully", category: .messaging)
     }
     
-    /// Send an image message
+    /// Send an image message with retry logic for network failures
     func sendImageMessage(
         matchId: String,
         senderId: String,
@@ -364,6 +567,19 @@ class MessageService: ObservableObject, MessageServiceProtocol {
         imageURL: String,
         caption: String? = nil
     ) async throws {
+        // Check if offline - queue for later delivery
+        guard networkMonitor.isConnected else {
+            Logger.shared.info("Offline - queueing image message for later delivery", category: .messaging)
+            await queueMessageForOfflineDelivery(
+                matchId: matchId,
+                senderId: senderId,
+                receiverId: receiverId,
+                text: caption ?? "📷 Photo",
+                imageURL: imageURL
+            )
+            return
+        }
+
         let messageText = caption.flatMap { !$0.isEmpty ? $0 : nil } ?? "📷 Photo"
         let lastMessageText = caption.flatMap { !$0.isEmpty ? "📷 \($0)" : nil } ?? "📷 Photo"
 
@@ -375,13 +591,114 @@ class MessageService: ObservableObject, MessageServiceProtocol {
             imageURL: imageURL
         )
 
-        _ = try db.collection("messages").addDocument(from: message)
+        // Send with retry logic
+        try await sendImageMessageWithRetry(
+            message: message,
+            matchId: matchId,
+            receiverId: receiverId,
+            senderId: senderId,
+            lastMessageText: lastMessageText,
+            imageURL: imageURL
+        )
 
-        try await db.collection("matches").document(matchId).updateData([
-            "lastMessage": lastMessageText,
-            "lastMessageTimestamp": FieldValue.serverTimestamp(),
-            "unreadCount.\(receiverId)": FieldValue.increment(Int64(1))
-        ])
+        Logger.shared.info("Image message sent successfully", category: .messaging)
+    }
+
+    /// Internal helper to send image message with exponential backoff retry
+    private func sendImageMessageWithRetry(
+        message: Message,
+        matchId: String,
+        receiverId: String,
+        senderId: String,
+        lastMessageText: String,
+        imageURL: String,
+        attempt: Int = 0
+    ) async throws {
+        do {
+            _ = try db.collection("messages").addDocument(from: message)
+
+            try await db.collection("matches").document(matchId).updateData([
+                "lastMessage": lastMessageText,
+                "lastMessageTimestamp": FieldValue.serverTimestamp(),
+                "unreadCount.\(receiverId)": FieldValue.increment(Int64(1))
+            ])
+
+            // Notify success
+            NotificationCenter.default.post(
+                name: .messageDeliveryStatusChanged,
+                object: nil,
+                userInfo: [
+                    "status": MessageDeliveryStatus.sent,
+                    "messageText": message.text,
+                    "isImage": true
+                ]
+            )
+
+        } catch {
+            let isRetryable = isRetryableError(error)
+
+            if isRetryable && attempt < MessageRetryConfig.maxRetries {
+                let delay = MessageRetryConfig.delay(for: attempt)
+                Logger.shared.warning("Image message send failed (attempt \(attempt + 1)/\(MessageRetryConfig.maxRetries + 1)), retrying in \(delay)s", category: .messaging)
+
+                try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+
+                guard networkMonitor.isConnected else {
+                    await queueMessageForOfflineDelivery(
+                        matchId: matchId,
+                        senderId: senderId,
+                        receiverId: receiverId,
+                        text: message.text,
+                        imageURL: imageURL
+                    )
+                    return
+                }
+
+                try await sendImageMessageWithRetry(
+                    message: message,
+                    matchId: matchId,
+                    receiverId: receiverId,
+                    senderId: senderId,
+                    lastMessageText: lastMessageText,
+                    imageURL: imageURL,
+                    attempt: attempt + 1
+                )
+            } else {
+                Logger.shared.error("Image message send failed after \(attempt + 1) attempts", category: .messaging, error: error)
+
+                if isRetryable {
+                    await queueMessageForOfflineDelivery(
+                        matchId: matchId,
+                        senderId: senderId,
+                        receiverId: receiverId,
+                        text: message.text,
+                        imageURL: imageURL
+                    )
+
+                    NotificationCenter.default.post(
+                        name: .messageDeliveryStatusChanged,
+                        object: nil,
+                        userInfo: [
+                            "status": MessageDeliveryStatus.pending,
+                            "messageText": message.text,
+                            "isImage": true
+                        ]
+                    )
+                } else {
+                    NotificationCenter.default.post(
+                        name: .messageDeliveryStatusChanged,
+                        object: nil,
+                        userInfo: [
+                            "status": MessageDeliveryStatus.failedPermanent,
+                            "messageText": message.text,
+                            "isImage": true,
+                            "error": error.localizedDescription
+                        ]
+                    )
+                    throw error
+                }
+            }
+        }
     }
     
     /// Mark messages as read (with transaction logging and retry)
@@ -476,4 +793,15 @@ class MessageService: ObservableObject, MessageServiceProtocol {
     deinit {
         listener?.remove()
     }
+}
+
+// MARK: - Notification Names for Message Delivery
+
+extension Notification.Name {
+    /// Posted when a message's delivery status changes
+    /// userInfo contains: "status" (MessageDeliveryStatus), "messageText" (String), optionally "isImage" (Bool), "error" (String)
+    static let messageDeliveryStatusChanged = Notification.Name("messageDeliveryStatusChanged")
+
+    /// Posted when a message is successfully queued for offline delivery
+    static let messageQueued = Notification.Name("messageQueued")
 }
