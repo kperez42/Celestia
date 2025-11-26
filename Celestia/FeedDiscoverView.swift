@@ -19,9 +19,8 @@ struct FeedDiscoverView: View {
     @State private var isLoading = false
     @State private var isInitialLoad = true
     @State private var showFilters = false
-    @State private var selectedUser: User?
-    @State private var showUserDetail = false
-    @State private var showPhotoGallery = false
+    @State private var selectedUserForDetail: User?
+    @State private var selectedUserForPhotos: User?
     @State private var showMatchAnimation = false
     @State private var matchedUser: User?
     @State private var favorites: Set<String> = []
@@ -29,10 +28,14 @@ struct FeedDiscoverView: View {
     @State private var showOwnProfileDetail = false
     @State private var showEditProfile = false
 
-    // Direct messaging state
-    @State private var showDirectChat = false
-    @State private var chatMatch: Match?
-    @State private var chatUser: User?
+    // Direct messaging state - using dedicated struct for item-based presentation
+    @State private var chatPresentation: ChatPresentation?
+
+    struct ChatPresentation: Identifiable {
+        let id = UUID()
+        let match: Match
+        let user: User
+    }
 
     // Action feedback toast
     @State private var showActionToast = false
@@ -64,16 +67,12 @@ struct FeedDiscoverView: View {
                     DiscoverFiltersView()
                         .environmentObject(authService)
                 }
-                .sheet(isPresented: $showUserDetail) {
-                    if let user = selectedUser {
-                        UserDetailView(user: user)
-                            .environmentObject(authService)
-                    }
+                .sheet(item: $selectedUserForDetail) { user in
+                    UserDetailView(user: user)
+                        .environmentObject(authService)
                 }
-                .sheet(isPresented: $showPhotoGallery) {
-                    if let user = selectedUser {
-                        PhotoGalleryView(user: user)
-                    }
+                .sheet(item: $selectedUserForPhotos) { user in
+                    PhotoGalleryView(user: user)
                 }
                 .onAppear {
                     Logger.shared.debug("FeedDiscoverView appeared - users.count: \(users.count), currentUser.lookingFor: \(authService.currentUser?.lookingFor ?? "nil")", category: .general)
@@ -119,12 +118,10 @@ struct FeedDiscoverView: View {
                     EditProfileView()
                         .environmentObject(authService)
                 }
-                .sheet(isPresented: $showDirectChat) {
-                    if let match = chatMatch, let user = chatUser {
-                        NavigationStack {
-                            ChatView(match: match, otherUser: user)
-                                .environmentObject(authService)
-                        }
+                .sheet(item: $chatPresentation) { presentation in
+                    NavigationStack {
+                        ChatView(match: presentation.match, otherUser: presentation.user)
+                            .environmentObject(authService)
                     }
                 }
         }
@@ -186,13 +183,11 @@ struct FeedDiscoverView: View {
                             handleMessage(user: user)
                         },
                         onViewPhotos: {
-                            selectedUser = user
-                            showPhotoGallery = true
+                            selectedUserForPhotos = user
                         },
                         onViewProfile: {
                             HapticManager.shared.impact(.light)
-                            selectedUser = user
-                            showUserDetail = true
+                            selectedUserForDetail = user
                         }
                     )
                     .onAppear {
@@ -861,10 +856,8 @@ struct FeedDiscoverView: View {
 
                 await MainActor.run {
                     if let match = existingMatch {
-                        // Open chat directly
-                        chatMatch = match
-                        chatUser = user
-                        showDirectChat = true
+                        // Open chat directly using item-based presentation
+                        chatPresentation = ChatPresentation(match: match, user: user)
 
                         let truncatedName = user.fullName.count > 20 ? String(user.fullName.prefix(20)) + "..." : user.fullName
                         Logger.shared.info("Opening chat with \(truncatedName)", category: .messaging)
