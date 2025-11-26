@@ -967,6 +967,10 @@ struct PhotoGalleryView: View {
     @State private var selectedPhotoIndex = 0
     @State private var showZoomableViewer = false
 
+    // Swipe-down to dismiss state
+    @State private var dismissDragOffset: CGFloat = 0
+    private let dismissThreshold: CGFloat = 150
+
     // Filter out empty photo URLs
     private var validPhotos: [String] {
         let photos = user.photos.filter { !$0.isEmpty }
@@ -975,61 +979,96 @@ struct PhotoGalleryView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color.black.ignoresSafeArea()
+            GeometryReader { geometry in
+                ZStack {
+                    Color.black
+                        .opacity(backgroundOpacity)
+                        .ignoresSafeArea()
 
-                if validPhotos.isEmpty {
-                    // No photos available
-                    VStack(spacing: 16) {
-                        Image(systemName: "photo.on.rectangle.angled")
-                            .font(.system(size: 60))
-                            .foregroundColor(.white.opacity(0.5))
+                    if validPhotos.isEmpty {
+                        // No photos available
+                        VStack(spacing: 16) {
+                            Image(systemName: "photo.on.rectangle.angled")
+                                .font(.system(size: 60))
+                                .foregroundColor(.white.opacity(0.5))
 
-                        Text("No photos available")
-                            .font(.headline)
-                            .foregroundColor(.white.opacity(0.7))
-                    }
-                } else {
-                    // PERFORMANCE: Photo gallery with smooth swiping
-                    TabView(selection: $selectedPhotoIndex) {
-                        ForEach(validPhotos.indices, id: \.self) { index in
-                            // PERFORMANCE: Always immediate - images already cached from card prefetch
-                            CachedCardImage(
-                                url: URL(string: validPhotos[index]),
-                                priority: .immediate
-                            )
-                            .aspectRatio(contentMode: .fit)
-                            .onTapGesture {
-                                HapticManager.shared.impact(.light)
-                                showZoomableViewer = true
-                            }
-                            .tag(index)
+                            Text("No photos available")
+                                .font(.headline)
+                                .foregroundColor(.white.opacity(0.7))
                         }
-                    }
-                    .tabViewStyle(.page(indexDisplayMode: .always))
-                    .indexViewStyle(.page(backgroundDisplayMode: .always))
-                    .task {
-                        // PERFORMANCE: Ensure all photos cached on open
-                        ImageCache.shared.prefetchAdjacentPhotos(photos: validPhotos, currentIndex: selectedPhotoIndex)
-                    }
-                    // PERFORMANCE: Preload adjacent photos when swiping
-                    .onChange(of: selectedPhotoIndex) { _, newIndex in
-                        ImageCache.shared.prefetchAdjacentPhotos(photos: validPhotos, currentIndex: newIndex)
-                    }
+                    } else {
+                        // PERFORMANCE: Photo gallery with smooth swiping
+                        TabView(selection: $selectedPhotoIndex) {
+                            ForEach(validPhotos.indices, id: \.self) { index in
+                                // PERFORMANCE: Always immediate - images already cached from card prefetch
+                                CachedCardImage(
+                                    url: URL(string: validPhotos[index]),
+                                    priority: .immediate
+                                )
+                                .aspectRatio(contentMode: .fit)
+                                .onTapGesture {
+                                    HapticManager.shared.impact(.light)
+                                    showZoomableViewer = true
+                                }
+                                .tag(index)
+                            }
+                        }
+                        .tabViewStyle(.page(indexDisplayMode: .always))
+                        .indexViewStyle(.page(backgroundDisplayMode: .always))
+                        // Apply dismiss offset and scale
+                        .offset(y: dismissDragOffset)
+                        .scaleEffect(dismissScale)
+                        .task {
+                            // PERFORMANCE: Ensure all photos cached on open
+                            ImageCache.shared.prefetchAdjacentPhotos(photos: validPhotos, currentIndex: selectedPhotoIndex)
+                        }
+                        // PERFORMANCE: Preload adjacent photos when swiping
+                        .onChange(of: selectedPhotoIndex) { _, newIndex in
+                            ImageCache.shared.prefetchAdjacentPhotos(photos: validPhotos, currentIndex: newIndex)
+                        }
 
-                    // Photo counter overlay
-                    VStack {
-                        Spacer()
-                        Text("\(selectedPhotoIndex + 1) / \(validPhotos.count)")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(Color.black.opacity(0.6))
-                            .cornerRadius(20)
-                            .padding(.bottom, 60)
+                        // Photo counter overlay
+                        VStack {
+                            Spacer()
+                            Text("\(selectedPhotoIndex + 1) / \(validPhotos.count)")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(Color.black.opacity(0.6))
+                                .cornerRadius(20)
+                                .padding(.bottom, 60)
+                        }
+                        .opacity(controlsOpacity)
                     }
                 }
+                // Swipe-down to dismiss gesture
+                .gesture(
+                    DragGesture()
+                        .onChanged { value in
+                            // Only allow downward drag for dismiss
+                            if value.translation.height > 0 {
+                                dismissDragOffset = value.translation.height
+                            }
+                        }
+                        .onEnded { value in
+                            if value.translation.height > dismissThreshold {
+                                // Dismiss with animation
+                                HapticManager.shared.impact(.light)
+                                withAnimation(.easeOut(duration: 0.2)) {
+                                    dismissDragOffset = geometry.size.height
+                                }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                    dismiss()
+                                }
+                            } else {
+                                // Snap back
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    dismissDragOffset = 0
+                                }
+                            }
+                        }
+                )
             }
             .navigationTitle("\(user.fullName)'s Photos")
             .navigationBarTitleDisplayMode(.inline)
@@ -1043,6 +1082,7 @@ struct PhotoGalleryView: View {
                             .font(.title2)
                             .foregroundColor(.white)
                     }
+                    .opacity(controlsOpacity)
                 }
             }
             .fullScreenCover(isPresented: $showZoomableViewer) {
@@ -1057,6 +1097,22 @@ struct PhotoGalleryView: View {
         .onAppear {
             ImageCache.shared.prefetchAdjacentPhotos(photos: validPhotos, currentIndex: selectedPhotoIndex)
         }
+    }
+
+    // Computed properties for smooth dismiss animation
+    private var backgroundOpacity: Double {
+        let progress = min(dismissDragOffset / dismissThreshold, 1.0)
+        return 1.0 - (progress * 0.5)
+    }
+
+    private var dismissScale: CGFloat {
+        let progress = min(dismissDragOffset / dismissThreshold, 1.0)
+        return 1.0 - (progress * 0.1)
+    }
+
+    private var controlsOpacity: Double {
+        let progress = min(dismissDragOffset / dismissThreshold, 1.0)
+        return 1.0 - progress
     }
 }
 

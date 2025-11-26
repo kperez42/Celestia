@@ -1671,61 +1671,116 @@ struct PhotoViewerView: View {
     @Binding var selectedIndex: Int
     @Environment(\.dismiss) var dismiss
 
-    var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
+    // Swipe-down to dismiss state
+    @State private var dismissDragOffset: CGFloat = 0
+    private let dismissThreshold: CGFloat = 150
 
-            TabView(selection: $selectedIndex) {
-                ForEach(photos.indices, id: \.self) { index in
-                    if let url = URL(string: photos[index]) {
-                        GeometryReader { geometry in
-                            CachedAsyncImage(
-                                url: url,
-                                content: { image in
-                                    image
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fit)
-                                        .frame(width: geometry.size.width, height: geometry.size.height)
-                                },
-                                placeholder: {
-                                    ZStack {
-                                        Color.clear
-                                        ProgressView()
-                                            .tint(.white)
-                                            .scaleEffect(1.5)
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                Color.black
+                    .opacity(backgroundOpacity)
+                    .ignoresSafeArea()
+
+                TabView(selection: $selectedIndex) {
+                    ForEach(photos.indices, id: \.self) { index in
+                        if let url = URL(string: photos[index]) {
+                            GeometryReader { imageGeometry in
+                                CachedAsyncImage(
+                                    url: url,
+                                    content: { image in
+                                        image
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fit)
+                                            .frame(width: imageGeometry.size.width, height: imageGeometry.size.height)
+                                    },
+                                    placeholder: {
+                                        ZStack {
+                                            Color.clear
+                                            ProgressView()
+                                                .tint(.white)
+                                                .scaleEffect(1.5)
+                                        }
                                     }
-                                }
-                            )
-                        }
-                        .tag(index)
-                    } else {
-                        Color.gray.opacity(0.3)
-                            .overlay {
-                                Text("Image unavailable")
-                                    .foregroundColor(.white)
+                                )
                             }
                             .tag(index)
+                        } else {
+                            Color.gray.opacity(0.3)
+                                .overlay {
+                                    Text("Image unavailable")
+                                        .foregroundColor(.white)
+                                }
+                                .tag(index)
+                        }
                     }
                 }
-            }
-            .tabViewStyle(.page(indexDisplayMode: .always))
-            .indexViewStyle(.page(backgroundDisplayMode: .always))
+                .tabViewStyle(.page(indexDisplayMode: .always))
+                .indexViewStyle(.page(backgroundDisplayMode: .always))
+                // Apply dismiss offset and scale
+                .offset(y: dismissDragOffset)
+                .scaleEffect(dismissScale)
 
-            VStack {
-                HStack {
-                    Spacer()
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.largeTitle)
-                            .foregroundColor(.white)
-                            .padding()
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.largeTitle)
+                                .foregroundColor(.white)
+                                .padding()
+                        }
+                        .opacity(controlsOpacity)
                     }
+                    Spacer()
                 }
-                Spacer()
             }
+            // Swipe-down to dismiss gesture
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        // Only allow downward drag for dismiss
+                        if value.translation.height > 0 {
+                            dismissDragOffset = value.translation.height
+                        }
+                    }
+                    .onEnded { value in
+                        if value.translation.height > dismissThreshold {
+                            // Dismiss with animation
+                            HapticManager.shared.impact(.light)
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                dismissDragOffset = geometry.size.height
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                dismiss()
+                            }
+                        } else {
+                            // Snap back
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                dismissDragOffset = 0
+                            }
+                        }
+                    }
+            )
         }
+    }
+
+    // Computed properties for smooth dismiss animation
+    private var backgroundOpacity: Double {
+        let progress = min(dismissDragOffset / dismissThreshold, 1.0)
+        return 1.0 - (progress * 0.5)
+    }
+
+    private var dismissScale: CGFloat {
+        let progress = min(dismissDragOffset / dismissThreshold, 1.0)
+        return 1.0 - (progress * 0.1)
+    }
+
+    private var controlsOpacity: Double {
+        let progress = min(dismissDragOffset / dismissThreshold, 1.0)
+        return 1.0 - progress
     }
 }
 
