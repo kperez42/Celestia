@@ -207,9 +207,14 @@ class ABTestingManager: ObservableObject {
             enhancedProperties["experiment_\(experimentId)"] = variantId
         }
 
-        analyticsService.trackEvent(.init(rawValue: event) ?? .featureFlagChanged, properties: enhancedProperties)
+        // MEMORY FIX: Only call analytics service if there are active experiments
+        // Reduces unnecessary analytics calls and memory allocations
+        if !userVariants.isEmpty {
+            analyticsService.trackEvent(.init(rawValue: event) ?? .featureFlagChanged, properties: enhancedProperties)
+        }
 
         // Save conversion to Firestore for experiment analysis
+        // Note: AnalyticsServiceEnhanced will batch this write
         Task {
             guard let userId = AuthService.shared.currentUser?.id else { return }
 
@@ -248,11 +253,15 @@ class ABTestingManager: ObservableObject {
             ])
         }
 
-        analyticsService.trackEvent(.featureFlagChanged, properties: [
-            "experimentId": experimentId,
-            "metricName": metricName,
-            "value": value
-        ])
+        // MEMORY FIX: Only track analytics if user is actually in this experiment
+        // Reduces unnecessary analytics events
+        if userVariants[experimentId] != nil {
+            analyticsService.trackEvent(.featureFlagChanged, properties: [
+                "experimentId": experimentId,
+                "metricName": metricName,
+                "value": value
+            ])
+        }
     }
 
     // MARK: - Experiment Creation (Admin)
