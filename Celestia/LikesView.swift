@@ -237,9 +237,9 @@ struct LikesView: View {
         HStack(spacing: 0) {
             ForEach(Array(tabs.enumerated()), id: \.0) { index, title in
                 Button {
-                    withAnimation(.spring(response: 0.3)) {
+                    HapticManager.shared.selection()
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
                         selectedTab = index
-                        HapticManager.shared.selection()
                     }
                 } label: {
                     VStack(spacing: 8) {
