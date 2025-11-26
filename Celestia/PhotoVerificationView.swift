@@ -18,6 +18,7 @@ struct PhotoVerificationView: View {
     @State private var verificationState: VerificationState = .instructions
     @State private var verificationResult: VerificationResult?
     @State private var showingSuccess = false
+    @State private var scanLineOffset: CGFloat = -60
 
     enum VerificationState {
         case instructions
@@ -210,11 +211,12 @@ struct PhotoVerificationView: View {
         VStack(spacing: 32) {
             Spacer()
 
-            // Processing animation
+            // Face ID-like scanning animation
             ZStack {
+                // Outer ring (progress)
                 Circle()
-                    .stroke(Color.purple.opacity(0.2), lineWidth: 8)
-                    .frame(width: 120, height: 120)
+                    .stroke(Color.purple.opacity(0.15), lineWidth: 4)
+                    .frame(width: 160, height: 160)
 
                 Circle()
                     .trim(from: 0, to: verificationService.verificationProgress)
@@ -224,32 +226,92 @@ struct PhotoVerificationView: View {
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),
-                        style: StrokeStyle(lineWidth: 8, lineCap: .round)
+                        style: StrokeStyle(lineWidth: 4, lineCap: .round)
                     )
-                    .frame(width: 120, height: 120)
+                    .frame(width: 160, height: 160)
                     .rotationEffect(.degrees(-90))
-                    .animation(.linear, value: verificationService.verificationProgress)
+                    .animation(.easeInOut(duration: 0.3), value: verificationService.verificationProgress)
 
-                Image(systemName: "person.crop.circle.fill")
-                    .font(.system(size: 50))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.purple, .pink],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+                // Face outline (like Face ID)
+                ZStack {
+                    // Face shape
+                    RoundedRectangle(cornerRadius: 40)
+                        .stroke(
+                            LinearGradient(
+                                colors: [.purple.opacity(0.6), .pink.opacity(0.6)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 3
                         )
-                    )
+                        .frame(width: 80, height: 100)
+
+                    // Scanning line animation
+                    Rectangle()
+                        .fill(
+                            LinearGradient(
+                                colors: [.clear, .purple.opacity(0.8), .clear],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .frame(width: 70, height: 8)
+                        .offset(y: scanLineOffset)
+                        .clipShape(RoundedRectangle(cornerRadius: 35))
+
+                    // Eyes
+                    HStack(spacing: 24) {
+                        Circle()
+                            .fill(Color.purple.opacity(0.5))
+                            .frame(width: 12, height: 12)
+                        Circle()
+                            .fill(Color.purple.opacity(0.5))
+                            .frame(width: 12, height: 12)
+                    }
+                    .offset(y: -15)
+
+                    // Nose
+                    Capsule()
+                        .fill(Color.purple.opacity(0.3))
+                        .frame(width: 4, height: 16)
+                        .offset(y: 5)
+
+                    // Mouth
+                    Capsule()
+                        .fill(Color.purple.opacity(0.4))
+                        .frame(width: 24, height: 6)
+                        .offset(y: 28)
+                }
+                .frame(width: 120, height: 120)
+            }
+            .onAppear {
+                startScanAnimation()
             }
 
             VStack(spacing: 12) {
-                Text("Verifying your photo...")
+                Text("Verifying Identity")
                     .font(.title2)
-                    .fontWeight(.semibold)
+                    .fontWeight(.bold)
 
                 Text(verificationStatusText)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
+                    .animation(.easeInOut(duration: 0.2), value: verificationStatusText)
+
+                // Confidence indicator (show when comparing)
+                if verificationService.verificationProgress > 0.4 && verificationService.verificationProgress < 0.9 {
+                    HStack(spacing: 8) {
+                        Image(systemName: "faceid")
+                            .font(.caption)
+                            .foregroundColor(.purple)
+                        Text("Analyzing facial geometry...")
+                            .font(.caption)
+                            .foregroundColor(.purple.opacity(0.8))
+                    }
+                    .padding(.top, 8)
+                    .transition(.opacity.combined(with: .scale))
+                }
             }
             .padding(.horizontal)
 
@@ -257,14 +319,31 @@ struct PhotoVerificationView: View {
         }
     }
 
+    private func startScanAnimation() {
+        withAnimation(
+            .easeInOut(duration: 1.2)
+            .repeatForever(autoreverses: true)
+        ) {
+            scanLineOffset = 60
+        }
+    }
+
     private var verificationStatusText: String {
+        // Use the detailed status message from the service
+        if !verificationService.statusMessage.isEmpty {
+            return verificationService.statusMessage
+        }
+
+        // Fallback to progress-based text
         let progress = verificationService.verificationProgress
-        if progress < 0.3 {
-            return "Detecting face..."
-        } else if progress < 0.5 {
-            return "Checking image quality..."
-        } else if progress < 0.8 {
-            return "Matching with profile photos..."
+        if progress < 0.2 {
+            return "Detecting your face..."
+        } else if progress < 0.35 {
+            return "Analyzing facial features..."
+        } else if progress < 0.4 {
+            return "Loading your profile photos..."
+        } else if progress < 0.9 {
+            return "Comparing with your profile..."
         } else {
             return "Finalizing verification..."
         }
