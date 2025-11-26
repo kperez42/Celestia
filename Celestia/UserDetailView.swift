@@ -20,6 +20,10 @@ struct UserDetailView: View {
     @State private var isSaved = false
     @ObservedObject private var savedProfilesVM = SavedProfilesViewModel.shared
 
+    // Photo viewer state
+    @State private var selectedPhotoIndex: Int = 0
+    @State private var showFullScreenPhotos = false
+
     // Filter out empty photo URLs
     private var validPhotos: [String] {
         let photos = user.photos.isEmpty ? [user.profileImageURL] : user.photos
@@ -70,13 +74,26 @@ struct UserDetailView: View {
     // MARK: - Photos Carousel
 
     private var photosCarousel: some View {
-        TabView {
-            ForEach(validPhotos, id: \.self) { photoURL in
+        TabView(selection: $selectedPhotoIndex) {
+            ForEach(Array(validPhotos.enumerated()), id: \.offset) { index, photoURL in
                 CachedCardImage(url: URL(string: photoURL))
+                    .onTapGesture {
+                        selectedPhotoIndex = index
+                        showFullScreenPhotos = true
+                        HapticManager.shared.impact(.light)
+                    }
+                    .tag(index)
             }
         }
         .frame(height: 450)
         .tabViewStyle(.page)
+        .fullScreenCover(isPresented: $showFullScreenPhotos) {
+            FullScreenPhotoViewer(
+                photos: validPhotos,
+                selectedIndex: $selectedPhotoIndex,
+                isPresented: $showFullScreenPhotos
+            )
+        }
     }
 
     // MARK: - Profile Content
@@ -662,6 +679,135 @@ struct FlowLayout2: Layout {
             }
 
             self.size = CGSize(width: maxWidth, height: currentY + lineHeight)
+        }
+    }
+}
+
+// MARK: - Full Screen Photo Viewer
+
+struct FullScreenPhotoViewer: View {
+    let photos: [String]
+    @Binding var selectedIndex: Int
+    @Binding var isPresented: Bool
+
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
+    @GestureState private var dragOffset: CGSize = .zero
+
+    var body: some View {
+        ZStack {
+            // Black background
+            Color.black.ignoresSafeArea()
+
+            // Photo carousel
+            TabView(selection: $selectedIndex) {
+                ForEach(Array(photos.enumerated()), id: \.offset) { index, photoURL in
+                    ZoomablePhotoView(url: URL(string: photoURL))
+                        .tag(index)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .automatic))
+            .indexViewStyle(.page(backgroundDisplayMode: .always))
+
+            // Close button and counter overlay
+            VStack {
+                HStack {
+                    // Close button
+                    Button {
+                        HapticManager.shared.impact(.light)
+                        isPresented = false
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.title3.weight(.semibold))
+                            .foregroundColor(.white)
+                            .frame(width: 40, height: 40)
+                            .background(Color.black.opacity(0.5))
+                            .clipShape(Circle())
+                    }
+
+                    Spacer()
+
+                    // Photo counter
+                    Text("\(selectedIndex + 1) / \(photos.count)")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.black.opacity(0.5))
+                        .cornerRadius(20)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 60)
+
+                Spacer()
+            }
+        }
+        .statusBarHidden()
+    }
+}
+
+// MARK: - Zoomable Photo View
+
+struct ZoomablePhotoView: View {
+    let url: URL?
+
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
+
+    var body: some View {
+        GeometryReader { geometry in
+            CachedCardImage(url: url)
+                .aspectRatio(contentMode: .fit)
+                .frame(width: geometry.size.width, height: geometry.size.height)
+                .scaleEffect(scale)
+                .offset(offset)
+                .gesture(
+                    MagnificationGesture()
+                        .onChanged { value in
+                            let delta = value / lastScale
+                            lastScale = value
+                            scale = min(max(scale * delta, 1), 4)
+                        }
+                        .onEnded { _ in
+                            lastScale = 1.0
+                            if scale < 1 {
+                                withAnimation(.spring(response: 0.3)) {
+                                    scale = 1
+                                    offset = .zero
+                                }
+                            }
+                        }
+                )
+                .simultaneousGesture(
+                    scale > 1 ?
+                    DragGesture()
+                        .onChanged { value in
+                            offset = CGSize(
+                                width: lastOffset.width + value.translation.width,
+                                height: lastOffset.height + value.translation.height
+                            )
+                        }
+                        .onEnded { _ in
+                            lastOffset = offset
+                        }
+                    : nil
+                )
+                .onTapGesture(count: 2) {
+                    withAnimation(.spring(response: 0.3)) {
+                        if scale > 1 {
+                            scale = 1
+                            offset = .zero
+                            lastOffset = .zero
+                        } else {
+                            scale = 2
+                        }
+                    }
+                    HapticManager.shared.impact(.light)
+                }
         }
     }
 }
