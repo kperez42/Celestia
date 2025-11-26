@@ -919,10 +919,10 @@ struct PhotoGalleryView: View {
                     // PERFORMANCE: Photo gallery with smooth swiping
                     TabView(selection: $selectedPhotoIndex) {
                         ForEach(validPhotos.indices, id: \.self) { index in
-                            // PERFORMANCE: Use high priority for current, normal for others
+                            // PERFORMANCE: Always immediate - images already cached from card prefetch
                             CachedCardImage(
                                 url: URL(string: validPhotos[index]),
-                                priority: index == selectedPhotoIndex ? .immediate : .high
+                                priority: .immediate
                             )
                             .aspectRatio(contentMode: .fit)
                             .onTapGesture {
@@ -934,8 +934,12 @@ struct PhotoGalleryView: View {
                     }
                     .tabViewStyle(.page(indexDisplayMode: .always))
                     .indexViewStyle(.page(backgroundDisplayMode: .always))
+                    .task {
+                        // PERFORMANCE: Ensure all photos cached on open
+                        ImageCache.shared.prefetchAdjacentPhotos(photos: validPhotos, currentIndex: selectedPhotoIndex)
+                    }
                     // PERFORMANCE: Preload adjacent photos when swiping
-                    .onChange(of: selectedPhotoIndex) { newIndex in
+                    .onChange(of: selectedPhotoIndex) { _, newIndex in
                         ImageCache.shared.prefetchAdjacentPhotos(photos: validPhotos, currentIndex: newIndex)
                     }
 
