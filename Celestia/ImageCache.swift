@@ -410,6 +410,8 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
     @State private var retryCount = 0
     // PERFORMANCE FIX: Store task for cancellation when view disappears
     @State private var loadTask: Task<Void, Never>?
+    // PERFORMANCE: Track if we've checked cache to avoid re-checking
+    @State private var hasCheckedCache = false
 
     init(
         url: URL?,
@@ -419,13 +421,22 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
         self.url = url
         self.content = content
         self.placeholder = placeholder
+
+        // PERFORMANCE: Check cache immediately on init for instant display
+        if let url = url {
+            let cacheKey = url.absoluteString
+            if let cachedImage = ImageCache.shared.image(for: cacheKey) {
+                _image = State(initialValue: cachedImage)
+                _hasCheckedCache = State(initialValue: true)
+            }
+        }
     }
 
     var body: some View {
         Group {
             if let image = image {
                 content(Image(uiImage: image))
-            } else if let error = loadError {
+            } else if loadError != nil {
                 // Error state with retry button
                 VStack(spacing: 12) {
                     Image(systemName: "photo.badge.exclamationmark")
@@ -454,7 +465,10 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
             } else {
                 placeholder()
                     .onAppear {
-                        loadImage()
+                        // Only load if we haven't checked cache yet or need to fetch
+                        if !hasCheckedCache || (image == nil && !isLoading) {
+                            loadImage()
+                        }
                     }
             }
         }
@@ -469,8 +483,9 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
         guard let url = url, !isLoading else { return }
 
         let cacheKey = url.absoluteString
+        hasCheckedCache = true
 
-        // Check cache first
+        // Check cache first (double-check in case init didn't catch it)
         if let cachedImage = ImageCache.shared.image(for: cacheKey) {
             self.image = cachedImage
             return
@@ -528,6 +543,15 @@ extension CachedAsyncImage where Placeholder == ProgressView<EmptyView, EmptyVie
         self.url = url
         self.content = content
         self.placeholder = { ProgressView() }
+
+        // PERFORMANCE: Check cache immediately on init for instant display
+        if let url = url {
+            let cacheKey = url.absoluteString
+            if let cachedImage = ImageCache.shared.image(for: cacheKey) {
+                _image = State(initialValue: cachedImage)
+                _hasCheckedCache = State(initialValue: true)
+            }
+        }
     }
 }
 
@@ -544,6 +568,22 @@ struct CachedProfileImage: View {
     @State private var retryCount = 0
     // PERFORMANCE FIX: Store task for cancellation when view disappears
     @State private var loadTask: Task<Void, Never>?
+    // PERFORMANCE: Track if we've checked cache to avoid re-checking
+    @State private var hasCheckedCache = false
+
+    // PERFORMANCE: Check cache immediately on init for instant display
+    init(url: URL?, size: CGFloat) {
+        self.url = url
+        self.size = size
+        // Pre-load from cache synchronously if available
+        if let url = url {
+            let cacheKey = url.absoluteString
+            if let cachedImage = ImageCache.shared.image(for: cacheKey) {
+                _image = State(initialValue: cachedImage)
+                _hasCheckedCache = State(initialValue: true)
+            }
+        }
+    }
 
     var body: some View {
         Group {
@@ -583,11 +623,15 @@ struct CachedProfileImage: View {
                         .fill(Color.gray.opacity(0.2))
                         .frame(width: size, height: size)
 
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .purple))
+                    if isLoading {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .purple))
+                    }
                 }
                 .onAppear {
-                    loadImage()
+                    if !hasCheckedCache || (image == nil && !isLoading) {
+                        loadImage()
+                    }
                 }
             }
         }
@@ -602,8 +646,9 @@ struct CachedProfileImage: View {
         guard let url = url, !isLoading else { return }
 
         let cacheKey = url.absoluteString
+        hasCheckedCache = true
 
-        // Check cache first
+        // Check cache first (double-check in case init didn't catch it)
         if let cachedImage = ImageCache.shared.image(for: cacheKey) {
             self.image = cachedImage
             return
@@ -664,6 +709,21 @@ struct CachedCardImage: View {
     @State private var retryCount = 0
     // PERFORMANCE FIX: Store task for cancellation when view disappears
     @State private var loadTask: Task<Void, Never>?
+    // PERFORMANCE: Track if we've checked cache to avoid re-checking
+    @State private var hasCheckedCache = false
+
+    // PERFORMANCE: Check cache immediately on init for instant display
+    init(url: URL?) {
+        self.url = url
+        // Pre-load from cache synchronously if available
+        if let url = url {
+            let cacheKey = url.absoluteString
+            if let cachedImage = ImageCache.shared.image(for: cacheKey) {
+                _image = State(initialValue: cachedImage)
+                _hasCheckedCache = State(initialValue: true)
+            }
+        }
+    }
 
     var body: some View {
         Group {
@@ -722,11 +782,18 @@ struct CachedCardImage: View {
                         endPoint: .bottomTrailing
                     )
 
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .purple))
+                    if isLoading {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .purple))
+                    }
                 }
                 .onAppear {
-                    loadImage()
+                    // Only load if we haven't checked cache yet or need to fetch
+                    if !hasCheckedCache {
+                        loadImage()
+                    } else if image == nil && !isLoading {
+                        loadImage()
+                    }
                 }
             }
         }
@@ -741,8 +808,9 @@ struct CachedCardImage: View {
         guard let url = url, !isLoading else { return }
 
         let cacheKey = url.absoluteString
+        hasCheckedCache = true
 
-        // Check cache first
+        // Check cache first (double-check in case init didn't catch it)
         if let cachedImage = ImageCache.shared.image(for: cacheKey) {
             self.image = cachedImage
             return
