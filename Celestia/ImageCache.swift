@@ -726,23 +726,12 @@ struct CachedCardImage: View {
     }
 
     var body: some View {
-        GeometryReader { geometry in
-            Group {
-                if let image = image {
-                    ZStack {
-                        // Subtle gradient background for any empty space
-                        LinearGradient(
-                            colors: [Color.gray.opacity(0.1), Color.gray.opacity(0.05)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-
-                        Image(uiImage: image)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: geometry.size.width, height: geometry.size.height)
-                    }
-                } else if loadError != nil {
+        Group {
+            if let image = image {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } else if loadError != nil {
                 // Error state with elegant retry button
                 VStack(spacing: 12) {
                     Image(systemName: "photo.badge.exclamationmark")
@@ -812,7 +801,6 @@ struct CachedCardImage: View {
         .onDisappear {
             loadTask?.cancel()
             loadTask = nil
-        }
         }
     }
 
