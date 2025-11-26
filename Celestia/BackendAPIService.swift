@@ -366,8 +366,8 @@ class BackendAPIService: BackendAPIServiceProtocol {
                 // For TLS errors, don't retry as it's likely a server-side certificate issue
                 // Log analytics for monitoring
                 Task { @MainActor in
-                    AnalyticsManager.shared.logEvent(.networkError, parameters: [
-                        "error_type": "tls_failure",
+                    AnalyticsManager.shared.logEvent(.validationError, parameters: [
+                        "type": "tls_failure",
                         "error_code": nsError.code,
                         "endpoint": request.url?.path ?? "unknown",
                         "attempt": attempt
