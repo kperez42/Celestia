@@ -156,6 +156,8 @@ struct SeeWhoLikesYouView: View {
                     onTap: {
                         if authService.currentUser?.isPremium ?? false {
                             // Premium users can view profiles
+                            // PERFORMANCE: Prefetch images for instant detail view
+                            ImageCache.shared.prefetchUserPhotosHighPriority(user: user)
                             selectedUser = user
                             showUserProfile = true
                             HapticManager.shared.impact(.light)
