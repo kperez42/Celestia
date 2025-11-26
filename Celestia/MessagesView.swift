@@ -19,9 +19,15 @@ struct MessagesView: View {
     @State private var matchedUsers: [String: User] = [:]
     @State private var searchText = ""
     @State private var showSearch = false
-    @State private var selectedMatch: (Match, User)?
-    @State private var showingChat = false
+    @State private var chatPresentation: ChatPresentation?
     @State private var selectedMessageTab = 0
+
+    // Wrapper for item-based sheet presentation
+    struct ChatPresentation: Identifiable {
+        let id = UUID()
+        let match: Match
+        let user: User
+    }
 
     // PERFORMANCE: Memoized conversation lists to avoid O(n) on every render
     @State private var cachedConversations: [(Match, User)] = []
@@ -166,12 +172,10 @@ struct MessagesView: View {
             .onChange(of: searchDebouncer.debouncedText) { _, _ in
                 updateFilteredConversations()
             }
-            .sheet(isPresented: $showingChat) {
-                if let selectedMatch = selectedMatch {
-                    NavigationStack {
-                        ChatView(match: selectedMatch.0, otherUser: selectedMatch.1)
-                            .environmentObject(authService)
-                    }
+            .sheet(item: $chatPresentation) { presentation in
+                NavigationStack {
+                    ChatView(match: presentation.match, otherUser: presentation.user)
+                        .environmentObject(authService)
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: .openChatWithUser)) { notification in
@@ -184,8 +188,7 @@ struct MessagesView: View {
 
                 // Find the match for this user
                 if let matchPair = conversations.first(where: { $0.1.id == userId }) {
-                    selectedMatch = matchPair
-                    showingChat = true
+                    chatPresentation = ChatPresentation(match: matchPair.0, user: matchPair.1)
                     HapticManager.shared.impact(.medium)
                     Logger.shared.info("Opening chat with \(user.fullName) from Discover", category: .messaging)
                 } else {
@@ -446,8 +449,7 @@ struct MessagesView: View {
                     )
                     .onTapGesture {
                         HapticManager.shared.impact(.medium)
-                        selectedMatch = (match, user)
-                        showingChat = true
+                        chatPresentation = ChatPresentation(match: match, user: user)
                     }
                     .onAppear {
                         // PERFORMANCE: Prefetch user images as conversations appear

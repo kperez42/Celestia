@@ -50,6 +50,9 @@ struct ChatView: View {
     @State private var cachedGroupedMessages: [(String, [Message])] = []
     @State private var lastMessageCount = 0
 
+    // Track initial load to prevent scroll animation on first load
+    @State private var isInitialLoad = true
+
     // Reusable date formatter for performance
     private static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -423,7 +426,14 @@ struct ChatView: View {
             .onChange(of: messageService.messages.count) {
                 // Only scroll to bottom for new messages (not when loading older)
                 if !messageService.isLoadingMore {
-                    scrollToBottom(proxy: proxy)
+                    // PERFORMANCE: Don't animate scroll on initial load - just jump to bottom
+                    let shouldAnimate = !isInitialLoad
+                    scrollToBottom(proxy: proxy, animated: shouldAnimate)
+
+                    // Mark initial load as complete after first scroll
+                    if isInitialLoad {
+                        isInitialLoad = false
+                    }
                 }
             }
             .onChange(of: isOtherUserTyping) {
@@ -538,15 +548,21 @@ struct ChatView: View {
         return sorted
     }
 
-    private func scrollToBottom(proxy: ScrollViewProxy) {
-        if isOtherUserTyping {
-            withAnimation {
+    private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool = true) {
+        let scrollAction = {
+            if isOtherUserTyping {
                 proxy.scrollTo("typing", anchor: .bottom)
-            }
-        } else if let lastMessage = messageService.messages.last {
-            withAnimation {
+            } else if let lastMessage = messageService.messages.last {
                 proxy.scrollTo(lastMessage.id, anchor: .bottom)
             }
+        }
+
+        if animated {
+            withAnimation {
+                scrollAction()
+            }
+        } else {
+            scrollAction()
         }
     }
     
