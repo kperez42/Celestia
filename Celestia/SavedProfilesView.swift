@@ -35,10 +35,8 @@ struct SavedProfilesView: View {
 
                 if viewModel.isLoading {
                     loadingView
-                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 } else if !viewModel.errorMessage.isEmpty {
                     errorStateView
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
                 } else {
                     TabView(selection: $selectedTab) {
                         allSavedTab.tag(0)
@@ -48,9 +46,6 @@ struct SavedProfilesView: View {
                     .tabViewStyle(.page(indexDisplayMode: .never))
                 }
             }
-            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.isLoading)
-            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.savedProfiles.isEmpty)
-            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.errorMessage.isEmpty)
         }
         .navigationBarHidden(true)
         .task {
