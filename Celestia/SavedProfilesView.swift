@@ -1143,25 +1143,55 @@ class SavedProfilesViewModel: ObservableObject {
                     .whereField("userId", isEqualTo: currentUserId)
                     .getDocuments()
 
-                // Delete all saved profiles
-                let batch = db.batch()
-                for doc in snapshot.documents {
-                    batch.deleteDocument(doc.reference)
+                guard !snapshot.documents.isEmpty else {
+                    savedProfiles = []
+                    return
                 }
-                try await batch.commit()
 
-                // Clear local state
+                // BATCH FIX: Firestore batch limit is 500 documents
+                // Chunk large deletions to avoid exceeding the limit
+                let batchSize = 500
+                let totalCount = snapshot.documents.count
+                var deletedCount = 0
+
+                for chunk in snapshot.documents.chunked(into: batchSize) {
+                    let batch = db.batch()
+                    for doc in chunk {
+                        batch.deleteDocument(doc.reference)
+                    }
+                    try await batch.commit()
+                    deletedCount += chunk.count
+
+                    Logger.shared.debug("Deleted batch of \(chunk.count) saved profiles, total: \(deletedCount)/\(totalCount)", category: .general)
+                }
+
+                // ATOMICITY FIX: Only clear local state after ALL batches succeed
                 savedProfiles = []
 
-                Logger.shared.info("Cleared all saved profiles", category: .general)
+                // PERFORMANCE: Invalidate cache
+                lastFetchTime = nil
+
+                Logger.shared.info("Cleared all \(totalCount) saved profiles", category: .general)
 
                 // Track analytics
                 AnalyticsServiceEnhanced.shared.trackEvent(
                     .savedProfilesCleared,
-                    properties: ["count": snapshot.documents.count]
+                    properties: ["count": totalCount]
                 )
             } catch {
+                // ERROR HANDLING: Show user feedback on failure
+                errorMessage = "Failed to clear saved profiles. Please try again."
                 Logger.shared.error("Error clearing saved profiles", category: .general, error: error)
+
+                // Auto-clear error after 3 seconds
+                Task {
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    await MainActor.run {
+                        if errorMessage == "Failed to clear saved profiles. Please try again." {
+                            errorMessage = ""
+                        }
+                    }
+                }
             }
         }
     }

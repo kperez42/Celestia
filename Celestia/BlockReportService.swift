@@ -56,20 +56,56 @@ class BlockReportService: ObservableObject, ListenerLifecycleAware {
         isLoading = true
         defer { isLoading = false }
 
-        // Add to blocked users collection
-        try await db.collection("blockedUsers")
-            .document("\(currentUserId)_\(userId)")
-            .setData([
+        // ATOMICITY FIX: Use batch to ensure blocking and match removal happen together
+        // If either operation fails, neither is applied
+        do {
+            // First, find any existing matches to deactivate
+            let matchesSnapshot = try await db.collection("matches")
+                .whereFilter(Filter.orFilter([
+                    Filter.andFilter([
+                        Filter.whereField("user1Id", isEqualTo: currentUserId),
+                        Filter.whereField("user2Id", isEqualTo: userId)
+                    ]),
+                    Filter.andFilter([
+                        Filter.whereField("user1Id", isEqualTo: userId),
+                        Filter.whereField("user2Id", isEqualTo: currentUserId)
+                    ])
+                ]))
+                .whereField("isActive", isEqualTo: true)
+                .getDocuments()
+
+            // Create batch for atomic operation
+            let batch = db.batch()
+
+            // 1. Add to blocked users
+            let blockRef = db.collection("blockedUsers").document("\(currentUserId)_\(userId)")
+            batch.setData([
                 "blockerId": currentUserId,
                 "blockedUserId": userId,
                 "timestamp": Timestamp(date: Date())
-            ])
+            ], forDocument: blockRef)
 
-        // Update local set
-        blockedUserIds.insert(userId)
+            // 2. Deactivate any active matches
+            for matchDoc in matchesSnapshot.documents {
+                batch.updateData([
+                    "isActive": false,
+                    "deactivatedReason": "blocked",
+                    "deactivatedAt": Timestamp(date: Date())
+                ], forDocument: matchDoc.reference)
+            }
 
-        // Remove any existing match
-        await removeMatch(userId: userId, currentUserId: currentUserId)
+            // Commit all operations atomically
+            try await batch.commit()
+
+            // Update local state only after successful commit
+            blockedUserIds.insert(userId)
+
+            Logger.shared.info("User blocked successfully (deactivated \(matchesSnapshot.documents.count) matches)", category: .moderation)
+
+        } catch {
+            Logger.shared.error("Failed to block user atomically", category: .moderation, error: error)
+            throw error
+        }
     }
 
     func unblockUser(blockerId: String, blockedId: String) async throws {
@@ -156,22 +192,72 @@ class BlockReportService: ObservableObject, ListenerLifecycleAware {
         isLoading = true
         defer { isLoading = false }
 
-        var reportData: [String: Any] = [
-            "reporterId": currentUserId,
-            "reportedUserId": userId,
-            "reason": reason.rawValue,
-            "timestamp": Timestamp(date: Date()),
-            "status": "pending"
-        ]
+        // ATOMICITY FIX: Create report and block user in a single batch operation
+        // This ensures both operations succeed or fail together
 
-        if let details = additionalDetails, !details.isEmpty {
-            reportData["additionalDetails"] = details
+        do {
+            // First, find any existing matches to deactivate
+            let matchesSnapshot = try await db.collection("matches")
+                .whereFilter(Filter.orFilter([
+                    Filter.andFilter([
+                        Filter.whereField("user1Id", isEqualTo: currentUserId),
+                        Filter.whereField("user2Id", isEqualTo: userId)
+                    ]),
+                    Filter.andFilter([
+                        Filter.whereField("user1Id", isEqualTo: userId),
+                        Filter.whereField("user2Id", isEqualTo: currentUserId)
+                    ])
+                ]))
+                .whereField("isActive", isEqualTo: true)
+                .getDocuments()
+
+            // Create batch for atomic operation
+            let batch = db.batch()
+
+            // 1. Create report
+            let reportRef = db.collection("reports").document()
+            var reportData: [String: Any] = [
+                "reporterId": currentUserId,
+                "reportedUserId": userId,
+                "reason": reason.rawValue,
+                "timestamp": Timestamp(date: Date()),
+                "status": "pending"
+            ]
+            if let details = additionalDetails, !details.isEmpty {
+                reportData["additionalDetails"] = details
+            }
+            batch.setData(reportData, forDocument: reportRef)
+
+            // 2. Block the user
+            let blockRef = db.collection("blockedUsers").document("\(currentUserId)_\(userId)")
+            batch.setData([
+                "blockerId": currentUserId,
+                "blockedUserId": userId,
+                "timestamp": Timestamp(date: Date()),
+                "reportId": reportRef.documentID  // Link to report for reference
+            ], forDocument: blockRef)
+
+            // 3. Deactivate any active matches
+            for matchDoc in matchesSnapshot.documents {
+                batch.updateData([
+                    "isActive": false,
+                    "deactivatedReason": "reported",
+                    "deactivatedAt": Timestamp(date: Date())
+                ], forDocument: matchDoc.reference)
+            }
+
+            // Commit all operations atomically
+            try await batch.commit()
+
+            // Update local state only after successful commit
+            blockedUserIds.insert(userId)
+
+            Logger.shared.info("User reported and blocked successfully (report: \(reportRef.documentID), deactivated \(matchesSnapshot.documents.count) matches)", category: .moderation)
+
+        } catch {
+            Logger.shared.error("Failed to report user atomically", category: .moderation, error: error)
+            throw error
         }
-
-        try await db.collection("reports").addDocument(data: reportData)
-
-        // Also block the user after reporting
-        try await blockUser(userId: userId, currentUserId: currentUserId)
     }
 
     // MARK: - Unmatch
@@ -199,31 +285,6 @@ class BlockReportService: ObservableObject, ListenerLifecycleAware {
             .updateData(updateData)
     }
 
-    // MARK: - Helper Methods
-
-    private func removeMatch(userId: String, currentUserId: String) async {
-        // Find and remove match between users
-        do {
-            let matchesSnapshot = try await db.collection("matches")
-                .whereFilter(Filter.orFilter([
-                    Filter.andFilter([
-                        Filter.whereField("user1Id", isEqualTo: currentUserId),
-                        Filter.whereField("user2Id", isEqualTo: userId)
-                    ]),
-                    Filter.andFilter([
-                        Filter.whereField("user1Id", isEqualTo: userId),
-                        Filter.whereField("user2Id", isEqualTo: currentUserId)
-                    ])
-                ]))
-                .getDocuments()
-
-            for document in matchesSnapshot.documents {
-                try await document.reference.updateData(["isActive": false])
-            }
-        } catch {
-            Logger.shared.error("Error removing match", category: .moderation, error: error)
-        }
-    }
 }
 
 // ReportReason is defined in Safety/Reporting/ReportingManager.swift
