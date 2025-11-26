@@ -24,6 +24,7 @@ struct FeedDiscoverView: View {
     @State private var showMatchAnimation = false
     @State private var matchedUser: User?
     @State private var favorites: Set<String> = []
+    @State private var likedUsers: Set<String> = []
     @State private var errorMessage: String = ""
     @State private var showOwnProfileDetail = false
     @State private var showEditProfile = false
@@ -80,6 +81,7 @@ struct FeedDiscoverView: View {
                     // BUGFIX: Always sync favorites when view appears
                     // This ensures save state is correct after navigating from other tabs
                     syncFavorites()
+                    loadLikedUsers()
 
                     if users.isEmpty {
                         Task {
@@ -173,8 +175,12 @@ struct FeedDiscoverView: View {
                         user: user,
                         currentUser: authService.currentUser,  // NEW: Pass current user for shared interests
                         initialIsFavorited: favorites.contains(user.effectiveId ?? ""),
+                        initialIsLiked: likedUsers.contains(user.effectiveId ?? ""),
                         onLike: {
                             handleLike(user: user)
+                        },
+                        onUnlike: {
+                            handleUnlike(user: user)
                         },
                         onFavorite: {
                             handleFavorite(user: user)
@@ -336,6 +342,22 @@ struct FeedDiscoverView: View {
         let userIds = savedProfilesViewModel.savedProfiles.compactMap { $0.user.effectiveId }
         favorites = Set(userIds)
         Logger.shared.debug("Favorites set synced: \(favorites.count) profiles", category: .general)
+    }
+
+    private func loadLikedUsers() {
+        guard let currentUserId = authService.currentUser?.effectiveId else { return }
+
+        Task {
+            do {
+                let likesSent = try await SwipeService.shared.getLikesSent(userId: currentUserId)
+                await MainActor.run {
+                    likedUsers = Set(likesSent)
+                    Logger.shared.debug("Loaded \(likedUsers.count) liked users", category: .matching)
+                }
+            } catch {
+                Logger.shared.error("Error loading liked users", category: .matching, error: error)
+            }
+        }
     }
 
     // MARK: - Initial Loading View
@@ -698,6 +720,9 @@ struct FeedDiscoverView: View {
             return
         }
 
+        // Optimistic update - add to liked users
+        likedUsers.insert(userId)
+
         Task {
             do {
                 // Send like to backend
@@ -732,7 +757,7 @@ struct FeedDiscoverView: View {
                     await MainActor.run {
                         let truncatedName = user.fullName.count > 20 ? String(user.fullName.prefix(20)) + "..." : user.fullName
                         showToast(
-                            message: "Liked \(truncatedName)!",
+                            message: "You like \(truncatedName)!",
                             icon: "heart.fill",
                             color: .pink
                         )
@@ -741,6 +766,8 @@ struct FeedDiscoverView: View {
             } catch {
                 Logger.shared.error("Error sending like", category: .matching, error: error)
                 await MainActor.run {
+                    // Revert optimistic update on error
+                    likedUsers.remove(userId)
                     showToast(
                         message: "Failed to send like. Try again.",
                         icon: "exclamationmark.triangle.fill",
@@ -813,6 +840,52 @@ struct FeedDiscoverView: View {
         }
 
         HapticManager.shared.impact(.light)
+    }
+
+    private func handleUnlike(user: User) {
+        guard let currentUserId = authService.currentUser?.effectiveId,
+              let userId = user.effectiveId else {
+            showToast(
+                message: "Unable to unlike. Please try again.",
+                icon: "exclamationmark.triangle.fill",
+                color: .red
+            )
+            return
+        }
+
+        // Optimistic update - remove from liked users
+        likedUsers.remove(userId)
+
+        Task {
+            do {
+                try await SwipeService.shared.unlikeUser(
+                    fromUserId: currentUserId,
+                    toUserId: userId
+                )
+
+                await MainActor.run {
+                    let truncatedName = user.fullName.count > 20 ? String(user.fullName.prefix(20)) + "..." : user.fullName
+                    showToast(
+                        message: "Unliked \(truncatedName)",
+                        icon: "heart.slash",
+                        color: .gray
+                    )
+                }
+
+                Logger.shared.info("Unliked user \(userId)", category: .matching)
+            } catch {
+                // Revert optimistic update on error
+                await MainActor.run {
+                    likedUsers.insert(userId)
+                    showToast(
+                        message: "Failed to unlike. Try again.",
+                        icon: "exclamationmark.triangle.fill",
+                        color: .red
+                    )
+                }
+                Logger.shared.error("Error unliking user", category: .matching, error: error)
+            }
+        }
     }
 
     private func handleMessage(user: User) {

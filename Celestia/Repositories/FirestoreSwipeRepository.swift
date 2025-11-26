@@ -75,6 +75,24 @@ class FirestoreSwipeRepository: SwipeRepository {
         return (hasLiked, hasPassed)
     }
 
+    func checkLikeExists(fromUserId: String, toUserId: String) async throws -> Bool {
+        let swipeId = "\(fromUserId)_\(toUserId)"
+        let likeDoc = try await db.collection("likes").document(swipeId).getDocument()
+        return likeDoc.exists && (likeDoc.data()?["isActive"] as? Bool == true)
+    }
+
+    func unlikeUser(fromUserId: String, toUserId: String) async throws {
+        let swipeId = "\(fromUserId)_\(toUserId)"
+
+        // Set isActive to false instead of deleting to preserve history
+        try await db.collection("likes").document(swipeId).updateData([
+            "isActive": false,
+            "unlikedAt": Timestamp(date: Date())
+        ])
+
+        Logger.shared.debug("Unlike recorded: \(fromUserId) -> \(toUserId)", category: .matching)
+    }
+
     /// Get user IDs who have liked this user
     /// - Parameters:
     ///   - userId: The user receiving likes
