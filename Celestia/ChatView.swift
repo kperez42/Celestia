@@ -132,17 +132,19 @@ struct ChatView: View {
         .sheet(isPresented: $showingReportSheet) {
             ReportUserView(user: otherUser)
         }
-        .onChange(of: messageService.messages.count) {
-            // SWIFTUI FIX: Defer safety check to avoid modifying state during view update
-            // This prevents "Modifying state during view update" warnings
+        .onChange(of: messageService.messages.count) { oldCount, newCount in
+            // SWIFTUI FIX: Defer safety check with longer delay to avoid modifying state during view update
+            // Only check if message count actually increased (not on initial load or deletions)
+            guard newCount > oldCount else { return }
             Task {
-                try? await Task.sleep(nanoseconds: 1_000_000) // 1ms delay
+                // Longer delay ensures view update cycle completes
+                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms delay
                 checkConversationSafety()
             }
         }
         .task {
-            // SWIFTUI FIX: Defer initial safety check
-            try? await Task.sleep(nanoseconds: 1_000_000)
+            // SWIFTUI FIX: Defer initial safety check until view is fully loaded
+            try? await Task.sleep(nanoseconds: 500_000_000) // 500ms delay
             checkConversationSafety()
         }
         .overlay(alignment: .top) {

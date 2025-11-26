@@ -8,6 +8,7 @@
 import SwiftUI
 import Firebase
 import FirebaseFirestore
+import FirebaseAnalytics
 
 @main
 struct CelestiaApp: App {
@@ -15,10 +16,17 @@ struct CelestiaApp: App {
     @StateObject private var deepLinkManager = DeepLinkManager()
 
     init() {
+        // MEMORY FIX: Disable Firebase Analytics automatic data collection to prevent malloc errors
+        // This significantly reduces memory pressure during app initialization
+        Analytics.setAnalyticsCollectionEnabled(false)
+
         // Configure Firebase first (must be on main thread)
         // NOTE: This is the SINGLE initialization point for Firebase
         // Do NOT call FirebaseApp.configure() anywhere else in the app
         FirebaseApp.configure()
+
+        // Re-enable analytics AFTER Firebase is configured, with manual control
+        Analytics.setAnalyticsCollectionEnabled(true)
 
         // PERFORMANCE: Move Firestore persistence initialization to background thread
         // This reduces cold start time by ~150-200ms
@@ -26,14 +34,14 @@ struct CelestiaApp: App {
             let settings = FirestoreSettings()
             settings.isPersistenceEnabled = true
 
-            // PERFORMANCE: Set cache size limit to 100MB (was unlimited)
-            // Prevents memory bloat on older devices (iPhone 8/X)
-            settings.cacheSizeBytes = 100 * 1024 * 1024 // 100MB limit
+            // PERFORMANCE: Set cache size limit to 50MB (reduced from 100MB)
+            // Prevents memory bloat and malloc errors on all devices
+            settings.cacheSizeBytes = 50 * 1024 * 1024 // 50MB limit
 
             // Apply settings on main thread as required by Firestore
             await MainActor.run {
                 Firestore.firestore().settings = settings
-                Logger.shared.info("Firestore persistence initialized (100MB cache limit)", category: .database)
+                Logger.shared.info("Firestore persistence initialized (50MB cache limit)", category: .database)
             }
         }
 
@@ -41,7 +49,7 @@ struct CelestiaApp: App {
         // This helps reduce malloc errors during Firebase initialization
         Task.detached(priority: .background) {
             // Allow Firebase core services to initialize first
-            try? await Task.sleep(nanoseconds: 500_000_000) // 500ms delay
+            try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second delay (increased from 500ms)
 
             // Pre-warm AnalyticsServiceEnhanced singleton on background to distribute memory allocations
             await MainActor.run {
