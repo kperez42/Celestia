@@ -217,9 +217,9 @@ struct LikeCardView: View {
             VStack(spacing: 0) {
                 // Profile image section
                 ZStack {
-                    // Profile image
+                    // Profile image - cached for smooth scrolling
                     if let imageURL = user.photos.first, let url = URL(string: imageURL) {
-                        AsyncImage(url: url) { image in
+                        CachedAsyncImage(url: url) { image in
                             image
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
