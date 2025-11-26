@@ -214,28 +214,41 @@ struct LikeCardView: View {
 
     var body: some View {
         Button(action: onTap) {
-            ZStack {
-                // Profile image - cached for smooth scrolling
-                if let imageURL = user.photos.first, let url = URL(string: imageURL) {
-                    CachedAsyncImage(url: url) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        Color.gray.opacity(0.2)
+            VStack(spacing: 0) {
+                // Profile image section
+                ZStack(alignment: .topLeading) {
+                    // Profile image - cached for smooth scrolling
+                    if let imageURL = user.photos.first, let url = URL(string: imageURL) {
+                        CachedAsyncImage(url: url) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(height: 180)
+                                .clipped()
+                        } placeholder: {
+                            Color.gray.opacity(0.2)
+                                .frame(height: 180)
+                        }
+                    } else {
+                        // Placeholder when no image
+                        ZStack {
+                            LinearGradient(
+                                colors: [Color.pink.opacity(0.7), Color.purple.opacity(0.5)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                            Text(user.fullName.prefix(1))
+                                .font(.system(size: 48, weight: .bold))
+                                .foregroundColor(.white)
+                        }
+                        .frame(height: 180)
                     }
 
                     // Online Status Indicator - Top Left (only if not blurred)
                     if !isBlurred {
-                        VStack {
-                            HStack {
-                                OnlineStatusIndicator(user: user)
-                                    .padding(.top, 8)
-                                    .padding(.leading, 8)
-                                Spacer()
-                            }
-                            Spacer()
-                        }
+                        OnlineStatusIndicator(user: user)
+                            .padding(.top, 8)
+                            .padding(.leading, 8)
                     }
 
                     // Blur overlay for non-premium
@@ -243,8 +256,10 @@ struct LikeCardView: View {
                         Rectangle()
                             .fill(.ultraThinMaterial)
                             .blur(radius: 20)
+                            .frame(height: 180)
 
                         VStack {
+                            Spacer()
                             Image(systemName: "lock.fill")
                                 .font(.title)
                                 .foregroundColor(.white)
@@ -253,14 +268,17 @@ struct LikeCardView: View {
                                 .font(.caption)
                                 .fontWeight(.semibold)
                                 .foregroundColor(.white)
+                            Spacer()
                         }
+                        .frame(height: 180)
                     }
                 }
-                .frame(height: 220)
+                .frame(height: 180)
+                .frame(maxWidth: .infinity)
                 .clipped()
                 .cornerRadius(16, corners: [.topLeft, .topRight])
 
-                // Info section with white background
+                // Info section with white background - separate from image
                 VStack(alignment: .leading, spacing: 6) {
                     Text(isBlurred ? "••••••" : user.fullName)
                         .font(.headline)
@@ -288,7 +306,6 @@ struct LikeCardView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 12)
                 .background(Color(.systemBackground))
-                .cornerRadius(16, corners: [.bottomLeft, .bottomRight])
             }
             .background(Color(.systemBackground))
             .cornerRadius(16)
