@@ -63,31 +63,50 @@ class UserService: ObservableObject, UserServiceProtocol {
             .limit(to: limit)
         
         // Apply filters
-        if let lookingFor = lookingFor {
-            query = query.whereField("gender", isEqualTo: lookingFor)
+        if let lookingFor = lookingFor, lookingFor != "Everyone" {
+            // Convert lookingFor values to gender values
+            let gender: String
+            switch lookingFor {
+            case "Women":
+                gender = "Female"
+            case "Men":
+                gender = "Male"
+            default:
+                gender = lookingFor // Use as-is if already in correct format
+            }
+            query = query.whereField("gender", isEqualTo: gender)
         }
-        
+
         if let ageRange = ageRange {
             query = query
                 .whereField("age", isGreaterThanOrEqualTo: ageRange.lowerBound)
                 .whereField("age", isLessThanOrEqualTo: ageRange.upperBound)
         }
-        
+
         if let country = country {
             query = query.whereField("country", isEqualTo: country)
         }
-        
+
         // Pagination
         if let lastDoc = lastDocument {
             query = query.start(afterDocument: lastDoc)
         }
-        
+
         do {
             let snapshot = try await query.getDocuments()
             lastDocument = snapshot.documents.last
 
+            // Get existing user IDs to prevent duplicates
+            let existingIds = Set(users.compactMap { $0.id })
+
             let newUsers = snapshot.documents.compactMap { try? $0.data(as: User.self) }
-                .filter { $0.id != excludingUserId }
+                .filter { user in
+                    // Exclude current user
+                    guard user.id != excludingUserId else { return false }
+                    // Exclude duplicates already in the array
+                    guard let userId = user.id, !existingIds.contains(userId) else { return false }
+                    return true
+                }
 
             users.append(contentsOf: newUsers)
             hasMoreUsers = newUsers.count >= limit
