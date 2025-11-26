@@ -56,6 +56,15 @@ struct LikesView: View {
             .task {
                 await viewModel.loadAllLikes()
             }
+            .onAppear {
+                // Refresh data when tab becomes visible, but only if not currently loading
+                // LazyTabContent caches views, so we need this for tab switches
+                if !viewModel.isLoading {
+                    Task {
+                        await viewModel.loadAllLikes()
+                    }
+                }
+            }
             .refreshable {
                 HapticManager.shared.impact(.light)
                 await viewModel.loadAllLikes()
