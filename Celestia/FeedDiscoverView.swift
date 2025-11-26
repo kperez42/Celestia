@@ -77,6 +77,11 @@ struct FeedDiscoverView: View {
                 }
                 .onAppear {
                     Logger.shared.debug("FeedDiscoverView appeared - users.count: \(users.count), currentUser.lookingFor: \(authService.currentUser?.lookingFor ?? "nil")", category: .general)
+
+                    // BUGFIX: Always sync favorites when view appears
+                    // This ensures save state is correct after navigating from other tabs
+                    syncFavorites()
+
                     if users.isEmpty {
                         Task {
                             await loadUsers()
