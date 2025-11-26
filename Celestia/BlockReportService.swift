@@ -9,7 +9,7 @@ import Foundation
 import FirebaseFirestore
 
 @MainActor
-class BlockReportService: ObservableObject {
+class BlockReportService: ObservableObject, ListenerLifecycleAware {
     static let shared = BlockReportService()
 
     private let db = Firestore.firestore()
@@ -20,7 +20,27 @@ class BlockReportService: ObservableObject {
     // AUDIT FIX: Store listener reference for proper cleanup
     private var blockedUsersListener: ListenerRegistration?
 
+    // MARK: - ListenerLifecycleAware Conformance
+
+    nonisolated var listenerId: String { "BlockReportService" }
+
+    var areListenersActive: Bool {
+        blockedUsersListener != nil
+    }
+
+    func reconnectListeners() {
+        Logger.shared.info("BlockReportService: Reconnecting listeners", category: .general)
+        restartListening()
+    }
+
+    func pauseListeners() {
+        Logger.shared.info("BlockReportService: Pausing listeners", category: .general)
+        stopListening()
+    }
+
     private init() {
+        // Register with lifecycle manager for automatic reconnection handling
+        ListenerLifecycleManager.shared.register(self)
         loadBlockedUsers()
     }
 

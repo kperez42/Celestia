@@ -10,7 +10,7 @@ import Firebase
 import FirebaseFirestore
 
 @MainActor
-class InterestService: ObservableObject {
+class InterestService: ObservableObject, ListenerLifecycleAware {
     @Published var sentInterests: [Interest] = []
     @Published var receivedInterests: [Interest] = []
     @Published var isLoading = false
@@ -22,7 +22,34 @@ class InterestService: ObservableObject {
     private var lastReceivedDocument: DocumentSnapshot?
     private var lastSentDocument: DocumentSnapshot?
 
+    // LIFECYCLE: Track current user for reconnection
+    private var currentUserId: String?
+
+    // MARK: - ListenerLifecycleAware Conformance
+
+    nonisolated var listenerId: String { "InterestService" }
+
+    var areListenersActive: Bool {
+        listener != nil
+    }
+
+    func reconnectListeners() {
+        guard let userId = currentUserId else {
+            Logger.shared.debug("InterestService: No userId for reconnection", category: .matching)
+            return
+        }
+        Logger.shared.info("InterestService: Reconnecting listeners for user: \(userId)", category: .matching)
+        listenToReceivedInterests(userId: userId)
+    }
+
+    func pauseListeners() {
+        Logger.shared.info("InterestService: Pausing listeners", category: .matching)
+        stopListening()
+    }
+
     private init() {
+        // Register with lifecycle manager for automatic reconnection handling
+        ListenerLifecycleManager.shared.register(self)
     }
     
     // MARK: - Send Interest
@@ -155,10 +182,13 @@ class InterestService: ObservableObject {
     }
     
     // MARK: - Listen to Interests
-    
+
     func listenToReceivedInterests(userId: String) {
+        // LIFECYCLE: Store userId for reconnection
+        currentUserId = userId
+
         listener?.remove()
-        
+
         listener = db.collection("interests")
             .whereField("toUserId", isEqualTo: userId)
             .whereField("status", isEqualTo: "pending")
@@ -248,5 +278,9 @@ class InterestService: ObservableObject {
     
     deinit {
         listener?.remove()
+        // LIFECYCLE: Unregister from lifecycle manager
+        Task { @MainActor in
+            ListenerLifecycleManager.shared.unregister(id: "InterestService")
+        }
     }
 }

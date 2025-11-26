@@ -33,7 +33,7 @@ struct MessageRetryConfig {
 }
 
 @MainActor
-class MessageService: ObservableObject, MessageServiceProtocol {
+class MessageService: ObservableObject, MessageServiceProtocol, ListenerLifecycleAware {
     @Published var messages: [Message] = []
     @Published var isLoading = false
     @Published var isLoadingMore = false
@@ -67,9 +67,37 @@ class MessageService: ObservableObject, MessageServiceProtocol {
     // AUDIT FIX: Use Set for O(1) duplicate detection instead of O(n) array search
     private var messageIdSet: Set<String> = []
 
+    // MARK: - ListenerLifecycleAware Conformance
+
+    nonisolated var listenerId: String { "MessageService" }
+
+    var areListenersActive: Bool {
+        listener != nil
+    }
+
+    func reconnectListeners() {
+        guard let matchId = currentMatchId else {
+            Logger.shared.debug("MessageService: No matchId for reconnection", category: .messaging)
+            return
+        }
+        Logger.shared.info("MessageService: Reconnecting listeners for match: \(matchId)", category: .messaging)
+        listenToMessages(matchId: matchId)
+    }
+
+    func pauseListeners() {
+        Logger.shared.info("MessageService: Pausing listeners", category: .messaging)
+        // Don't clear currentMatchId - we need it for reconnection
+        loadingTask?.cancel()
+        loadingTask = nil
+        listener?.remove()
+        listener = nil
+    }
+
     // Dependency injection initializer
     init(repository: MessageRepository) {
         self.repository = repository
+        // Register with lifecycle manager for automatic reconnection handling
+        ListenerLifecycleManager.shared.register(self)
     }
 
     /// Listen to messages in real-time for a specific match with pagination
@@ -903,6 +931,10 @@ class MessageService: ObservableObject, MessageServiceProtocol {
         // AUDIT FIX: Cancel loading task to prevent memory leaks
         loadingTask?.cancel()
         listener?.remove()
+        // LIFECYCLE: Unregister from lifecycle manager
+        Task { @MainActor in
+            ListenerLifecycleManager.shared.unregister(id: "MessageService")
+        }
     }
 }
 
