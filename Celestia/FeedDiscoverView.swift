@@ -524,7 +524,6 @@ struct FeedDiscoverView: View {
         }
 
         isLoading = true
-        defer { isLoading = false }
 
         do {
             // Fetch from Firestore with filters
@@ -563,6 +562,7 @@ struct FeedDiscoverView: View {
                 Logger.shared.info("FeedDiscoverView: Loaded \(users.count) users", category: .database)
                 errorMessage = ""  // Clear any previous errors
                 isInitialLoad = false  // Hide skeleton and show content
+                isLoading = false  // BUGFIX: Set to false before calling loadMoreUsers()
                 loadMoreUsers()
 
                 // Prefetch images for smooth scrolling
@@ -573,21 +573,32 @@ struct FeedDiscoverView: View {
             await MainActor.run {
                 errorMessage = "Failed to load users. Please check your connection and try again."
                 isInitialLoad = false  // Show error state instead of skeleton
+                isLoading = false
             }
         }
     }
 
     private func loadMoreUsers() {
-        guard !isLoading else { return }
+        guard !isLoading else {
+            Logger.shared.debug("loadMoreUsers: Skipped - already loading", category: .general)
+            return
+        }
 
         let startIndex = currentPage * usersPerPage
         let endIndex = min(startIndex + usersPerPage, users.count)
 
-        guard startIndex < users.count else { return }
+        Logger.shared.debug("loadMoreUsers: currentPage=\(currentPage), startIndex=\(startIndex), endIndex=\(endIndex), users.count=\(users.count)", category: .general)
+
+        guard startIndex < users.count else {
+            Logger.shared.debug("loadMoreUsers: No more users to load", category: .general)
+            return
+        }
 
         let newUsers = Array(users[startIndex..<endIndex])
         displayedUsers.append(contentsOf: newUsers)
         currentPage += 1
+
+        Logger.shared.info("loadMoreUsers: Added \(newUsers.count) users to display. Total displayed: \(displayedUsers.count). Users: \(newUsers.map { $0.fullName }.joined(separator: ", "))", category: .general)
 
         // Prefetch images for next batch to ensure smooth scrolling
         let nextBatchStart = endIndex
@@ -606,6 +617,7 @@ struct FeedDiscoverView: View {
     }
 
     private func reloadWithFilters() async {
+        Logger.shared.info("reloadWithFilters: Clearing displayedUsers and reloading", category: .general)
         currentPage = 0
         displayedUsers = []
         await loadUsers()
