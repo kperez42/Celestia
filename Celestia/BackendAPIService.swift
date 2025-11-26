@@ -351,6 +351,33 @@ class BackendAPIService: BackendAPIServiceProtocol {
         } catch let error as BackendAPIError {
             throw error
         } catch {
+            // Check if this is a TLS/SSL error
+            let nsError = error as NSError
+            let isTLSError = nsError.domain == NSURLErrorDomain &&
+                            (nsError.code == NSURLErrorSecureConnectionFailed ||
+                             nsError.code == NSURLErrorServerCertificateUntrusted ||
+                             nsError.code == NSURLErrorClientCertificateRejected ||
+                             nsError.code == -1200) // Generic SSL error
+
+            if isTLSError {
+                // Log detailed TLS error information
+                Logger.shared.error("TLS/SSL connection error to backend API - domain: \(nsError.domain), code: \(nsError.code), url: \(request.url?.absoluteString ?? "unknown")", category: .networking)
+
+                // For TLS errors, don't retry as it's likely a server-side certificate issue
+                // Log analytics for monitoring
+                Task { @MainActor in
+                    AnalyticsManager.shared.logEvent(.networkError, parameters: [
+                        "error_type": "tls_failure",
+                        "error_code": nsError.code,
+                        "endpoint": request.url?.path ?? "unknown",
+                        "attempt": attempt
+                    ])
+                }
+
+                // Throw immediately without retry for TLS errors
+                throw BackendAPIError.tlsError(nsError)
+            }
+
             // Network error - retry if we haven't exceeded max attempts
             if attempt < AppConstants.API.retryAttempts {
                 Logger.shared.warning("Network error (attempt \(attempt)/\(AppConstants.API.retryAttempts)), retrying...", category: .networking)
@@ -475,6 +502,7 @@ enum BackendAPIError: LocalizedError {
     case serverError(Int)
     case httpError(Int)
     case networkError(Error)
+    case tlsError(NSError)
 
     var errorDescription: String? {
         switch self {
@@ -492,6 +520,8 @@ enum BackendAPIError: LocalizedError {
             return "HTTP error (\(code))"
         case .networkError(let error):
             return "Network error: \(error.localizedDescription)"
+        case .tlsError(let error):
+            return "Secure connection failed (TLS/SSL error \(error.code)). The backend server may have a certificate configuration issue."
         }
     }
 }
