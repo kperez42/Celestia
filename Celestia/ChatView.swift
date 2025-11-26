@@ -133,11 +133,16 @@ struct ChatView: View {
             ReportUserView(user: otherUser)
         }
         .onChange(of: messageService.messages.count) {
-            // Check conversation safety whenever new messages arrive
-            checkConversationSafety()
+            // SWIFTUI FIX: Defer safety check to avoid modifying state during view update
+            // This prevents "Modifying state during view update" warnings
+            Task {
+                try? await Task.sleep(nanoseconds: 1_000_000) // 1ms delay
+                checkConversationSafety()
+            }
         }
         .task {
-            // Initial safety check
+            // SWIFTUI FIX: Defer initial safety check
+            try? await Task.sleep(nanoseconds: 1_000_000)
             checkConversationSafety()
         }
         .overlay(alignment: .top) {
