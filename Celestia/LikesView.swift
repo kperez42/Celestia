@@ -701,6 +701,14 @@ class LikesViewModel: ObservableObject {
             }
 
             Logger.shared.info("Loaded likes - Received: \(likesReceivedUsers.count), Sent: \(likesSentUsers.count), Mutual: \(mutualUsers.count)", category: .matching)
+
+            // PERFORMANCE: Eagerly prefetch images for all loaded likes
+            // This ensures images are cached when users tap cards
+            Task {
+                for user in likesReceivedUsers + likesSentUsers {
+                    ImageCache.shared.prefetchUserPhotosHighPriority(user: user)
+                }
+            }
         } catch {
             Logger.shared.error("Error loading likes", category: .matching, error: error)
         }

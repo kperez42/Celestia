@@ -16,8 +16,8 @@ struct CelestiaApp: App {
     @StateObject private var deepLinkManager = DeepLinkManager()
 
     init() {
-        // MEMORY FIX: Disable Firebase Analytics automatic data collection to prevent malloc errors
-        // This significantly reduces memory pressure during app initialization
+        // MEMORY FIX: Completely disable Firebase Analytics to eliminate malloc errors
+        // Analytics can be re-enabled later if needed via remote config
         Analytics.setAnalyticsCollectionEnabled(false)
 
         // Configure Firebase first (must be on main thread)
@@ -25,8 +25,9 @@ struct CelestiaApp: App {
         // Do NOT call FirebaseApp.configure() anywhere else in the app
         FirebaseApp.configure()
 
-        // Re-enable analytics AFTER Firebase is configured, with manual control
-        Analytics.setAnalyticsCollectionEnabled(true)
+        // Keep analytics disabled to prevent memory issues
+        // App uses AnalyticsServiceEnhanced for analytics instead
+        Analytics.setAnalyticsCollectionEnabled(false)
 
         // PERFORMANCE: Move Firestore persistence initialization to background thread
         // This reduces cold start time by ~150-200ms
