@@ -783,6 +783,7 @@
           "order": "ASCENDING"
         },
         {
+          "fieldPath": "toUserId",
           "fieldPath": "timestamp",
           "order": "DESCENDING"
         }

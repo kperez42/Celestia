@@ -65,12 +65,20 @@ class UserService: ObservableObject, UserServiceProtocol {
             .limit(to: limit)
 
         // Apply filters
+        // IMPORTANT: Skip gender filter when lookingFor is "Everyone" to show all genders
+        if let lookingFor = lookingFor, lookingFor != "Everyone" {
         if let lookingFor = lookingFor {
             // Convert lookingFor values to match gender field values
             // lookingFor uses: "Men", "Women", "Everyone"
             // gender uses: "Male", "Female", "Non-binary", "Other"
             let genderToMatch: String
             switch lookingFor {
+            case "Women":
+                genderToMatch = "Female"
+            case "Men":
+                genderToMatch = "Male"
+            default:
+                genderToMatch = lookingFor // Use as-is if already in correct format
             case "Men":
                 genderToMatch = "Male"
             case "Women":
@@ -104,8 +112,25 @@ class UserService: ObservableObject, UserServiceProtocol {
             let snapshot = try await query.getDocuments()
             lastDocument = snapshot.documents.last
 
+            // Get existing user IDs to prevent duplicates
+            let existingIds = Set(users.compactMap { $0.id })
+
             let newUsers = snapshot.documents.compactMap { try? $0.data(as: User.self) }
-                .filter { $0.id != excludingUserId }
+                .filter { user in
+                    // Exclude current user
+                    guard user.id != excludingUserId else { return false }
+                    // Exclude duplicates already in the array
+                    guard let userId = user.id, !existingIds.contains(userId) else { return false }
+                    return true
+                }
+
+            Logger.shared.info("UserService: Query returned \(snapshot.documents.count) documents, \(newUsers.count) valid users after filtering", category: .database)
+
+            if newUsers.isEmpty {
+                Logger.shared.warning("UserService: No users found! Check Firebase indexes and user data.", category: .database)
+            } else {
+                Logger.shared.info("UserService: Found users - \(newUsers.map { "\($0.fullName) (gender: \($0.gender))" }.joined(separator: ", "))", category: .database)
+            }
 
             Logger.shared.info("UserService: Query returned \(snapshot.documents.count) documents, \(newUsers.count) valid users after filtering", category: .database)
 
