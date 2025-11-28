@@ -181,12 +181,9 @@ struct MessageBubbleGradient: View {
                                     .font(.caption2)
                                     .foregroundColor(.blue)
 
-                                // Show read time if available
-                                if let readAt = message.readAt {
-                                    Text("• Read \(formatReadTime(readAt))")
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                }
+                                Text("Read")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
                             }
                         } else if message.isDelivered {
                             Image(systemName: "checkmark.circle")
@@ -217,17 +214,6 @@ struct MessageBubbleGradient: View {
             )
         } else {
             Color(.systemGray5)
-        }
-    }
-
-    // PERFORMANCE: Use cached formatters from Date extension
-    private func formatReadTime(_ date: Date) -> String {
-        if Calendar.current.isDateInToday(date) {
-            return date.formattedTime()
-        } else if Calendar.current.isDateInYesterday(date) {
-            return "yesterday"
-        } else {
-            return date.formattedDate()
         }
     }
 }

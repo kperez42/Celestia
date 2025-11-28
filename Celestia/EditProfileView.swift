@@ -8,6 +8,7 @@
 import SwiftUI
 import PhotosUI
 import FirebaseAuth
+import UniformTypeIdentifiers
 
 struct EditProfileView: View {
     @Environment(\.dismiss) var dismiss
@@ -42,6 +43,7 @@ struct EditProfileView: View {
     @State private var uploadProgress: Double = 0.0
     @State private var isUploadingProfilePhoto = false
     @State private var uploadingPhotoCount = 0
+    @State private var draggingPhotoURL: String?
 
     // Store user ID to ensure it's available during uploads
     @State private var userId: String = ""
@@ -541,22 +543,28 @@ struct EditProfileView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 40)
             } else {
-                // Photo grid with drag-and-drop reordering
+                // Photo grid with long-press drag-and-drop reordering
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                     ForEach(Array(photos.enumerated()), id: \.element) { index, photoURL in
-                        PhotoGridItem(
+                        DraggablePhotoGridItem(
                             photoURL: photoURL,
+                            isDragging: draggingPhotoURL == photoURL,
                             onDelete: {
                                 deletePhoto(at: index)
-                            },
-                            onMoveUp: index > 0 ? {
-                                movePhoto(from: index, to: index - 1)
-                            } : nil,
-                            onMoveDown: index < photos.count - 1 ? {
-                                movePhoto(from: index, to: index + 1)
-                            } : nil
+                            }
                         )
-                        .id(photoURL) // Stable ID for proper SwiftUI tracking
+                        .id(photoURL)
+                        .onDrag {
+                            draggingPhotoURL = photoURL
+                            HapticManager.shared.impact(.medium)
+                            return NSItemProvider(object: photoURL as NSString)
+                        }
+                        .onDrop(of: [.text], delegate: PhotoDropDelegate(
+                            item: photoURL,
+                            items: $photos,
+                            draggingItem: $draggingPhotoURL,
+                            onReorder: { savePhotoOrder() }
+                        ))
                     }
 
                     // Show uploading placeholders with smooth animation
@@ -1488,8 +1496,11 @@ struct EditProfileView: View {
             photos.insert(photo, at: destination)
         }
         HapticManager.shared.impact(.light)
+        savePhotoOrder()
+    }
 
-        // Immediately save to Firestore so reordering persists
+    private func savePhotoOrder() {
+        // Save photo order to Firestore so reordering persists
         Task {
             guard var user = authService.currentUser else { return }
             user.photos = photos
@@ -2143,13 +2154,12 @@ struct UploadingPhotoPlaceholder: View {
     }
 }
 
-// MARK: - Photo Grid Item
+// MARK: - Draggable Photo Grid Item
 
-struct PhotoGridItem: View {
+struct DraggablePhotoGridItem: View {
     let photoURL: String
+    let isDragging: Bool
     let onDelete: () -> Void
-    let onMoveUp: (() -> Void)?
-    let onMoveDown: (() -> Void)?
 
     @State private var showDeleteConfirmation = false
 
@@ -2175,65 +2185,84 @@ struct PhotoGridItem: View {
             )
             .frame(height: 120)
             .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(isDragging ? Color.purple : Color.clear, lineWidth: 3)
+            )
 
-            // Controls overlay
-            VStack(spacing: 4) {
-                // Delete button
-                Button {
-                    showDeleteConfirmation = true
-                } label: {
-                    Circle()
-                        .fill(Color.red)
-                        .frame(width: 28, height: 28)
-                        .overlay {
-                            Image(systemName: "trash.fill")
-                                .font(.system(size: 12))
-                                .foregroundColor(.white)
-                        }
-                        .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
-                }
-
-                // Reorder buttons
-                if onMoveUp != nil || onMoveDown != nil {
-                    VStack(spacing: 2) {
-                        if let moveUp = onMoveUp {
-                            Button(action: moveUp) {
-                                Circle()
-                                    .fill(Color.white)
-                                    .frame(width: 24, height: 24)
-                                    .overlay {
-                                        Image(systemName: "chevron.up")
-                                            .font(.system(size: 10, weight: .bold))
-                                            .foregroundColor(.purple)
-                                    }
-                                    .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
-                            }
-                        }
-
-                        if let moveDown = onMoveDown {
-                            Button(action: moveDown) {
-                                Circle()
-                                    .fill(Color.white)
-                                    .frame(width: 24, height: 24)
-                                    .overlay {
-                                        Image(systemName: "chevron.down")
-                                            .font(.system(size: 10, weight: .bold))
-                                            .foregroundColor(.purple)
-                                    }
-                                    .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
-                            }
-                        }
+            // Delete button
+            Button {
+                showDeleteConfirmation = true
+            } label: {
+                Circle()
+                    .fill(Color.red)
+                    .frame(width: 28, height: 28)
+                    .overlay {
+                        Image(systemName: "trash.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(.white)
                     }
-                }
+                    .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
             }
             .padding(6)
+
+            // Drag hint overlay (shows on long press)
+            if isDragging {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.purple.opacity(0.2))
+                    .frame(height: 120)
+            }
         }
+        .scaleEffect(isDragging ? 1.05 : 1.0)
+        .shadow(color: isDragging ? .purple.opacity(0.4) : .clear, radius: 10, y: 5)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isDragging)
         .confirmationDialog("Delete this photo?", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
             Button("Delete", role: .destructive) {
                 onDelete()
             }
             Button("Cancel", role: .cancel) {}
         }
+    }
+}
+
+// MARK: - Photo Drop Delegate
+
+struct PhotoDropDelegate: DropDelegate {
+    let item: String
+    @Binding var items: [String]
+    @Binding var draggingItem: String?
+    let onReorder: () -> Void
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggingItem = nil
+        onReorder()
+        return true
+    }
+
+    func dropEntered(info: DropInfo) {
+        guard let draggingItem = draggingItem,
+              draggingItem != item,
+              let fromIndex = items.firstIndex(of: draggingItem),
+              let toIndex = items.firstIndex(of: item) else {
+            return
+        }
+
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            items.move(fromOffsets: IndexSet(integer: fromIndex), toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex)
+        }
+        HapticManager.shared.impact(.light)
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        return DropProposal(operation: .move)
+    }
+
+    func dropExited(info: DropInfo) {
+        // Optional: Add any cleanup when drag exits
+    }
+
+    func validateDrop(info: DropInfo) -> Bool {
+        return draggingItem != nil
     }
 }
 
