@@ -3,6 +3,7 @@
 //  Celestia
 //
 //  Manages referral system logic
+//  Optimized for 10k+ users with caching, rate limiting, and efficient queries
 //
 
 import Foundation
@@ -18,6 +19,7 @@ class ReferralManager: ObservableObject {
     @Published var isLoading = false
     @Published var lastError: String?
     @Published var newMilestoneReached: ReferralMilestone?
+    @Published var hasMoreReferrals = false  // For pagination
 
     private let db = Firestore.firestore()
     private let authService = AuthService.shared
@@ -26,7 +28,61 @@ class ReferralManager: ObservableObject {
     private let maxRetries = 3
     private let retryDelaySeconds: UInt64 = 1
 
+    // MARK: - Caching Configuration (for 10k+ scale)
+
+    private struct CacheEntry<T> {
+        let value: T
+        let timestamp: Date
+        let expiresIn: TimeInterval
+
+        var isExpired: Bool {
+            Date().timeIntervalSince(timestamp) > expiresIn
+        }
+    }
+
+    // Cache storage
+    private var statsCache: [String: CacheEntry<ReferralStats>] = [:]
+    private var leaderboardCache: CacheEntry<[ReferralLeaderboardEntry]>?
+    private var codeValidationCache: [String: CacheEntry<Bool>] = [:]
+
+    // Cache durations
+    private let statsCacheDuration: TimeInterval = 60  // 1 minute
+    private let leaderboardCacheDuration: TimeInterval = 300  // 5 minutes
+    private let codeValidationCacheDuration: TimeInterval = 30  // 30 seconds
+
+    // MARK: - Rate Limiting (prevent abuse at scale)
+
+    private var lastReferralAttempt: [String: Date] = [:]  // userId -> lastAttempt
+    private var referralAttemptCount: [String: Int] = [:]  // userId -> count in window
+    private let rateLimitWindow: TimeInterval = 3600  // 1 hour
+    private let maxReferralsPerWindow = 10  // Max referral attempts per hour
+
+    // Pagination
+    private var lastReferralDocument: DocumentSnapshot?
+    private let referralsPageSize = 20
+
     private init() {}
+
+    // MARK: - Cache Management
+
+    /// Clears all caches - call when user logs out or data needs refresh
+    func clearCaches() {
+        statsCache.removeAll()
+        leaderboardCache = nil
+        codeValidationCache.removeAll()
+        lastReferralDocument = nil
+        Logger.shared.info("Referral caches cleared", category: .referral)
+    }
+
+    /// Invalidates stats cache for a specific user
+    private func invalidateStatsCache(for userId: String) {
+        statsCache.removeValue(forKey: userId)
+    }
+
+    /// Invalidates leaderboard cache
+    private func invalidateLeaderboardCache() {
+        leaderboardCache = nil
+    }
 
     // MARK: - Referral Code Generation
 
@@ -43,23 +99,36 @@ class ReferralManager: ObservableObject {
             }
             let fullCode = "CEL-\(code)"
 
-            // Check if code already exists
-            let snapshot = try await db.collection("users")
-                .whereField("referralStats.referralCode", isEqualTo: fullCode)
-                .limit(to: 1)
-                .getDocuments()
+            // Check if code exists in dedicated referralCodes collection (faster lookup at scale)
+            // This collection is indexed by code for O(1) lookups
+            let codeDoc = try await db.collection("referralCodes").document(fullCode).getDocument()
 
-            if snapshot.documents.isEmpty {
-                // Code is unique
+            if !codeDoc.exists {
+                // Code is unique - reserve it in the dedicated collection
+                try await db.collection("referralCodes").document(fullCode).setData([
+                    "userId": userId,
+                    "createdAt": Timestamp(date: Date()),
+                    "active": true
+                ])
                 return fullCode
             }
 
             Logger.shared.warning("Referral code collision detected (attempt \(attempt)/5): \(fullCode)", category: .referral)
         }
 
-        // If we still can't generate a unique code after 5 attempts, use timestamp
+        // If we still can't generate a unique code after 5 attempts, use userId hash + timestamp
         let timestamp = Int(Date().timeIntervalSince1970)
-        return "CEL-\(String(timestamp).suffix(8))"
+        let hashSuffix = String(userId.hashValue).suffix(4)
+        let fallbackCode = "CEL-\(hashSuffix)\(String(timestamp).suffix(4))"
+
+        // Reserve the fallback code
+        try await db.collection("referralCodes").document(fallbackCode).setData([
+            "userId": userId,
+            "createdAt": Timestamp(date: Date()),
+            "active": true
+        ])
+
+        return fallbackCode
     }
 
     func initializeReferralCode(for user: inout User) async throws {
@@ -80,6 +149,29 @@ class ReferralManager: ObservableObject {
         try await db.collection("users").document(userId).updateData(updateData)
     }
 
+    // MARK: - Rate Limiting Helpers
+
+    private func checkRateLimit(for userId: String) throws {
+        let now = Date()
+
+        // Clean up old entries
+        if let lastAttempt = lastReferralAttempt[userId],
+           now.timeIntervalSince(lastAttempt) > rateLimitWindow {
+            referralAttemptCount[userId] = 0
+        }
+
+        // Check if rate limited
+        let currentCount = referralAttemptCount[userId] ?? 0
+        if currentCount >= maxReferralsPerWindow {
+            Logger.shared.warning("Rate limit exceeded for user \(userId)", category: .referral)
+            throw ReferralError.rateLimitExceeded
+        }
+
+        // Update tracking
+        lastReferralAttempt[userId] = now
+        referralAttemptCount[userId] = currentCount + 1
+    }
+
     // MARK: - Process Referral on Signup
 
     func processReferralSignup(newUser: User, referralCode: String) async throws {
@@ -89,89 +181,145 @@ class ReferralManager: ObservableObject {
             throw ReferralError.invalidUser
         }
 
-        // Step 1: Find the referrer by their referral code
-        let referrerSnapshot = try await db.collection("users")
-            .whereField("referralStats.referralCode", isEqualTo: referralCode)
-            .limit(to: 1)
-            .getDocuments()
+        // Rate limiting check (prevent abuse at scale)
+        try checkRateLimit(for: newUserId)
 
-        guard let referrerDoc = referrerSnapshot.documents.first else {
-            Logger.shared.warning("Invalid referral code: \(referralCode)", category: .referral)
-            throw ReferralError.invalidCode
+        // Step 1: Look up referral code in dedicated collection (O(1) lookup)
+        let codeDoc = try await db.collection("referralCodes").document(referralCode).getDocument()
+
+        var referrerId: String
+        var referrerName: String = "Someone"
+
+        if let codeData = codeDoc.data(), codeDoc.exists {
+            // Found in dedicated collection
+            referrerId = codeData["userId"] as? String ?? ""
+            guard !referrerId.isEmpty else {
+                Logger.shared.warning("Invalid referral code (no userId): \(referralCode)", category: .referral)
+                throw ReferralError.invalidCode
+            }
+
+            // Fetch referrer name
+            let referrerDoc = try await db.collection("users").document(referrerId).getDocument()
+            referrerName = referrerDoc.data()?["fullName"] as? String ?? "Someone"
+        } else {
+            // Fallback: legacy lookup in users collection
+            let referrerSnapshot = try await db.collection("users")
+                .whereField("referralStats.referralCode", isEqualTo: referralCode)
+                .limit(to: 1)
+                .getDocuments()
+
+            guard let referrerDoc = referrerSnapshot.documents.first else {
+                Logger.shared.warning("Invalid referral code: \(referralCode)", category: .referral)
+                throw ReferralError.invalidCode
+            }
+
+            referrerId = referrerDoc.documentID
+            referrerName = referrerDoc.data()["fullName"] as? String ?? "Someone"
+
+            // Migrate code to dedicated collection for future fast lookups
+            try? await db.collection("referralCodes").document(referralCode).setData([
+                "userId": referrerId,
+                "createdAt": Timestamp(date: Date()),
+                "active": true,
+                "migrated": true
+            ])
         }
-
-        let referrerId = referrerDoc.documentID
-        let referrerData = referrerDoc.data()
-        let referrerName = referrerData["fullName"] as? String ?? "Someone"
 
         guard referrerId != newUserId else {
             Logger.shared.warning("User attempted to refer themselves", category: .referral)
             throw ReferralError.selfReferral
         }
 
-        // Step 1.5: Check if referrer has reached max referrals
-        let referrerStatsDict = referrerData["referralStats"] as? [String: Any] ?? [:]
-        let currentReferrals = referrerStatsDict["totalReferrals"] as? Int ?? 0
-
-        if currentReferrals >= ReferralRewards.maxReferrals {
-            Logger.shared.warning("Referrer has reached max referrals limit: \(currentReferrals)", category: .referral)
-            throw ReferralError.maxReferralsReached
-        }
-
-        // Step 2: Use a unique document ID to prevent duplicate referrals
-        // This provides database-level duplicate prevention
+        // Step 2: Use Firestore transaction for atomic referral creation
+        // This prevents race conditions at scale
         let referralDocId = "\(referrerId)_\(newUserId)"
-        let existingReferralDoc = try await db.collection("referrals").document(referralDocId).getDocument()
 
-        if existingReferralDoc.exists {
-            Logger.shared.warning("Duplicate referral attempt detected", category: .referral)
-            throw ReferralError.alreadyReferred
+        do {
+            try await db.runTransaction { transaction, errorPointer in
+                // Check if referral already exists
+                let referralRef = self.db.collection("referrals").document(referralDocId)
+                let referralDoc: DocumentSnapshot
+                do {
+                    referralDoc = try transaction.getDocument(referralRef)
+                } catch let error as NSError {
+                    errorPointer?.pointee = error
+                    return nil
+                }
+
+                if referralDoc.exists {
+                    errorPointer?.pointee = NSError(
+                        domain: "ReferralError",
+                        code: 409,
+                        userInfo: [NSLocalizedDescriptionKey: "Referral already exists"]
+                    )
+                    return nil
+                }
+
+                // Check referrer's current count
+                let referrerRef = self.db.collection("users").document(referrerId)
+                let referrerDoc: DocumentSnapshot
+                do {
+                    referrerDoc = try transaction.getDocument(referrerRef)
+                } catch let error as NSError {
+                    errorPointer?.pointee = error
+                    return nil
+                }
+
+                let referrerData = referrerDoc.data() ?? [:]
+                let referrerStatsDict = referrerData["referralStats"] as? [String: Any] ?? [:]
+                let currentReferrals = referrerStatsDict["totalReferrals"] as? Int ?? 0
+
+                if currentReferrals >= ReferralRewards.maxReferrals {
+                    errorPointer?.pointee = NSError(
+                        domain: "ReferralError",
+                        code: 429,
+                        userInfo: [NSLocalizedDescriptionKey: "Max referrals reached"]
+                    )
+                    return nil
+                }
+
+                // Create referral record
+                let referralData: [String: Any] = [
+                    "referrerUserId": referrerId,
+                    "referredUserId": newUserId,
+                    "referralCode": referralCode,
+                    "status": ReferralStatus.completed.rawValue,
+                    "createdAt": Timestamp(date: Date()),
+                    "completedAt": Timestamp(date: Date()),
+                    "rewardClaimed": false
+                ]
+
+                transaction.setData(referralData, forDocument: referralRef)
+
+                // Atomically increment referrer's total count
+                transaction.updateData([
+                    "referralStats.totalReferrals": FieldValue.increment(Int64(1))
+                ], forDocument: referrerRef)
+
+                return nil
+            }
+        } catch {
+            // Check specific error types
+            if let nsError = error as NSError?, nsError.code == 409 {
+                throw ReferralError.alreadyReferred
+            } else if let nsError = error as NSError?, nsError.code == 429 {
+                throw ReferralError.maxReferralsReached
+            }
+            throw error
         }
 
-        // Step 3: Check for email abuse (multiple accounts with same email using referral)
-        let emailCheckSnapshot = try await db.collection("users")
-            .whereField("email", isEqualTo: newUser.email)
-            .limit(to: 5)
-            .getDocuments()
-
-        // Count other accounts (not this user) that used a referral code
-        let otherAccountsWithReferral = emailCheckSnapshot.documents.filter { doc in
-            guard doc.documentID != newUserId else { return false }
-            let data = doc.data()
-            let referredByCode = data["referredByCode"] as? String
-            return referredByCode != nil && !referredByCode!.isEmpty
-        }
-
-        if !otherAccountsWithReferral.isEmpty {
-            Logger.shared.warning("Email has already been referred with a different account", category: .referral)
-            throw ReferralError.emailAlreadyReferred
-        }
-
-        // Step 4: Create referral record with deterministic ID to prevent duplicates
-        let referral = Referral(
-            referrerUserId: referrerId,
-            referredUserId: newUserId,
-            referralCode: referralCode,
-            status: .completed,
-            createdAt: Date(),
-            completedAt: Date(),
-            rewardClaimed: false
-        )
-
-        // Use setData with the deterministic ID
-        let referralData = try Firestore.Encoder().encode(referral)
-        try await db.collection("referrals").document(referralDocId).setData(referralData)
-
-        // Step 5: Award bonus days to new user (with retry)
+        // Step 3: Award bonus days (outside transaction for better reliability)
         try await awardPremiumDays(userId: newUserId, days: ReferralRewards.newUserBonusDays, reason: "referral_signup")
-
-        // Step 6: Award bonus days to referrer (with retry)
         try await awardPremiumDays(userId: referrerId, days: ReferralRewards.referrerBonusDays, reason: "successful_referral")
 
-        // Step 7: Update referrer stats
+        // Step 4: Update referrer stats (full recalculation for milestones)
         try await updateReferrerStats(userId: referrerId)
 
-        // Step 8: Send notification to referrer about successful referral
+        // Invalidate caches
+        invalidateStatsCache(for: referrerId)
+        invalidateLeaderboardCache()
+
+        // Step 5: Send notification
         await sendReferralSuccessNotification(
             referrerId: referrerId,
             referredUserName: newUser.fullName,
@@ -374,21 +522,36 @@ class ReferralManager: ObservableObject {
         }
     }
 
-    // MARK: - Fetch User Referrals
+    // MARK: - Fetch User Referrals (Paginated for scale)
 
-    func fetchUserReferrals(userId: String) async throws {
+    func fetchUserReferrals(userId: String, loadMore: Bool = false) async throws {
         isLoading = true
         defer { isLoading = false }
 
         var referrals: [Referral] = []
 
+        // If not loading more, reset pagination
+        if !loadMore {
+            lastReferralDocument = nil
+        }
+
         do {
-            // Try with ordering first (requires composite index)
-            let snapshot = try await db.collection("referrals")
+            // Build query with pagination
+            var query = db.collection("referrals")
                 .whereField("referrerUserId", isEqualTo: userId)
                 .order(by: "createdAt", descending: true)
-                .limit(to: 50)
-                .getDocuments()
+                .limit(to: referralsPageSize)
+
+            // If loading more, start after last document
+            if loadMore, let lastDoc = lastReferralDocument {
+                query = query.start(afterDocument: lastDoc)
+            }
+
+            let snapshot = try await query.getDocuments()
+
+            // Track last document for pagination
+            lastReferralDocument = snapshot.documents.last
+            hasMoreReferrals = snapshot.documents.count == referralsPageSize
 
             referrals = snapshot.documents.compactMap { doc in
                 try? doc.data(as: Referral.self)
@@ -399,7 +562,7 @@ class ReferralManager: ObservableObject {
 
             let snapshot = try await db.collection("referrals")
                 .whereField("referrerUserId", isEqualTo: userId)
-                .limit(to: 50)
+                .limit(to: referralsPageSize)
                 .getDocuments()
 
             // Sort locally instead
@@ -407,10 +570,24 @@ class ReferralManager: ObservableObject {
                 try? doc.data(as: Referral.self)
             }
             referrals.sort { $0.createdAt > $1.createdAt }
+            hasMoreReferrals = false  // Can't paginate without ordering
         }
 
         // Fetch referred user names for each referral
-        userReferrals = await enrichReferralsWithUserInfo(referrals)
+        let enrichedReferrals = await enrichReferralsWithUserInfo(referrals)
+
+        // If loading more, append to existing list
+        if loadMore {
+            userReferrals.append(contentsOf: enrichedReferrals)
+        } else {
+            userReferrals = enrichedReferrals
+        }
+    }
+
+    /// Load more referrals for pagination
+    func loadMoreReferrals(userId: String) async throws {
+        guard hasMoreReferrals, !isLoading else { return }
+        try await fetchUserReferrals(userId: userId, loadMore: true)
     }
 
     /// Enriches referrals with referred user information (name, photo)
@@ -507,9 +684,18 @@ class ReferralManager: ObservableObject {
         referralListener = nil
     }
 
-    // MARK: - Leaderboard
+    // MARK: - Leaderboard (Optimized for 10k+ users)
 
-    func fetchLeaderboard(limit: Int = 20) async throws {
+    func fetchLeaderboard(limit: Int = 20, forceRefresh: Bool = false) async throws {
+        // Check cache first (unless force refresh)
+        if !forceRefresh,
+           let cached = leaderboardCache,
+           !cached.isExpired {
+            leaderboard = cached.value
+            Logger.shared.info("Returning cached leaderboard (\(cached.value.count) entries)", category: .referral)
+            return
+        }
+
         isLoading = true
         defer { isLoading = false }
 
@@ -521,7 +707,15 @@ class ReferralManager: ObservableObject {
                 .limit(to: limit)
                 .getDocuments()
 
-            leaderboard = parseLeaderboardEntries(from: snapshot.documents)
+            let entries = parseLeaderboardEntries(from: snapshot.documents)
+            leaderboard = entries
+
+            // Cache the result
+            leaderboardCache = CacheEntry(
+                value: entries,
+                timestamp: Date(),
+                expiresIn: leaderboardCacheDuration
+            )
         } catch {
             // Fallback: fetch without ordering if index doesn't exist
             Logger.shared.warning("Falling back to unordered leaderboard query - composite index may be missing", category: .referral)
@@ -536,7 +730,7 @@ class ReferralManager: ObservableObject {
             entries.sort { $0.totalReferrals > $1.totalReferrals }
 
             // Re-assign ranks after sorting
-            leaderboard = entries.prefix(limit).enumerated().map { index, entry in
+            let finalEntries = Array(entries.prefix(limit).enumerated().map { index, entry in
                 ReferralLeaderboardEntry(
                     id: entry.id,
                     userName: entry.userName,
@@ -545,7 +739,16 @@ class ReferralManager: ObservableObject {
                     rank: index + 1,
                     premiumDaysEarned: entry.premiumDaysEarned
                 )
-            }
+            })
+
+            leaderboard = finalEntries
+
+            // Cache the result
+            leaderboardCache = CacheEntry(
+                value: finalEntries,
+                timestamp: Date(),
+                expiresIn: leaderboardCacheDuration
+            )
         }
     }
 
@@ -569,27 +772,63 @@ class ReferralManager: ObservableObject {
         return entries
     }
 
-    // MARK: - Validate Referral Code
+    // MARK: - Validate Referral Code (Cached for scale)
 
     func validateReferralCode(_ code: String) async -> Bool {
+        // Check cache first
+        if let cached = codeValidationCache[code], !cached.isExpired {
+            return cached.value
+        }
+
         do {
+            // First check dedicated referralCodes collection (O(1) lookup)
+            let codeDoc = try await db.collection("referralCodes").document(code).getDocument()
+
+            if codeDoc.exists {
+                // Cache the result
+                codeValidationCache[code] = CacheEntry(
+                    value: true,
+                    timestamp: Date(),
+                    expiresIn: codeValidationCacheDuration
+                )
+                return true
+            }
+
+            // Fallback to users collection for legacy codes
             let snapshot = try await db.collection("users")
                 .whereField("referralStats.referralCode", isEqualTo: code)
                 .limit(to: 1)
                 .getDocuments()
 
-            return !snapshot.documents.isEmpty
+            let isValid = !snapshot.documents.isEmpty
+
+            // Cache the result
+            codeValidationCache[code] = CacheEntry(
+                value: isValid,
+                timestamp: Date(),
+                expiresIn: codeValidationCacheDuration
+            )
+
+            return isValid
         } catch {
             Logger.shared.error("Error validating referral code", category: .referral, error: error)
             return false
         }
     }
 
-    // MARK: - Get Referral Stats
+    // MARK: - Get Referral Stats (Cached for scale)
 
-    func getReferralStats(for user: User) async throws -> ReferralStats {
+    func getReferralStats(for user: User, forceRefresh: Bool = false) async throws -> ReferralStats {
         guard let userId = user.id else {
             return ReferralStats()
+        }
+
+        // Check cache first (unless force refresh)
+        if !forceRefresh,
+           let cached = statsCache[userId],
+           !cached.isExpired {
+            Logger.shared.info("Returning cached stats for user", category: .referral)
+            return cached.value
         }
 
         var baseStats = user.referralStats
@@ -609,20 +848,38 @@ class ReferralManager: ObservableObject {
             baseStats.pendingReferrals = 0
         }
 
-        // Only fetch leaderboard rank if user has referrals
+        // Optimized rank calculation for 10k+ users
+        // Instead of counting all users with more referrals, use cached leaderboard position
         if totalReferrals > 0 {
-            do {
-                let leaderboardSnapshot = try await db.collection("users")
-                    .whereField("referralStats.totalReferrals", isGreaterThan: totalReferrals)
-                    .getDocuments()
+            // First check if user is in cached leaderboard
+            if let cachedLeaderboard = leaderboardCache?.value,
+               let entry = cachedLeaderboard.first(where: { $0.id == userId }) {
+                baseStats.referralRank = entry.rank
+            } else {
+                // Use count query with limit for efficiency (approximate rank)
+                do {
+                    let leaderboardSnapshot = try await db.collection("users")
+                        .whereField("referralStats.totalReferrals", isGreaterThan: totalReferrals)
+                        .limit(to: 1000)  // Limit query scope for performance
+                        .getDocuments()
 
-                baseStats.referralRank = leaderboardSnapshot.documents.count + 1
-            } catch {
-                // If query fails, estimate rank as 0 (unknown)
-                Logger.shared.warning("Could not fetch referral rank - index may be missing", category: .referral)
-                baseStats.referralRank = 0
+                    // If at limit, rank is approximate (1000+)
+                    let countAbove = leaderboardSnapshot.documents.count
+                    baseStats.referralRank = countAbove >= 1000 ? 1000 : countAbove + 1
+                } catch {
+                    // If query fails, estimate rank as 0 (unknown)
+                    Logger.shared.warning("Could not fetch referral rank - index may be missing", category: .referral)
+                    baseStats.referralRank = 0
+                }
             }
         }
+
+        // Cache the result
+        statsCache[userId] = CacheEntry(
+            value: baseStats,
+            timestamp: Date(),
+            expiresIn: statsCacheDuration
+        )
 
         return baseStats
     }

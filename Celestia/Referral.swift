@@ -18,6 +18,7 @@ enum ReferralError: LocalizedError {
     case emailAlreadyReferred
     case codeGenerationFailed
     case maxReferralsReached
+    case rateLimitExceeded
 
     var errorDescription: String? {
         switch self {
@@ -35,6 +36,8 @@ enum ReferralError: LocalizedError {
             return "Failed to generate a unique referral code. Please try again."
         case .maxReferralsReached:
             return "You've reached the maximum number of referrals allowed."
+        case .rateLimitExceeded:
+            return "Too many requests. Please try again later."
         }
     }
 }
