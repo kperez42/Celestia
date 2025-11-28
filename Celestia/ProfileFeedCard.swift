@@ -91,7 +91,6 @@ struct ProfileFeedCard: View {
 
     private var profileImage: some View {
         CachedCardImage(url: URL(string: displayPhotoURL))
-            .aspectRatio(contentMode: .fill)
             .frame(height: 400)
             .frame(maxWidth: .infinity)
             .clipped()

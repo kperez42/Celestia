@@ -534,7 +534,6 @@ struct SavedProfileCard: View {
                     Group {
                         if let imageURL = savedProfile.user.photos.first, let url = URL(string: imageURL) {
                             CachedCardImage(url: url)
-                                .aspectRatio(contentMode: .fill)
                         } else {
                             LinearGradient(
                                 colors: [.purple.opacity(0.6), .pink.opacity(0.5)],
@@ -678,7 +677,6 @@ struct SavedYouCard: View {
                 Group {
                     if let imageURL = profile.user.photos.first, let url = URL(string: imageURL) {
                         CachedCardImage(url: url)
-                            .aspectRatio(contentMode: .fill)
                     } else {
                         LinearGradient(
                             colors: [.blue.opacity(0.6), .purple.opacity(0.5)],
