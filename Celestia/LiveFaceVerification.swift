@@ -163,6 +163,13 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
     private var verificationStartTime: Date?
     private var userId: String = ""
 
+    // Timeout and retry management
+    private var challengeRetryCount: Int = 0
+    private let maxChallengeRetries: Int = 3
+    private let verificationTimeout: TimeInterval = 90 // 90 seconds max
+    private var timeoutTask: Task<Void, Never>?
+    private var isCompleting: Bool = false
+
     private override init() {
         super.init()
     }
@@ -177,10 +184,32 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
         state = .positioning
         currentInstruction = "Position your face in the circle"
 
+        // Start verification timeout
+        timeoutTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(90 * 1_000_000_000)) // 90 seconds
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard let self = self else { return }
+                // Only timeout if not already completed
+                if case .success = self.state { return }
+                if case .failure = self.state { return }
+                if case .processing = self.state { return }
+
+                self.state = .failure("Verification timed out. Please try again.")
+                self.currentInstruction = "Verification timed out"
+                HapticManager.shared.notification(.error)
+                Logger.shared.warning("Face verification timed out after 90 seconds", category: .general)
+            }
+        }
+
         Logger.shared.info("Starting live face verification for user: \(userId)", category: .general)
     }
 
     func reset() {
+        // Cancel any pending timeout
+        timeoutTask?.cancel()
+        timeoutTask = nil
+
         state = .initializing
         progress = 0.0
         faceDetected = false
@@ -197,12 +226,18 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
         eyeClosedFrames = 0
         lastEyeState = true
         debugInfo = ""
+        challengeRetryCount = 0
+        isCompleting = false
     }
 
     // MARK: - Face Processing (called from video frames)
 
     func processFaceObservation(_ observation: VNFaceObservation, in image: UIImage) {
-        guard state != .success && state != .processing else { return }
+        // Don't process if already completing, succeeded, or failed
+        guard !isCompleting else { return }
+        if case .success = state { return }
+        if case .processing = state { return }
+        if case .failure = state { return }
 
         faceDetected = true
         faceBoundingBox = observation.boundingBox
@@ -439,6 +474,7 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
             completedChallenges.insert(.blink)
             HapticManager.shared.notification(.success)
             currentInstruction = "Great!"
+            challengeRetryCount = 0 // Reset retry count on success
 
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                 self?.advanceToNextChallenge()
@@ -446,9 +482,19 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
 
             progress = 0.5 + Double(completedChallenges.count) / Double(requiredChallenges.count) * 0.3
         } else if livenessFrameCount > 150 {
-            // Timeout - ask again
-            currentInstruction = "Please blink your eyes twice"
-            livenessFrameCount = 0
+            challengeRetryCount += 1
+            if challengeRetryCount >= maxChallengeRetries {
+                // Too many retries - fail verification
+                state = .failure("Could not detect blink. Please ensure good lighting and try again.")
+                currentInstruction = "Verification failed"
+                HapticManager.shared.notification(.error)
+                Logger.shared.warning("Blink challenge failed after \(maxChallengeRetries) retries", category: .general)
+            } else {
+                // Timeout - ask again
+                currentInstruction = "Please blink your eyes twice"
+                livenessFrameCount = 0
+                HapticManager.shared.impact(.light)
+            }
         }
     }
 
@@ -457,6 +503,7 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
             completedChallenges.insert(.smile)
             HapticManager.shared.notification(.success)
             currentInstruction = "Perfect!"
+            challengeRetryCount = 0 // Reset retry count on success
 
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                 self?.advanceToNextChallenge()
@@ -464,9 +511,19 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
 
             progress = 0.5 + Double(completedChallenges.count) / Double(requiredChallenges.count) * 0.3
         } else if livenessFrameCount > 150 {
-            currentInstruction = "Give us a natural smile"
-            livenessFrameCount = 0
-            smileDetectedCount = 0
+            challengeRetryCount += 1
+            if challengeRetryCount >= maxChallengeRetries {
+                // Too many retries - fail verification
+                state = .failure("Could not detect smile. Please ensure good lighting and try again.")
+                currentInstruction = "Verification failed"
+                HapticManager.shared.notification(.error)
+                Logger.shared.warning("Smile challenge failed after \(maxChallengeRetries) retries", category: .general)
+            } else {
+                currentInstruction = "Give us a natural smile"
+                livenessFrameCount = 0
+                smileDetectedCount = 0
+                HapticManager.shared.impact(.light)
+            }
         }
     }
 
@@ -489,6 +546,17 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
     // MARK: - Verification Completion
 
     private func completeVerification() {
+        // Prevent multiple completion calls
+        guard !isCompleting else {
+            Logger.shared.debug("completeVerification already in progress, skipping", category: .general)
+            return
+        }
+        isCompleting = true
+
+        // Cancel timeout since we're completing
+        timeoutTask?.cancel()
+        timeoutTask = nil
+
         state = .processing
         currentInstruction = "Verifying your identity..."
         progress = 0.85
@@ -503,10 +571,12 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
                         progress = 1.0
                         currentInstruction = "Verification complete!"
                         HapticManager.shared.notification(.success)
+                        Logger.shared.info("Face verification completed successfully with confidence: \(result.confidence)", category: .general)
                     } else {
                         state = .failure(result.message)
                         currentInstruction = result.message
                         HapticManager.shared.notification(.error)
+                        isCompleting = false // Allow retry
                     }
                 }
             } catch {
@@ -514,6 +584,8 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
                     state = .failure(error.localizedDescription)
                     currentInstruction = "Verification failed. Please try again."
                     HapticManager.shared.notification(.error)
+                    isCompleting = false // Allow retry
+                    Logger.shared.error("Face verification failed", category: .general, error: error)
                 }
             }
         }
