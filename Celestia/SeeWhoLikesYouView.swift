@@ -224,6 +224,8 @@ struct LikeCardView: View {
                         CachedAsyncImage(url: url) { image in
                             image
                                 .resizable()
+                                .interpolation(.high)
+                                .antialiased(true)
                                 .aspectRatio(contentMode: .fill)
                                 .frame(height: 180)
                                 .clipped()
