@@ -2,7 +2,7 @@
 //  PremiumUpgradeView.swift
 //  Celestia
 //
-//  ELITE PREMIUM UPGRADE - Maximize Conversions
+//  PREMIUM UPGRADE - Immersive Conversion Experience
 //
 
 import SwiftUI
@@ -12,56 +12,73 @@ struct PremiumUpgradeView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var authService: AuthService
     @StateObject private var storeManager = StoreManager.shared
-    
+
     @State private var selectedPlan: PremiumPlan = .annual
     @State private var showPurchaseSuccess = false
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var isProcessing = false
-    @State private var animateHeader = false
+
+    // Animation states
+    @State private var animateHero = false
+    @State private var animateCards = false
     @State private var animateFeatures = false
-    
+    @State private var pulseGlow = false
+    @State private var currentShowcaseIndex = 0
+    @State private var showLimitedOffer = true
+
+    // Timer for showcase rotation
+    let showcaseTimer = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
+
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(.systemGroupedBackground)
-                    .ignoresSafeArea()
-                
+                // Animated gradient background
+                animatedBackground
+
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 0) {
-                        // Hero header
-                        heroSection
-                        
-                        // Content
-                        VStack(spacing: 30) {
-                            // Social proof
-                            socialProofBanner
-                            
-                            // Features showcase
-                            featuresShowcase
-                            
+                        // Immersive hero with live preview
+                        immersiveHero
+
+                        // Content sections
+                        VStack(spacing: 28) {
+                            // Limited time banner
+                            if showLimitedOffer {
+                                limitedTimeBanner
+                            }
+
+                            // Live feature showcase
+                            liveFeatureShowcase
+
+                            // Stats that matter
+                            impactStats
+
+                            // Feature comparison
+                            featureComparisonSection
+
                             // Pricing cards
                             pricingSection
-                            
-                            // Testimonials
-                            testimonialCarousel
-                            
+
+                            // Real success stories
+                            successStoriesSection
+
+                            // Money back guarantee
+                            guaranteeSection
+
                             // FAQ
                             faqSection
-                            
-                            // Trust badges
-                            trustSection
                         }
                         .padding(.horizontal, 20)
-                        .padding(.top, 20)
-                        .padding(.bottom, 120)
+                        .padding(.top, 24)
+                        .padding(.bottom, 140)
                     }
                 }
-                
-                // Sticky CTA button
+
+                // Floating CTA
                 VStack {
                     Spacer()
-                    ctaButton
+                    floatingCTA
                 }
             }
             .navigationTitle("")
@@ -72,25 +89,26 @@ struct PremiumUpgradeView: View {
                         dismiss()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.title3)
-                            .foregroundColor(.gray)
+                            .font(.title2)
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundColor(.white.opacity(0.8))
                     }
                 }
-                
+
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Restore") {
                         restorePurchases()
                     }
-                    .font(.subheadline)
-                    .foregroundColor(.purple)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundColor(.white.opacity(0.9))
                 }
             }
-            .alert("Welcome to Premium! 🎉", isPresented: $showPurchaseSuccess) {
-                Button("Start Exploring") {
+            .alert("Welcome to Premium!", isPresented: $showPurchaseSuccess) {
+                Button("Start Discovering") {
                     dismiss()
                 }
             } message: {
-                Text("You now have unlimited access to all premium features!")
+                Text("You now have unlimited access to all premium features. Your feed just got a whole lot better!")
             }
             .alert("Error", isPresented: $showError) {
                 Button("OK", role: .cancel) {}
@@ -99,549 +117,776 @@ struct PremiumUpgradeView: View {
             }
             .overlay {
                 if isProcessing {
-                    ZStack {
-                        Color.black.opacity(0.4)
-                            .ignoresSafeArea()
-                        
-                        VStack(spacing: 20) {
-                            ProgressView()
-                                .scaleEffect(1.5)
-                                .tint(.white)
-                            
-                            Text("Processing...")
-                                .foregroundColor(.white)
-                                .fontWeight(.semibold)
-                        }
-                        .padding(40)
-                        .background(Color.white.opacity(0.2))
-                        .cornerRadius(20)
-                    }
+                    processingOverlay
                 }
             }
             .onAppear {
-                withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
-                    animateHeader = true
-                }
-                withAnimation(.spring(response: 1.0, dampingFraction: 0.7).delay(0.2)) {
-                    animateFeatures = true
-                }
-                
+                startAnimations()
                 Task {
                     await storeManager.loadProducts()
                 }
             }
+            .onReceive(showcaseTimer) { _ in
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    currentShowcaseIndex = (currentShowcaseIndex + 1) % 4
+                }
+            }
         }
     }
-    
-    // MARK: - Hero Section
-    
-    private var heroSection: some View {
+
+    // MARK: - Animated Background
+
+    private var animatedBackground: some View {
         ZStack {
-            // Gradient background
+            // Deep gradient
             LinearGradient(
                 colors: [
-                    Color.purple.opacity(0.95),
-                    Color.pink.opacity(0.85),
-                    Color.orange.opacity(0.75)
+                    Color(red: 0.1, green: 0.05, blue: 0.2),
+                    Color(red: 0.15, green: 0.05, blue: 0.25),
+                    Color(red: 0.1, green: 0.02, blue: 0.15)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            .frame(height: 340)
-            
-            // Decorative elements
+            .ignoresSafeArea()
+
+            // Animated orbs
             GeometryReader { geo in
                 Circle()
-                    .fill(Color.white.opacity(0.1))
+                    .fill(
+                        RadialGradient(
+                            colors: [Color.purple.opacity(0.4), Color.clear],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: 150
+                        )
+                    )
+                    .frame(width: 300, height: 300)
+                    .blur(radius: 60)
+                    .offset(x: animateHero ? -50 : -80, y: animateHero ? 100 : 150)
+
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [Color.pink.opacity(0.35), Color.clear],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: 120
+                        )
+                    )
+                    .frame(width: 250, height: 250)
+                    .blur(radius: 50)
+                    .offset(x: geo.size.width - 100, y: animateHero ? 200 : 250)
+
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [Color.orange.opacity(0.25), Color.clear],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: 100
+                        )
+                    )
                     .frame(width: 200, height: 200)
                     .blur(radius: 40)
-                    .offset(x: -60, y: -40)
-                
-                Circle()
-                    .fill(Color.yellow.opacity(0.2))
-                    .frame(width: 140, height: 140)
-                    .blur(radius: 30)
-                    .offset(x: geo.size.width - 70, y: 80)
+                    .offset(x: geo.size.width / 2 - 100, y: geo.size.height - 300)
             }
-            
-            // Content
-            VStack(spacing: 24) {
-                Spacer()
-                
-                // Crown icon
-                ZStack {
+        }
+        .animation(.easeInOut(duration: 4).repeatForever(autoreverses: true), value: animateHero)
+    }
+
+    // MARK: - Immersive Hero
+
+    private var immersiveHero: some View {
+        VStack(spacing: 20) {
+            Spacer().frame(height: 20)
+
+            // Animated crown with glow
+            ZStack {
+                // Glow rings
+                ForEach(0..<3) { i in
                     Circle()
-                        .fill(Color.yellow.opacity(0.3))
-                        .frame(width: 120, height: 120)
-                        .blur(radius: 30)
-                    
-                    Image(systemName: "crown.fill")
-                        .font(.system(size: 70))
-                        .foregroundStyle(
+                        .stroke(
                             LinearGradient(
-                                colors: [Color.yellow, Color.orange],
+                                colors: [.yellow.opacity(0.3), .orange.opacity(0.1)],
                                 startPoint: .top,
                                 endPoint: .bottom
-                            )
+                            ),
+                            lineWidth: 2
                         )
-                        .shadow(color: .yellow.opacity(0.6), radius: 15)
-                        .rotationEffect(.degrees(animateHeader ? 0 : -15))
-                        .scaleEffect(animateHeader ? 1 : 0.5)
+                        .frame(width: CGFloat(100 + i * 30), height: CGFloat(100 + i * 30))
+                        .scaleEffect(pulseGlow ? 1.1 : 0.9)
+                        .opacity(pulseGlow ? 0.3 : 0.6)
+                        .animation(
+                            .easeInOut(duration: 1.5)
+                            .repeatForever(autoreverses: true)
+                            .delay(Double(i) * 0.2),
+                            value: pulseGlow
+                        )
                 }
-                
-                VStack(spacing: 12) {
-                    Text("Upgrade to Premium")
-                        .font(.system(size: 36, weight: .bold))
-                        .foregroundColor(.white)
-                        .opacity(animateHeader ? 1 : 0)
-                    
-                    Text("Join 50,000+ premium members")
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white.opacity(0.95))
-                        .opacity(animateHeader ? 1 : 0)
-                    
-                    Text("Get 3x more matches & exclusive features")
-                        .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.9))
-                        .multilineTextAlignment(.center)
-                        .opacity(animateHeader ? 1 : 0)
-                }
-                
-                Spacer()
-            }
-            .padding(.vertical, 40)
-        }
-    }
-    
-    // MARK: - Social Proof Banner
-    
-    private var socialProofBanner: some View {
-        HStack(spacing: 30) {
-            statBadge(number: "50K+", label: "Members", icon: "person.3.fill")
-            statBadge(number: "4.8★", label: "Rating", icon: "star.fill")
-            statBadge(number: "3x", label: "Matches", icon: "heart.fill")
-        }
-        .padding(.vertical, 24)
-        .padding(.horizontal, 20)
-        .background(Color.white)
-        .cornerRadius(20)
-        .shadow(color: .black.opacity(0.08), radius: 15, y: 8)
-    }
-    
-    private func statBadge(number: String, label: String, icon: String) -> some View {
-        VStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [.purple, .pink],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+
+                // Crown icon
+                Image(systemName: "crown.fill")
+                    .font(.system(size: 60))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.yellow, .orange, .yellow],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     )
-                )
-            
-            Text(number)
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(.primary)
-            
-            Text(label)
-                .font(.caption)
-                .foregroundColor(.secondary)
+                    .shadow(color: .yellow.opacity(0.6), radius: 20)
+                    .shadow(color: .orange.opacity(0.4), radius: 40)
+                    .scaleEffect(animateHero ? 1 : 0.5)
+                    .rotationEffect(.degrees(animateHero ? 0 : -20))
+            }
+            .frame(height: 160)
+
+            // Title
+            VStack(spacing: 12) {
+                Text("Go Premium")
+                    .font(.system(size: 42, weight: .bold, design: .rounded))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.white, .white.opacity(0.9)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .opacity(animateHero ? 1 : 0)
+                    .offset(y: animateHero ? 0 : 20)
+
+                Text("Discover more people who match your vibe")
+                    .font(.title3.weight(.medium))
+                    .foregroundColor(.white.opacity(0.8))
+                    .multilineTextAlignment(.center)
+                    .opacity(animateHero ? 1 : 0)
+                    .offset(y: animateHero ? 0 : 15)
+            }
+
+            // Mini preview cards (showing what premium unlocks)
+            miniPreviewCards
+                .padding(.top, 10)
+
+            Spacer().frame(height: 10)
         }
-        .frame(maxWidth: .infinity)
-        .scaleEffect(animateFeatures ? 1 : 0.8)
-        .opacity(animateFeatures ? 1 : 0)
+        .frame(height: 420)
     }
-    
-    // MARK: - Features Showcase
-    
-    private var featuresShowcase: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Premium Features")
-                .font(.title2)
-                .fontWeight(.bold)
-            
-            VStack(spacing: 16) {
-                featureRow(
-                    icon: "infinity",
-                    title: "Unlimited Likes",
-                    description: "Like as many profiles as you want",
-                    color: .purple
-                )
-                
-                featureRow(
-                    icon: "eye.fill",
-                    title: "See Who Likes You",
-                    description: "Know who's interested before you swipe",
-                    color: .pink
-                )
-                
-                featureRow(
-                    icon: "arrow.uturn.left",
-                    title: "Rewind Swipes",
-                    description: "Undo accidental passes instantly",
-                    color: .blue
-                )
-                
-                featureRow(
-                    icon: "sparkles",
-                    title: "5 Super Likes/Day",
-                    description: "Stand out and get 3x more matches",
-                    color: .cyan
-                )
-                
-                featureRow(
-                    icon: "bolt.fill",
-                    title: "Profile Boost",
-                    description: "Be seen by 10x more people",
-                    color: .orange
-                )
-                
-                featureRow(
-                    icon: "shield.checkered",
-                    title: "Priority Support",
-                    description: "Get help when you need it",
-                    color: .green
-                )
+
+    // MARK: - Mini Preview Cards
+
+    private var miniPreviewCards: some View {
+        HStack(spacing: -20) {
+            ForEach(0..<4) { index in
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(
+                        LinearGradient(
+                            colors: previewCardColors(for: index),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 70, height: 90)
+                    .overlay(
+                        VStack {
+                            Image(systemName: previewCardIcon(for: index))
+                                .font(.title2)
+                                .foregroundColor(.white)
+                            Text(previewCardLabel(for: index))
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundColor(.white.opacity(0.9))
+                        }
+                    )
+                    .shadow(color: previewCardColors(for: index)[0].opacity(0.4), radius: 8, y: 4)
+                    .rotationEffect(.degrees(Double(index - 2) * 8))
+                    .offset(y: index == currentShowcaseIndex ? -10 : 0)
+                    .scaleEffect(index == currentShowcaseIndex ? 1.1 : 1)
+                    .zIndex(index == currentShowcaseIndex ? 1 : 0)
+                    .opacity(animateCards ? 1 : 0)
+                    .offset(y: animateCards ? 0 : 30)
+                    .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(Double(index) * 0.1), value: animateCards)
             }
         }
-        .padding(24)
-        .background(Color.white)
-        .cornerRadius(20)
-        .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
     }
-    
-    private func featureRow(icon: String, title: String, description: String, color: Color) -> some View {
-        HStack(spacing: 16) {
+
+    private func previewCardColors(for index: Int) -> [Color] {
+        switch index {
+        case 0: return [.purple, .purple.opacity(0.7)]
+        case 1: return [.pink, .pink.opacity(0.7)]
+        case 2: return [.orange, .orange.opacity(0.7)]
+        default: return [.cyan, .cyan.opacity(0.7)]
+        }
+    }
+
+    private func previewCardIcon(for index: Int) -> String {
+        switch index {
+        case 0: return "infinity"
+        case 1: return "eye.fill"
+        case 2: return "bolt.fill"
+        default: return "star.fill"
+        }
+    }
+
+    private func previewCardLabel(for index: Int) -> String {
+        switch index {
+        case 0: return "Unlimited"
+        case 1: return "See Likes"
+        case 2: return "Boost"
+        default: return "Super Like"
+        }
+    }
+
+    // MARK: - Limited Time Banner
+
+    private var limitedTimeBanner: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "clock.fill")
+                .font(.title3)
+                .foregroundColor(.orange)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Limited Time: 50% Off Annual")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundColor(.white)
+
+                Text("Offer ends soon")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.7))
+            }
+
+            Spacer()
+
+            Button {
+                withAnimation {
+                    showLimitedOffer = false
+                }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.6))
+            }
+        }
+        .padding(16)
+        .background(
+            LinearGradient(
+                colors: [Color.orange.opacity(0.3), Color.red.opacity(0.2)],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        )
+        .background(.ultraThinMaterial.opacity(0.5))
+        .cornerRadius(16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.orange.opacity(0.4), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Live Feature Showcase
+
+    private var liveFeatureShowcase: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("What You're Missing")
+                    .font(.title2.weight(.bold))
+                    .foregroundColor(.white)
+
+                Spacer()
+
+                // Live indicator
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(.green)
+                        .frame(width: 8, height: 8)
+                        .overlay(
+                            Circle()
+                                .stroke(.green.opacity(0.5), lineWidth: 2)
+                                .scaleEffect(pulseGlow ? 1.5 : 1)
+                                .opacity(pulseGlow ? 0 : 0.5)
+                        )
+
+                    Text("LIVE")
+                        .font(.caption2.weight(.bold))
+                        .foregroundColor(.green)
+                }
+            }
+
+            // Showcase card
+            showcaseCard
+        }
+    }
+
+    private var showcaseCard: some View {
+        let showcases = [
+            ("23 people liked you today", "heart.circle.fill", Color.pink, "See who they are with Premium"),
+            ("You're missing 15+ profiles", "eye.slash.fill", Color.purple, "Get unlimited browsing"),
+            ("5 Super Likes ready to use", "star.circle.fill", Color.yellow, "Stand out in their feed"),
+            ("Boost available now", "bolt.circle.fill", Color.orange, "Be seen by 10x more people")
+        ]
+
+        let current = showcases[currentShowcaseIndex]
+
+        return HStack(spacing: 16) {
+            // Icon
             ZStack {
                 Circle()
-                    .fill(color.opacity(0.15))
-                    .frame(width: 50, height: 50)
-                
-                Image(systemName: icon)
-                    .font(.title3)
-                    .foregroundColor(color)
+                    .fill(current.2.opacity(0.2))
+                    .frame(width: 60, height: 60)
+
+                Image(systemName: current.1)
+                    .font(.title)
+                    .foregroundColor(current.2)
             }
-            
+
             VStack(alignment: .leading, spacing: 4) {
-                Text(title)
+                Text(current.0)
                     .font(.headline)
-                    .foregroundColor(.primary)
-                
-                Text(description)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.white)
+
+                Text(current.3)
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.7))
             }
-            
+
             Spacer()
-            
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundColor(.green)
-                .font(.title3)
+
+            Image(systemName: "chevron.right")
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.white.opacity(0.5))
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(.ultraThinMaterial.opacity(0.3))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(
+                            LinearGradient(
+                                colors: [current.2.opacity(0.5), current.2.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+        )
+        .shadow(color: current.2.opacity(0.2), radius: 20, y: 10)
+    }
+
+    // MARK: - Impact Stats
+
+    private var impactStats: some View {
+        HStack(spacing: 0) {
+            impactStat(value: "3x", label: "More Matches", icon: "heart.fill", color: .pink)
+
+            Divider()
+                .frame(height: 50)
+                .background(Color.white.opacity(0.2))
+
+            impactStat(value: "10x", label: "More Views", icon: "eye.fill", color: .purple)
+
+            Divider()
+                .frame(height: 50)
+                .background(Color.white.opacity(0.2))
+
+            impactStat(value: "85%", label: "Success Rate", icon: "checkmark.seal.fill", color: .green)
+        }
+        .padding(.vertical, 20)
+        .background(.ultraThinMaterial.opacity(0.3))
+        .cornerRadius(20)
+    }
+
+    private func impactStat(value: String, label: String, icon: String, color: Color) -> some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.caption)
+                    .foregroundColor(color)
+
+                Text(value)
+                    .font(.title2.weight(.bold))
+                    .foregroundColor(.white)
+            }
+
+            Text(label)
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.7))
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - Feature Comparison
+
+    private var featureComparisonSection: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Premium vs Free")
+                .font(.title2.weight(.bold))
+                .foregroundColor(.white)
+
+            VStack(spacing: 12) {
+                comparisonRow(feature: "Daily Likes", free: "50/day", premium: "Unlimited", icon: "heart.fill")
+                comparisonRow(feature: "See Who Likes You", free: "Hidden", premium: "Full Access", icon: "eye.fill")
+                comparisonRow(feature: "Super Likes", free: "1/day", premium: "5/day", icon: "star.fill")
+                comparisonRow(feature: "Rewind Profiles", free: "No", premium: "Unlimited", icon: "arrow.uturn.backward")
+                comparisonRow(feature: "Profile Boost", free: "No", premium: "Monthly", icon: "bolt.fill")
+                comparisonRow(feature: "Advanced Filters", free: "Basic", premium: "All Filters", icon: "slider.horizontal.3")
+                comparisonRow(feature: "Read Receipts", free: "No", premium: "Yes", icon: "checkmark.message.fill")
+                comparisonRow(feature: "Priority in Feed", free: "Standard", premium: "Top Priority", icon: "arrow.up.circle.fill")
+            }
+            .padding(20)
+            .background(.ultraThinMaterial.opacity(0.3))
+            .cornerRadius(20)
         }
     }
-    
+
+    private func comparisonRow(feature: String, free: String, premium: String, icon: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.subheadline)
+                .foregroundColor(.purple)
+                .frame(width: 24)
+
+            Text(feature)
+                .font(.subheadline)
+                .foregroundColor(.white)
+
+            Spacer()
+
+            Text(free)
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.4))
+                .frame(width: 70)
+
+            Image(systemName: "arrow.right")
+                .font(.caption2)
+                .foregroundColor(.white.opacity(0.3))
+
+            Text(premium)
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.green)
+                .frame(width: 70, alignment: .trailing)
+        }
+    }
+
     // MARK: - Pricing Section
-    
+
     private var pricingSection: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Choose Your Plan")
-                .font(.title2)
-                .fontWeight(.bold)
-            
-            VStack(spacing: 16) {
+                .font(.title2.weight(.bold))
+                .foregroundColor(.white)
+
+            VStack(spacing: 12) {
                 ForEach(PremiumPlan.allCases, id: \.self) { plan in
-                    pricingCard(plan: plan)
-                }
-            }
-        }
-    }
-    
-    private func pricingCard(plan: PremiumPlan) -> some View {
-        Button {
-            withAnimation(.spring(response: 0.3)) {
-                selectedPlan = plan
-                HapticManager.shared.selection()
-            }
-        } label: {
-            VStack(spacing: 16) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 8) {
-                            Text(plan.name)
-                                .font(.title3)
-                                .fontWeight(.bold)
-                                .foregroundColor(.primary)
-                            
-                            if plan == .annual {
-                                Text("BEST VALUE")
-                                    .font(.caption2)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(Color.green)
-                                    .cornerRadius(8)
+                    PremiumPlanCard(
+                        plan: plan,
+                        isSelected: selectedPlan == plan,
+                        onSelect: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                selectedPlan = plan
+                                HapticManager.shared.selection()
                             }
                         }
-                        
-                        Text(plan.totalPrice)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Spacer()
-                    
-                    VStack(alignment: .trailing, spacing: 4) {
-                        HStack(alignment: .firstTextBaseline, spacing: 2) {
-                            Text(plan.price)
-                                .font(.system(size: 28, weight: .bold))
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [.purple, .pink],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                            
-                            Text("/\(plan.period)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        if plan.savings > 0 {
-                            Text("Save \(plan.savings)%")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.green)
-                        }
-                    }
-                }
-                
-                if selectedPlan == plan {
-                    Divider()
-                    
-                    HStack {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.purple)
-                        
-                        Text("Selected")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.purple)
-                        
-                        Spacer()
-                    }
-                }
-            }
-            .padding(20)
-            .background(
-                selectedPlan == plan ?
-                LinearGradient(
-                    colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.05)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ) :
-                LinearGradient(colors: [Color.white], startPoint: .leading, endPoint: .trailing)
-            )
-            .cornerRadius(20)
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(
-                        selectedPlan == plan ?
-                        LinearGradient(
-                            colors: [Color.purple, Color.pink],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ) :
-                        LinearGradient(colors: [Color.gray.opacity(0.2)], startPoint: .leading, endPoint: .trailing),
-                        lineWidth: 2
-                    )
-            )
-            .shadow(color: selectedPlan == plan ? .purple.opacity(0.2) : .clear, radius: 15, y: 8)
-        }
-    }
-    
-    // MARK: - Testimonial Carousel
-    
-    private var testimonialCarousel: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Success Stories")
-                .font(.title2)
-                .fontWeight(.bold)
-            
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
-                    testimonialCard(
-                        name: "Sarah M.",
-                        text: "Found my perfect match within a week of upgrading! Totally worth it.",
-                        rating: 5
-                    )
-                    
-                    testimonialCard(
-                        name: "Mike R.",
-                        text: "The unlimited likes feature changed everything. Met amazing people!",
-                        rating: 5
-                    )
-                    
-                    testimonialCard(
-                        name: "Emma L.",
-                        text: "Seeing who likes me first saved so much time. Best decision ever!",
-                        rating: 5
                     )
                 }
             }
         }
     }
-    
-    private func testimonialCard(name: String, text: String, rating: Int) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+
+    // MARK: - Success Stories
+
+    private var successStoriesSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
             HStack {
-                ForEach(0..<rating, id: \.self) { _ in
+                Text("Success Stories")
+                    .font(.title2.weight(.bold))
+                    .foregroundColor(.white)
+
+                Spacer()
+
+                HStack(spacing: 4) {
                     Image(systemName: "star.fill")
                         .foregroundColor(.yellow)
-                        .font(.caption)
+                    Text("4.8")
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
                 }
             }
-            
-            Text(text)
-                .font(.subheadline)
-                .foregroundColor(.primary)
-                .lineLimit(3)
-            
-            Text(name)
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundColor(.secondary)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 16) {
+                    successStoryCard(
+                        initials: "JM",
+                        name: "Jake M.",
+                        story: "Matched with my girlfriend within 2 weeks of going premium. The 'See Who Likes You' feature was a game changer!",
+                        color: .purple
+                    )
+
+                    successStoryCard(
+                        initials: "SE",
+                        name: "Sarah E.",
+                        story: "So many more quality matches since upgrading. The unlimited likes mean I never miss someone interesting.",
+                        color: .pink
+                    )
+
+                    successStoryCard(
+                        initials: "AT",
+                        name: "Alex T.",
+                        story: "Profile boost got me 3x the views. Met some amazing people I would have missed on free.",
+                        color: .orange
+                    )
+                }
+            }
         }
-        .frame(width: 250)
+    }
+
+    private func successStoryCard(initials: String, name: String, story: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [color, color.opacity(0.6)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 44, height: 44)
+                    .overlay(
+                        Text(initials)
+                            .font(.headline)
+                            .foregroundColor(.white)
+                    )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(name)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.white)
+
+                    HStack(spacing: 2) {
+                        ForEach(0..<5) { _ in
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 10))
+                                .foregroundColor(.yellow)
+                        }
+                    }
+                }
+            }
+
+            Text("\"\(story)\"")
+                .font(.subheadline)
+                .foregroundColor(.white.opacity(0.85))
+                .lineLimit(4)
+                .italic()
+        }
+        .frame(width: 280)
         .padding(20)
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+        .background(.ultraThinMaterial.opacity(0.3))
+        .cornerRadius(20)
     }
-    
+
+    // MARK: - Guarantee Section
+
+    private var guaranteeSection: some View {
+        HStack(spacing: 16) {
+            Image(systemName: "checkmark.shield.fill")
+                .font(.title)
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.green, .mint],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("7-Day Free Trial")
+                    .font(.headline)
+                    .foregroundColor(.white)
+
+                Text("Try Premium risk-free. Cancel anytime before your trial ends and pay nothing.")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.7))
+            }
+        }
+        .padding(20)
+        .background(
+            LinearGradient(
+                colors: [Color.green.opacity(0.15), Color.green.opacity(0.05)],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        )
+        .background(.ultraThinMaterial.opacity(0.3))
+        .cornerRadius(20)
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(Color.green.opacity(0.3), lineWidth: 1)
+        )
+    }
+
     // MARK: - FAQ Section
-    
+
     private var faqSection: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Frequently Asked")
-                .font(.title2)
-                .fontWeight(.bold)
-            
-            VStack(spacing: 12) {
-                faqItem(
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Common Questions")
+                .font(.title2.weight(.bold))
+                .foregroundColor(.white)
+
+            VStack(spacing: 8) {
+                FAQItem(
                     question: "Can I cancel anytime?",
-                    answer: "Yes! Cancel your subscription anytime from your account settings. No questions asked."
+                    answer: "Yes! Cancel your subscription anytime from Settings. You'll keep premium access until your billing period ends."
                 )
-                
-                faqItem(
-                    question: "What payment methods do you accept?",
-                    answer: "We accept all major credit cards, Apple Pay, and Google Pay through the App Store."
+
+                FAQItem(
+                    question: "Do I keep my matches if I cancel?",
+                    answer: "Absolutely! All your matches and conversations are yours to keep. You just won't have access to premium features."
                 )
-                
-                faqItem(
-                    question: "Will I lose my matches if I cancel?",
-                    answer: "No, you'll keep all your existing matches. You just won't have access to premium features."
+
+                FAQItem(
+                    question: "How does the free trial work?",
+                    answer: "Try Premium free for 7 days. You won't be charged until the trial ends. Cancel anytime before that and pay nothing."
                 )
             }
         }
     }
-    
-    private func faqItem(question: String, answer: String) -> some View {
-        DisclosureGroup {
-            Text(answer)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .padding(.top, 8)
-        } label: {
-            Text(question)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-        }
-        .padding(16)
-        .background(Color.white)
-        .cornerRadius(12)
-    }
-    
-    // MARK: - Trust Section
-    
-    private var trustSection: some View {
-        VStack(spacing: 16) {
-            HStack(spacing: 20) {
-                trustBadge(icon: "lock.shield.fill", text: "Secure")
-                trustBadge(icon: "checkmark.seal.fill", text: "Verified")
-                trustBadge(icon: "arrow.clockwise", text: "Cancel Anytime")
-            }
-            
-            Text("Your payment information is encrypted and secure")
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .padding(.vertical, 20)
-    }
-    
-    private func trustBadge(icon: String, text: String) -> some View {
+
+    // MARK: - Floating CTA
+
+    private var floatingCTA: some View {
         VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundColor(.green)
-            
-            Text(text)
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-    }
-    
-    // MARK: - CTA Button
-    
-    private var ctaButton: some View {
-        VStack(spacing: 12) {
+            // Main button
             Button {
                 purchasePremium()
             } label: {
                 HStack(spacing: 12) {
                     Image(systemName: "crown.fill")
-                    
-                    Text("Upgrade to Premium")
-                        .fontWeight(.bold)
-                    
-                    Text(selectedPlan.price + "/" + selectedPlan.period)
-                        .fontWeight(.semibold)
+                        .font(.title3)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Start 7-Day Free Trial")
+                            .font(.headline)
+
+                        Text("Then \(selectedPlan.price)/\(selectedPlan.period)")
+                            .font(.caption)
+                            .opacity(0.9)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "arrow.right.circle.fill")
+                        .font(.title2)
                 }
                 .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 24)
                 .padding(.vertical, 18)
                 .background(
                     LinearGradient(
-                        colors: [Color.purple, Color.pink],
+                        colors: [Color.purple, Color.pink, Color.orange.opacity(0.8)],
                         startPoint: .leading,
                         endPoint: .trailing
                     )
                 )
-                .cornerRadius(16)
+                .cornerRadius(20)
                 .shadow(color: .purple.opacity(0.5), radius: 20, y: 10)
             }
             .disabled(isProcessing)
-            
-            Text("7-day free trial • Cancel anytime")
-                .font(.caption)
-                .foregroundColor(.secondary)
+
+            // Trust indicators
+            HStack(spacing: 16) {
+                Label("Secure", systemImage: "lock.fill")
+                Label("Cancel Anytime", systemImage: "arrow.clockwise")
+            }
+            .font(.caption2)
+            .foregroundColor(.white.opacity(0.5))
         }
-        .padding(20)
-        .background(Color.white)
-        .shadow(color: .black.opacity(0.1), radius: 15, y: -5)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color(red: 0.1, green: 0.05, blue: 0.2).opacity(0.98),
+                    Color(red: 0.1, green: 0.05, blue: 0.2)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+        .background(.ultraThinMaterial.opacity(0.5))
     }
-    
+
+    // MARK: - Processing Overlay
+
+    private var processingOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.6)
+                .ignoresSafeArea()
+
+            VStack(spacing: 24) {
+                // Animated loading
+                ZStack {
+                    Circle()
+                        .stroke(Color.white.opacity(0.2), lineWidth: 4)
+                        .frame(width: 60, height: 60)
+
+                    Circle()
+                        .trim(from: 0, to: 0.7)
+                        .stroke(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                        )
+                        .frame(width: 60, height: 60)
+                        .rotationEffect(.degrees(isProcessing ? 360 : 0))
+                        .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: isProcessing)
+                }
+
+                VStack(spacing: 8) {
+                    Text("Processing...")
+                        .font(.headline)
+                        .foregroundColor(.white)
+
+                    Text("Please wait while we set up your premium access")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.7))
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .padding(40)
+            .background(.ultraThinMaterial)
+            .cornerRadius(24)
+        }
+    }
+
+    // MARK: - Animations
+
+    private func startAnimations() {
+        withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
+            animateHero = true
+        }
+
+        withAnimation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.3)) {
+            animateCards = true
+        }
+
+        withAnimation(.spring(response: 1.0, dampingFraction: 0.8).delay(0.5)) {
+            animateFeatures = true
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            pulseGlow = true
+        }
+    }
+
     // MARK: - Actions
-    
+
     private func purchasePremium() {
         isProcessing = true
-        
+
         Task {
             do {
                 guard let product = storeManager.getProduct(for: selectedPlan) else {
@@ -651,11 +896,10 @@ struct PremiumUpgradeView: View {
                 let result = try await storeManager.purchase(product)
 
                 if result.isSuccess {
-                    // Update Firestore
                     if var user = authService.currentUser {
                         user.isPremium = true
                         user.premiumTier = selectedPlan.rawValue
-                        user.subscriptionExpiryDate = nil // Use SubscriptionManager for expiry tracking
+                        user.subscriptionExpiryDate = nil
                         try await authService.updateUser(user)
                     }
 
@@ -678,17 +922,17 @@ struct PremiumUpgradeView: View {
             }
         }
     }
-    
+
     private func restorePurchases() {
         isProcessing = true
-        
+
         Task {
             do {
                 try await storeManager.restorePurchases()
-                
+
                 await MainActor.run {
                     isProcessing = false
-                    
+
                     if storeManager.hasActiveSubscription {
                         showPurchaseSuccess = true
                         HapticManager.shared.notification(.success)
@@ -708,9 +952,201 @@ struct PremiumUpgradeView: View {
     }
 }
 
-// MARK: - Note
-// PremiumPlan, StoreManager, and PurchaseError have been extracted to StoreManager.swift
-// for better separation of concerns, improved testability, and maintainability.
+// MARK: - Premium Plan Card
+
+struct PremiumPlanCard: View {
+    let plan: PremiumPlan
+    let isSelected: Bool
+    let onSelect: () -> Void
+
+    var body: some View {
+        Button(action: onSelect) {
+            HStack(spacing: 16) {
+                // Selection indicator
+                ZStack {
+                    Circle()
+                        .stroke(isSelected ? Color.purple : Color.white.opacity(0.3), lineWidth: 2)
+                        .frame(width: 24, height: 24)
+
+                    if isSelected {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [.purple, .pink],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 16, height: 16)
+                    }
+                }
+
+                // Plan details
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text(plan.name)
+                            .font(.headline)
+                            .foregroundColor(.white)
+
+                        if plan == .annual {
+                            Text("BEST VALUE")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(
+                                    LinearGradient(
+                                        colors: [.green, .mint],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .cornerRadius(6)
+                        }
+
+                        if plan == .sixMonth {
+                            Text("POPULAR")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Color.orange)
+                                .cornerRadius(6)
+                        }
+                    }
+
+                    Text(plan.totalPrice)
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.6))
+                }
+
+                Spacer()
+
+                // Price
+                VStack(alignment: .trailing, spacing: 2) {
+                    HStack(alignment: .firstTextBaseline, spacing: 2) {
+                        Text(plan.price)
+                            .font(.title2.weight(.bold))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.white, .white.opacity(0.9)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+
+                        Text("/\(plan.period)")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+
+                    if plan.savings > 0 {
+                        Text("Save \(plan.savings)%")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(.green)
+                    }
+                }
+            }
+            .padding(20)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(isSelected ?
+                        LinearGradient(
+                            colors: [Color.purple.opacity(0.3), Color.pink.opacity(0.2)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ) :
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.1), Color.white.opacity(0.05)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(
+                        isSelected ?
+                        LinearGradient(
+                            colors: [Color.purple, Color.pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ) :
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.2), Color.white.opacity(0.1)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: isSelected ? 2 : 1
+                    )
+            )
+            .shadow(color: isSelected ? .purple.opacity(0.3) : .clear, radius: 15, y: 8)
+        }
+    }
+}
+
+// MARK: - FAQ Item
+
+struct FAQItem: View {
+    let question: String
+    let answer: String
+
+    @State private var isExpanded = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack {
+                    Text(question)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.leading)
+
+                    Spacer()
+
+                    Image(systemName: "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.white.opacity(0.5))
+                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                }
+                .padding(16)
+            }
+
+            if isExpanded {
+                Text(answer)
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.7))
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
+            }
+        }
+        .background(.ultraThinMaterial.opacity(0.2))
+        .cornerRadius(12)
+    }
+}
+
+// MARK: - Purchase Error
+
+enum PurchaseError: LocalizedError {
+    case productNotFound
+    case purchaseFailed
+    case cancelled
+
+    var errorDescription: String? {
+        switch self {
+        case .productNotFound:
+            return "Unable to load product. Please try again."
+        case .purchaseFailed:
+            return "Purchase failed. Please try again."
+        case .cancelled:
+            return "Purchase was cancelled."
+        }
+    }
+}
 
 #Preview {
     NavigationStack {
