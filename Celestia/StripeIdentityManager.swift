@@ -18,6 +18,15 @@ import SwiftUI
 import FirebaseFirestore
 import FirebaseAuth
 import FirebaseFunctions
+// TODO: Uncomment after adding StripeIdentity SDK via SPM
+// import StripeIdentity
+
+// MARK: - Stripe Configuration
+
+enum StripeConfig {
+    /// Stripe Publishable Key (safe to include in app)
+    static let publishableKey = "pk_live_51Il3uhFgeBuSpm7JQHQEi7J8FdQnbkzndYl2Jeq0EKOjmZidgEwd7wacFpWgujpnAbCrLDOiiPESLPjNAQZ9V2h000FbzP66S5"
+}
 
 // MARK: - Stripe Identity Manager
 
