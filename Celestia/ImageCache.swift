@@ -972,88 +972,92 @@ struct CachedCardImage: View {
     }
 
     var body: some View {
-        Group {
-            if let image = image {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .clipped()
-                    .opacity(imageOpacity)
-                    .onAppear {
-                        // Smooth fade-in for newly loaded images
-                        if imageOpacity < 1.0 {
-                            withAnimation(.easeOut(duration: 0.15)) {
-                                imageOpacity = 1.0
+        GeometryReader { geometry in
+            Group {
+                if let image = image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .clipped()
+                        .opacity(imageOpacity)
+                        .onAppear {
+                            // Smooth fade-in for newly loaded images
+                            if imageOpacity < 1.0 {
+                                withAnimation(.easeOut(duration: 0.15)) {
+                                    imageOpacity = 1.0
+                                }
                             }
-                        }
+                    }
                 }
-            }
 
-            if image == nil && loadError != nil {
-                // Error state with elegant retry button
-                VStack(spacing: 12) {
-                    Image(systemName: "photo.badge.exclamationmark")
-                        .font(.system(size: 60))
-                        .foregroundColor(.gray.opacity(0.6))
+                if image == nil && loadError != nil {
+                    // Error state with elegant retry button
+                    VStack(spacing: 12) {
+                        Image(systemName: "photo.badge.exclamationmark")
+                            .font(.system(size: 60))
+                            .foregroundColor(.gray.opacity(0.6))
 
-                    Text("Image unavailable")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        Text("Image unavailable")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
 
-                    Button {
-                        retryCount += 1
-                        loadError = nil
-                        loadImage()
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "arrow.clockwise")
-                            Text("Retry")
-                        }
-                        .font(.caption)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(
-                            LinearGradient(
-                                colors: [.purple, .pink],
-                                startPoint: .leading,
-                                endPoint: .trailing
+                        Button {
+                            retryCount += 1
+                            loadError = nil
+                            loadImage()
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "arrow.clockwise")
+                                Text("Retry")
+                            }
+                            .font(.caption)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(
+                                LinearGradient(
+                                    colors: [.purple, .pink],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
                             )
+                            .cornerRadius(20)
+                        }
+                    }
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .background(
+                        LinearGradient(
+                            colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.05)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
                         )
-                        .cornerRadius(20)
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(
-                    LinearGradient(
-                        colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.05)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
                     )
-                )
-            }
-
-            if image == nil && loadError == nil {
-                // Loading state with brand gradient - optimized shimmer
-                ZStack {
-                    LinearGradient(
-                        colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.05)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-
-                    if isLoading {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .purple))
-                            .scaleEffect(1.2)
-                    }
                 }
-                .onAppear {
-                    // Only load if we haven't checked cache yet or need to fetch
-                    if !hasCheckedCache {
-                        loadImage()
-                    } else if image == nil && !isLoading {
-                        loadImage()
+
+                if image == nil && loadError == nil {
+                    // Loading state with brand gradient - optimized shimmer
+                    ZStack {
+                        LinearGradient(
+                            colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.05)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+
+                        if isLoading {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .purple))
+                                .scaleEffect(1.2)
+                        }
+                    }
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .onAppear {
+                        // Only load if we haven't checked cache yet or need to fetch
+                        if !hasCheckedCache {
+                            loadImage()
+                        } else if image == nil && !isLoading {
+                            loadImage()
+                        }
                     }
                 }
             }

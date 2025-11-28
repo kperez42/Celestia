@@ -525,7 +525,6 @@ struct LikeProfileCard: View {
         Group {
             if let imageURL = URL(string: user.profileImageURL), !user.profileImageURL.isEmpty {
                 CachedCardImage(url: imageURL)
-                    .aspectRatio(contentMode: .fill)
             } else {
                 placeholderImage
             }

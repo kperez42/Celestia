@@ -91,7 +91,9 @@ struct ProfileFeedCard: View {
 
     private var profileImage: some View {
         CachedCardImage(url: URL(string: displayPhotoURL))
-            .frame(maxWidth: .infinity, maxHeight: 400)
+            .frame(height: 400)
+            .frame(maxWidth: .infinity)
+            .clipped()
             .cornerRadius(16, corners: [.topLeft, .topRight])
             .onTapGesture {
                 HapticManager.shared.impact(.medium)
