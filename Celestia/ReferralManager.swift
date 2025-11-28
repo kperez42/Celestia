@@ -259,7 +259,7 @@ class ReferralManager: ObservableObject {
             userId: newUserId,
             referrerId: referrerId,
             referralCode: referralCode,
-            email: newUser.email ?? "",
+            email: newUser.email,
             ipAddress: ipAddress
         )
 
