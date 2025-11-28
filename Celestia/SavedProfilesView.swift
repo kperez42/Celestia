@@ -569,6 +569,9 @@ struct SavedProfileCard: View {
     let onTap: () -> Void
     let onUnsave: () -> Void
 
+    // Fixed height for consistent card sizing across all grid cards
+    private let imageHeight: CGFloat = 180
+
     var body: some View {
         Button(action: onTap) {
             VStack(spacing: 0) {
@@ -577,6 +580,7 @@ struct SavedProfileCard: View {
                     Group {
                         if let imageURL = savedProfile.user.photos.first, let url = URL(string: imageURL) {
                             CachedCardImage(url: url)
+                                .frame(height: imageHeight)
                         } else {
                             LinearGradient(
                                 colors: [.purple.opacity(0.6), .pink.opacity(0.5)],
@@ -610,9 +614,10 @@ struct SavedProfileCard: View {
                         .transition(.opacity)
                     }
                 }
-                .frame(height: 180)
+                .frame(height: imageHeight)
                 .frame(maxWidth: .infinity)
                 .clipped()
+                .contentShape(Rectangle())
                 .cornerRadius(16, corners: [.topLeft, .topRight])
 
                 // User info section with white background - matching Likes page
@@ -721,6 +726,9 @@ struct SavedYouCard: View {
     let profile: SavedYouProfile
     let onTap: () -> Void
 
+    // Fixed height for consistent card sizing across all grid cards
+    private let imageHeight: CGFloat = 180
+
     var body: some View {
         Button(action: onTap) {
             VStack(spacing: 0) {
@@ -728,6 +736,7 @@ struct SavedYouCard: View {
                 Group {
                     if let imageURL = profile.user.photos.first, let url = URL(string: imageURL) {
                         CachedCardImage(url: url)
+                            .frame(height: imageHeight)
                     } else {
                         LinearGradient(
                             colors: [.blue.opacity(0.6), .purple.opacity(0.5)],
@@ -741,9 +750,10 @@ struct SavedYouCard: View {
                         }
                     }
                 }
-                .frame(height: 180)
+                .frame(height: imageHeight)
                 .frame(maxWidth: .infinity)
                 .clipped()
+                .contentShape(Rectangle())
                 .cornerRadius(16, corners: [.topLeft, .topRight])
 
                 // User info section with white background - matching Likes page
@@ -794,6 +804,9 @@ struct ViewedProfileCard: View {
     let profile: ViewedProfile
     let onTap: () -> Void
 
+    // Fixed height for consistent card sizing across all grid cards
+    private let imageHeight: CGFloat = 180
+
     var body: some View {
         Button(action: onTap) {
             VStack(spacing: 0) {
@@ -801,6 +814,7 @@ struct ViewedProfileCard: View {
                 Group {
                     if let imageURL = profile.user.photos.first, let url = URL(string: imageURL) {
                         CachedCardImage(url: url)
+                            .frame(height: imageHeight)
                     } else {
                         LinearGradient(
                             colors: [.green.opacity(0.6), .teal.opacity(0.5)],
@@ -814,9 +828,10 @@ struct ViewedProfileCard: View {
                         }
                     }
                 }
-                .frame(height: 180)
+                .frame(height: imageHeight)
                 .frame(maxWidth: .infinity)
                 .clipped()
+                .contentShape(Rectangle())
                 .cornerRadius(16, corners: [.topLeft, .topRight])
 
                 // User info section with white background

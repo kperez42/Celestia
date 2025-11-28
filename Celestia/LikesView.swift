@@ -442,6 +442,9 @@ struct LikeProfileCard: View {
     var onLikeBack: (() -> Void)? = nil
     var onMessage: (() -> Void)? = nil
 
+    // Fixed height for consistent card sizing across all grid cards
+    private let imageHeight: CGFloat = 180
+
     var body: some View {
         VStack(spacing: 0) {
             // Profile image - fixed height for consistent card sizes
@@ -457,6 +460,9 @@ struct LikeProfileCard: View {
                         .padding(8)
                 }
             }
+            .frame(height: imageHeight)
+            .clipped()
+            .contentShape(Rectangle())
             .cornerRadius(16, corners: [.topLeft, .topRight])
 
             // User info
@@ -525,13 +531,15 @@ struct LikeProfileCard: View {
         Group {
             if let imageURL = URL(string: user.profileImageURL), !user.profileImageURL.isEmpty {
                 CachedCardImage(url: imageURL)
+                    .frame(height: imageHeight)
             } else {
                 placeholderImage
             }
         }
-        .frame(height: 180)
+        .frame(height: imageHeight)
         .frame(maxWidth: .infinity)
         .clipped()
+        .contentShape(Rectangle())
     }
 
     private var placeholderImage: some View {
