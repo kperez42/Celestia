@@ -750,19 +750,22 @@ class LikesViewModel: ObservableObject {
             )
 
             if isMatch {
-                // Move to mutual likes
+                // Add to mutual likes but keep in "Liked Me" so user can still see who liked them
                 await MainActor.run {
-                    if let index = usersWhoLikedMe.firstIndex(where: { $0.effectiveId == targetUserId }) {
-                        let likedUser = usersWhoLikedMe.remove(at: index)
-                        mutualLikes.append(likedUser)
-                        usersILiked.append(likedUser)
+                    if !mutualLikes.contains(where: { $0.effectiveId == targetUserId }) {
+                        mutualLikes.append(user)
+                    }
+                    if !usersILiked.contains(where: { $0.effectiveId == targetUserId }) {
+                        usersILiked.append(user)
                     }
                 }
                 HapticManager.shared.notification(.success)
                 Logger.shared.info("Liked back user - now mutual!", category: .matching)
             } else {
                 await MainActor.run {
-                    usersILiked.append(user)
+                    if !usersILiked.contains(where: { $0.effectiveId == targetUserId }) {
+                        usersILiked.append(user)
+                    }
                 }
             }
         } catch {
