@@ -800,7 +800,16 @@ struct ProfileInsightsView: View {
 
                 // Calculate additional metrics
                 insights.passesReceived = insights.swipesReceived - insights.likesReceived
-                insights.matchCount = authService.currentUser?.matchCount ?? 0
+
+                // Use accurate match count from ProfileStatsService
+                if let userId = authService.currentUser?.id {
+                    let accurateStats = try await ProfileStatsService.shared.getAccurateStats(userId: userId)
+                    insights.matchCount = accurateStats.matchCount
+                    insights.likesReceived = accurateStats.likesReceived
+                    insights.profileViews = accurateStats.profileViews
+                } else {
+                    insights.matchCount = authService.currentUser?.matchCount ?? 0
+                }
 
                 // Mock data for features not yet tracked (will be implemented later)
                 insights.responseRate = Double.random(in: 0.60...0.95)
@@ -819,9 +828,26 @@ struct ProfileInsightsView: View {
 
     // Fallback method for basic insights
     private func loadBasicInsights(user: User) {
-        insights.profileViews = user.profileViews
-        insights.likesReceived = user.likesReceived
-        insights.matchCount = user.matchCount
+        // Use accurate stats from ProfileStatsService
+        Task {
+            if let userId = user.id {
+                do {
+                    let accurateStats = try await ProfileStatsService.shared.getAccurateStats(userId: userId)
+                    await MainActor.run {
+                        insights.profileViews = accurateStats.profileViews
+                        insights.likesReceived = accurateStats.likesReceived
+                        insights.matchCount = accurateStats.matchCount
+                    }
+                } catch {
+                    Logger.shared.error("Failed to load accurate stats for insights, using user stored values", category: .general, error: error)
+                    await MainActor.run {
+                        insights.profileViews = user.profileViews
+                        insights.likesReceived = user.likesReceived
+                        insights.matchCount = user.matchCount
+                    }
+                }
+            }
+        }
         insights.viewsThisWeek = Int.random(in: 15...50)
         insights.viewsLastWeek = Int.random(in: 10...40)
         insights.swipesReceived = user.likesReceived + Int.random(in: 10...30)
