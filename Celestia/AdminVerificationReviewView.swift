@@ -756,6 +756,7 @@ struct IDVerificationReviewEmbeddedView: View {
                             VerificationCardView(
                                 verification: verification,
                                 onApprove: {
+                                    HapticManager.shared.notification(.success)
                                     Task {
                                         await viewModel.approveVerification(verification)
                                         showApprovalSuccess = true
@@ -766,12 +767,18 @@ struct IDVerificationReviewEmbeddedView: View {
                                     }
                                 },
                                 onReject: {
+                                    HapticManager.shared.impact(.medium)
                                     verificationToReject = verification
                                     showingQuickRejectAlert = true
                                 }
                             )
                             .padding(.horizontal)
+                            .transition(.asymmetric(
+                                insertion: .scale.combined(with: .opacity),
+                                removal: .move(edge: .leading).combined(with: .opacity)
+                            ))
                         }
+                        .animation(.spring(response: 0.4), value: viewModel.pendingVerifications.count)
                     }
                     .padding(.bottom, 20)
                 }
@@ -804,16 +811,19 @@ struct IDVerificationReviewEmbeddedView: View {
         }
         .alert("Reject Verification", isPresented: $showingQuickRejectAlert) {
             Button("ID Blurry") {
+                HapticManager.shared.notification(.warning)
                 if let v = verificationToReject {
                     Task { await viewModel.rejectVerification(v, reason: "ID photo is blurry or unreadable") }
                 }
             }
             Button("Doesn't Match") {
+                HapticManager.shared.notification(.warning)
                 if let v = verificationToReject {
                     Task { await viewModel.rejectVerification(v, reason: "Selfie doesn't match ID photo") }
                 }
             }
             Button("Fake/Invalid") {
+                HapticManager.shared.notification(.error)
                 if let v = verificationToReject {
                     Task { await viewModel.rejectVerification(v, reason: "ID appears to be fake or invalid") }
                 }

@@ -20,6 +20,7 @@ struct ManualIDVerificationView: View {
     @State private var currentStep = 1
     @State private var showingImageSourcePicker = false
     @State private var imageSourceType: ImageSourceType = .id
+    @State private var animateProgress = false
 
     enum ImageSourceType {
         case id, selfie
@@ -33,17 +34,30 @@ struct ManualIDVerificationView: View {
 
                 if viewModel.isVerified {
                     verifiedView
+                        .transition(.asymmetric(
+                            insertion: .scale.combined(with: .opacity),
+                            removal: .opacity
+                        ))
                 } else if viewModel.pendingVerification {
                     pendingView
+                        .transition(.opacity)
+                } else if viewModel.wasRejected {
+                    rejectedView
+                        .transition(.opacity)
                 } else {
                     mainContent
                 }
             }
+            .animation(.spring(response: 0.5), value: viewModel.isVerified)
+            .animation(.spring(response: 0.5), value: viewModel.pendingVerification)
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { dismiss() }) {
+                    Button(action: {
+                        HapticManager.shared.impact(.light)
+                        dismiss()
+                    }) {
                         Image(systemName: "xmark")
                             .font(.body.weight(.medium))
                             .foregroundColor(.primary)
@@ -52,10 +66,12 @@ struct ManualIDVerificationView: View {
             }
             .confirmationDialog("Choose Photo Source", isPresented: $showingImageSourcePicker) {
                 Button("Take Photo") {
+                    HapticManager.shared.impact(.medium)
                     viewModel.showingCamera = true
                     viewModel.cameraSourceType = imageSourceType
                 }
                 Button("Choose from Library") {
+                    HapticManager.shared.impact(.light)
                     if imageSourceType == .id {
                         viewModel.showingIDPicker = true
                     } else {
@@ -70,13 +86,36 @@ struct ManualIDVerificationView: View {
             .photosPicker(isPresented: $viewModel.showingIDPicker, selection: $viewModel.idPhotoItem, matching: .images)
             .photosPicker(isPresented: $viewModel.showingSelfiePicker, selection: $viewModel.selfiePhotoItem, matching: .images)
             .onChange(of: viewModel.idPhotoItem) { _ in
-                Task { await viewModel.loadIDPhoto() }
+                Task {
+                    await viewModel.loadIDPhoto()
+                    if viewModel.idImage != nil {
+                        HapticManager.shared.notification(.success)
+                    }
+                }
             }
             .onChange(of: viewModel.selfiePhotoItem) { _ in
-                Task { await viewModel.loadSelfiePhoto() }
+                Task {
+                    await viewModel.loadSelfiePhoto()
+                    if viewModel.selfieImage != nil {
+                        HapticManager.shared.notification(.success)
+                    }
+                }
+            }
+            .onChange(of: viewModel.idImage) { newValue in
+                withAnimation(.spring(response: 0.3)) {
+                    animateProgress = newValue != nil
+                }
+            }
+            .onChange(of: viewModel.selfieImage) { newValue in
+                withAnimation(.spring(response: 0.3)) {
+                    animateProgress = newValue != nil
+                }
             }
             .alert("Submitted!", isPresented: $viewModel.showingSuccess) {
-                Button("Done") { dismiss() }
+                Button("Done") {
+                    HapticManager.shared.notification(.success)
+                    dismiss()
+                }
             } message: {
                 Text("Your verification is being reviewed. We'll notify you when approved!")
             }
@@ -432,6 +471,85 @@ struct ManualIDVerificationView: View {
             .padding(.bottom, 40)
         }
     }
+
+    // MARK: - Rejected View (with retry option)
+
+    private var rejectedView: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            ZStack {
+                Circle()
+                    .fill(Color.red.opacity(0.15))
+                    .frame(width: 120, height: 120)
+
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 50))
+                    .foregroundColor(.red)
+            }
+
+            Text("Verification Rejected")
+                .font(.title)
+                .fontWeight(.bold)
+
+            if let reason = viewModel.rejectionReason {
+                VStack(spacing: 8) {
+                    Text("Reason:")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+
+                    Text(reason)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+                        .multilineTextAlignment(.center)
+                        .padding()
+                        .background(Color.red.opacity(0.1))
+                        .cornerRadius(12)
+                }
+                .padding(.horizontal, 20)
+            }
+
+            Text("Please try again with clearer photos.")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+
+            Spacer()
+
+            VStack(spacing: 12) {
+                Button(action: {
+                    HapticManager.shared.impact(.medium)
+                    viewModel.retryVerification()
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.clockwise")
+                        Text("Try Again")
+                    }
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(14)
+                }
+
+                Button("Cancel") {
+                    dismiss()
+                }
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 40)
+        }
+    }
 }
 
 // MARK: - Camera View
@@ -497,6 +615,8 @@ class ManualIDVerificationViewModel: ObservableObject {
 
     @Published var pendingVerification = false
     @Published var isVerified = false
+    @Published var wasRejected = false
+    @Published var rejectionReason: String?
     @Published var submittedAt: Date?
 
     private let db = Firestore.firestore()
@@ -517,6 +637,13 @@ class ManualIDVerificationViewModel: ObservableObject {
 
             isVerified = (data["isVerified"] as? Bool ?? false) || (data["idVerified"] as? Bool ?? false)
 
+            // Check for rejection status
+            if data["idVerificationRejected"] as? Bool == true {
+                wasRejected = true
+                rejectionReason = data["idVerificationRejectionReason"] as? String
+                return  // Don't check pending if already rejected
+            }
+
             // Check for pending verification
             let verificationDoc = try await db.collection("pendingVerifications").document(userId).getDocument()
             if verificationDoc.exists {
@@ -529,6 +656,33 @@ class ManualIDVerificationViewModel: ObservableObject {
             }
         } catch {
             Logger.shared.error("Failed to check verification status", category: .general, error: error)
+        }
+    }
+
+    // MARK: - Retry Verification
+
+    func retryVerification() {
+        // Clear rejection state and allow user to submit again
+        wasRejected = false
+        rejectionReason = nil
+        idImage = nil
+        selfieImage = nil
+        idPhotoItem = nil
+        selfiePhotoItem = nil
+
+        // Clear rejection flags from user document
+        guard let userId = Auth.auth().currentUser?.uid else { return }
+        Task {
+            do {
+                try await db.collection("users").document(userId).updateData([
+                    "idVerificationRejected": FieldValue.delete(),
+                    "idVerificationRejectedAt": FieldValue.delete(),
+                    "idVerificationRejectionReason": FieldValue.delete()
+                ])
+                Logger.shared.info("Cleared rejection status for retry", category: .general)
+            } catch {
+                Logger.shared.error("Failed to clear rejection status", category: .general, error: error)
+            }
         }
     }
 
