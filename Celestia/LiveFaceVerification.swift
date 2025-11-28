@@ -683,26 +683,49 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
         }
 
         // Use the best quality center capture
-        let bestCapture = centerCaptures.max { c1, c2 in
+        guard let bestCapture = centerCaptures.max(by: { c1, c2 in
             let q1 = c1.observation.faceCaptureQuality ?? 0
             let q2 = c2.observation.faceCaptureQuality ?? 0
             return q1 < q2
-        }!
+        }) else {
+            return (false, "Could not find best face capture", 0)
+        }
 
         let selfieSignature = bestCapture.signature
 
         // Compare with each profile photo
         var bestMatch: Float = 0.0
+        var successfulComparisons = 0
+        var downloadFailures = 0
+        var faceExtractionFailures = 0
 
         for photoURL in profilePhotos {
-            if let profileImage = await downloadImage(from: photoURL),
-               let profileSignature = await extractFaceSignature(from: profileImage) {
-                let similarity = calculateCosineSimilarity(selfieSignature, profileSignature)
-                Logger.shared.debug("Profile photo similarity: \(similarity)", category: .general)
+            if let profileImage = await downloadImage(from: photoURL) {
+                if let profileSignature = await extractFaceSignature(from: profileImage) {
+                    let similarity = calculateCosineSimilarity(selfieSignature, profileSignature)
+                    Logger.shared.debug("Profile photo similarity: \(similarity)", category: .general)
+                    successfulComparisons += 1
 
-                if similarity > bestMatch {
-                    bestMatch = similarity
+                    if similarity > bestMatch {
+                        bestMatch = similarity
+                    }
+                } else {
+                    faceExtractionFailures += 1
+                    Logger.shared.warning("Could not extract face from profile photo", category: .general)
                 }
+            } else {
+                downloadFailures += 1
+            }
+        }
+
+        // Check if we had any successful comparisons
+        if successfulComparisons == 0 {
+            if downloadFailures == profilePhotos.count {
+                return (false, "Could not load profile photos. Please check your internet connection.", 0)
+            } else if faceExtractionFailures > 0 {
+                return (false, "Could not detect face in your profile photos. Please use photos with clear face visibility.", 0)
+            } else {
+                return (false, "Verification failed. Please try again.", 0)
             }
         }
 
@@ -713,7 +736,12 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
             try await updateUserVerification(userId: userId, confidence: confidence)
             return (true, "Face verified successfully!", confidence)
         } else {
-            return (false, "Face doesn't match your profile photos.", confidence)
+            // Provide more helpful message based on confidence
+            if bestMatch < 0.5 {
+                return (false, "Face doesn't match your profile photos. Please ensure your profile has recent photos.", confidence)
+            } else {
+                return (false, "Face similarity too low. Please try again with better lighting.", confidence)
+            }
         }
     }
 
@@ -773,6 +801,13 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
         return requiredPoses.first { !completedPoses.contains($0) }
     }
 
+    // Helper function to safely calculate width/height from points
+    private func safeRange(of points: [CGPoint], axis: KeyPath<CGPoint, CGFloat>) -> Float {
+        let values = points.map { Float($0[keyPath: axis]) }
+        guard let maxVal = values.max(), let minVal = values.min() else { return 0.001 }
+        return max(maxVal - minVal, 0.001)
+    }
+
     private func generateFaceSignature(_ observation: VNFaceObservation) -> [Float]? {
         guard let landmarks = observation.landmarks else { return nil }
 
@@ -783,7 +818,12 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
               let rightEyePoints = landmarks.rightEye?.normalizedPoints,
               let nosePoints = landmarks.nose?.normalizedPoints,
               let outerLipsPoints = landmarks.outerLips?.normalizedPoints,
-              let faceContourPoints = landmarks.faceContour?.normalizedPoints else {
+              let faceContourPoints = landmarks.faceContour?.normalizedPoints,
+              !leftEyePoints.isEmpty,
+              !rightEyePoints.isEmpty,
+              !nosePoints.isEmpty,
+              !outerLipsPoints.isEmpty,
+              !faceContourPoints.isEmpty else {
             return nil
         }
 
@@ -797,9 +837,9 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
         let ipd = distance(from: leftEyeCenter, to: rightEyeCenter)
         guard ipd > 0.01 else { return nil }
 
-        // Face dimensions
-        let faceWidth = faceContourPoints.map { Float($0.x) }.max()! - faceContourPoints.map { Float($0.x) }.min()!
-        let faceHeight = faceContourPoints.map { Float($0.y) }.max()! - faceContourPoints.map { Float($0.y) }.min()!
+        // Face dimensions (using safe helper)
+        let faceWidth = safeRange(of: faceContourPoints, axis: \.x)
+        let faceHeight = safeRange(of: faceContourPoints, axis: \.y)
 
         // === GEOMETRIC RATIOS ===
         signature.append(ipd / faceWidth)
@@ -817,11 +857,11 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
         signature.append(distance(from: rightEyeCenter, to: noseCenter) / ipd)
 
         // Mouth width ratio
-        let mouthWidth = outerLipsPoints.map { Float($0.x) }.max()! - outerLipsPoints.map { Float($0.x) }.min()!
+        let mouthWidth = safeRange(of: outerLipsPoints, axis: \.x)
         signature.append(mouthWidth / ipd)
 
         // Nose width ratio
-        let noseWidth = nosePoints.map { Float($0.x) }.max()! - nosePoints.map { Float($0.x) }.min()!
+        let noseWidth = safeRange(of: nosePoints, axis: \.x)
         signature.append(noseWidth / ipd)
 
         // Eye symmetry
@@ -833,18 +873,18 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
         signature.append(atan2(Float(mouthCenter.y - noseCenter.y), Float(mouthCenter.x - noseCenter.x)))
 
         // === SHAPE FEATURES ===
-        let leftEyeWidth = leftEyePoints.map { Float($0.x) }.max()! - leftEyePoints.map { Float($0.x) }.min()!
-        let leftEyeHeight = leftEyePoints.map { Float($0.y) }.max()! - leftEyePoints.map { Float($0.y) }.min()!
-        signature.append(leftEyeHeight / max(leftEyeWidth, 0.001))
+        let leftEyeWidth = safeRange(of: leftEyePoints, axis: \.x)
+        let leftEyeHeight = safeRange(of: leftEyePoints, axis: \.y)
+        signature.append(leftEyeHeight / leftEyeWidth)
 
-        let rightEyeWidth = rightEyePoints.map { Float($0.x) }.max()! - rightEyePoints.map { Float($0.x) }.min()!
-        let rightEyeHeight = rightEyePoints.map { Float($0.y) }.max()! - rightEyePoints.map { Float($0.y) }.min()!
-        signature.append(rightEyeHeight / max(rightEyeWidth, 0.001))
+        let rightEyeWidth = safeRange(of: rightEyePoints, axis: \.x)
+        let rightEyeHeight = safeRange(of: rightEyePoints, axis: \.y)
+        signature.append(rightEyeHeight / rightEyeWidth)
 
-        let noseLength = nosePoints.map { Float($0.y) }.max()! - nosePoints.map { Float($0.y) }.min()!
+        let noseLength = safeRange(of: nosePoints, axis: \.y)
         signature.append(noseLength / ipd)
 
-        let mouthHeight = outerLipsPoints.map { Float($0.y) }.max()! - outerLipsPoints.map { Float($0.y) }.min()!
+        let mouthHeight = safeRange(of: outerLipsPoints, axis: \.y)
         signature.append(mouthHeight / ipd)
 
         // === EYEBROW FEATURES ===
@@ -866,8 +906,8 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
             let lowerJawPoints = Array(sortedByY.prefix(faceContourPoints.count / 3))
             let midJawPoints = Array(sortedByY.dropFirst(faceContourPoints.count / 3).prefix(faceContourPoints.count / 3))
 
-            let lowerJawWidth = lowerJawPoints.map { Float($0.x) }.max()! - lowerJawPoints.map { Float($0.x) }.min()!
-            let midJawWidth = midJawPoints.map { Float($0.x) }.max()! - midJawPoints.map { Float($0.x) }.min()!
+            let lowerJawWidth = safeRange(of: lowerJawPoints, axis: \.x)
+            let midJawWidth = safeRange(of: midJawPoints, axis: \.x)
 
             signature.append(lowerJawWidth / faceWidth)
             signature.append(midJawWidth / faceWidth)
@@ -986,12 +1026,35 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
     }
 
     private func downloadImage(from urlString: String) async -> UIImage? {
-        guard let url = URL(string: urlString) else { return nil }
+        guard let url = URL(string: urlString) else {
+            Logger.shared.warning("Invalid URL for image download: \(urlString)", category: .network)
+            return nil
+        }
+
+        // Create a URLSession with timeout configuration
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 15 // 15 seconds timeout
+        config.timeoutIntervalForResource = 30 // 30 seconds total
+        let session = URLSession(configuration: config)
 
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            return UIImage(data: data)
+            let (data, response) = try await session.data(from: url)
+
+            // Verify we got a valid response
+            if let httpResponse = response as? HTTPURLResponse,
+               !(200...299).contains(httpResponse.statusCode) {
+                Logger.shared.warning("Image download failed with status: \(httpResponse.statusCode)", category: .network)
+                return nil
+            }
+
+            guard let image = UIImage(data: data) else {
+                Logger.shared.warning("Failed to create UIImage from downloaded data", category: .network)
+                return nil
+            }
+
+            return image
         } catch {
+            Logger.shared.error("Image download error: \(error.localizedDescription)", category: .network, error: error)
             return nil
         }
     }

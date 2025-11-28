@@ -21,6 +21,37 @@ struct LiveFaceVerificationView: View {
     @State private var showingSuccess = false
     @State private var pulseAnimation = false
     @State private var rotationAngle: Double = 0
+    @State private var cameraError: CameraErrorType? = nil
+
+    enum CameraErrorType {
+        case permissionDenied
+        case setupFailed
+        case unknown(String)
+
+        var title: String {
+            switch self {
+            case .permissionDenied: return "Camera Access Required"
+            case .setupFailed: return "Camera Error"
+            case .unknown: return "Error"
+            }
+        }
+
+        var message: String {
+            switch self {
+            case .permissionDenied:
+                return "Please enable camera access in Settings to verify your profile."
+            case .setupFailed:
+                return "Could not start the camera. Please try again."
+            case .unknown(let msg):
+                return msg
+            }
+        }
+
+        var showSettingsButton: Bool {
+            if case .permissionDenied = self { return true }
+            return false
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -60,6 +91,11 @@ struct LiveFaceVerificationView: View {
             // Failure overlay
             if case .failure(let message) = verificationManager.state {
                 failureOverlay(message: message)
+            }
+
+            // Camera error overlay
+            if let error = cameraError {
+                cameraErrorOverlay(error: error)
             }
         }
         .onAppear {
@@ -447,6 +483,97 @@ struct LiveFaceVerificationView: View {
         }
     }
 
+    // MARK: - Camera Error Overlay
+
+    private func cameraErrorOverlay(error: CameraErrorType) -> some View {
+        ZStack {
+            Color.black.opacity(0.9)
+                .ignoresSafeArea()
+
+            VStack(spacing: 32) {
+                Spacer()
+
+                ZStack {
+                    Circle()
+                        .fill(Color.orange.opacity(0.2))
+                        .frame(width: 140, height: 140)
+
+                    Image(systemName: error.showSettingsButton ? "camera.fill" : "exclamationmark.triangle.fill")
+                        .font(.system(size: 70))
+                        .foregroundColor(.orange)
+                }
+
+                VStack(spacing: 12) {
+                    Text(error.title)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+
+                    Text(error.message)
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+
+                Spacer()
+
+                VStack(spacing: 12) {
+                    if error.showSettingsButton {
+                        Button {
+                            if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(settingsUrl)
+                            }
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "gear")
+                                Text("Open Settings")
+                                    .fontWeight(.semibold)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .foregroundColor(.white)
+                            .background(
+                                LinearGradient(
+                                    colors: [.purple, .pink],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(16)
+                        }
+                    }
+
+                    Button {
+                        cameraError = nil
+                        startVerification()
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "arrow.clockwise")
+                            Text("Try Again")
+                                .fontWeight(.semibold)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .foregroundColor(.white)
+                        .background(Color.white.opacity(0.2))
+                        .cornerRadius(16)
+                    }
+
+                    Button {
+                        onVerificationComplete?(false)
+                        dismiss()
+                    } label: {
+                        Text("Cancel")
+                            .foregroundColor(.white.opacity(0.7))
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 40)
+            }
+        }
+    }
+
     // MARK: - Methods
 
     private func startVerification() {
@@ -464,8 +591,21 @@ struct LiveFaceVerificationView: View {
                 await MainActor.run {
                     verificationManager.startVerification(for: userId)
                 }
+            } catch let error as LiveCameraController.CameraError {
+                await MainActor.run {
+                    switch error {
+                    case .notAuthorized:
+                        cameraError = .permissionDenied
+                    case .setupFailed:
+                        cameraError = .setupFailed
+                    }
+                    Logger.shared.error("Camera error: \(error)", category: .general)
+                }
             } catch {
-                Logger.shared.error("Failed to start camera: \(error.localizedDescription)", category: .general)
+                await MainActor.run {
+                    cameraError = .unknown(error.localizedDescription)
+                    Logger.shared.error("Failed to start camera: \(error.localizedDescription)", category: .general)
+                }
             }
         }
     }
