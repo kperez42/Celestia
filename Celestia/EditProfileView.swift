@@ -360,16 +360,22 @@ struct EditProfileView: View {
                 }
             }
             
-            Text("Change Profile Photo")
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [.purple, .pink],
-                        startPoint: .leading,
-                        endPoint: .trailing
+            VStack(spacing: 4) {
+                Text("Profile Photo")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
                     )
-                )
+
+                Text("Shown on your Profile page")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
         }
     }
     
@@ -401,10 +407,10 @@ struct EditProfileView: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Photo Gallery")
+                    Text("Discovery Photos")
                         .font(.title3)
                         .fontWeight(.bold)
-                    Text("Add up to 6 photos")
+                    Text("These photos appear on your card in Discover, Likes & Saved")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
