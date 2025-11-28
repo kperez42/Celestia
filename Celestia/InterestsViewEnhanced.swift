@@ -366,7 +366,7 @@ struct InterestsViewEnhanced: View {
             .padding(.horizontal)
             .padding(.bottom, 100)
         }
-        .transition(.move(edge: .bottom).combined(with: .opacity))
+        .transition(.opacity)
     }
 
     // MARK: - Helper Functions

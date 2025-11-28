@@ -154,7 +154,7 @@ struct ChatView: View {
             if showErrorToast {
                 errorToastView
                     .padding(.top, 60)
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .transition(.opacity)
                     .zIndex(999)
             }
         }
@@ -403,14 +403,14 @@ struct ChatView: View {
                                 }
                             }
                         }
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                        .transition(.opacity)
                         .id("sending")
                     }
 
                     // Typing indicator
                     if isOtherUserTyping {
                         TypingIndicator(userName: otherUser.fullName)
-                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                            .transition(.opacity)
                             .id("typing")
                     }
                 }
