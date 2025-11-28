@@ -1027,7 +1027,7 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
 
     private func downloadImage(from urlString: String) async -> UIImage? {
         guard let url = URL(string: urlString) else {
-            Logger.shared.warning("Invalid URL for image download: \(urlString)", category: .network)
+            Logger.shared.warning("Invalid URL for image download: \(urlString)", category: .networking)
             return nil
         }
 
@@ -1043,18 +1043,18 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
             // Verify we got a valid response
             if let httpResponse = response as? HTTPURLResponse,
                !(200...299).contains(httpResponse.statusCode) {
-                Logger.shared.warning("Image download failed with status: \(httpResponse.statusCode)", category: .network)
+                Logger.shared.warning("Image download failed with status: \(httpResponse.statusCode)", category: .networking)
                 return nil
             }
 
             guard let image = UIImage(data: data) else {
-                Logger.shared.warning("Failed to create UIImage from downloaded data", category: .network)
+                Logger.shared.warning("Failed to create UIImage from downloaded data", category: .networking)
                 return nil
             }
 
             return image
         } catch {
-            Logger.shared.error("Image download error: \(error.localizedDescription)", category: .network, error: error)
+            Logger.shared.error("Image download error: \(error.localizedDescription)", category: .networking, error: error)
             return nil
         }
     }
