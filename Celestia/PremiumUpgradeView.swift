@@ -30,130 +30,130 @@ struct PremiumUpgradeView: View {
     // Timer for showcase rotation
     let showcaseTimer = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
 
+    // Dark background color used throughout
+    private let darkBackground = Color(red: 0.1, green: 0.05, blue: 0.2)
+
     var body: some View {
-        NavigationStack {
-            ZStack {
-                // Animated gradient background
-                animatedBackground
+        ZStack {
+            // Full screen dark background
+            darkBackground
+                .ignoresSafeArea(.all)
 
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 0) {
-                        // Immersive hero with live preview
-                        immersiveHero
+            NavigationStack {
+                ZStack {
+                    // Content background
+                    darkBackground
+                        .ignoresSafeArea(.all)
 
-                        // Content sections
-                        VStack(spacing: 28) {
-                            // Limited time banner
-                            if showLimitedOffer {
-                                limitedTimeBanner
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(spacing: 0) {
+                            // Immersive hero with live preview
+                            immersiveHero
+
+                            // Content sections
+                            VStack(spacing: 28) {
+                                // Limited time banner
+                                if showLimitedOffer {
+                                    limitedTimeBanner
+                                }
+
+                                // Live feature showcase
+                                liveFeatureShowcase
+
+                                // Stats that matter
+                                impactStats
+
+                                // Feature comparison
+                                featureComparisonSection
+
+                                // Pricing cards
+                                pricingSection
+
+                                // Real success stories
+                                successStoriesSection
+
+                                // Money back guarantee
+                                guaranteeSection
+
+                                // FAQ
+                                faqSection
                             }
-
-                            // Live feature showcase
-                            liveFeatureShowcase
-
-                            // Stats that matter
-                            impactStats
-
-                            // Feature comparison
-                            featureComparisonSection
-
-                            // Pricing cards
-                            pricingSection
-
-                            // Real success stories
-                            successStoriesSection
-
-                            // Money back guarantee
-                            guaranteeSection
-
-                            // FAQ
-                            faqSection
+                            .padding(.horizontal, 20)
+                            .padding(.top, 24)
+                            .padding(.bottom, 140)
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 24)
-                        .padding(.bottom, 140)
+                    }
+                    .scrollContentBackground(.hidden)
+
+                    // Floating CTA
+                    VStack {
+                        Spacer()
+                        floatingCTA
                     }
                 }
-                .scrollContentBackground(.hidden)
+                .background(darkBackground.ignoresSafeArea(.all))
+                .navigationTitle("")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbarBackground(.hidden, for: .navigationBar)
+                .toolbarColorScheme(.dark, for: .navigationBar)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.title2)
+                                .symbolRenderingMode(.hierarchical)
+                                .foregroundColor(.white.opacity(0.8))
+                        }
+                    }
 
-                // Floating CTA
-                VStack {
-                    Spacer()
-                    floatingCTA
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Restore") {
+                            restorePurchases()
+                        }
+                        .font(.subheadline.weight(.medium))
+                        .foregroundColor(.white.opacity(0.9))
+                    }
                 }
-            }
-            .background(
-                Color(red: 0.1, green: 0.05, blue: 0.2)
-                    .ignoresSafeArea()
-            )
-            .clipped()
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.hidden, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
+                .alert("Welcome to Premium!", isPresented: $showPurchaseSuccess) {
+                    Button("Start Discovering") {
                         dismiss()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title2)
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundColor(.white.opacity(0.8))
+                    }
+                } message: {
+                    Text("You now have unlimited access to all premium features. Your feed just got a whole lot better!")
+                }
+                .alert("Error", isPresented: $showError) {
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    Text(errorMessage)
+                }
+                .overlay {
+                    if isProcessing {
+                        processingOverlay
                     }
                 }
-
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Restore") {
-                        restorePurchases()
+                .onAppear {
+                    startAnimations()
+                    Task {
+                        await storeManager.loadProducts()
                     }
-                    .font(.subheadline.weight(.medium))
-                    .foregroundColor(.white.opacity(0.9))
                 }
-            }
-            .alert("Welcome to Premium!", isPresented: $showPurchaseSuccess) {
-                Button("Start Discovering") {
-                    dismiss()
-                }
-            } message: {
-                Text("You now have unlimited access to all premium features. Your feed just got a whole lot better!")
-            }
-            .alert("Error", isPresented: $showError) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(errorMessage)
-            }
-            .overlay {
-                if isProcessing {
-                    processingOverlay
-                }
-            }
-            .onAppear {
-                startAnimations()
-                Task {
-                    await storeManager.loadProducts()
-                }
-            }
-            .onReceive(showcaseTimer) { _ in
-                withAnimation(.easeInOut(duration: 0.5)) {
-                    currentShowcaseIndex = (currentShowcaseIndex + 1) % 4
+                .onReceive(showcaseTimer) { _ in
+                    withAnimation(.easeInOut(duration: 0.5)) {
+                        currentShowcaseIndex = (currentShowcaseIndex + 1) % 4
+                    }
                 }
             }
         }
+        .preferredColorScheme(.dark)
     }
 
     // MARK: - Animated Background
 
     private var animatedBackground: some View {
-        LinearGradient(
-            colors: [
-                Color(red: 0.1, green: 0.05, blue: 0.2),
-                Color(red: 0.15, green: 0.05, blue: 0.25),
-                Color(red: 0.1, green: 0.02, blue: 0.15)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-        .ignoresSafeArea()
+        darkBackground
+            .ignoresSafeArea(.all)
     }
 
     // MARK: - Immersive Hero
@@ -763,10 +763,7 @@ struct PremiumUpgradeView: View {
         .padding(.horizontal, 20)
         .padding(.top, 12)
         .padding(.bottom, 8)
-        .background(
-            Color(red: 0.1, green: 0.05, blue: 0.2)
-                .ignoresSafeArea(edges: .bottom)
-        )
+        .background(darkBackground.ignoresSafeArea(edges: .bottom))
     }
 
     // MARK: - Processing Overlay
