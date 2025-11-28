@@ -83,28 +83,13 @@ class ReferralManager: ObservableObject {
             throw ReferralError.invalidUser
         }
 
-        // Parallelize all validation queries for better performance
-        async let referrerQuery = db.collection("users")
+        // Step 1: Find the referrer by their referral code
+        let referrerSnapshot = try await db.collection("users")
             .whereField("referralStats.referralCode", isEqualTo: referralCode)
             .limit(to: 1)
             .getDocuments()
 
-        async let existingReferralQuery = db.collection("referrals")
-            .whereField("referredUserId", isEqualTo: newUserId)
-            .whereField("status", isEqualTo: ReferralStatus.completed.rawValue)
-            .limit(to: 1)
-            .getDocuments()
-
-        async let emailCheckQuery = db.collection("users")
-            .whereField("email", isEqualTo: newUser.email)
-            .limit(to: 5)
-            .getDocuments()
-
-        // Wait for all queries to complete
-        let (querySnapshot, existingReferralSnapshot, emailCheckSnapshot) = try await (referrerQuery, existingReferralQuery, emailCheckQuery)
-
-        // Validate referrer exists
-        guard let referrerDoc = querySnapshot.documents.first else {
+        guard let referrerDoc = referrerSnapshot.documents.first else {
             Logger.shared.warning("Invalid referral code: \(referralCode)", category: .referral)
             throw ReferralError.invalidCode
         }
@@ -115,27 +100,56 @@ class ReferralManager: ObservableObject {
             throw ReferralError.selfReferral
         }
 
-        // Check if this user has already been referred
-        if !existingReferralSnapshot.documents.isEmpty {
+        // Step 2: Check if this user has already been referred (with fallback for missing index)
+        var alreadyReferred = false
+        do {
+            let existingReferralSnapshot = try await db.collection("referrals")
+                .whereField("referredUserId", isEqualTo: newUserId)
+                .whereField("status", isEqualTo: ReferralStatus.completed.rawValue)
+                .limit(to: 1)
+                .getDocuments()
+
+            alreadyReferred = !existingReferralSnapshot.documents.isEmpty
+        } catch {
+            // Fallback: fetch referrals for this user and filter locally
+            Logger.shared.warning("Falling back to local filtering for existing referral check", category: .referral)
+
+            let referralsSnapshot = try await db.collection("referrals")
+                .whereField("referredUserId", isEqualTo: newUserId)
+                .limit(to: 10)
+                .getDocuments()
+
+            alreadyReferred = referralsSnapshot.documents.contains { doc in
+                let data = doc.data()
+                return (data["status"] as? String) == ReferralStatus.completed.rawValue
+            }
+        }
+
+        if alreadyReferred {
             Logger.shared.warning("User has already been referred", category: .referral)
             throw ReferralError.alreadyReferred
         }
 
-        // Filter for users with referredByCode
-        let usersWithReferral = emailCheckSnapshot.documents.filter { doc in
+        // Step 3: Check for email abuse (multiple accounts with same email using referral)
+        let emailCheckSnapshot = try await db.collection("users")
+            .whereField("email", isEqualTo: newUser.email)
+            .limit(to: 5)
+            .getDocuments()
+
+        // Count other accounts (not this user) that used a referral code
+        let otherAccountsWithReferral = emailCheckSnapshot.documents.filter { doc in
+            guard doc.documentID != newUserId else { return false }
             let data = doc.data()
-            return data["referredByCode"] != nil && !(data["referredByCode"] is NSNull)
+            let referredByCode = data["referredByCode"] as? String
+            return referredByCode != nil && !referredByCode!.isEmpty
         }
 
-        if !usersWithReferral.isEmpty {
-            // Email was already used with a referral code
-        }
-        if emailCheckSnapshot.documents.count > 1 {
+        if !otherAccountsWithReferral.isEmpty {
             Logger.shared.warning("Email has already been referred with a different account", category: .referral)
             throw ReferralError.emailAlreadyReferred
         }
 
-        // Create referral record
+        // Step 4: Create referral record
         let referral = Referral(
             referrerUserId: referrerId,
             referredUserId: newUserId,
@@ -149,13 +163,13 @@ class ReferralManager: ObservableObject {
         // Save referral
         try await db.collection("referrals").addDocument(from: referral)
 
-        // Award bonus days to new user
+        // Step 5: Award bonus days to new user
         try await awardPremiumDays(userId: newUserId, days: ReferralRewards.newUserBonusDays, reason: "referral_signup")
 
-        // Award bonus days to referrer
+        // Step 6: Award bonus days to referrer
         try await awardPremiumDays(userId: referrerId, days: ReferralRewards.referrerBonusDays, reason: "successful_referral")
 
-        // Update referrer stats
+        // Step 7: Update referrer stats
         try await updateReferrerStats(userId: referrerId)
 
         Logger.shared.info("Referral processed successfully: \(referralCode)", category: .referral)
@@ -210,13 +224,30 @@ class ReferralManager: ObservableObject {
     // MARK: - Update Referrer Stats
 
     private func updateReferrerStats(userId: String) async throws {
-        // Count successful referrals
-        let referralsSnapshot = try await db.collection("referrals")
-            .whereField("referrerUserId", isEqualTo: userId)
-            .whereField("status", isEqualTo: ReferralStatus.completed.rawValue)
-            .getDocuments()
+        var totalReferrals = 0
 
-        let totalReferrals = referralsSnapshot.documents.count
+        do {
+            // Try composite query first (requires index)
+            let referralsSnapshot = try await db.collection("referrals")
+                .whereField("referrerUserId", isEqualTo: userId)
+                .whereField("status", isEqualTo: ReferralStatus.completed.rawValue)
+                .getDocuments()
+
+            totalReferrals = referralsSnapshot.documents.count
+        } catch {
+            // Fallback: fetch all referrals for user and filter locally
+            Logger.shared.warning("Falling back to local filtering for referrer stats - composite index may be missing", category: .referral)
+
+            let referralsSnapshot = try await db.collection("referrals")
+                .whereField("referrerUserId", isEqualTo: userId)
+                .getDocuments()
+
+            totalReferrals = referralsSnapshot.documents.filter { doc in
+                let data = doc.data()
+                return (data["status"] as? String) == ReferralStatus.completed.rawValue
+            }.count
+        }
+
         let premiumDaysEarned = ReferralRewards.calculateTotalDays(referrals: totalReferrals)
 
         // Update user stats
