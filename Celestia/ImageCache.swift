@@ -10,6 +10,25 @@ import SwiftUI
 import UIKit
 import CryptoKit
 
+// MARK: - Image Load Priority
+
+/// Priority levels for image loading - higher priority loads faster
+enum ImageLoadPriority {
+    case low        // Prefetch, background loading
+    case normal     // Default card loading
+    case high       // User interaction (tapped card)
+    case immediate  // Full screen viewer, current photo
+
+    var taskPriority: TaskPriority {
+        switch self {
+        case .low: return .utility
+        case .normal: return .medium
+        case .high: return .userInitiated
+        case .immediate: return .high
+        }
+    }
+}
+
 @MainActor
 class ImageCache {
     static let shared = ImageCache()
@@ -1012,6 +1031,8 @@ struct CachedCardImage: View {
                         endPoint: .bottomTrailing
                     )
                 )
+            }
+
             if image == nil && loadError == nil {
                 // Loading state with brand gradient - optimized shimmer
                 ZStack {
@@ -1123,25 +1144,6 @@ struct CachedCardImage: View {
                     self.loadError = NSError(domain: "ImageCache", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to load image"])
                 }
             }
-        }
-    }
-}
-
-// MARK: - Image Load Priority
-
-/// Priority levels for image loading - higher priority loads faster
-enum ImageLoadPriority {
-    case low        // Prefetch, background loading
-    case normal     // Default card loading
-    case high       // User interaction (tapped card)
-    case immediate  // Full screen viewer, current photo
-
-    var taskPriority: TaskPriority {
-        switch self {
-        case .low: return .utility
-        case .normal: return .medium
-        case .high: return .userInitiated
-        case .immediate: return .high
         }
     }
 }
