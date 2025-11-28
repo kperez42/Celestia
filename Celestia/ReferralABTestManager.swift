@@ -117,7 +117,7 @@ struct UserExperimentAssignment: Codable {
 
 // MARK: - Experiment Results
 
-struct ExperimentResults: Codable {
+struct ReferralExperimentResults: Codable {
     let experimentId: String
     let calculatedAt: Date
     let variants: [VariantResults]
@@ -483,7 +483,7 @@ class ReferralABTestManager: ObservableObject {
     // MARK: - Results Analysis
 
     /// Calculates experiment results with statistical analysis
-    func calculateResults(experimentId: String) async throws -> ExperimentResults {
+    func calculateResults(experimentId: String) async throws -> ReferralExperimentResults {
         guard let experiment = experimentsCache.first(where: { $0.id == experimentId }) else {
             throw NSError(domain: "ExperimentError", code: 404, userInfo: [NSLocalizedDescriptionKey: "Experiment not found"])
         }
@@ -603,7 +603,7 @@ class ReferralABTestManager: ObservableObject {
 
         let overallSignificance = variantResults.compactMap { $0.pValue }.min() ?? 1.0
 
-        return ExperimentResults(
+        return ReferralExperimentResults(
             experimentId: experimentId,
             calculatedAt: Date(),
             variants: variantResults,

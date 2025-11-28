@@ -24,7 +24,7 @@ struct ReferralAdminDashboardView: View {
     @State private var conversionFunnel: ConversionFunnel?
     @State private var topSources: [SourcePerformance] = []
     @State private var flaggedReferrals: [FraudAssessment] = []
-    @State private var experimentResults: [String: ExperimentResults] = [:]
+    @State private var experimentResults: [String: ReferralExperimentResults] = [:]
 
     var body: some View {
         NavigationStack {

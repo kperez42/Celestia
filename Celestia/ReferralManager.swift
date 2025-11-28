@@ -1171,7 +1171,7 @@ class ReferralManager: ObservableObject {
     }
 
     /// Gets experiment results
-    func getExperimentResults(experimentId: String) async throws -> ExperimentResults {
+    func getExperimentResults(experimentId: String) async throws -> ReferralExperimentResults {
         return try await abTestManager.calculateResults(experimentId: experimentId)
     }
 
