@@ -170,6 +170,12 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
     private var timeoutTask: Task<Void, Never>?
     private var isCompleting: Bool = false
 
+    // Pose capture timeout management
+    private var poseFrameCount: Int = 0
+    private var poseRetryCount: Int = 0
+    private let maxPoseFrames: Int = 300 // ~10 seconds at 30fps
+    private let maxPoseRetries: Int = 3
+
     private override init() {
         super.init()
     }
@@ -228,6 +234,8 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
         debugInfo = ""
         challengeRetryCount = 0
         isCompleting = false
+        poseFrameCount = 0
+        poseRetryCount = 0
     }
 
     // MARK: - Face Processing (called from video frames)
@@ -310,10 +318,15 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
     }
 
     private func handleCapturingState(_ observation: VNFaceObservation, image: UIImage) {
+        poseFrameCount += 1
+
         // Check if current pose matches required pose
         let poseMatches = checkPoseMatch(observation, targetPose: currentPose)
 
         if poseMatches {
+            // Reset frame count on successful match
+            poseFrameCount = 0
+
             // Capture this frame
             if let signature = generateFaceSignature(observation) {
                 let capture = FaceCaptureData(
@@ -331,12 +344,15 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
                     // Pose captured successfully
                     completedPoses.insert(currentPose)
                     HapticManager.shared.notification(.success)
+                    poseRetryCount = 0 // Reset retry count on success
 
                     // Move to next pose or liveness check
                     if let nextPose = getNextPose() {
                         currentPose = nextPose
                         currentInstruction = nextPose.rawValue
+                        poseFrameCount = 0 // Reset for next pose
                         progress = Double(completedPoses.count) / Double(requiredPoses.count) * 0.5
+                        Logger.shared.debug("Moving to next pose: \(nextPose.rawValue)", category: .general)
                     } else {
                         // All poses captured, start liveness check
                         startLivenessCheck()
@@ -346,7 +362,64 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
                 }
             }
         } else {
-            currentInstruction = currentPose.rawValue
+            // Provide helpful guidance based on current pose
+            currentInstruction = getPoseGuidance(for: currentPose, observation: observation)
+
+            // Check for pose timeout
+            if poseFrameCount >= maxPoseFrames {
+                poseRetryCount += 1
+                poseFrameCount = 0
+
+                if poseRetryCount >= maxPoseRetries {
+                    // Too many retries for this pose - fail with clear message
+                    let poseName = currentPose.rawValue.lowercased()
+                    state = .failure("Could not capture \(poseName) pose. Please ensure good lighting and try again.")
+                    currentInstruction = "Verification failed"
+                    HapticManager.shared.notification(.error)
+                    Logger.shared.warning("Pose capture failed for \(currentPose.rawValue) after \(maxPoseRetries) retries", category: .general)
+                } else {
+                    // Timeout - give another chance with helpful feedback
+                    HapticManager.shared.impact(.medium)
+                    currentInstruction = "Let's try again - \(currentPose.rawValue)"
+                    Logger.shared.debug("Pose capture retry \(poseRetryCount) for \(currentPose.rawValue)", category: .general)
+                }
+            }
+        }
+    }
+
+    private func getPoseGuidance(for pose: FacePoseDirection, observation: VNFaceObservation) -> String {
+        switch pose {
+        case .center:
+            if abs(faceYaw) > 0.2 {
+                return "Look straight at the camera"
+            } else if abs(facePitch) > 0.2 {
+                return "Keep your head level"
+            }
+            return pose.rawValue
+        case .left:
+            if faceYaw > -0.15 {
+                return "Turn your head more to the left"
+            } else if faceYaw < -0.6 {
+                return "Not so far - turn slightly left"
+            }
+            return pose.rawValue
+        case .right:
+            if faceYaw < 0.15 {
+                return "Turn your head more to the right"
+            } else if faceYaw > 0.6 {
+                return "Not so far - turn slightly right"
+            }
+            return pose.rawValue
+        case .up:
+            if facePitch < 0.15 {
+                return "Tilt your chin up slightly"
+            }
+            return pose.rawValue
+        case .down:
+            if facePitch > -0.15 {
+                return "Tilt your chin down slightly"
+            }
+            return pose.rawValue
         }
     }
 
