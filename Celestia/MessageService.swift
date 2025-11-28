@@ -121,7 +121,8 @@ class MessageService: ObservableObject, MessageServiceProtocol, ListenerLifecycl
         hasMoreMessages = true
         isLoading = true
 
-        Logger.shared.info("Starting paginated message loading for match: \(matchId)", category: .messaging)
+        Logger.shared.info("🔄 Starting message listener for match: \(matchId)", category: .messaging)
+        Logger.shared.info("📱 Setting up paginated message loading...", category: .messaging)
 
         // AUDIT FIX: Store task reference for proper cancellation
         loadingTask = Task { [weak self] in
@@ -157,7 +158,8 @@ class MessageService: ObservableObject, MessageServiceProtocol, ListenerLifecycl
                     self.hasMoreMessages = initialMessages.count >= self.messagesPerPage
                     self.isLoading = false
 
-                    Logger.shared.info("Loaded \(initialMessages.count) initial messages", category: .messaging)
+                    Logger.shared.info("📚 Loaded \(initialMessages.count) initial messages for match: \(matchId)", category: .messaging)
+                    Logger.shared.info("🎯 Now listening for real-time messages...", category: .messaging)
                 }
 
                 // AUDIT FIX: Final check before setting up listener
@@ -204,9 +206,16 @@ class MessageService: ObservableObject, MessageServiceProtocol, ListenerLifecycl
         // AUDIT FIX: Ensure any previous listener is removed
         listener?.remove()
 
+        // BUGFIX: Use greaterThanOrEqualTo instead of isGreaterThan to prevent message loss
+        // Add 1ms buffer to cutoff to create overlap with initial load, preventing race conditions
+        // Deduplication via messageIdSet ensures no duplicates appear in UI
+        let safetyBufferCutoff = cutoffTimestamp.addingTimeInterval(-0.001) // 1ms buffer
+
+        Logger.shared.info("🔊 Setting up real-time listener - Match: \(matchId), Cutoff: \(cutoffTimestamp)", category: .messaging)
+
         listener = db.collection("messages")
             .whereField("matchId", isEqualTo: matchId)
-            .whereField("timestamp", isGreaterThan: Timestamp(date: cutoffTimestamp))
+            .whereField("timestamp", isGreaterThanOrEqualTo: Timestamp(date: safetyBufferCutoff))
             .order(by: "timestamp", descending: false)
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self else { return }
@@ -252,6 +261,7 @@ class MessageService: ObservableObject, MessageServiceProtocol, ListenerLifecycl
 
                     // Append new messages to existing ones
                     var addedCount = 0
+                    var duplicateCount = 0
                     for message in newMessages {
                         // AUDIT FIX: Handle nil message IDs - use document path as fallback
                         guard let messageId = message.id else {
@@ -279,8 +289,17 @@ class MessageService: ObservableObject, MessageServiceProtocol, ListenerLifecycl
                             self.messageIdSet.insert(messageId)
                             self.messages.append(message)
                             addedCount += 1
-                            Logger.shared.debug("New message received: \(messageId)", category: .messaging)
+
+                            // BUGFIX: Enhanced logging for debugging message delivery
+                            Logger.shared.info("✉️ New message received - ID: \(messageId), From: \(message.senderId), To: \(message.receiverId), Text: \(message.text.prefix(50))...", category: .messaging)
+                        } else {
+                            duplicateCount += 1
                         }
+                    }
+
+                    // Log summary of message processing
+                    if addedCount > 0 || duplicateCount > 0 {
+                        Logger.shared.info("📨 Message batch processed - Added: \(addedCount), Duplicates filtered: \(duplicateCount), Total messages: \(self.messages.count)", category: .messaging)
                     }
 
                     // Only sort if we actually added messages
@@ -547,15 +566,21 @@ class MessageService: ObservableObject, MessageServiceProtocol, ListenerLifecycl
         attempt: Int = 0
     ) async throws {
         do {
+            // BUGFIX: Enhanced logging for debugging message delivery
+            Logger.shared.info("📤 Sending message - From: \(senderId), To: \(receiverId), Match: \(matchId), Text: \(message.text.prefix(50))...", category: .messaging)
+
             // Add message to Firestore
-            _ = try db.collection("messages").addDocument(from: message)
+            let documentRef = try db.collection("messages").addDocument(from: message)
+            Logger.shared.info("✅ Message written to Firestore - DocID: \(documentRef.documentID)", category: .messaging)
 
             // Update match with last message info
             try await db.collection("matches").document(matchId).updateData([
                 "lastMessage": message.text,
                 "lastMessageTimestamp": FieldValue.serverTimestamp(),
+                "lastMessageSenderId": senderId,
                 "unreadCount.\(receiverId)": FieldValue.increment(Int64(1))
             ])
+            Logger.shared.info("✅ Match document updated with last message info", category: .messaging)
 
             // Send notification to receiver
             await sendMessageNotificationWithFallback(message: message, senderId: senderId, matchId: matchId)
@@ -569,6 +594,8 @@ class MessageService: ObservableObject, MessageServiceProtocol, ListenerLifecycl
                     "messageText": message.text
                 ]
             )
+
+            Logger.shared.info("🎉 Message delivery complete - successfully sent to \(receiverId)", category: .messaging)
 
         } catch {
             // Check if this is a retryable network error
@@ -783,13 +810,19 @@ class MessageService: ObservableObject, MessageServiceProtocol, ListenerLifecycl
         attempt: Int = 0
     ) async throws {
         do {
-            _ = try db.collection("messages").addDocument(from: message)
+            // BUGFIX: Enhanced logging for debugging image message delivery
+            Logger.shared.info("📤 Sending image message - From: \(senderId), To: \(receiverId), Match: \(matchId)", category: .messaging)
+
+            let documentRef = try db.collection("messages").addDocument(from: message)
+            Logger.shared.info("✅ Image message written to Firestore - DocID: \(documentRef.documentID)", category: .messaging)
 
             try await db.collection("matches").document(matchId).updateData([
                 "lastMessage": lastMessageText,
                 "lastMessageTimestamp": FieldValue.serverTimestamp(),
+                "lastMessageSenderId": senderId,
                 "unreadCount.\(receiverId)": FieldValue.increment(Int64(1))
             ])
+            Logger.shared.info("✅ Match document updated with image message info", category: .messaging)
 
             // Notify success
             NotificationCenter.default.post(
@@ -801,6 +834,8 @@ class MessageService: ObservableObject, MessageServiceProtocol, ListenerLifecycl
                     "isImage": true
                 ]
             )
+
+            Logger.shared.info("🎉 Image message delivery complete - successfully sent to \(receiverId)", category: .messaging)
 
         } catch {
             let isRetryable = isRetryableError(error)
