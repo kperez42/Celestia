@@ -287,7 +287,7 @@ struct SettingsView: View {
     private var isAdminUser: Bool {
         guard let email = authService.currentUser?.email else { return false }
         // Add your admin email(s) here
-        let adminEmails = ["kperez42@gmail.com", "admin@celestia.app"]
+        let adminEmails = ["perezkevin640@gmail.com", "admin@celestia.app"]
         return adminEmails.contains(email.lowercased())
     }
 }
