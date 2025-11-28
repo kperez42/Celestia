@@ -532,13 +532,24 @@ struct UserDetailView: View {
                 }
             }
 
+            // Record profile view to database (for "Viewed Me" feature)
+            do {
+                try await ProfileStatsService.shared.recordProfileView(
+                    viewerId: currentUserId,
+                    viewedUserId: viewedUserId
+                )
+            } catch {
+                Logger.shared.error("Error recording profile view", category: .general, error: error)
+            }
+
+            // Track analytics separately
             do {
                 try await AnalyticsManager.shared.trackProfileView(
                     viewedUserId: viewedUserId,
                     viewerUserId: currentUserId
                 )
             } catch {
-                Logger.shared.error("Error tracking profile view", category: .general, error: error)
+                Logger.shared.error("Error tracking profile view analytics", category: .general, error: error)
             }
         }
     }

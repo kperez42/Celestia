@@ -163,6 +163,19 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
     private var verificationStartTime: Date?
     private var userId: String = ""
 
+    // Timeout and retry management
+    private var challengeRetryCount: Int = 0
+    private let maxChallengeRetries: Int = 3
+    private let verificationTimeout: TimeInterval = 90 // 90 seconds max
+    private var timeoutTask: Task<Void, Never>?
+    private var isCompleting: Bool = false
+
+    // Pose capture timeout management
+    private var poseFrameCount: Int = 0
+    private var poseRetryCount: Int = 0
+    private let maxPoseFrames: Int = 300 // ~10 seconds at 30fps
+    private let maxPoseRetries: Int = 3
+
     private override init() {
         super.init()
     }
@@ -177,10 +190,32 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
         state = .positioning
         currentInstruction = "Position your face in the circle"
 
+        // Start verification timeout
+        timeoutTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(90 * 1_000_000_000)) // 90 seconds
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard let self = self else { return }
+                // Only timeout if not already completed
+                if case .success = self.state { return }
+                if case .failure = self.state { return }
+                if case .processing = self.state { return }
+
+                self.state = .failure("Verification timed out. Please try again.")
+                self.currentInstruction = "Verification timed out"
+                HapticManager.shared.notification(.error)
+                Logger.shared.warning("Face verification timed out after 90 seconds", category: .general)
+            }
+        }
+
         Logger.shared.info("Starting live face verification for user: \(userId)", category: .general)
     }
 
     func reset() {
+        // Cancel any pending timeout
+        timeoutTask?.cancel()
+        timeoutTask = nil
+
         state = .initializing
         progress = 0.0
         faceDetected = false
@@ -197,12 +232,20 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
         eyeClosedFrames = 0
         lastEyeState = true
         debugInfo = ""
+        challengeRetryCount = 0
+        isCompleting = false
+        poseFrameCount = 0
+        poseRetryCount = 0
     }
 
     // MARK: - Face Processing (called from video frames)
 
     func processFaceObservation(_ observation: VNFaceObservation, in image: UIImage) {
-        guard state != .success && state != .processing else { return }
+        // Don't process if already completing, succeeded, or failed
+        guard !isCompleting else { return }
+        if case .success = state { return }
+        if case .processing = state { return }
+        if case .failure = state { return }
 
         faceDetected = true
         faceBoundingBox = observation.boundingBox
@@ -275,10 +318,15 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
     }
 
     private func handleCapturingState(_ observation: VNFaceObservation, image: UIImage) {
+        poseFrameCount += 1
+
         // Check if current pose matches required pose
         let poseMatches = checkPoseMatch(observation, targetPose: currentPose)
 
         if poseMatches {
+            // Reset frame count on successful match
+            poseFrameCount = 0
+
             // Capture this frame
             if let signature = generateFaceSignature(observation) {
                 let capture = FaceCaptureData(
@@ -296,12 +344,15 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
                     // Pose captured successfully
                     completedPoses.insert(currentPose)
                     HapticManager.shared.notification(.success)
+                    poseRetryCount = 0 // Reset retry count on success
 
                     // Move to next pose or liveness check
                     if let nextPose = getNextPose() {
                         currentPose = nextPose
                         currentInstruction = nextPose.rawValue
+                        poseFrameCount = 0 // Reset for next pose
                         progress = Double(completedPoses.count) / Double(requiredPoses.count) * 0.5
+                        Logger.shared.debug("Moving to next pose: \(nextPose.rawValue)", category: .general)
                     } else {
                         // All poses captured, start liveness check
                         startLivenessCheck()
@@ -311,7 +362,64 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
                 }
             }
         } else {
-            currentInstruction = currentPose.rawValue
+            // Provide helpful guidance based on current pose
+            currentInstruction = getPoseGuidance(for: currentPose, observation: observation)
+
+            // Check for pose timeout
+            if poseFrameCount >= maxPoseFrames {
+                poseRetryCount += 1
+                poseFrameCount = 0
+
+                if poseRetryCount >= maxPoseRetries {
+                    // Too many retries for this pose - fail with clear message
+                    let poseName = currentPose.rawValue.lowercased()
+                    state = .failure("Could not capture \(poseName) pose. Please ensure good lighting and try again.")
+                    currentInstruction = "Verification failed"
+                    HapticManager.shared.notification(.error)
+                    Logger.shared.warning("Pose capture failed for \(currentPose.rawValue) after \(maxPoseRetries) retries", category: .general)
+                } else {
+                    // Timeout - give another chance with helpful feedback
+                    HapticManager.shared.impact(.medium)
+                    currentInstruction = "Let's try again - \(currentPose.rawValue)"
+                    Logger.shared.debug("Pose capture retry \(poseRetryCount) for \(currentPose.rawValue)", category: .general)
+                }
+            }
+        }
+    }
+
+    private func getPoseGuidance(for pose: FacePoseDirection, observation: VNFaceObservation) -> String {
+        switch pose {
+        case .center:
+            if abs(faceYaw) > 0.2 {
+                return "Look straight at the camera"
+            } else if abs(facePitch) > 0.2 {
+                return "Keep your head level"
+            }
+            return pose.rawValue
+        case .left:
+            if faceYaw > -0.15 {
+                return "Turn your head more to the left"
+            } else if faceYaw < -0.6 {
+                return "Not so far - turn slightly left"
+            }
+            return pose.rawValue
+        case .right:
+            if faceYaw < 0.15 {
+                return "Turn your head more to the right"
+            } else if faceYaw > 0.6 {
+                return "Not so far - turn slightly right"
+            }
+            return pose.rawValue
+        case .up:
+            if facePitch < 0.15 {
+                return "Tilt your chin up slightly"
+            }
+            return pose.rawValue
+        case .down:
+            if facePitch > -0.15 {
+                return "Tilt your chin down slightly"
+            }
+            return pose.rawValue
         }
     }
 
@@ -439,6 +547,7 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
             completedChallenges.insert(.blink)
             HapticManager.shared.notification(.success)
             currentInstruction = "Great!"
+            challengeRetryCount = 0 // Reset retry count on success
 
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                 self?.advanceToNextChallenge()
@@ -446,9 +555,19 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
 
             progress = 0.5 + Double(completedChallenges.count) / Double(requiredChallenges.count) * 0.3
         } else if livenessFrameCount > 150 {
-            // Timeout - ask again
-            currentInstruction = "Please blink your eyes twice"
-            livenessFrameCount = 0
+            challengeRetryCount += 1
+            if challengeRetryCount >= maxChallengeRetries {
+                // Too many retries - fail verification
+                state = .failure("Could not detect blink. Please ensure good lighting and try again.")
+                currentInstruction = "Verification failed"
+                HapticManager.shared.notification(.error)
+                Logger.shared.warning("Blink challenge failed after \(maxChallengeRetries) retries", category: .general)
+            } else {
+                // Timeout - ask again
+                currentInstruction = "Please blink your eyes twice"
+                livenessFrameCount = 0
+                HapticManager.shared.impact(.light)
+            }
         }
     }
 
@@ -457,6 +576,7 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
             completedChallenges.insert(.smile)
             HapticManager.shared.notification(.success)
             currentInstruction = "Perfect!"
+            challengeRetryCount = 0 // Reset retry count on success
 
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                 self?.advanceToNextChallenge()
@@ -464,9 +584,19 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
 
             progress = 0.5 + Double(completedChallenges.count) / Double(requiredChallenges.count) * 0.3
         } else if livenessFrameCount > 150 {
-            currentInstruction = "Give us a natural smile"
-            livenessFrameCount = 0
-            smileDetectedCount = 0
+            challengeRetryCount += 1
+            if challengeRetryCount >= maxChallengeRetries {
+                // Too many retries - fail verification
+                state = .failure("Could not detect smile. Please ensure good lighting and try again.")
+                currentInstruction = "Verification failed"
+                HapticManager.shared.notification(.error)
+                Logger.shared.warning("Smile challenge failed after \(maxChallengeRetries) retries", category: .general)
+            } else {
+                currentInstruction = "Give us a natural smile"
+                livenessFrameCount = 0
+                smileDetectedCount = 0
+                HapticManager.shared.impact(.light)
+            }
         }
     }
 
@@ -489,6 +619,17 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
     // MARK: - Verification Completion
 
     private func completeVerification() {
+        // Prevent multiple completion calls
+        guard !isCompleting else {
+            Logger.shared.debug("completeVerification already in progress, skipping", category: .general)
+            return
+        }
+        isCompleting = true
+
+        // Cancel timeout since we're completing
+        timeoutTask?.cancel()
+        timeoutTask = nil
+
         state = .processing
         currentInstruction = "Verifying your identity..."
         progress = 0.85
@@ -503,10 +644,12 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
                         progress = 1.0
                         currentInstruction = "Verification complete!"
                         HapticManager.shared.notification(.success)
+                        Logger.shared.info("Face verification completed successfully with confidence: \(result.confidence)", category: .general)
                     } else {
                         state = .failure(result.message)
                         currentInstruction = result.message
                         HapticManager.shared.notification(.error)
+                        isCompleting = false // Allow retry
                     }
                 }
             } catch {
@@ -514,6 +657,8 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
                     state = .failure(error.localizedDescription)
                     currentInstruction = "Verification failed. Please try again."
                     HapticManager.shared.notification(.error)
+                    isCompleting = false // Allow retry
+                    Logger.shared.error("Face verification failed", category: .general, error: error)
                 }
             }
         }
@@ -538,26 +683,49 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
         }
 
         // Use the best quality center capture
-        let bestCapture = centerCaptures.max { c1, c2 in
+        guard let bestCapture = centerCaptures.max(by: { c1, c2 in
             let q1 = c1.observation.faceCaptureQuality ?? 0
             let q2 = c2.observation.faceCaptureQuality ?? 0
             return q1 < q2
-        }!
+        }) else {
+            return (false, "Could not find best face capture", 0)
+        }
 
         let selfieSignature = bestCapture.signature
 
         // Compare with each profile photo
         var bestMatch: Float = 0.0
+        var successfulComparisons = 0
+        var downloadFailures = 0
+        var faceExtractionFailures = 0
 
         for photoURL in profilePhotos {
-            if let profileImage = await downloadImage(from: photoURL),
-               let profileSignature = await extractFaceSignature(from: profileImage) {
-                let similarity = calculateCosineSimilarity(selfieSignature, profileSignature)
-                Logger.shared.debug("Profile photo similarity: \(similarity)", category: .general)
+            if let profileImage = await downloadImage(from: photoURL) {
+                if let profileSignature = await extractFaceSignature(from: profileImage) {
+                    let similarity = calculateCosineSimilarity(selfieSignature, profileSignature)
+                    Logger.shared.debug("Profile photo similarity: \(similarity)", category: .general)
+                    successfulComparisons += 1
 
-                if similarity > bestMatch {
-                    bestMatch = similarity
+                    if similarity > bestMatch {
+                        bestMatch = similarity
+                    }
+                } else {
+                    faceExtractionFailures += 1
+                    Logger.shared.warning("Could not extract face from profile photo", category: .general)
                 }
+            } else {
+                downloadFailures += 1
+            }
+        }
+
+        // Check if we had any successful comparisons
+        if successfulComparisons == 0 {
+            if downloadFailures == profilePhotos.count {
+                return (false, "Could not load profile photos. Please check your internet connection.", 0)
+            } else if faceExtractionFailures > 0 {
+                return (false, "Could not detect face in your profile photos. Please use photos with clear face visibility.", 0)
+            } else {
+                return (false, "Verification failed. Please try again.", 0)
             }
         }
 
@@ -568,7 +736,12 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
             try await updateUserVerification(userId: userId, confidence: confidence)
             return (true, "Face verified successfully!", confidence)
         } else {
-            return (false, "Face doesn't match your profile photos.", confidence)
+            // Provide more helpful message based on confidence
+            if bestMatch < 0.5 {
+                return (false, "Face doesn't match your profile photos. Please ensure your profile has recent photos.", confidence)
+            } else {
+                return (false, "Face similarity too low. Please try again with better lighting.", confidence)
+            }
         }
     }
 
@@ -628,6 +801,13 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
         return requiredPoses.first { !completedPoses.contains($0) }
     }
 
+    // Helper function to safely calculate width/height from points
+    private func safeRange(of points: [CGPoint], axis: KeyPath<CGPoint, CGFloat>) -> Float {
+        let values = points.map { Float($0[keyPath: axis]) }
+        guard let maxVal = values.max(), let minVal = values.min() else { return 0.001 }
+        return max(maxVal - minVal, 0.001)
+    }
+
     private func generateFaceSignature(_ observation: VNFaceObservation) -> [Float]? {
         guard let landmarks = observation.landmarks else { return nil }
 
@@ -638,7 +818,12 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
               let rightEyePoints = landmarks.rightEye?.normalizedPoints,
               let nosePoints = landmarks.nose?.normalizedPoints,
               let outerLipsPoints = landmarks.outerLips?.normalizedPoints,
-              let faceContourPoints = landmarks.faceContour?.normalizedPoints else {
+              let faceContourPoints = landmarks.faceContour?.normalizedPoints,
+              !leftEyePoints.isEmpty,
+              !rightEyePoints.isEmpty,
+              !nosePoints.isEmpty,
+              !outerLipsPoints.isEmpty,
+              !faceContourPoints.isEmpty else {
             return nil
         }
 
@@ -652,9 +837,9 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
         let ipd = distance(from: leftEyeCenter, to: rightEyeCenter)
         guard ipd > 0.01 else { return nil }
 
-        // Face dimensions
-        let faceWidth = faceContourPoints.map { Float($0.x) }.max()! - faceContourPoints.map { Float($0.x) }.min()!
-        let faceHeight = faceContourPoints.map { Float($0.y) }.max()! - faceContourPoints.map { Float($0.y) }.min()!
+        // Face dimensions (using safe helper)
+        let faceWidth = safeRange(of: faceContourPoints, axis: \.x)
+        let faceHeight = safeRange(of: faceContourPoints, axis: \.y)
 
         // === GEOMETRIC RATIOS ===
         signature.append(ipd / faceWidth)
@@ -672,11 +857,11 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
         signature.append(distance(from: rightEyeCenter, to: noseCenter) / ipd)
 
         // Mouth width ratio
-        let mouthWidth = outerLipsPoints.map { Float($0.x) }.max()! - outerLipsPoints.map { Float($0.x) }.min()!
+        let mouthWidth = safeRange(of: outerLipsPoints, axis: \.x)
         signature.append(mouthWidth / ipd)
 
         // Nose width ratio
-        let noseWidth = nosePoints.map { Float($0.x) }.max()! - nosePoints.map { Float($0.x) }.min()!
+        let noseWidth = safeRange(of: nosePoints, axis: \.x)
         signature.append(noseWidth / ipd)
 
         // Eye symmetry
@@ -688,18 +873,18 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
         signature.append(atan2(Float(mouthCenter.y - noseCenter.y), Float(mouthCenter.x - noseCenter.x)))
 
         // === SHAPE FEATURES ===
-        let leftEyeWidth = leftEyePoints.map { Float($0.x) }.max()! - leftEyePoints.map { Float($0.x) }.min()!
-        let leftEyeHeight = leftEyePoints.map { Float($0.y) }.max()! - leftEyePoints.map { Float($0.y) }.min()!
-        signature.append(leftEyeHeight / max(leftEyeWidth, 0.001))
+        let leftEyeWidth = safeRange(of: leftEyePoints, axis: \.x)
+        let leftEyeHeight = safeRange(of: leftEyePoints, axis: \.y)
+        signature.append(leftEyeHeight / leftEyeWidth)
 
-        let rightEyeWidth = rightEyePoints.map { Float($0.x) }.max()! - rightEyePoints.map { Float($0.x) }.min()!
-        let rightEyeHeight = rightEyePoints.map { Float($0.y) }.max()! - rightEyePoints.map { Float($0.y) }.min()!
-        signature.append(rightEyeHeight / max(rightEyeWidth, 0.001))
+        let rightEyeWidth = safeRange(of: rightEyePoints, axis: \.x)
+        let rightEyeHeight = safeRange(of: rightEyePoints, axis: \.y)
+        signature.append(rightEyeHeight / rightEyeWidth)
 
-        let noseLength = nosePoints.map { Float($0.y) }.max()! - nosePoints.map { Float($0.y) }.min()!
+        let noseLength = safeRange(of: nosePoints, axis: \.y)
         signature.append(noseLength / ipd)
 
-        let mouthHeight = outerLipsPoints.map { Float($0.y) }.max()! - outerLipsPoints.map { Float($0.y) }.min()!
+        let mouthHeight = safeRange(of: outerLipsPoints, axis: \.y)
         signature.append(mouthHeight / ipd)
 
         // === EYEBROW FEATURES ===
@@ -721,8 +906,8 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
             let lowerJawPoints = Array(sortedByY.prefix(faceContourPoints.count / 3))
             let midJawPoints = Array(sortedByY.dropFirst(faceContourPoints.count / 3).prefix(faceContourPoints.count / 3))
 
-            let lowerJawWidth = lowerJawPoints.map { Float($0.x) }.max()! - lowerJawPoints.map { Float($0.x) }.min()!
-            let midJawWidth = midJawPoints.map { Float($0.x) }.max()! - midJawPoints.map { Float($0.x) }.min()!
+            let lowerJawWidth = safeRange(of: lowerJawPoints, axis: \.x)
+            let midJawWidth = safeRange(of: midJawPoints, axis: \.x)
 
             signature.append(lowerJawWidth / faceWidth)
             signature.append(midJawWidth / faceWidth)
@@ -841,12 +1026,35 @@ class LiveFaceVerificationManager: NSObject, ObservableObject {
     }
 
     private func downloadImage(from urlString: String) async -> UIImage? {
-        guard let url = URL(string: urlString) else { return nil }
+        guard let url = URL(string: urlString) else {
+            Logger.shared.warning("Invalid URL for image download: \(urlString)", category: .network)
+            return nil
+        }
+
+        // Create a URLSession with timeout configuration
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 15 // 15 seconds timeout
+        config.timeoutIntervalForResource = 30 // 30 seconds total
+        let session = URLSession(configuration: config)
 
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            return UIImage(data: data)
+            let (data, response) = try await session.data(from: url)
+
+            // Verify we got a valid response
+            if let httpResponse = response as? HTTPURLResponse,
+               !(200...299).contains(httpResponse.statusCode) {
+                Logger.shared.warning("Image download failed with status: \(httpResponse.statusCode)", category: .network)
+                return nil
+            }
+
+            guard let image = UIImage(data: data) else {
+                Logger.shared.warning("Failed to create UIImage from downloaded data", category: .network)
+                return nil
+            }
+
+            return image
         } catch {
+            Logger.shared.error("Image download error: \(error.localizedDescription)", category: .network, error: error)
             return nil
         }
     }

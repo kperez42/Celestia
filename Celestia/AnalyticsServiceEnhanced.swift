@@ -57,7 +57,7 @@ class AnalyticsServiceEnhanced: ObservableObject {
         }
 
         // Fetch profile views
-        let viewsSnapshot = try await db.collection("profile_views")
+        let viewsSnapshot = try await db.collection("profileViews")
             .whereField("viewedUserId", isEqualTo: userId)
             .whereField("timestamp", isGreaterThan: startDate)
             .order(by: "timestamp", descending: false)
@@ -163,7 +163,7 @@ class AnalyticsServiceEnhanced: ObservableObject {
     private func getViewsBySource(userId: String, since: Date) async -> [String: Int] {
         var sources: [String: Int] = [:]
 
-        let snapshot = try? await db.collection("profile_views")
+        let snapshot = try? await db.collection("profileViews")
             .whereField("viewedUserId", isEqualTo: userId)
             .whereField("timestamp", isGreaterThan: since)
             .getDocuments()
@@ -494,7 +494,7 @@ class AnalyticsServiceEnhanced: ObservableObject {
             .whereField("timestamp", isGreaterThan: last30Days)
             .getDocuments()
 
-        let profileViewsSnapshot = try? await db.collection("profile_views")
+        let profileViewsSnapshot = try? await db.collection("profileViews")
             .whereField("viewerUserId", isEqualTo: userId)
             .whereField("timestamp", isGreaterThan: last30Days)
             .getDocuments()

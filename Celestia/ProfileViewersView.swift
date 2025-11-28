@@ -331,7 +331,7 @@ class ProfileViewersViewModel: ObservableObject {
         defer { isLoading = false }
 
         do {
-            let viewsSnapshot = try await db.collection("profile_views")
+            let viewsSnapshot = try await db.collection("profileViews")
                 .whereField("viewedUserId", isEqualTo: currentUserId)
                 .order(by: "timestamp", descending: true)
                 .limit(to: 50)
