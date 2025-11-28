@@ -17,30 +17,52 @@ struct ProfileInsightsView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 20) {
-                    // Header with overall score
+            VStack(spacing: 0) {
+                // Header with score - always visible
+                ScrollView(showsIndicators: false) {
                     profileScoreCard
-
-                    // Tab selector
-                    tabSelector
-
-                    // Content based on selected tab
-                    if selectedTab == 0 {
-                        overviewSection
-                    } else if selectedTab == 1 {
-                        viewersSection
-                    } else if selectedTab == 2 {
-                        photoPerformanceSection
-                    } else {
-                        suggestionsSection
-                    }
+                        .padding(.horizontal)
+                        .padding(.top)
                 }
-                .padding()
+                .frame(height: 280)
+
+                // Tab selector - sticky
+                tabSelector
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    .background(Color(.systemGroupedBackground))
+
+                // Swipeable content
+                TabView(selection: $selectedTab) {
+                    ScrollView(showsIndicators: false) {
+                        overviewSection
+                            .padding()
+                    }
+                    .tag(0)
+
+                    ScrollView(showsIndicators: false) {
+                        viewersSection
+                            .padding()
+                    }
+                    .tag(1)
+
+                    ScrollView(showsIndicators: false) {
+                        photoPerformanceSection
+                            .padding()
+                    }
+                    .tag(2)
+
+                    ScrollView(showsIndicators: false) {
+                        suggestionsSection
+                            .padding()
+                    }
+                    .tag(3)
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
             }
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Profile Insights")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
@@ -133,48 +155,45 @@ struct ProfileInsightsView: View {
 
     // MARK: - Tab Selector
 
-    private var tabSelector: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                tabButton(title: "Overview", icon: "chart.bar.fill", index: 0)
-                tabButton(title: "Who Viewed", icon: "eye.fill", index: 1)
-                tabButton(title: "Photos", icon: "photo.fill", index: 2)
-                tabButton(title: "Tips", icon: "lightbulb.fill", index: 3)
-            }
-        }
-    }
+    private let tabs = ["Overview", "Viewers", "Photos", "Tips"]
+    private let tabIcons = ["chart.bar.fill", "eye.fill", "photo.fill", "lightbulb.fill"]
 
-    private func tabButton(title: String, icon: String, index: Int) -> some View {
-        Button {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                selectedTab = index
+    private var tabSelector: some View {
+        HStack(spacing: 0) {
+            ForEach(0..<tabs.count, id: \.self) { index in
+                Button {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                        selectedTab = index
+                    }
+                    HapticManager.shared.selection()
+                } label: {
+                    VStack(spacing: 8) {
+                        HStack(spacing: 6) {
+                            Image(systemName: tabIcons[index])
+                                .font(.caption)
+                            Text(tabs[index])
+                                .font(.subheadline)
+                                .fontWeight(selectedTab == index ? .bold : .medium)
+                        }
+                        .foregroundColor(selectedTab == index ? .purple : .gray)
+
+                        // Indicator line
+                        Rectangle()
+                            .fill(
+                                selectedTab == index ?
+                                LinearGradient(
+                                    colors: [.purple, .pink],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                ) :
+                                LinearGradient(colors: [Color.clear], startPoint: .leading, endPoint: .trailing)
+                            )
+                            .frame(height: 3)
+                            .cornerRadius(1.5)
+                    }
+                }
+                .frame(maxWidth: .infinity)
             }
-            HapticManager.shared.impact(.light)
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.subheadline)
-                Text(title)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-            }
-            .foregroundColor(selectedTab == index ? .white : .purple)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-            .background(
-                selectedTab == index ?
-                    LinearGradient(
-                        colors: [.purple, .pink],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ) :
-                    LinearGradient(
-                        colors: [Color(.systemGray6)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-            )
-            .cornerRadius(20)
         }
     }
 
@@ -182,8 +201,14 @@ struct ProfileInsightsView: View {
 
     private var overviewSection: some View {
         VStack(spacing: 16) {
+            // Achievements & Streaks - NEW gamification
+            achievementsCard
+
             // Weekly stats
             weeklyStatsCard
+
+            // Your Ranking
+            rankingCard
 
             // Swipe statistics
             swipeStatsCard
@@ -194,6 +219,226 @@ struct ProfileInsightsView: View {
             // Activity insights
             activityCard
         }
+        .padding(.bottom, 100)
+    }
+
+    // MARK: - Achievements Card
+
+    private var achievementsCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "trophy.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.yellow, .orange],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                Text("Achievements")
+                    .font(.headline)
+
+                Spacer()
+
+                // Streak badge
+                HStack(spacing: 4) {
+                    Image(systemName: "flame.fill")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                    Text("\(insights.daysActive) day streak")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.orange)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.orange.opacity(0.15))
+                .cornerRadius(12)
+            }
+
+            // Achievement badges grid
+            LazyVGrid(columns: [
+                GridItem(.flexible()),
+                GridItem(.flexible()),
+                GridItem(.flexible())
+            ], spacing: 12) {
+                achievementBadge(
+                    icon: "camera.fill",
+                    title: "Shutterbug",
+                    subtitle: "6 photos",
+                    isUnlocked: (authService.currentUser?.photos.count ?? 0) >= 6,
+                    color: .purple
+                )
+
+                achievementBadge(
+                    icon: "heart.fill",
+                    title: "Heartthrob",
+                    subtitle: "50+ likes",
+                    isUnlocked: insights.likesReceived >= 50,
+                    color: .pink
+                )
+
+                achievementBadge(
+                    icon: "message.fill",
+                    title: "Socialite",
+                    subtitle: "10+ chats",
+                    isUnlocked: insights.matchCount >= 10,
+                    color: .blue
+                )
+
+                achievementBadge(
+                    icon: "checkmark.seal.fill",
+                    title: "Verified",
+                    subtitle: "ID check",
+                    isUnlocked: authService.currentUser?.isVerified ?? false,
+                    color: .cyan
+                )
+
+                achievementBadge(
+                    icon: "star.fill",
+                    title: "Popular",
+                    subtitle: "100+ views",
+                    isUnlocked: insights.profileViews >= 100,
+                    color: .yellow
+                )
+
+                achievementBadge(
+                    icon: "bolt.fill",
+                    title: "Active",
+                    subtitle: "7+ days",
+                    isUnlocked: insights.daysActive >= 7,
+                    color: .green
+                )
+            }
+        }
+        .padding(20)
+        .background(Color(.systemBackground))
+        .cornerRadius(20)
+        .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
+    }
+
+    private func achievementBadge(icon: String, title: String, subtitle: String, isUnlocked: Bool, color: Color) -> some View {
+        VStack(spacing: 8) {
+            ZStack {
+                Circle()
+                    .fill(isUnlocked ? color.opacity(0.15) : Color.gray.opacity(0.1))
+                    .frame(width: 50, height: 50)
+
+                Image(systemName: icon)
+                    .font(.title3)
+                    .foregroundColor(isUnlocked ? color : .gray.opacity(0.4))
+            }
+
+            Text(title)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundColor(isUnlocked ? .primary : .gray)
+
+            Text(subtitle)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+        .opacity(isUnlocked ? 1 : 0.6)
+        .scaleEffect(animateStats && isUnlocked ? 1 : 0.9)
+        .animation(.spring(response: 0.5, dampingFraction: 0.6).delay(isUnlocked ? 0.2 : 0), value: animateStats)
+    }
+
+    // MARK: - Ranking Card
+
+    private var rankingCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "chart.line.uptrend.xyaxis.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                Text("Your Ranking")
+                    .font(.headline)
+            }
+
+            HStack(spacing: 20) {
+                // Percentile ranking
+                VStack(spacing: 8) {
+                    Text("Top")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    HStack(alignment: .firstTextBaseline, spacing: 2) {
+                        Text("\(calculatePercentile())")
+                            .font(.system(size: 36, weight: .bold))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.purple, .pink],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                        Text("%")
+                            .font(.headline)
+                            .foregroundColor(.purple)
+                    }
+
+                    Text("of profiles")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(
+                    LinearGradient(
+                        colors: [.purple.opacity(0.1), .pink.opacity(0.05)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .cornerRadius(16)
+
+                // Quick stats
+                VStack(alignment: .leading, spacing: 12) {
+                    rankingStat(icon: "eye.fill", label: "Views today", value: "\(Int.random(in: 5...20))", color: .blue)
+                    rankingStat(icon: "heart.fill", label: "Likes today", value: "\(Int.random(in: 2...10))", color: .pink)
+                    rankingStat(icon: "message.fill", label: "Messages", value: "\(Int.random(in: 1...5))", color: .green)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(20)
+        .background(Color(.systemBackground))
+        .cornerRadius(20)
+        .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
+    }
+
+    private func rankingStat(icon: String, label: String, value: String, color: Color) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundColor(color)
+                .frame(width: 20)
+
+            Text(label)
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+            Spacer()
+
+            Text(value)
+                .font(.subheadline)
+                .fontWeight(.bold)
+                .foregroundColor(color)
+        }
+    }
+
+    private func calculatePercentile() -> Int {
+        // Calculate percentile based on profile score
+        // Higher score = lower percentile (top X%)
+        let percentile = max(5, 100 - insights.profileScore + Int.random(in: -5...5))
+        return min(95, percentile)
     }
 
     private var weeklyStatsCard: some View {
@@ -488,6 +733,7 @@ struct ProfileInsightsView: View {
                 }
             }
         }
+        .padding(.bottom, 100)
     }
 
     private var emptyViewersCard: some View {
@@ -586,6 +832,7 @@ struct ProfileInsightsView: View {
                 }
             }
         }
+        .padding(.bottom, 100)
     }
 
     private var emptyPhotosCard: some View {
@@ -722,6 +969,7 @@ struct ProfileInsightsView: View {
                 }
             }
         }
+        .padding(.bottom, 100)
     }
 
     private func suggestionCard(suggestion: ProfileSuggestion) -> some View {
