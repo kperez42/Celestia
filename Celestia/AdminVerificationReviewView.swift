@@ -9,6 +9,7 @@
 import SwiftUI
 import FirebaseFirestore
 import FirebaseAuth
+import FirebaseStorage
 
 // MARK: - Pending Verification Model
 
@@ -569,17 +570,16 @@ class AdminVerificationReviewViewModel: ObservableObject {
                 "trustScore": FieldValue.increment(Int64(30))
             ])
 
-            // Update pending verification status
-            try await db.collection("pendingVerifications").document(verification.id).updateData([
-                "status": "approved",
-                "reviewedAt": FieldValue.serverTimestamp(),
-                "reviewedBy": Auth.auth().currentUser?.uid ?? "admin"
-            ])
+            // Delete sensitive photos from Storage (privacy protection)
+            await deleteVerificationPhotos(userId: verification.userId)
+
+            // Delete the verification record completely (no need to keep sensitive data)
+            try await db.collection("pendingVerifications").document(verification.id).delete()
 
             // Remove from local list
             pendingVerifications.removeAll { $0.id == verification.id }
 
-            Logger.shared.info("Approved verification for user: \(verification.userId)", category: .general)
+            Logger.shared.info("Approved verification for user: \(verification.userId) - photos deleted for privacy", category: .general)
 
         } catch {
             Logger.shared.error("Failed to approve verification", category: .general, error: error)
@@ -592,23 +592,52 @@ class AdminVerificationReviewViewModel: ObservableObject {
 
     func rejectVerification(_ verification: PendingVerification, reason: String) async {
         do {
-            // Update pending verification status
-            try await db.collection("pendingVerifications").document(verification.id).updateData([
-                "status": "rejected",
-                "reviewedAt": FieldValue.serverTimestamp(),
-                "reviewedBy": Auth.auth().currentUser?.uid ?? "admin",
-                "rejectionReason": reason
+            // Delete sensitive photos from Storage (privacy protection)
+            await deleteVerificationPhotos(userId: verification.userId)
+
+            // Delete the verification record completely
+            try await db.collection("pendingVerifications").document(verification.id).delete()
+
+            // Notify user of rejection (optional: update user doc with rejection info)
+            try await db.collection("users").document(verification.userId).updateData([
+                "idVerificationRejected": true,
+                "idVerificationRejectedAt": FieldValue.serverTimestamp(),
+                "idVerificationRejectionReason": reason
             ])
 
             // Remove from local list
             pendingVerifications.removeAll { $0.id == verification.id }
 
-            Logger.shared.info("Rejected verification for user: \(verification.userId), reason: \(reason)", category: .general)
+            Logger.shared.info("Rejected verification for user: \(verification.userId), reason: \(reason) - photos deleted", category: .general)
 
         } catch {
             Logger.shared.error("Failed to reject verification", category: .general, error: error)
             errorMessage = "Failed to reject: \(error.localizedDescription)"
             showingError = true
+        }
+    }
+
+    // MARK: - Delete Verification Photos (Privacy)
+
+    private func deleteVerificationPhotos(userId: String) async {
+        let storage = Storage.storage()
+
+        // Delete ID photo
+        let idPhotoRef = storage.reference().child("verification/\(userId)/id_photo.jpg")
+        do {
+            try await idPhotoRef.delete()
+            Logger.shared.info("Deleted ID photo for user: \(userId)", category: .general)
+        } catch {
+            Logger.shared.warning("Could not delete ID photo: \(error.localizedDescription)", category: .general)
+        }
+
+        // Delete selfie photo
+        let selfieRef = storage.reference().child("verification/\(userId)/selfie.jpg")
+        do {
+            try await selfieRef.delete()
+            Logger.shared.info("Deleted selfie photo for user: \(userId)", category: .general)
+        } catch {
+            Logger.shared.warning("Could not delete selfie photo: \(error.localizedDescription)", category: .general)
         }
     }
 }
