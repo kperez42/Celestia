@@ -16,6 +16,7 @@
 		BA6731D62EB33154005E3235 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = BA6731D52EB33154005E3235 /* FirebaseAuth */; };
 		BA6731D82EB33154005E3235 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = BA6731D72EB33154005E3235 /* FirebaseFirestore */; };
 		BA6731DA2EB33154005E3235 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = BA6731D92EB33154005E3235 /* FirebaseStorage */; };
+		BA8329652EDA2FEA0079A858 /* StripeIdentity in Frameworks */ = {isa = PBXBuildFile; productRef = BA8329642EDA2FEA0079A858 /* StripeIdentity */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -71,6 +72,7 @@
 				BA6731D82EB33154005E3235 /* FirebaseFirestore in Frameworks */,
 				BA58E5B02EC3C2BA005DE376 /* FirebaseCrashlytics in Frameworks */,
 				BA58E5AE2EC3C2BA005DE376 /* FirebaseAnalytics in Frameworks */,
+				BA8329652EDA2FEA0079A858 /* StripeIdentity in Frameworks */,
 				BA6731DA2EB33154005E3235 /* FirebaseStorage in Frameworks */,
 				BA58E5B62EC3C2BA005DE376 /* FirebaseRemoteConfig in Frameworks */,
 			);
@@ -142,6 +144,7 @@
 				BA58E5B32EC3C2BA005DE376 /* FirebasePerformance */,
 				BA58E5B52EC3C2BA005DE376 /* FirebaseRemoteConfig */,
 				BA283BDE2ECCCB3D0065FFE0 /* FirebaseFunctions */,
+				BA8329642EDA2FEA0079A858 /* StripeIdentity */,
 			);
 			productName = Celestia;
 			productReference = BA6731632EB320C4005E3235 /* Celestia.app */;
@@ -231,6 +234,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				BA6731D42EB33154005E3235 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				BA8329632EDA2FEA0079A858 /* XCRemoteSwiftPackageReference "stripe-ios" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = BA6731642EB320C4005E3235 /* Products */;
@@ -437,7 +441,7 @@
 				DEVELOPMENT_TEAM = Z86968747M;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSCameraUsageDescription = "Celestia needs camera access to verify your identity and help you create an authentic profile.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "We need camera access to verify your identity by scanning your ID and taking a selfie.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -468,7 +472,7 @@
 				DEVELOPMENT_TEAM = Z86968747M;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSCameraUsageDescription = "Celestia needs camera access to verify your identity and help you create an authentic profile.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "We need camera access to verify your identity by scanning your ID and taking a selfie.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -609,6 +613,14 @@
 				minimumVersion = 12.5.0;
 			};
 		};
+		BA8329632EDA2FEA0079A858 /* XCRemoteSwiftPackageReference "stripe-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/stripe/stripe-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 25.1.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -656,6 +668,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = BA6731D42EB33154005E3235 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseStorage;
+		};
+		BA8329642EDA2FEA0079A858 /* StripeIdentity */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BA8329632EDA2FEA0079A858 /* XCRemoteSwiftPackageReference "stripe-ios" */;
+			productName = StripeIdentity;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
