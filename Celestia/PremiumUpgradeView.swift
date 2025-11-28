@@ -36,7 +36,7 @@ struct PremiumUpgradeView: View {
                 // Animated gradient background
                 animatedBackground
 
-                ScrollView(showsIndicators: false) {
+                ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 0) {
                         // Immersive hero with live preview
                         immersiveHero
@@ -82,6 +82,7 @@ struct PremiumUpgradeView: View {
                     floatingCTA
                 }
             }
+            .clipped()
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.hidden, for: .navigationBar)
@@ -496,31 +497,32 @@ struct PremiumUpgradeView: View {
     }
 
     private func comparisonRow(feature: String, free: String, premium: String, icon: String) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.subheadline)
+                .font(.caption)
                 .foregroundColor(.purple)
-                .frame(width: 24)
+                .frame(width: 20)
 
             Text(feature)
-                .font(.subheadline)
+                .font(.caption)
                 .foregroundColor(.white)
+                .lineLimit(1)
 
-            Spacer()
+            Spacer(minLength: 4)
 
             Text(free)
-                .font(.caption)
-                .foregroundColor(.white.opacity(0.4))
-                .frame(width: 70)
-
-            Image(systemName: "arrow.right")
                 .font(.caption2)
+                .foregroundColor(.white.opacity(0.4))
+                .frame(width: 55, alignment: .trailing)
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 8))
                 .foregroundColor(.white.opacity(0.3))
 
             Text(premium)
-                .font(.caption.weight(.semibold))
+                .font(.caption2.weight(.semibold))
                 .foregroundColor(.green)
-                .frame(width: 70, alignment: .trailing)
+                .frame(width: 60, alignment: .trailing)
         }
     }
 
@@ -569,76 +571,75 @@ struct PremiumUpgradeView: View {
                 }
             }
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
-                    successStoryCard(
-                        initials: "JM",
-                        name: "Jake M.",
-                        story: "Matched with my girlfriend within 2 weeks of going premium. The 'See Who Likes You' feature was a game changer!",
-                        color: .purple
-                    )
+            VStack(spacing: 12) {
+                successStoryCard(
+                    initials: "JM",
+                    name: "Jake M.",
+                    story: "Found my match within 2 weeks! The 'See Who Likes You' feature was a game changer.",
+                    color: .purple
+                )
 
-                    successStoryCard(
-                        initials: "SE",
-                        name: "Sarah E.",
-                        story: "So many more quality matches since upgrading. The unlimited likes mean I never miss someone interesting.",
-                        color: .pink
-                    )
+                successStoryCard(
+                    initials: "SE",
+                    name: "Sarah E.",
+                    story: "So many more quality matches since upgrading. Unlimited likes means I never miss someone.",
+                    color: .pink
+                )
 
-                    successStoryCard(
-                        initials: "AT",
-                        name: "Alex T.",
-                        story: "Profile boost got me 3x the views. Met some amazing people I would have missed on free.",
-                        color: .orange
-                    )
-                }
+                successStoryCard(
+                    initials: "AT",
+                    name: "Alex T.",
+                    story: "Profile boost got me 3x the views. Met amazing people I would have missed.",
+                    color: .orange
+                )
             }
         }
     }
 
     private func successStoryCard(initials: String, name: String, story: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [color, color.opacity(0.6)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
+        HStack(spacing: 12) {
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [color, color.opacity(0.6)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
                     )
-                    .frame(width: 44, height: 44)
-                    .overlay(
-                        Text(initials)
-                            .font(.headline)
-                            .foregroundColor(.white)
-                    )
+                )
+                .frame(width: 40, height: 40)
+                .overlay(
+                    Text(initials)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.white)
+                )
 
-                VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
                     Text(name)
                         .font(.subheadline.weight(.semibold))
                         .foregroundColor(.white)
 
+                    Spacer()
+
                     HStack(spacing: 2) {
                         ForEach(0..<5) { _ in
                             Image(systemName: "star.fill")
-                                .font(.system(size: 10))
+                                .font(.system(size: 8))
                                 .foregroundColor(.yellow)
                         }
                     }
                 }
-            }
 
-            Text("\"\(story)\"")
-                .font(.subheadline)
-                .foregroundColor(.white.opacity(0.85))
-                .lineLimit(4)
-                .italic()
+                Text("\"\(story)\"")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.8))
+                    .lineLimit(2)
+                    .italic()
+            }
         }
-        .frame(width: 280)
-        .padding(20)
+        .padding(16)
         .background(.ultraThinMaterial.opacity(0.3))
-        .cornerRadius(20)
+        .cornerRadius(16)
     }
 
     // MARK: - Guarantee Section
@@ -711,46 +712,44 @@ struct PremiumUpgradeView: View {
     // MARK: - Floating CTA
 
     private var floatingCTA: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 6) {
             // Main button
             Button {
                 purchasePremium()
             } label: {
-                HStack(spacing: 12) {
+                HStack(spacing: 10) {
                     Image(systemName: "crown.fill")
-                        .font(.title3)
+                        .font(.body)
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Start 7-Day Free Trial")
-                            .font(.headline)
-
-                        Text("Then \(selectedPlan.price)/\(selectedPlan.period)")
-                            .font(.caption)
-                            .opacity(0.9)
-                    }
+                    Text("Start 7-Day Free Trial")
+                        .font(.subheadline.weight(.semibold))
 
                     Spacer()
 
-                    Image(systemName: "arrow.right.circle.fill")
-                        .font(.title2)
+                    Text("\(selectedPlan.price)/\(selectedPlan.period)")
+                        .font(.caption.weight(.medium))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Color.white.opacity(0.2))
+                        .cornerRadius(8)
                 }
                 .foregroundColor(.white)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 18)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
                 .background(
                     LinearGradient(
-                        colors: [Color.purple, Color.pink, Color.orange.opacity(0.8)],
+                        colors: [Color.purple, Color.pink],
                         startPoint: .leading,
                         endPoint: .trailing
                     )
                 )
-                .cornerRadius(20)
-                .shadow(color: .purple.opacity(0.5), radius: 20, y: 10)
+                .cornerRadius(16)
+                .shadow(color: .purple.opacity(0.4), radius: 15, y: 8)
             }
             .disabled(isProcessing)
 
             // Trust indicators
-            HStack(spacing: 16) {
+            HStack(spacing: 12) {
                 Label("Secure", systemImage: "lock.fill")
                 Label("Cancel Anytime", systemImage: "arrow.clockwise")
             }
@@ -758,18 +757,10 @@ struct PremiumUpgradeView: View {
             .foregroundColor(.white.opacity(0.5))
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 16)
+        .padding(.vertical, 12)
         .background(
-            LinearGradient(
-                colors: [
-                    Color(red: 0.1, green: 0.05, blue: 0.2).opacity(0.98),
-                    Color(red: 0.1, green: 0.05, blue: 0.2)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+            Color(red: 0.1, green: 0.05, blue: 0.2).opacity(0.95)
         )
-        .background(.ultraThinMaterial.opacity(0.5))
     }
 
     // MARK: - Processing Overlay
