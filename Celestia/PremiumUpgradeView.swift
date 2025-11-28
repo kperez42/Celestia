@@ -74,6 +74,7 @@ struct PremiumUpgradeView: View {
                         .padding(.bottom, 140)
                     }
                 }
+                .scrollContentBackground(.hidden)
 
                 // Floating CTA
                 VStack {
@@ -83,6 +84,7 @@ struct PremiumUpgradeView: View {
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
@@ -137,62 +139,16 @@ struct PremiumUpgradeView: View {
     // MARK: - Animated Background
 
     private var animatedBackground: some View {
-        ZStack {
-            // Deep gradient
-            LinearGradient(
-                colors: [
-                    Color(red: 0.1, green: 0.05, blue: 0.2),
-                    Color(red: 0.15, green: 0.05, blue: 0.25),
-                    Color(red: 0.1, green: 0.02, blue: 0.15)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-
-            // Animated orbs
-            GeometryReader { geo in
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [Color.purple.opacity(0.4), Color.clear],
-                            center: .center,
-                            startRadius: 0,
-                            endRadius: 150
-                        )
-                    )
-                    .frame(width: 300, height: 300)
-                    .blur(radius: 60)
-                    .offset(x: animateHero ? -50 : -80, y: animateHero ? 100 : 150)
-
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [Color.pink.opacity(0.35), Color.clear],
-                            center: .center,
-                            startRadius: 0,
-                            endRadius: 120
-                        )
-                    )
-                    .frame(width: 250, height: 250)
-                    .blur(radius: 50)
-                    .offset(x: geo.size.width - 100, y: animateHero ? 200 : 250)
-
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [Color.orange.opacity(0.25), Color.clear],
-                            center: .center,
-                            startRadius: 0,
-                            endRadius: 100
-                        )
-                    )
-                    .frame(width: 200, height: 200)
-                    .blur(radius: 40)
-                    .offset(x: geo.size.width / 2 - 100, y: geo.size.height - 300)
-            }
-        }
-        .animation(.easeInOut(duration: 4).repeatForever(autoreverses: true), value: animateHero)
+        LinearGradient(
+            colors: [
+                Color(red: 0.1, green: 0.05, blue: 0.2),
+                Color(red: 0.15, green: 0.05, blue: 0.25),
+                Color(red: 0.1, green: 0.02, blue: 0.15)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .ignoresSafeArea()
     }
 
     // MARK: - Immersive Hero
