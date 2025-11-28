@@ -1838,6 +1838,267 @@ exports.stripeIdentityWebhook = functions.https.onRequest(async (req, res) => {
   return stripeIdentity.handleStripeWebhook(req, res);
 });
 
+// ============================================================================
+// AUTOMATIC IMAGE MODERATION - STORAGE TRIGGERS
+// ============================================================================
+
+/**
+ * Storage Trigger: Automatically moderate images when uploaded
+ * Checks for nudity, violence, and other inappropriate content
+ * Rejects inappropriate images and notifies the user
+ */
+exports.onPhotoUploaded = functions.storage.object().onFinalize(async (object) => {
+  const filePath = object.name;
+  const contentType = object.contentType;
+
+  // Only process images
+  if (!contentType || !contentType.startsWith('image/')) {
+    functions.logger.info('Skipping non-image file', { filePath, contentType });
+    return null;
+  }
+
+  // Skip already processed files (have _moderated suffix)
+  if (filePath.includes('_moderated')) {
+    return null;
+  }
+
+  // Skip thumbnails and system files
+  if (filePath.includes('thumb_') || filePath.includes('.thumbnail')) {
+    return null;
+  }
+
+  functions.logger.info('Processing uploaded image for moderation', {
+    filePath,
+    contentType,
+    size: object.size
+  });
+
+  try {
+    const bucket = admin.storage().bucket(object.bucket);
+    const file = bucket.file(filePath);
+
+    // Get signed URL for moderation API
+    const [signedUrl] = await file.getSignedUrl({
+      action: 'read',
+      expires: Date.now() + 15 * 60 * 1000 // 15 minutes
+    });
+
+    // Run content moderation
+    const moderationResult = await contentModeration.moderateImage(signedUrl);
+
+    functions.logger.info('Moderation result', {
+      filePath,
+      isApproved: moderationResult.isApproved,
+      severity: moderationResult.severity,
+      reason: moderationResult.reason
+    });
+
+    // Extract userId from path (e.g., "verification/{userId}/id_photo.jpg" or "photos/{userId}/...")
+    const pathParts = filePath.split('/');
+    let userId = null;
+
+    if (pathParts.length >= 2) {
+      // Common patterns: verification/{userId}/..., photos/{userId}/..., profile-photos/{userId}/...
+      if (['verification', 'photos', 'profile-photos', 'user-photos'].includes(pathParts[0])) {
+        userId = pathParts[1];
+      }
+    }
+
+    // Log moderation result
+    await db.collection('moderation_logs').add({
+      filePath,
+      userId: userId || 'unknown',
+      result: moderationResult,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      fileSize: object.size,
+      contentType
+    });
+
+    // If content is NOT approved, take action
+    if (!moderationResult.isApproved) {
+      functions.logger.warn('Inappropriate content detected - taking action', {
+        filePath,
+        userId,
+        severity: moderationResult.severity,
+        reason: moderationResult.reason
+      });
+
+      // Delete the inappropriate image
+      await file.delete();
+      functions.logger.info('Deleted inappropriate image', { filePath });
+
+      // Record in flagged content
+      await db.collection('flagged_content').add({
+        userId: userId || 'unknown',
+        contentType: 'photo',
+        filePath,
+        reason: moderationResult.reason,
+        severity: moderationResult.severity,
+        details: moderationResult.details,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        action: 'auto_deleted',
+        reviewed: false
+      });
+
+      // If this was a verification photo, update the pending verification
+      if (filePath.includes('verification/') && userId) {
+        await db.collection('pendingVerifications').doc(userId).update({
+          status: 'rejected',
+          rejectionReason: 'Photo did not pass content moderation: ' + moderationResult.reason,
+          reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+          reviewedBy: 'auto_moderation'
+        });
+
+        // Update user document with rejection
+        await db.collection('users').doc(userId).update({
+          idVerificationRejected: true,
+          idVerificationRejectedAt: admin.firestore.FieldValue.serverTimestamp(),
+          idVerificationRejectionReason: 'Photo content not appropriate. Please submit appropriate photos.'
+        });
+
+        functions.logger.info('Updated verification status to rejected', { userId });
+      }
+
+      // Send notification to user
+      if (userId) {
+        await db.collection('notifications').add({
+          userId,
+          type: 'photo_rejected',
+          title: 'Photo Not Accepted',
+          message: 'Your photo was not accepted because it does not meet our community guidelines. Please upload an appropriate photo.',
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          read: false,
+          data: {
+            reason: moderationResult.reason,
+            severity: moderationResult.severity
+          }
+        });
+      }
+
+      // If high severity, warn the user
+      if (moderationResult.severity === 'high' && userId) {
+        await warnUser(userId, `Inappropriate photo upload: ${moderationResult.reason}`);
+      }
+
+      return { approved: false, reason: moderationResult.reason };
+    }
+
+    // Content approved
+    functions.logger.info('Image passed moderation', { filePath });
+    return { approved: true };
+
+  } catch (error) {
+    functions.logger.error('Image moderation error', {
+      filePath,
+      error: error.message,
+      stack: error.stack
+    });
+
+    // Don't delete on error - log and continue
+    await db.collection('moderation_errors').add({
+      filePath,
+      error: error.message,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return { approved: true, error: 'Moderation check failed' };
+  }
+});
+
+/**
+ * Callable function to check if a photo will pass moderation before upload
+ * Can be called from the iOS app to pre-check images
+ */
+exports.preCheckPhoto = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { photoBase64 } = data;
+  const userId = context.auth.uid;
+
+  if (!photoBase64) {
+    throw new functions.https.HttpsError('invalid-argument', 'Photo data is required');
+  }
+
+  try {
+    functions.logger.info('Pre-checking photo for moderation', { userId });
+
+    // Upload temporarily to get a URL for moderation
+    const bucket = admin.storage().bucket();
+    const tempPath = `temp-moderation/${userId}/${Date.now()}.jpg`;
+    const file = bucket.file(tempPath);
+
+    // Decode and upload
+    const buffer = Buffer.from(photoBase64, 'base64');
+    await file.save(buffer, {
+      metadata: { contentType: 'image/jpeg' }
+    });
+
+    // Get signed URL
+    const [signedUrl] = await file.getSignedUrl({
+      action: 'read',
+      expires: Date.now() + 5 * 60 * 1000 // 5 minutes
+    });
+
+    // Run moderation
+    const moderationResult = await contentModeration.moderateImage(signedUrl);
+
+    // Delete temp file
+    await file.delete().catch(() => {});
+
+    functions.logger.info('Pre-check result', {
+      userId,
+      isApproved: moderationResult.isApproved,
+      severity: moderationResult.severity
+    });
+
+    if (!moderationResult.isApproved) {
+      return {
+        approved: false,
+        reason: moderationResult.reason,
+        message: getContentRejectionMessage(moderationResult)
+      };
+    }
+
+    return {
+      approved: true,
+      message: 'Photo looks good!'
+    };
+
+  } catch (error) {
+    functions.logger.error('Pre-check error', { userId, error: error.message });
+
+    // On error, allow upload (will be checked on storage trigger)
+    return {
+      approved: true,
+      message: 'Unable to pre-check, will verify after upload',
+      warning: true
+    };
+  }
+});
+
+/**
+ * Get user-friendly rejection message based on moderation result
+ */
+function getContentRejectionMessage(result) {
+  const { details } = result;
+
+  if (details && details.scores) {
+    if (details.scores.adult >= 4) {
+      return 'This photo contains adult content which is not allowed. Please choose a different photo.';
+    }
+    if (details.scores.violence >= 4) {
+      return 'This photo contains violent content which is not allowed. Please choose a different photo.';
+    }
+    if (details.scores.racy >= 4) {
+      return 'This photo is too revealing for our platform. Please choose a photo that follows community guidelines.';
+    }
+  }
+
+  return 'This photo does not meet our community guidelines. Please choose a different photo.';
+}
+
 // Export admin object for use in modules
 exports.admin = admin;
 exports.db = db;

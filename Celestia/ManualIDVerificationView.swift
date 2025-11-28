@@ -142,6 +142,13 @@ struct ManualIDVerificationView: View {
             } message: {
                 Text(viewModel.errorMessage)
             }
+            .alert("Photo Not Accepted", isPresented: $viewModel.showingContentWarning) {
+                Button("Choose Different Photo") {
+                    HapticManager.shared.impact(.medium)
+                }
+            } message: {
+                Text(viewModel.contentWarningMessage)
+            }
             .task {
                 await viewModel.checkVerificationStatus()
             }
@@ -468,6 +475,12 @@ struct ManualIDVerificationView: View {
                 if viewModel.isSubmitting {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
+
+                    if viewModel.isCheckingContent {
+                        Text("Checking photos...")
+                    } else {
+                        Text("Uploading...")
+                    }
                 } else {
                     Image(systemName: "paperplane.fill")
                     Text("Submit for Review")
@@ -719,9 +732,12 @@ class ManualIDVerificationViewModel: ObservableObject {
     var cameraSourceType: ManualIDVerificationView.ImageSourceType = .id
 
     @Published var isSubmitting = false
+    @Published var isCheckingContent = false
     @Published var showingSuccess = false
     @Published var showingError = false
     @Published var errorMessage = ""
+    @Published var showingContentWarning = false
+    @Published var contentWarningMessage = ""
 
     @Published var pendingVerification = false
     @Published var isVerified = false
@@ -731,6 +747,7 @@ class ManualIDVerificationViewModel: ObservableObject {
 
     private let db = Firestore.firestore()
     private let storage = Storage.storage()
+    private let moderationService = ContentModerationService.shared
 
     var canSubmit: Bool {
         selectedIDType != nil && idImage != nil && selfieImage != nil && !isSubmitting
@@ -836,12 +853,41 @@ class ManualIDVerificationViewModel: ObservableObject {
         }
 
         isSubmitting = true
+        isCheckingContent = true
 
         do {
-            // Upload ID photo
-            let idPhotoURL = try await uploadImage(idImage, path: "verification/\(userId)/id_photo.jpg")
+            // STEP 1: Pre-check photos for inappropriate content
+            Logger.shared.info("Checking photos for appropriate content...", category: .general)
 
-            // Upload selfie photo
+            // Check ID photo
+            let idCheckResult = await moderationService.preCheckPhoto(idImage)
+            if !idCheckResult.approved {
+                isSubmitting = false
+                isCheckingContent = false
+                contentWarningMessage = idCheckResult.message
+                showingContentWarning = true
+                HapticManager.shared.notification(.error)
+                Logger.shared.warning("ID photo rejected by moderation: \(idCheckResult.message)", category: .general)
+                return
+            }
+
+            // Check selfie photo
+            let selfieCheckResult = await moderationService.preCheckPhoto(selfieImage)
+            if !selfieCheckResult.approved {
+                isSubmitting = false
+                isCheckingContent = false
+                contentWarningMessage = selfieCheckResult.message
+                showingContentWarning = true
+                HapticManager.shared.notification(.error)
+                Logger.shared.warning("Selfie photo rejected by moderation: \(selfieCheckResult.message)", category: .general)
+                return
+            }
+
+            isCheckingContent = false
+            Logger.shared.info("Photos passed content check, uploading...", category: .general)
+
+            // STEP 2: Upload photos (they will also be checked server-side automatically)
+            let idPhotoURL = try await uploadImage(idImage, path: "verification/\(userId)/id_photo.jpg")
             let selfiePhotoURL = try await uploadImage(selfieImage, path: "verification/\(userId)/selfie.jpg")
 
             // Get user info for review
@@ -860,19 +906,23 @@ class ManualIDVerificationViewModel: ObservableObject {
                 "submittedAt": FieldValue.serverTimestamp(),
                 "reviewedAt": NSNull(),
                 "reviewedBy": NSNull(),
-                "notes": ""
+                "notes": "",
+                "contentChecked": true
             ])
 
             isSubmitting = false
             showingSuccess = true
             pendingVerification = true
+            HapticManager.shared.notification(.success)
 
             Logger.shared.info("ID verification submitted for review - ID Type: \(idType.rawValue)", category: .general)
 
         } catch {
             isSubmitting = false
+            isCheckingContent = false
             errorMessage = "Failed to submit: \(error.localizedDescription)"
             showingError = true
+            HapticManager.shared.notification(.error)
             Logger.shared.error("Failed to submit verification", category: .general, error: error)
         }
     }
