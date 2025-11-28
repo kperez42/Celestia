@@ -115,6 +115,103 @@ struct ReferralRewards {
     static func calculateTotalDays(referrals: Int) -> Int {
         return min(referrals * referrerBonusDays, maxReferrals * referrerBonusDays)
     }
+
+    /// Returns the number of referrals remaining until max limit
+    static func remainingReferrals(current: Int) -> Int {
+        return max(0, maxReferrals - current)
+    }
+}
+
+// MARK: - Referral Milestones
+
+struct ReferralMilestone: Identifiable, Equatable {
+    let id: String
+    let name: String
+    let description: String
+    let requiredReferrals: Int
+    let icon: String
+    let bonusDays: Int  // Extra bonus days for reaching milestone
+
+    static let milestones: [ReferralMilestone] = [
+        ReferralMilestone(
+            id: "first_referral",
+            name: "First Steps",
+            description: "Complete your first referral",
+            requiredReferrals: 1,
+            icon: "star.fill",
+            bonusDays: 0
+        ),
+        ReferralMilestone(
+            id: "rising_star",
+            name: "Rising Star",
+            description: "Refer 5 friends",
+            requiredReferrals: 5,
+            icon: "star.circle.fill",
+            bonusDays: 3
+        ),
+        ReferralMilestone(
+            id: "social_butterfly",
+            name: "Social Butterfly",
+            description: "Refer 10 friends",
+            requiredReferrals: 10,
+            icon: "person.3.fill",
+            bonusDays: 7
+        ),
+        ReferralMilestone(
+            id: "influencer",
+            name: "Influencer",
+            description: "Refer 25 friends",
+            requiredReferrals: 25,
+            icon: "megaphone.fill",
+            bonusDays: 14
+        ),
+        ReferralMilestone(
+            id: "ambassador",
+            name: "Ambassador",
+            description: "Refer 50 friends",
+            requiredReferrals: 50,
+            icon: "crown.fill",
+            bonusDays: 30
+        ),
+        ReferralMilestone(
+            id: "legend",
+            name: "Legend",
+            description: "Refer 100 friends",
+            requiredReferrals: 100,
+            icon: "trophy.fill",
+            bonusDays: 60
+        )
+    ]
+
+    /// Returns the next milestone for a given referral count
+    static func nextMilestone(for referralCount: Int) -> ReferralMilestone? {
+        return milestones.first { $0.requiredReferrals > referralCount }
+    }
+
+    /// Returns the milestone just achieved (if any) when going from oldCount to newCount
+    static func newlyAchievedMilestone(oldCount: Int, newCount: Int) -> ReferralMilestone? {
+        return milestones.first { milestone in
+            oldCount < milestone.requiredReferrals && newCount >= milestone.requiredReferrals
+        }
+    }
+
+    /// Returns all achieved milestones for a referral count
+    static func achievedMilestones(for referralCount: Int) -> [ReferralMilestone] {
+        return milestones.filter { $0.requiredReferrals <= referralCount }
+    }
+
+    /// Returns progress toward next milestone (0.0 to 1.0)
+    static func progressToNextMilestone(for referralCount: Int) -> Double {
+        guard let nextMilestone = nextMilestone(for: referralCount) else {
+            return 1.0 // All milestones achieved
+        }
+
+        let previousMilestone = milestones.last { $0.requiredReferrals <= referralCount }
+        let startCount = previousMilestone?.requiredReferrals ?? 0
+
+        let progress = Double(referralCount - startCount) / Double(nextMilestone.requiredReferrals - startCount)
+        return min(1.0, max(0.0, progress))
+    }
 }
 
 // MARK: - Leaderboard Entry

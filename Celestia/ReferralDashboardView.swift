@@ -20,6 +20,8 @@ struct ReferralDashboardView: View {
     @State private var isInitializingCode = false
     @State private var errorMessage: String?
     @State private var referralCode: String = ""
+    @State private var isRefreshing = false
+    @State private var showMilestoneAlert = false
 
     var body: some View {
         NavigationStack {
@@ -31,6 +33,9 @@ struct ReferralDashboardView: View {
                     VStack(spacing: 24) {
                         // Hero section with referral code
                         referralCodeCard
+
+                        // Milestone progress
+                        milestoneProgressCard
 
                         // Stats overview
                         statsGrid
@@ -53,6 +58,9 @@ struct ReferralDashboardView: View {
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 20)
+                }
+                .refreshable {
+                    await refreshData()
                 }
             }
             .navigationTitle("Referral Program")
@@ -79,6 +87,21 @@ struct ReferralDashboardView: View {
             } message: {
                 if let message = errorMessage {
                     Text(message)
+                }
+            }
+            .alert("Milestone Achieved!", isPresented: $showMilestoneAlert) {
+                Button("Awesome!") {
+                    referralManager.newMilestoneReached = nil
+                }
+            } message: {
+                if let milestone = referralManager.newMilestoneReached {
+                    Text("You've reached \(milestone.name)!\n\(milestone.bonusDays > 0 ? "Bonus: +\(milestone.bonusDays) premium days!" : milestone.description)")
+                }
+            }
+            .onChange(of: referralManager.newMilestoneReached) { _, newMilestone in
+                if newMilestone != nil {
+                    showMilestoneAlert = true
+                    HapticManager.shared.notification(.success)
                 }
             }
             .task {
@@ -233,6 +256,131 @@ struct ReferralDashboardView: View {
         .background(Color.white)
         .cornerRadius(24)
         .shadow(color: .black.opacity(0.08), radius: 15, y: 8)
+    }
+
+    // MARK: - Milestone Progress
+
+    private var milestoneProgressCard: some View {
+        let totalReferrals = referralStats?.totalReferrals ?? 0
+        let nextMilestone = ReferralMilestone.nextMilestone(for: totalReferrals)
+        let progress = ReferralMilestone.progressToNextMilestone(for: totalReferrals)
+        let achievedMilestones = ReferralMilestone.achievedMilestones(for: totalReferrals)
+
+        return VStack(spacing: 16) {
+            HStack {
+                Text("Milestone Progress")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+
+                Spacer()
+
+                if !achievedMilestones.isEmpty {
+                    HStack(spacing: -8) {
+                        ForEach(achievedMilestones.suffix(3)) { milestone in
+                            Image(systemName: milestone.icon)
+                                .font(.caption)
+                                .foregroundColor(.white)
+                                .frame(width: 24, height: 24)
+                                .background(
+                                    Circle()
+                                        .fill(LinearGradient(
+                                            colors: [.purple, .pink],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ))
+                                )
+                        }
+                    }
+                }
+            }
+
+            if let next = nextMilestone {
+                VStack(spacing: 8) {
+                    HStack {
+                        Image(systemName: next.icon)
+                            .foregroundColor(.purple)
+
+                        Text(next.name)
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+
+                        Spacer()
+
+                        Text("\(totalReferrals)/\(next.requiredReferrals)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.gray.opacity(0.2))
+                                .frame(height: 12)
+
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [.purple, .pink],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .frame(width: geometry.size.width * progress, height: 12)
+                                .animation(.spring(response: 0.5), value: progress)
+                        }
+                    }
+                    .frame(height: 12)
+
+                    if next.bonusDays > 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: "gift.fill")
+                                .font(.caption2)
+                                .foregroundColor(.orange)
+                            Text("Bonus: +\(next.bonusDays) premium days")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+            } else {
+                // All milestones achieved
+                HStack(spacing: 8) {
+                    Image(systemName: "trophy.fill")
+                        .foregroundColor(.yellow)
+                        .font(.title2)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Legend Status Achieved!")
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
+
+                        Text("You've completed all milestones!")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
+                }
+            }
+
+            // Remaining referrals info
+            let remaining = ReferralRewards.remainingReferrals(current: totalReferrals)
+            if remaining > 0 && remaining < ReferralRewards.maxReferrals {
+                HStack(spacing: 4) {
+                    Image(systemName: "info.circle.fill")
+                        .font(.caption2)
+                        .foregroundColor(.blue)
+                    Text("\(remaining) referrals remaining until limit")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .padding(16)
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
     }
 
     // MARK: - Stats Grid
@@ -713,6 +861,32 @@ struct ReferralDashboardView: View {
         } catch {
             Logger.shared.error("Error loading referral data", category: .referral, error: error)
             errorMessage = "Failed to load referral data. Please try again."
+        }
+    }
+
+    private func refreshData() async {
+        isRefreshing = true
+        defer { isRefreshing = false }
+
+        guard let user = authService.currentUser else { return }
+
+        do {
+            // Re-fetch all data
+            referralStats = try await referralManager.getReferralStats(for: user)
+
+            if let userId = user.id {
+                try await referralManager.fetchUserReferrals(userId: userId)
+            }
+
+            try await referralManager.fetchLeaderboard()
+
+            // Haptic feedback on successful refresh
+            HapticManager.shared.notification(.success)
+            errorMessage = nil
+        } catch {
+            Logger.shared.error("Error refreshing referral data", category: .referral, error: error)
+            errorMessage = "Failed to refresh data. Pull down to try again."
+            HapticManager.shared.notification(.error)
         }
     }
 

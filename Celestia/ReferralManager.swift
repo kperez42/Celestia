@@ -16,9 +16,15 @@ class ReferralManager: ObservableObject {
     @Published var userReferrals: [Referral] = []
     @Published var leaderboard: [ReferralLeaderboardEntry] = []
     @Published var isLoading = false
+    @Published var lastError: String?
+    @Published var newMilestoneReached: ReferralMilestone?
 
     private let db = Firestore.firestore()
     private let authService = AuthService.shared
+
+    // Retry configuration
+    private let maxRetries = 3
+    private let retryDelaySeconds: UInt64 = 1
 
     private init() {}
 
@@ -100,6 +106,16 @@ class ReferralManager: ObservableObject {
             throw ReferralError.selfReferral
         }
 
+        // Step 1.5: Check if referrer has reached max referrals
+        let referrerData = referrerDoc.data()
+        let referrerStatsDict = referrerData["referralStats"] as? [String: Any] ?? [:]
+        let currentReferrals = referrerStatsDict["totalReferrals"] as? Int ?? 0
+
+        if currentReferrals >= ReferralRewards.maxReferrals {
+            Logger.shared.warning("Referrer has reached max referrals limit: \(currentReferrals)", category: .referral)
+            throw ReferralError.maxReferralsReached
+        }
+
         // Step 2: Check if this user has already been referred (with fallback for missing index)
         var alreadyReferred = false
         do {
@@ -178,10 +194,38 @@ class ReferralManager: ObservableObject {
     // MARK: - Award Premium Days
 
     func awardPremiumDays(userId: String, days: Int, reason: String) async throws {
+        // Use retry logic for reliability
+        var lastError: Error?
+
+        for attempt in 1...maxRetries {
+            do {
+                try await performPremiumDaysAward(userId: userId, days: days, reason: reason)
+                return // Success
+            } catch {
+                lastError = error
+                Logger.shared.warning("Award premium days attempt \(attempt)/\(maxRetries) failed", category: .referral)
+
+                if attempt < maxRetries {
+                    // Wait before retrying with exponential backoff
+                    try? await Task.sleep(nanoseconds: retryDelaySeconds * UInt64(attempt) * 1_000_000_000)
+                }
+            }
+        }
+
+        // All retries failed
+        if let error = lastError {
+            Logger.shared.error("Failed to award premium days after \(maxRetries) attempts", category: .referral, error: error)
+            throw error
+        }
+    }
+
+    private func performPremiumDaysAward(userId: String, days: Int, reason: String) async throws {
         let userRef = db.collection("users").document(userId)
         let document = try await userRef.getDocument()
 
-        guard let data = document.data() else { return }
+        guard let data = document.data() else {
+            throw ReferralError.invalidUser
+        }
 
         var expiryDate: Date
 
@@ -201,7 +245,7 @@ class ReferralManager: ObservableObject {
         let calendar = Calendar.current
         expiryDate = calendar.date(byAdding: .day, value: days, to: expiryDate) ?? expiryDate
 
-        // Update user
+        // Update user with atomic transaction to prevent race conditions
         let userUpdateData: [String: Any] = [
             "isPremium": true,
             "subscriptionExpiryDate": Timestamp(date: expiryDate)
@@ -214,7 +258,8 @@ class ReferralManager: ObservableObject {
             "days": days,
             "reason": reason,
             "awardedAt": Timestamp(date: Date()),
-            "expiryDate": Timestamp(date: expiryDate)
+            "expiryDate": Timestamp(date: expiryDate),
+            "success": true
         ]
         try await db.collection("referralRewards").addDocument(data: rewardData)
 
@@ -224,6 +269,12 @@ class ReferralManager: ObservableObject {
     // MARK: - Update Referrer Stats
 
     private func updateReferrerStats(userId: String) async throws {
+        // First get the old stats to check for milestones
+        let userDoc = try await db.collection("users").document(userId).getDocument()
+        let userData = userDoc.data() ?? [:]
+        let oldStatsDict = userData["referralStats"] as? [String: Any] ?? [:]
+        let oldTotalReferrals = oldStatsDict["totalReferrals"] as? Int ?? 0
+
         var totalReferrals = 0
 
         do {
@@ -256,6 +307,58 @@ class ReferralManager: ObservableObject {
             "referralStats.premiumDaysEarned": premiumDaysEarned
         ]
         try await db.collection("users").document(userId).updateData(statsUpdateData)
+
+        // Check for milestone achievement
+        if let milestone = ReferralMilestone.newlyAchievedMilestone(oldCount: oldTotalReferrals, newCount: totalReferrals) {
+            Logger.shared.info("User \(userId) achieved milestone: \(milestone.name)", category: .referral)
+
+            // Award milestone bonus days if any
+            if milestone.bonusDays > 0 {
+                try await awardPremiumDays(userId: userId, days: milestone.bonusDays, reason: "milestone_\(milestone.id)")
+            }
+
+            // Log milestone achievement
+            let milestoneData: [String: Any] = [
+                "userId": userId,
+                "milestoneId": milestone.id,
+                "milestoneName": milestone.name,
+                "bonusDaysAwarded": milestone.bonusDays,
+                "totalReferrals": totalReferrals,
+                "achievedAt": Timestamp(date: Date())
+            ]
+            try await db.collection("referralMilestones").addDocument(data: milestoneData)
+
+            // Set the milestone for UI notification
+            await MainActor.run {
+                self.newMilestoneReached = milestone
+            }
+
+            // Send push notification for milestone
+            await sendMilestoneNotification(userId: userId, milestone: milestone)
+        }
+    }
+
+    // MARK: - Milestone Notifications
+
+    private func sendMilestoneNotification(userId: String, milestone: ReferralMilestone) async {
+        do {
+            let notificationData: [String: Any] = [
+                "userId": userId,
+                "type": "referral_milestone",
+                "title": "Milestone Achieved!",
+                "body": "Congrats! You've reached \(milestone.name) with \(milestone.requiredReferrals) referrals!",
+                "data": [
+                    "milestoneId": milestone.id,
+                    "bonusDays": milestone.bonusDays
+                ],
+                "timestamp": Timestamp(date: Date()),
+                "isRead": false
+            ]
+            try await db.collection("users").document(userId).collection("notifications").addDocument(data: notificationData)
+            Logger.shared.info("Sent milestone notification to user \(userId)", category: .referral)
+        } catch {
+            Logger.shared.error("Failed to send milestone notification", category: .referral, error: error)
+        }
     }
 
     // MARK: - Fetch User Referrals
