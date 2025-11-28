@@ -17,7 +17,7 @@ struct SavedProfilesView: View {
     @State private var showClearAllConfirmation = false
     @State private var selectedTab = 0
 
-    private let tabs = ["All Saved", "Viewed", "Saved You"]
+    private let tabs = ["My Saves", "Viewed Me", "Saved Me"]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -166,7 +166,7 @@ struct SavedProfilesView: View {
     private var viewedTab: some View {
         Group {
             if viewModel.viewedProfiles.isEmpty {
-                emptyStateView(message: "No profile views yet", hint: "When someone views your profile, they'll appear here")
+                emptyStateView(message: "No one viewed you yet", hint: "When someone views your profile, they'll appear here")
             } else {
                 viewedProfilesGrid(profiles: viewModel.viewedProfiles)
             }
@@ -249,7 +249,7 @@ struct SavedProfilesView: View {
                                     HStack(spacing: 4) {
                                         Image(systemName: "eye")
                                             .font(.caption)
-                                        Text("\(viewModel.viewedProfiles.count) viewed")
+                                        Text("\(viewModel.viewedProfiles.count) views")
                                             .fontWeight(.semibold)
                                     }
                                 }
