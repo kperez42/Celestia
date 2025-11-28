@@ -233,14 +233,33 @@ class ReferralManager: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
-        let snapshot = try await db.collection("referrals")
-            .whereField("referrerUserId", isEqualTo: userId)
-            .order(by: "createdAt", descending: true)
-            .limit(to: 50)
-            .getDocuments()
+        do {
+            // Try with ordering first (requires composite index)
+            let snapshot = try await db.collection("referrals")
+                .whereField("referrerUserId", isEqualTo: userId)
+                .order(by: "createdAt", descending: true)
+                .limit(to: 50)
+                .getDocuments()
 
-        userReferrals = snapshot.documents.compactMap { doc in
-            try? doc.data(as: Referral.self)
+            userReferrals = snapshot.documents.compactMap { doc in
+                try? doc.data(as: Referral.self)
+            }
+        } catch {
+            // Fallback: fetch without ordering if index doesn't exist
+            // This handles the case where composite index is not yet created
+            Logger.shared.warning("Falling back to unordered referral query - composite index may be missing", category: .referral)
+
+            let snapshot = try await db.collection("referrals")
+                .whereField("referrerUserId", isEqualTo: userId)
+                .limit(to: 50)
+                .getDocuments()
+
+            // Sort locally instead
+            var referrals = snapshot.documents.compactMap { doc in
+                try? doc.data(as: Referral.self)
+            }
+            referrals.sort { $0.createdAt > $1.createdAt }
+            userReferrals = referrals
         }
     }
 
@@ -250,14 +269,45 @@ class ReferralManager: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
-        let snapshot = try await db.collection("users")
-            .whereField("referralStats.totalReferrals", isGreaterThan: 0)
-            .order(by: "referralStats.totalReferrals", descending: true)
-            .limit(to: limit)
-            .getDocuments()
+        do {
+            // Try with ordering (requires composite index on referralStats.totalReferrals)
+            let snapshot = try await db.collection("users")
+                .whereField("referralStats.totalReferrals", isGreaterThan: 0)
+                .order(by: "referralStats.totalReferrals", descending: true)
+                .limit(to: limit)
+                .getDocuments()
 
+            leaderboard = parseLeaderboardEntries(from: snapshot.documents)
+        } catch {
+            // Fallback: fetch without ordering if index doesn't exist
+            Logger.shared.warning("Falling back to unordered leaderboard query - composite index may be missing", category: .referral)
+
+            let snapshot = try await db.collection("users")
+                .whereField("referralStats.totalReferrals", isGreaterThan: 0)
+                .limit(to: limit * 2) // Fetch more to account for local sorting
+                .getDocuments()
+
+            // Sort locally and limit
+            var entries = parseLeaderboardEntries(from: snapshot.documents)
+            entries.sort { $0.totalReferrals > $1.totalReferrals }
+
+            // Re-assign ranks after sorting
+            leaderboard = entries.prefix(limit).enumerated().map { index, entry in
+                ReferralLeaderboardEntry(
+                    id: entry.id,
+                    userName: entry.userName,
+                    profileImageURL: entry.profileImageURL,
+                    totalReferrals: entry.totalReferrals,
+                    rank: index + 1,
+                    premiumDaysEarned: entry.premiumDaysEarned
+                )
+            }
+        }
+    }
+
+    private func parseLeaderboardEntries(from documents: [QueryDocumentSnapshot]) -> [ReferralLeaderboardEntry] {
         var entries: [ReferralLeaderboardEntry] = []
-        for (index, doc) in snapshot.documents.enumerated() {
+        for (index, doc) in documents.enumerated() {
             let data = doc.data()
             let referralStatsDict = data["referralStats"] as? [String: Any] ?? [:]
             let stats = ReferralStats(dictionary: referralStatsDict)
@@ -272,8 +322,7 @@ class ReferralManager: ObservableObject {
             )
             entries.append(entry)
         }
-
-        leaderboard = entries
+        return entries
     }
 
     // MARK: - Validate Referral Code
@@ -299,36 +348,71 @@ class ReferralManager: ObservableObject {
             return ReferralStats()
         }
 
-        let baseStats = user.referralStats
+        var baseStats = user.referralStats
         let totalReferrals = baseStats.totalReferrals
 
-        // Parallelize queries for better performance
-        async let pendingQuery = db.collection("referrals")
-            .whereField("referrerUserId", isEqualTo: userId)
-            .whereField("status", isEqualTo: ReferralStatus.pending.rawValue)
-            .getDocuments()
-
-        // Only fetch leaderboard if user has referrals
-        if totalReferrals > 0 {
-            async let leaderboardQuery = db.collection("users")
-                .whereField("referralStats.totalReferrals", isGreaterThan: totalReferrals)
+        // Try to get pending referrals count
+        do {
+            let pendingSnapshot = try await db.collection("referrals")
+                .whereField("referrerUserId", isEqualTo: userId)
+                .whereField("status", isEqualTo: ReferralStatus.pending.rawValue)
                 .getDocuments()
 
-            // Wait for both queries
-            let (pendingSnapshot, leaderboardSnapshot) = try await (pendingQuery, leaderboardQuery)
-
-            var stats = baseStats
-            stats.pendingReferrals = pendingSnapshot.documents.count
-            stats.referralRank = leaderboardSnapshot.documents.count + 1
-            return stats
-        } else {
-            // Only wait for pending query
-            let pendingSnapshot = try await pendingQuery
-
-            var stats = baseStats
-            stats.pendingReferrals = pendingSnapshot.documents.count
-            return stats
+            baseStats.pendingReferrals = pendingSnapshot.documents.count
+        } catch {
+            // If composite index is missing, log and continue with 0 pending
+            Logger.shared.warning("Could not fetch pending referrals - composite index may be missing", category: .referral)
+            baseStats.pendingReferrals = 0
         }
+
+        // Only fetch leaderboard rank if user has referrals
+        if totalReferrals > 0 {
+            do {
+                let leaderboardSnapshot = try await db.collection("users")
+                    .whereField("referralStats.totalReferrals", isGreaterThan: totalReferrals)
+                    .getDocuments()
+
+                baseStats.referralRank = leaderboardSnapshot.documents.count + 1
+            } catch {
+                // If query fails, estimate rank as 0 (unknown)
+                Logger.shared.warning("Could not fetch referral rank - index may be missing", category: .referral)
+                baseStats.referralRank = 0
+            }
+        }
+
+        return baseStats
+    }
+
+    // MARK: - Ensure Referral Code Exists
+
+    /// Ensures the user has a referral code, generating one if needed
+    /// Returns the user's referral code
+    func ensureReferralCode(for user: User) async throws -> String {
+        // If user already has a code, return it
+        if !user.referralStats.referralCode.isEmpty {
+            return user.referralStats.referralCode
+        }
+
+        // Generate and save a new code
+        guard let userId = user.id else {
+            throw ReferralError.invalidUser
+        }
+
+        let code = try await generateReferralCode(for: userId)
+
+        // Update in Firestore
+        let updateData: [String: Any] = [
+            "referralStats.referralCode": code
+        ]
+        try await db.collection("users").document(userId).updateData(updateData)
+
+        // Update local user via AuthService
+        await MainActor.run {
+            authService.updateLocalReferralCode(code)
+        }
+
+        Logger.shared.info("Generated referral code for user: \(code)", category: .referral)
+        return code
     }
 
     // MARK: - Share Methods

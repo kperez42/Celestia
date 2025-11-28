@@ -17,6 +17,9 @@ struct ReferralDashboardView: View {
     @State private var selectedTab = 0
     @State private var copiedToClipboard = false
     @State private var animateStats = false
+    @State private var isInitializingCode = false
+    @State private var errorMessage: String?
+    @State private var referralCode: String = ""
 
     var body: some View {
         NavigationStack {
@@ -65,8 +68,17 @@ struct ReferralDashboardView: View {
                 }
             }
             .sheet(isPresented: $showShareSheet) {
-                if let user = authService.currentUser {
+                if let user = authService.currentUser, !referralCode.isEmpty {
                     ShareSheet(items: [getReferralMessage(user: user)])
+                }
+            }
+            .alert("Error", isPresented: .constant(errorMessage != nil)) {
+                Button("OK") {
+                    errorMessage = nil
+                }
+            } message: {
+                if let message = errorMessage {
+                    Text(message)
                 }
             }
             .task {
@@ -139,8 +151,11 @@ struct ReferralDashboardView: View {
                     .foregroundColor(.secondary)
                     .textCase(.uppercase)
 
-                if let code = authService.currentUser?.referralStats.referralCode, !code.isEmpty {
-                    Text(code)
+                if isInitializingCode {
+                    ProgressView()
+                        .frame(height: 38)
+                } else if !referralCode.isEmpty {
+                    Text(referralCode)
                         .font(.system(size: 32, weight: .bold, design: .rounded))
                         .foregroundStyle(
                             LinearGradient(
@@ -171,12 +186,13 @@ struct ReferralDashboardView: View {
                         Text("Copy Code")
                             .fontWeight(.semibold)
                     }
-                    .foregroundColor(.purple)
+                    .foregroundColor(referralCode.isEmpty ? .gray : .purple)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(Color.purple.opacity(0.1))
+                    .background(referralCode.isEmpty ? Color.gray.opacity(0.1) : Color.purple.opacity(0.1))
                     .cornerRadius(12)
                 }
+                .disabled(referralCode.isEmpty || isInitializingCode)
 
                 Button {
                     showShareSheet = true
@@ -187,7 +203,7 @@ struct ReferralDashboardView: View {
                         Task {
                             await referralManager.trackShare(
                                 userId: user.id ?? "",
-                                code: user.referralStats.referralCode,
+                                code: referralCode,
                                 shareMethod: "share_button"
                             )
                         }
@@ -203,13 +219,14 @@ struct ReferralDashboardView: View {
                     .padding(.vertical, 14)
                     .background(
                         LinearGradient(
-                            colors: [.purple, .pink],
+                            colors: referralCode.isEmpty ? [.gray, .gray] : [.purple, .pink],
                             startPoint: .leading,
                             endPoint: .trailing
                         )
                     )
                     .cornerRadius(12)
                 }
+                .disabled(referralCode.isEmpty || isInitializingCode)
             }
         }
         .padding(24)
@@ -384,11 +401,11 @@ struct ReferralDashboardView: View {
                 HapticManager.shared.impact(.medium)
 
                 // Track share event
-                if let user = authService.currentUser {
+                if let user = authService.currentUser, !referralCode.isEmpty {
                     Task {
                         await referralManager.trackShare(
                             userId: user.id ?? "",
-                            code: user.referralStats.referralCode,
+                            code: referralCode,
                             shareMethod: "empty_state_share"
                         )
                     }
@@ -404,13 +421,14 @@ struct ReferralDashboardView: View {
                 .padding(.vertical, 12)
                 .background(
                     LinearGradient(
-                        colors: [.purple, .pink],
+                        colors: referralCode.isEmpty ? [.gray, .gray] : [.purple, .pink],
                         startPoint: .leading,
                         endPoint: .trailing
                     )
                 )
                 .cornerRadius(12)
             }
+            .disabled(referralCode.isEmpty)
             .scaleButton()
         }
         .frame(maxWidth: .infinity)
@@ -675,6 +693,9 @@ struct ReferralDashboardView: View {
     private func loadData() async {
         guard let user = authService.currentUser else { return }
 
+        // First, ensure we have a referral code
+        await ensureReferralCodeExists(for: user)
+
         do {
             // Fetch referral stats
             referralStats = try await referralManager.getReferralStats(for: user)
@@ -686,15 +707,40 @@ struct ReferralDashboardView: View {
 
             // Fetch leaderboard
             try await referralManager.fetchLeaderboard()
+
+            // Clear any previous errors on success
+            errorMessage = nil
         } catch {
             Logger.shared.error("Error loading referral data", category: .referral, error: error)
+            errorMessage = "Failed to load referral data. Please try again."
+        }
+    }
+
+    private func ensureReferralCodeExists(for user: User) async {
+        // Check if user already has a code
+        let existingCode = user.referralStats.referralCode
+        if !existingCode.isEmpty {
+            referralCode = existingCode
+            return
+        }
+
+        // Generate a new code
+        isInitializingCode = true
+        defer { isInitializingCode = false }
+
+        do {
+            let newCode = try await referralManager.ensureReferralCode(for: user)
+            referralCode = newCode
+        } catch {
+            Logger.shared.error("Failed to generate referral code", category: .referral, error: error)
+            errorMessage = "Failed to generate referral code. Please try again."
         }
     }
 
     private func copyCodeToClipboard() {
-        guard let code = authService.currentUser?.referralStats.referralCode else { return }
+        guard !referralCode.isEmpty else { return }
 
-        UIPasteboard.general.string = code
+        UIPasteboard.general.string = referralCode
         HapticManager.shared.notification(.success)
 
         withAnimation {
@@ -710,7 +756,7 @@ struct ReferralDashboardView: View {
 
     private func getReferralMessage(user: User) -> String {
         return referralManager.getReferralShareMessage(
-            code: user.referralStats.referralCode,
+            code: referralCode,
             userName: user.fullName
         )
     }

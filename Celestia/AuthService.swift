@@ -516,6 +516,16 @@ class AuthService: ObservableObject, AuthServiceProtocol {
         Logger.shared.auth("User updated successfully", level: .info)
     }
 
+    /// Updates the local user's referral code without a Firestore call
+    /// Used when ReferralManager generates a new code
+    @MainActor
+    func updateLocalReferralCode(_ code: String) {
+        guard var user = currentUser else { return }
+        user.referralStats.referralCode = code
+        self.currentUser = user
+        Logger.shared.auth("Updated local referral code", level: .debug)
+    }
+
     @MainActor
     func deleteAccount() async throws {
         guard let user = Auth.auth().currentUser else {
