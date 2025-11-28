@@ -19,7 +19,8 @@ struct AdminModerationDashboard: View {
                 Picker("View", selection: $selectedTab) {
                     Text("Reports").tag(0)
                     Text("Suspicious").tag(1)
-                    Text("Stats").tag(2)
+                    Text("ID Review").tag(2)
+                    Text("Stats").tag(3)
                 }
                 .pickerStyle(.segmented)
                 .padding()
@@ -32,6 +33,8 @@ struct AdminModerationDashboard: View {
                     case 1:
                         suspiciousProfilesView
                     case 2:
+                        idVerificationReviewView
+                    case 3:
                         statsView
                     default:
                         reportsListView
@@ -104,6 +107,12 @@ struct AdminModerationDashboard: View {
                 .listStyle(.plain)
             }
         }
+    }
+
+    // MARK: - ID Verification Review
+
+    private var idVerificationReviewView: some View {
+        IDVerificationReviewEmbeddedView()
     }
 
     // MARK: - Stats

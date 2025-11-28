@@ -12,7 +12,9 @@ struct VerificationFlowView: View {
     @StateObject private var verificationService = VerificationService.shared
     @State private var selectedVerification: VerificationType?
     @State private var showingPhotoVerification = false
-    @State private var showingIDVerification = false
+    @State private var showingManualIDVerification = false  // Manual review for small apps
+    @State private var showingStripeIdentityVerification = false  // Stripe Identity (for scaling)
+    @State private var showingIDVerification = false  // Legacy, kept for fallback
     @State private var showingBackgroundCheck = false
 
     var body: some View {
@@ -36,8 +38,14 @@ struct VerificationFlowView: View {
         .sheet(isPresented: $showingPhotoVerification) {
             PhotoVerificationSheet()
         }
+        .sheet(isPresented: $showingManualIDVerification) {
+            ManualIDVerificationView()  // Manual review for small apps
+        }
+        .sheet(isPresented: $showingStripeIdentityVerification) {
+            StripeIdentityVerificationView()  // Stripe Identity (for scaling)
+        }
         .sheet(isPresented: $showingIDVerification) {
-            IDVerificationSheet()
+            IDVerificationSheet()  // Legacy, kept for fallback
         }
         .sheet(isPresented: $showingBackgroundCheck) {
             BackgroundCheckSheet()
@@ -111,19 +119,32 @@ struct VerificationFlowView: View {
                 type: .photo,
                 title: "Photo Verification",
                 description: "Verify you match your profile photos",
-                points: "+30 points",
+                points: "+25 points",
                 isCompleted: verificationService.photoVerified,
                 action: { showingPhotoVerification = true }
             )
 
+            // Manual ID Verification - Primary for small apps (manual review)
             verificationOption(
-                type: .id,
+                type: .manualID,
                 title: "ID Verification",
-                description: "Verify your government-issued ID",
+                description: "Submit ID + selfie for verification",
                 points: "+30 points",
                 isCompleted: verificationService.idVerified,
-                action: { showingIDVerification = true }
+                isRecommended: true,
+                action: { showingManualIDVerification = true }
             )
+
+            // Stripe Identity - Alternative for auto-verification (future scaling)
+            // Uncomment when ready to use Stripe Identity
+            // verificationOption(
+            //     type: .stripeIdentity,
+            //     title: "Instant ID Verification",
+            //     description: "Fast & secure auto-verification powered by Stripe",
+            //     points: "+35 points",
+            //     isCompleted: verificationService.stripeIdentityVerified,
+            //     action: { showingStripeIdentityVerification = true }
+            // )
 
             verificationOption(
                 type: .background,
@@ -142,51 +163,84 @@ struct VerificationFlowView: View {
         description: String,
         points: String,
         isCompleted: Bool,
+        isRecommended: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 16) {
-                // Icon
-                Image(systemName: type.icon)
-                    .font(.title2)
-                    .foregroundColor(isCompleted ? .green : .blue)
-                    .frame(width: 50, height: 50)
-                    .background(isCompleted ? Color.green.opacity(0.1) : Color.blue.opacity(0.1))
-                    .cornerRadius(10)
+        let accentColor: Color = isRecommended ? .purple : .blue
 
-                // Content
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(.headline)
-                        .foregroundColor(.primary)
-
-                    Text(description)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+        return Button(action: action) {
+            VStack(spacing: 0) {
+                // Recommended badge
+                if isRecommended && !isCompleted {
+                    HStack {
+                        Spacer()
+                        Text("RECOMMENDED")
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.purple)
+                            .cornerRadius(4)
+                    }
+                    .padding(.bottom, 8)
                 }
 
-                Spacer()
-
-                // Status
-                if isCompleted {
-                    Image(systemName: "checkmark.circle.fill")
+                HStack(spacing: 16) {
+                    // Icon
+                    Image(systemName: type.icon)
                         .font(.title2)
-                        .foregroundColor(.green)
-                } else {
-                    VStack(spacing: 4) {
-                        Text(points)
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.blue)
+                        .foregroundColor(isCompleted ? .green : accentColor)
+                        .frame(width: 50, height: 50)
+                        .background(isCompleted ? Color.green.opacity(0.1) : accentColor.opacity(0.1))
+                        .cornerRadius(10)
 
-                        Image(systemName: "chevron.right")
+                    // Content
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 6) {
+                            Text(title)
+                                .font(.headline)
+                                .foregroundColor(.primary)
+
+                            if isRecommended && !isCompleted {
+                                Image(systemName: "bolt.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.purple)
+                            }
+                        }
+
+                        Text(description)
                             .font(.caption)
-                            .foregroundColor(.gray)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
+
+                    // Status
+                    if isCompleted {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.green)
+                    } else {
+                        VStack(spacing: 4) {
+                            Text(points)
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(accentColor)
+
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
                     }
                 }
             }
             .padding()
             .background(Color(.secondarySystemBackground))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(isRecommended && !isCompleted ? Color.purple.opacity(0.5) : Color.clear, lineWidth: 2)
+            )
             .cornerRadius(12)
         }
         .disabled(isCompleted)
@@ -225,15 +279,21 @@ struct VerificationFlowView: View {
 
 enum VerificationType {
     case photo
-    case id
+    case manualID  // Manual ID verification with admin review
+    case stripeIdentity  // Auto ID verification via Stripe (for scaling)
+    case id  // Legacy on-device ID verification
     case background
 
     var icon: String {
         switch self {
         case .photo:
             return "camera.fill"
-        case .id:
+        case .manualID:
             return "person.text.rectangle.fill"
+        case .stripeIdentity:
+            return "bolt.shield.fill"
+        case .id:
+            return "person.text.rectangle"
         case .background:
             return "shield.checkered"
         }
