@@ -101,10 +101,10 @@ class ProfileStatsService: ObservableObject {
 
     /// Count unique profile views for a user
     private func getUniqueProfileViews(userId: String) async throws -> Int {
-        // Try to get from profile_views collection first
+        // Try to get from profileViews collection first
         do {
-            let snapshot = try await db.collection("profile_views")
-                .whereField("profileUserId", isEqualTo: userId)
+            let snapshot = try await db.collection("profileViews")
+                .whereField("viewedUserId", isEqualTo: userId)
                 .getDocuments()
 
             // Use Set to count unique viewers
@@ -118,9 +118,9 @@ class ProfileStatsService: ObservableObject {
 
             return uniqueViewers.count
         } catch {
-            // If profile_views collection doesn't exist or has no data,
+            // If profileViews collection doesn't exist or has no data,
             // fall back to the user's profileViews field
-            Logger.shared.warning("profile_views collection not available, using user field", category: .database)
+            Logger.shared.warning("profileViews collection not available, using user field", category: .database)
 
             let userDoc = try await db.collection("users").document(userId).getDocument()
             if let profileViews = userDoc.data()?["profileViews"] as? Int {
@@ -131,32 +131,32 @@ class ProfileStatsService: ObservableObject {
     }
 
     /// Record a profile view (with duplicate prevention)
-    func recordProfileView(viewerId: String, profileUserId: String) async throws {
+    func recordProfileView(viewerId: String, viewedUserId: String) async throws {
         // Don't record if viewing own profile
-        guard viewerId != profileUserId else {
+        guard viewerId != viewedUserId else {
             return
         }
 
         // Use deterministic document ID to prevent duplicate views from same user
-        let viewId = "\(viewerId)_\(profileUserId)"
+        let viewId = "\(viewerId)_\(viewedUserId)"
 
         let viewData: [String: Any] = [
             "viewerUserId": viewerId,
-            "profileUserId": profileUserId,
+            "viewedUserId": viewedUserId,
             "timestamp": FieldValue.serverTimestamp()
         ]
 
         // Use setData with merge to update timestamp if view already exists
         // This ensures each viewer is counted only once
-        try await db.collection("profile_views")
+        try await db.collection("profileViews")
             .document(viewId)
             .setData(viewData, merge: true)
 
         // Invalidate cache for this user
-        statsCache.removeValue(forKey: profileUserId)
-        cacheTimestamps.removeValue(forKey: profileUserId)
+        statsCache.removeValue(forKey: viewedUserId)
+        cacheTimestamps.removeValue(forKey: viewedUserId)
 
-        Logger.shared.debug("Profile view recorded: \(viewerId) -> \(profileUserId)", category: .database)
+        Logger.shared.debug("Profile view recorded: \(viewerId) -> \(viewedUserId)", category: .database)
     }
 
     /// Clear cache for a specific user (useful after updates)
