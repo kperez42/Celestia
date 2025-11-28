@@ -17,6 +17,11 @@ struct ReferralDashboardView: View {
     @State private var selectedTab = 0
     @State private var copiedToClipboard = false
     @State private var animateStats = false
+    @State private var isInitializingCode = false
+    @State private var errorMessage: String?
+    @State private var referralCode: String = ""
+    @State private var isRefreshing = false
+    @State private var showMilestoneAlert = false
 
     var body: some View {
         NavigationStack {
@@ -28,6 +33,9 @@ struct ReferralDashboardView: View {
                     VStack(spacing: 24) {
                         // Hero section with referral code
                         referralCodeCard
+
+                        // Milestone progress
+                        milestoneProgressCard
 
                         // Stats overview
                         statsGrid
@@ -51,6 +59,9 @@ struct ReferralDashboardView: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 20)
                 }
+                .refreshable {
+                    await refreshData()
+                }
             }
             .navigationTitle("Referral Program")
             .navigationBarTitleDisplayMode(.inline)
@@ -65,8 +76,32 @@ struct ReferralDashboardView: View {
                 }
             }
             .sheet(isPresented: $showShareSheet) {
-                if let user = authService.currentUser {
+                if let user = authService.currentUser, !referralCode.isEmpty {
                     ShareSheet(items: [getReferralMessage(user: user)])
+                }
+            }
+            .alert("Error", isPresented: .constant(errorMessage != nil)) {
+                Button("OK") {
+                    errorMessage = nil
+                }
+            } message: {
+                if let message = errorMessage {
+                    Text(message)
+                }
+            }
+            .alert("Milestone Achieved!", isPresented: $showMilestoneAlert) {
+                Button("Awesome!") {
+                    referralManager.newMilestoneReached = nil
+                }
+            } message: {
+                if let milestone = referralManager.newMilestoneReached {
+                    Text("You've reached \(milestone.name)!\n\(milestone.bonusDays > 0 ? "Bonus: +\(milestone.bonusDays) premium days!" : milestone.description)")
+                }
+            }
+            .onChange(of: referralManager.newMilestoneReached) { _, newMilestone in
+                if newMilestone != nil {
+                    showMilestoneAlert = true
+                    HapticManager.shared.notification(.success)
                 }
             }
             .task {
@@ -74,6 +109,15 @@ struct ReferralDashboardView: View {
                 withAnimation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.1)) {
                     animateStats = true
                 }
+
+                // Start real-time listener for updates
+                if let userId = authService.currentUser?.id {
+                    referralManager.startReferralListener(for: userId)
+                }
+            }
+            .onDisappear {
+                // Stop listener when view disappears
+                referralManager.stopReferralListener()
             }
             .overlay {
                 if copiedToClipboard {
@@ -139,8 +183,11 @@ struct ReferralDashboardView: View {
                     .foregroundColor(.secondary)
                     .textCase(.uppercase)
 
-                if let code = authService.currentUser?.referralStats.referralCode, !code.isEmpty {
-                    Text(code)
+                if isInitializingCode {
+                    ProgressView()
+                        .frame(height: 38)
+                } else if !referralCode.isEmpty {
+                    Text(referralCode)
                         .font(.system(size: 32, weight: .bold, design: .rounded))
                         .foregroundStyle(
                             LinearGradient(
@@ -171,12 +218,13 @@ struct ReferralDashboardView: View {
                         Text("Copy Code")
                             .fontWeight(.semibold)
                     }
-                    .foregroundColor(.purple)
+                    .foregroundColor(referralCode.isEmpty ? .gray : .purple)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(Color.purple.opacity(0.1))
+                    .background(referralCode.isEmpty ? Color.gray.opacity(0.1) : Color.purple.opacity(0.1))
                     .cornerRadius(12)
                 }
+                .disabled(referralCode.isEmpty || isInitializingCode)
 
                 Button {
                     showShareSheet = true
@@ -187,7 +235,7 @@ struct ReferralDashboardView: View {
                         Task {
                             await referralManager.trackShare(
                                 userId: user.id ?? "",
-                                code: user.referralStats.referralCode,
+                                code: referralCode,
                                 shareMethod: "share_button"
                             )
                         }
@@ -203,19 +251,145 @@ struct ReferralDashboardView: View {
                     .padding(.vertical, 14)
                     .background(
                         LinearGradient(
-                            colors: [.purple, .pink],
+                            colors: referralCode.isEmpty ? [.gray, .gray] : [.purple, .pink],
                             startPoint: .leading,
                             endPoint: .trailing
                         )
                     )
                     .cornerRadius(12)
                 }
+                .disabled(referralCode.isEmpty || isInitializingCode)
             }
         }
         .padding(24)
         .background(Color.white)
         .cornerRadius(24)
         .shadow(color: .black.opacity(0.08), radius: 15, y: 8)
+    }
+
+    // MARK: - Milestone Progress
+
+    private var milestoneProgressCard: some View {
+        let totalReferrals = referralStats?.totalReferrals ?? 0
+        let nextMilestone = ReferralMilestone.nextMilestone(for: totalReferrals)
+        let progress = ReferralMilestone.progressToNextMilestone(for: totalReferrals)
+        let achievedMilestones = ReferralMilestone.achievedMilestones(for: totalReferrals)
+
+        return VStack(spacing: 16) {
+            HStack {
+                Text("Milestone Progress")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+
+                Spacer()
+
+                if !achievedMilestones.isEmpty {
+                    HStack(spacing: -8) {
+                        ForEach(achievedMilestones.suffix(3)) { milestone in
+                            Image(systemName: milestone.icon)
+                                .font(.caption)
+                                .foregroundColor(.white)
+                                .frame(width: 24, height: 24)
+                                .background(
+                                    Circle()
+                                        .fill(LinearGradient(
+                                            colors: [.purple, .pink],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ))
+                                )
+                        }
+                    }
+                }
+            }
+
+            if let next = nextMilestone {
+                VStack(spacing: 8) {
+                    HStack {
+                        Image(systemName: next.icon)
+                            .foregroundColor(.purple)
+
+                        Text(next.name)
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+
+                        Spacer()
+
+                        Text("\(totalReferrals)/\(next.requiredReferrals)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.gray.opacity(0.2))
+                                .frame(height: 12)
+
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [.purple, .pink],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .frame(width: geometry.size.width * progress, height: 12)
+                                .animation(.spring(response: 0.5), value: progress)
+                        }
+                    }
+                    .frame(height: 12)
+
+                    if next.bonusDays > 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: "gift.fill")
+                                .font(.caption2)
+                                .foregroundColor(.orange)
+                            Text("Bonus: +\(next.bonusDays) premium days")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+            } else {
+                // All milestones achieved
+                HStack(spacing: 8) {
+                    Image(systemName: "trophy.fill")
+                        .foregroundColor(.yellow)
+                        .font(.title2)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Legend Status Achieved!")
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
+
+                        Text("You've completed all milestones!")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
+                }
+            }
+
+            // Remaining referrals info
+            let remaining = ReferralRewards.remainingReferrals(current: totalReferrals)
+            if remaining > 0 && remaining < ReferralRewards.maxReferrals {
+                HStack(spacing: 4) {
+                    Image(systemName: "info.circle.fill")
+                        .font(.caption2)
+                        .foregroundColor(.blue)
+                    Text("\(remaining) referrals remaining until limit")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .padding(16)
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
     }
 
     // MARK: - Stats Grid
@@ -384,11 +558,11 @@ struct ReferralDashboardView: View {
                 HapticManager.shared.impact(.medium)
 
                 // Track share event
-                if let user = authService.currentUser {
+                if let user = authService.currentUser, !referralCode.isEmpty {
                     Task {
                         await referralManager.trackShare(
                             userId: user.id ?? "",
-                            code: user.referralStats.referralCode,
+                            code: referralCode,
                             shareMethod: "empty_state_share"
                         )
                     }
@@ -404,13 +578,14 @@ struct ReferralDashboardView: View {
                 .padding(.vertical, 12)
                 .background(
                     LinearGradient(
-                        colors: [.purple, .pink],
+                        colors: referralCode.isEmpty ? [.gray, .gray] : [.purple, .pink],
                         startPoint: .leading,
                         endPoint: .trailing
                     )
                 )
                 .cornerRadius(12)
             }
+            .disabled(referralCode.isEmpty)
             .scaleButton()
         }
         .frame(maxWidth: .infinity)
@@ -421,19 +596,36 @@ struct ReferralDashboardView: View {
     }
 
     private func referralRow(referral: Referral) -> some View {
-        let isNew = referral.status == .completed &&
-                    referral.completedAt.map { Date().timeIntervalSince($0) < 86400 } ?? false // 24 hours
+        let isNew = referral.isRecent && referral.status == .completed
+        let userName = referral.referredUserName ?? "Friend"
 
         return HStack(spacing: 16) {
-            // Status Icon
+            // User avatar or status icon
             ZStack {
-                Circle()
-                    .fill(referral.status == .completed ? Color.green.opacity(0.2) : Color.orange.opacity(0.2))
+                if let photoURL = referral.referredUserPhotoURL, !photoURL.isEmpty {
+                    AsyncImage(url: URL(string: photoURL)) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        default:
+                            Image(systemName: "person.fill")
+                                .font(.title3)
+                                .foregroundColor(.purple)
+                        }
+                    }
                     .frame(width: 50, height: 50)
+                    .clipShape(Circle())
+                } else {
+                    Circle()
+                        .fill(referral.status == .completed ? Color.green.opacity(0.2) : Color.orange.opacity(0.2))
+                        .frame(width: 50, height: 50)
 
-                Image(systemName: referral.status == .completed ? "checkmark.circle.fill" : "clock.fill")
-                    .font(.title3)
-                    .foregroundColor(referral.status == .completed ? .green : .orange)
+                    Image(systemName: referral.status == .completed ? "person.fill.checkmark" : "clock.fill")
+                        .font(.title3)
+                        .foregroundColor(referral.status == .completed ? .green : .orange)
+                }
 
                 // New badge
                 if isNew {
@@ -450,9 +642,10 @@ struct ReferralDashboardView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
-                    Text(referral.status == .completed ? "Completed" : "Pending")
+                    Text(userName)
                         .font(.headline)
                         .foregroundColor(.primary)
+                        .lineLimit(1)
 
                     if isNew {
                         Image(systemName: "sparkles")
@@ -461,9 +654,15 @@ struct ReferralDashboardView: View {
                     }
                 }
 
-                Text(referral.createdAt.formatted(date: .abbreviated, time: .omitted))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                HStack(spacing: 4) {
+                    Image(systemName: referral.status == .completed ? "checkmark.circle.fill" : "clock.fill")
+                        .font(.caption2)
+                        .foregroundColor(referral.status == .completed ? .green : .orange)
+
+                    Text(referral.formattedDate)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
 
             Spacer()
@@ -675,6 +874,9 @@ struct ReferralDashboardView: View {
     private func loadData() async {
         guard let user = authService.currentUser else { return }
 
+        // First, ensure we have a referral code
+        await ensureReferralCodeExists(for: user)
+
         do {
             // Fetch referral stats
             referralStats = try await referralManager.getReferralStats(for: user)
@@ -686,15 +888,66 @@ struct ReferralDashboardView: View {
 
             // Fetch leaderboard
             try await referralManager.fetchLeaderboard()
+
+            // Clear any previous errors on success
+            errorMessage = nil
         } catch {
             Logger.shared.error("Error loading referral data", category: .referral, error: error)
+            errorMessage = "Failed to load referral data. Please try again."
+        }
+    }
+
+    private func refreshData() async {
+        isRefreshing = true
+        defer { isRefreshing = false }
+
+        guard let user = authService.currentUser else { return }
+
+        do {
+            // Re-fetch all data
+            referralStats = try await referralManager.getReferralStats(for: user)
+
+            if let userId = user.id {
+                try await referralManager.fetchUserReferrals(userId: userId)
+            }
+
+            try await referralManager.fetchLeaderboard()
+
+            // Haptic feedback on successful refresh
+            HapticManager.shared.notification(.success)
+            errorMessage = nil
+        } catch {
+            Logger.shared.error("Error refreshing referral data", category: .referral, error: error)
+            errorMessage = "Failed to refresh data. Pull down to try again."
+            HapticManager.shared.notification(.error)
+        }
+    }
+
+    private func ensureReferralCodeExists(for user: User) async {
+        // Check if user already has a code
+        let existingCode = user.referralStats.referralCode
+        if !existingCode.isEmpty {
+            referralCode = existingCode
+            return
+        }
+
+        // Generate a new code
+        isInitializingCode = true
+        defer { isInitializingCode = false }
+
+        do {
+            let newCode = try await referralManager.ensureReferralCode(for: user)
+            referralCode = newCode
+        } catch {
+            Logger.shared.error("Failed to generate referral code", category: .referral, error: error)
+            errorMessage = "Failed to generate referral code. Please try again."
         }
     }
 
     private func copyCodeToClipboard() {
-        guard let code = authService.currentUser?.referralStats.referralCode else { return }
+        guard !referralCode.isEmpty else { return }
 
-        UIPasteboard.general.string = code
+        UIPasteboard.general.string = referralCode
         HapticManager.shared.notification(.success)
 
         withAnimation {
@@ -710,7 +963,7 @@ struct ReferralDashboardView: View {
 
     private func getReferralMessage(user: User) -> String {
         return referralManager.getReferralShareMessage(
-            code: user.referralStats.referralCode,
+            code: referralCode,
             userName: user.fullName
         )
     }
