@@ -1407,9 +1407,9 @@ struct EditProfileView: View {
                     let imageURL = try await ImageUploadService.shared.uploadProfileImage(profileImage, userId: userId)
                     user.profileImageURL = imageURL
 
-                    // CACHE FIX: Also clear any cached version of the new URL to force fresh load
+                    // CACHE FIX: Cache the newly uploaded image immediately for instant display across all views
                     await MainActor.run {
-                        ImageCache.shared.removeImage(for: imageURL)
+                        ImageCache.shared.setImage(profileImage, for: imageURL)
                     }
                 }
                 
@@ -1573,8 +1573,11 @@ struct EditProfileView: View {
 
                                 Logger.shared.info("✅ Photo \(index + 1) uploaded successfully: \(photoURL)", category: .general)
 
-                                // Success - update UI immediately
+                                // Success - update UI immediately and cache for instant display
                                 await MainActor.run {
+                                    // Cache the uploaded image immediately for instant display across all views
+                                    ImageCache.shared.setImage(optimizedImage, for: photoURL)
+
                                     self.photos.append(photoURL)
                                     self.uploadingPhotoCount -= 1
                                     let progress = Double(items.count - self.uploadingPhotoCount) / Double(items.count)
@@ -2159,6 +2162,8 @@ struct PhotoGridItem: View {
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)
+                        .frame(maxWidth: .infinity)
+                        .clipped()
                 },
                 placeholder: {
                     Rectangle()

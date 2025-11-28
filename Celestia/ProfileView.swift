@@ -68,95 +68,127 @@ struct ProfileView: View {
                             // Hero header with profile photo
                             heroSection(user: user)
 
-                            // Content sections with better organization
-                            VStack(spacing: 16) {
-                                // Profile completion
-                                if profileCompletion < 100 {
-                                    profileCompletionCard(user: user)
-                                        .padding(.top, 20)
+                            // Content sections with professional organization
+                            VStack(spacing: 20) {
+                                // ===== QUICK STATS & ACTIONS SECTION =====
+                                VStack(spacing: 16) {
+                                    // Stats row
+                                    statsRow(user: user)
+
+                                    // Primary action - Edit Profile
+                                    editButton
+
+                                    // Secondary action - Profile Boost
+                                    ProfileBoostButton()
+                                }
+                                .padding(.top, 20)
+
+                                // ===== PROFILE STATUS SECTION =====
+                                VStack(spacing: 16) {
+                                    // Profile completion
+                                    if profileCompletion < 100 {
+                                        profileCompletionCard(user: user)
+                                    }
+
+                                    // Verification card (if not verified)
+                                    if !user.isVerified {
+                                        verificationCard
+                                    }
+
+                                    // Premium badge or upgrade
+                                    if user.isPremium {
+                                        premiumBadgeCard
+                                    } else {
+                                        premiumUpgradeCard
+                                    }
                                 }
 
-                                // Stats row
-                                statsRow(user: user)
-
-                                // Profile Boost button
-                                ProfileBoostButton()
-                                    .padding(.top, 8)
-
-                                // Profile insights card
-                                profileInsightsCard
-
-                                // Edit profile button
-                                editButton
-
-                                // Verification card (if not verified)
-                                if !user.isVerified {
-                                    verificationCard
+                                // ===== INSIGHTS SECTION =====
+                                VStack(spacing: 12) {
+                                    sectionDivider()
+                                    profileInsightsCard
                                 }
+                                .padding(.top, 8)
 
-                                // Premium badge or upgrade
-                                if user.isPremium {
-                                    premiumBadgeCard
-                                } else {
-                                    premiumUpgradeCard
+                                // ===== ABOUT ME SECTION =====
+                                VStack(spacing: 16) {
+                                    sectionDivider()
+                                    sectionHeader(title: "About Me", icon: "person.text.rectangle")
+
+                                    // About section
+                                    if !user.bio.isEmpty {
+                                        aboutSection(bio: user.bio)
+                                    }
+
+                                    // Profile prompts
+                                    if !user.prompts.isEmpty {
+                                        promptsSection(prompts: user.prompts)
+                                    }
+
+                                    // Photo Gallery
+                                    if !user.photos.isEmpty {
+                                        VStack(spacing: 12) {
+                                            sectionHeader(title: "Photo Gallery", icon: "photo.stack")
+                                                .padding(.top, 8)
+                                            photoGallerySection(photos: user.photos)
+                                        }
+                                    }
                                 }
+                                .padding(.top, 8)
 
-                                // Profile Information Section Header
-                                sectionHeader(title: "Profile Information", icon: "person.text.rectangle")
-                                    .padding(.top, 8)
+                                // ===== PROFILE DETAILS SECTION =====
+                                VStack(spacing: 16) {
+                                    sectionDivider()
+                                    sectionHeader(title: "Profile Details", icon: "info.circle.fill")
 
-                                // About section
-                                if !user.bio.isEmpty {
-                                    aboutSection(bio: user.bio)
+                                    // Details grid
+                                    detailsCard(user: user)
+
+                                    // Lifestyle card
+                                    lifestyleCard(user: user)
                                 }
+                                .padding(.top, 8)
 
-                                // Profile prompts
-                                if !user.prompts.isEmpty {
-                                    promptsSection(prompts: user.prompts)
+                                // ===== INTERESTS & LANGUAGES SECTION =====
+                                VStack(spacing: 16) {
+                                    sectionDivider()
+                                    sectionHeader(title: "Interests & Languages", icon: "sparkles")
+
+                                    // Languages
+                                    if !user.languages.isEmpty {
+                                        languagesCard(languages: user.languages)
+                                    }
+
+                                    // Interests
+                                    if !user.interests.isEmpty {
+                                        interestsCard(interests: user.interests)
+                                    }
                                 }
+                                .padding(.top, 8)
 
-                                // Details grid
-                                detailsCard(user: user)
+                                // ===== PREFERENCES & ACTIVITY SECTION =====
+                                VStack(spacing: 16) {
+                                    sectionDivider()
+                                    sectionHeader(title: "Preferences & Activity", icon: "slider.horizontal.3")
 
-                                // Lifestyle card
-                                lifestyleCard(user: user)
+                                    // Preferences
+                                    preferencesCard(user: user)
 
-                                // Interests & Languages Section Header
-                                sectionHeader(title: "Interests & Languages", icon: "sparkles")
-                                    .padding(.top, 8)
-
-                                // Languages
-                                if !user.languages.isEmpty {
-                                    languagesCard(languages: user.languages)
+                                    // Activity & Achievements
+                                    achievementsCard(user: user)
                                 }
+                                .padding(.top, 8)
 
-                                // Interests
-                                if !user.interests.isEmpty {
-                                    interestsCard(interests: user.interests)
+                                // ===== ACCOUNT SECTION =====
+                                VStack(spacing: 16) {
+                                    sectionDivider()
+                                    sectionHeader(title: "Account", icon: "person.circle.fill")
+
+                                    // Action buttons
+                                    actionButtons
                                 }
-
-                                // Gallery Section Header
-                                if !user.photos.isEmpty {
-                                    sectionHeader(title: "Photo Gallery", icon: "photo.stack")
-                                        .padding(.top, 8)
-
-                                    // Photo gallery
-                                    photoGallerySection(photos: user.photos)
-                                }
-
-                                // Preferences Section Header
-                                sectionHeader(title: "Preferences", icon: "slider.horizontal.3")
-                                    .padding(.top, 8)
-
-                                // Preferences
-                                preferencesCard(user: user)
-
-                                // Activity & Achievements
-                                achievementsCard(user: user)
-
-                                // Action buttons
-                                actionButtons
-                                    .padding(.bottom, 20)
+                                .padding(.top, 8)
+                                .padding(.bottom, 40)
                             }
                             .padding(.top, -40)
                         }
@@ -974,32 +1006,61 @@ struct ProfileView: View {
         .padding(.horizontal, 20)
     }
 
-    // MARK: - Section Headers
+    // MARK: - Section Headers & Dividers
 
-    private func sectionHeader(title: String, icon: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(
+    private func sectionDivider() -> some View {
+        VStack(spacing: 0) {
+            Rectangle()
+                .fill(
                     LinearGradient(
-                        colors: [.purple, .pink],
+                        colors: [
+                            .clear,
+                            .purple.opacity(0.15),
+                            .pink.opacity(0.1),
+                            .clear
+                        ],
                         startPoint: .leading,
                         endPoint: .trailing
                     )
                 )
+                .frame(height: 1)
+                .padding(.horizontal, 40)
+        }
+        .padding(.vertical, 12)
+    }
+
+    private func sectionHeader(title: String, icon: String) -> some View {
+        HStack(spacing: 12) {
+            // Icon with gradient background
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.purple.opacity(0.15), .pink.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 36, height: 36)
+
+                Image(systemName: icon)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
 
             Text(title)
                 .font(.title3.weight(.bold))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [.purple, .pink],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
+                .foregroundColor(.primary)
 
             Spacer()
 
+            // Decorative line
             Rectangle()
                 .fill(
                     LinearGradient(
@@ -1009,9 +1070,10 @@ struct ProfileView: View {
                     )
                 )
                 .frame(height: 2)
+                .frame(maxWidth: 80)
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 8)
+        .padding(.vertical, 4)
     }
 
     // MARK: - About Section
@@ -1057,40 +1119,55 @@ struct ProfileView: View {
     // MARK: - Prompts Section
 
     private func promptsSection(prompts: [ProfilePrompt]) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 8) {
-                Image(systemName: "quote.bubble.fill")
-                    .foregroundColor(.purple)
-                Text("About Me")
-                    .font(.headline)
-            }
-            .padding(.horizontal, 20)
-
+        VStack(alignment: .leading, spacing: 12) {
             ForEach(prompts) { prompt in
                 VStack(alignment: .leading, spacing: 10) {
-                    Text(prompt.question)
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.purple)
+                    HStack(spacing: 6) {
+                        Image(systemName: "quote.bubble.fill")
+                            .font(.caption)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.purple, .pink],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+
+                        Text(prompt.question)
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.purple, .pink],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                    }
 
                     Text(prompt.answer)
                         .font(.body)
                         .foregroundColor(.primary)
                         .fixedSize(horizontal: false, vertical: true)
+                        .lineSpacing(2)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(20)
                 .background(
-                    LinearGradient(
-                        colors: [Color.purple.opacity(0.05), Color.pink.opacity(0.03)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color(.systemBackground))
+                        .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
                 )
-                .cornerRadius(16)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.purple.opacity(0.15), lineWidth: 1)
+                        .stroke(
+                            LinearGradient(
+                                colors: [Color.purple.opacity(0.2), Color.pink.opacity(0.15)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
                 )
                 .padding(.horizontal, 20)
             }
@@ -1237,28 +1314,38 @@ struct ProfileView: View {
     }
     
     // MARK: - Photo Gallery
-    
+
     private func photoGallerySection(photos: [String]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: "photo.on.rectangle")
-                    .foregroundColor(.purple)
-                Text("Photo Gallery")
-                    .font(.headline)
-                
+        VStack(alignment: .leading, spacing: 16) {
+            // Photo count badge
+            HStack {
                 Spacer()
-                
-                Text("\(photos.count)")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(Color.purple)
-                    .cornerRadius(12)
+
+                HStack(spacing: 6) {
+                    Image(systemName: "photo.stack")
+                        .font(.caption2)
+
+                    Text("\(photos.count) photo\(photos.count != 1 ? "s" : "")")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    LinearGradient(
+                        colors: [.purple, .pink],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(20)
+
+                Spacer()
             }
             .padding(.horizontal, 20)
-            
+
+            // Photo gallery scroll view
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     ForEach(photos.indices, id: \.self) { index in
@@ -1275,6 +1362,18 @@ struct ProfileView: View {
                             .frame(width: 140, height: 200)
                             .cornerRadius(16)
                             .clipped()
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(
+                                        LinearGradient(
+                                            colors: [.purple.opacity(0.3), .pink.opacity(0.2)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        lineWidth: 2
+                                    )
+                            )
+                            .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
                         }
                         .accessibilityLabel("Photo \(index + 1) of \(photos.count)")
                         .accessibilityHint("Tap to view full size")
@@ -1428,69 +1527,83 @@ struct ProfileView: View {
     }
 
     // MARK: - Achievements Card
-    
+
     private func achievementsCard(user: User) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 8) {
-                Image(systemName: "trophy.fill")
-                    .foregroundColor(.purple)
-                Text("Achievements")
-                    .font(.headline)
-            }
-            
+        VStack(alignment: .leading, spacing: 20) {
             HStack(spacing: 12) {
                 achievementBadge(
                     icon: "flame.fill",
                     title: "Active",
                     subtitle: "Daily user",
-                    color: .orange
+                    colors: [.orange, .red]
                 )
-                
-                if accurateMatchCount >= 10 {
+
+                if user.matchCount >= 10 {
                     achievementBadge(
                         icon: "heart.fill",
                         title: "Popular",
-                        subtitle: "\(accurateMatchCount) matches",
-                        color: .pink
+                        subtitle: "\(user.matchCount) matches",
+                        colors: [.pink, .purple]
                     )
                 }
-                
+
                 if user.isVerified {
                     achievementBadge(
                         icon: "checkmark.seal.fill",
                         title: "Verified",
                         subtitle: "Trusted",
-                        color: .blue
+                        colors: [.blue, .cyan]
                     )
                 }
             }
         }
         .padding(20)
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.gray.opacity(0.1), lineWidth: 1)
+        )
         .padding(.horizontal, 20)
     }
 
-    private func achievementBadge(icon: String, title: String, subtitle: String, color: Color) -> some View {
-        VStack(spacing: 8) {
+    private func achievementBadge(icon: String, title: String, subtitle: String, colors: [Color]) -> some View {
+        VStack(spacing: 10) {
             ZStack {
                 Circle()
-                    .fill(color.opacity(0.15))
-                    .frame(width: 60, height: 60)
-                
+                    .fill(
+                        LinearGradient(
+                            colors: [colors[0].opacity(0.2), colors[1].opacity(0.15)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 64, height: 64)
+
                 Image(systemName: icon)
                     .font(.title2)
-                    .foregroundColor(color)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: colors,
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
             }
-            
-            Text(title)
-                .font(.caption)
-                .fontWeight(.semibold)
-            
-            Text(subtitle)
-                .font(.caption2)
-                .foregroundColor(.secondary)
+
+            VStack(spacing: 4) {
+                Text(title)
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+
+                Text(subtitle)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
         }
         .frame(maxWidth: .infinity)
     }
