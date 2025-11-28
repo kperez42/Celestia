@@ -1129,25 +1129,6 @@ struct FAQItem: View {
     }
 }
 
-// MARK: - Purchase Error
-
-enum PurchaseError: LocalizedError {
-    case productNotFound
-    case purchaseFailed
-    case cancelled
-
-    var errorDescription: String? {
-        switch self {
-        case .productNotFound:
-            return "Unable to load product. Please try again."
-        case .purchaseFailed:
-            return "Purchase failed. Please try again."
-        case .cancelled:
-            return "Purchase was cancelled."
-        }
-    }
-}
-
 #Preview {
     NavigationStack {
         PremiumUpgradeView()
