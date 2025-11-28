@@ -20,7 +20,6 @@ struct MessagesView: View {
     @State private var searchText = ""
     @State private var showSearch = false
     @State private var chatPresentation: ChatPresentation?
-    @State private var selectedMessageTab = 0
 
     // Wrapper for item-based sheet presentation
     struct ChatPresentation: Identifiable {
@@ -31,50 +30,28 @@ struct MessagesView: View {
 
     // PERFORMANCE: Memoized conversation lists to avoid O(n) on every render
     @State private var cachedConversations: [(Match, User)] = []
-    @State private var cachedReceivedConversations: [(Match, User)] = []
-    @State private var cachedSentConversations: [(Match, User)] = []
     @State private var cachedFilteredConversations: [(Match, User)] = []
-
-    private let tabs = ["Received", "Sent"]
 
     // PERFORMANCE: Use cached values
     var conversations: [(Match, User)] { cachedConversations }
-    var receivedConversations: [(Match, User)] { cachedReceivedConversations }
-    var sentConversations: [(Match, User)] { cachedSentConversations }
     var filteredConversations: [(Match, User)] { cachedFilteredConversations }
 
     // PERFORMANCE: Update cached conversations only when dependencies change
     private func updateCachedConversations() {
-        // Build base conversations
+        // Build base conversations sorted by most recent activity
         cachedConversations = matchService.matches.compactMap { match in
             guard let user = getMatchedUser(match) else { return nil }
             return (match, user)
         }
-
-        let currentUserId = authService.currentUser?.id ?? "current_user"
-
-        // Filter received (other person sent last message or new match)
-        cachedReceivedConversations = cachedConversations.filter { match, _ in
-            guard let lastSenderId = match.lastMessageSenderId else { return true }
-            return lastSenderId != currentUserId
-        }
-
-        // Filter sent (you sent last message)
-        cachedSentConversations = cachedConversations.filter { match, _ in
-            guard let lastSenderId = match.lastMessageSenderId else { return false }
-            return lastSenderId == currentUserId
-        }
-
         updateFilteredConversations()
     }
 
     private func updateFilteredConversations() {
-        let baseConversations = selectedMessageTab == 0 ? cachedReceivedConversations : cachedSentConversations
         guard !searchDebouncer.debouncedText.isEmpty else {
-            cachedFilteredConversations = baseConversations
+            cachedFilteredConversations = cachedConversations
             return
         }
-        cachedFilteredConversations = baseConversations.filter { _, user in
+        cachedFilteredConversations = cachedConversations.filter { _, user in
             user.fullName.localizedCaseInsensitiveContains(searchDebouncer.debouncedText) ||
             user.location.localizedCaseInsensitiveContains(searchDebouncer.debouncedText)
         }
@@ -99,51 +76,22 @@ struct MessagesView: View {
                     // Header
                     headerView
 
-                    // Tab selector
-                    messageTabSelector
-
                     // Search bar
                     if showSearch {
                         searchBar
                             .transition(.move(edge: .top).combined(with: .opacity))
                     }
 
-                    // Content
+                    // Content - single unified list of all conversations
                     if matchService.isLoading && conversations.isEmpty {
                         loadingView
                     } else if conversations.isEmpty {
                         emptyStateView
+                    } else if filteredConversations.isEmpty && !searchDebouncer.debouncedText.isEmpty {
+                        // No search results
+                        noSearchResultsView
                     } else {
-                        TabView(selection: $selectedMessageTab) {
-                            // Received tab
-                            Group {
-                                if receivedConversations.isEmpty {
-                                    tabEmptyStateView(
-                                        icon: "arrow.down.circle",
-                                        title: "No Messages to Reply",
-                                        subtitle: "When someone messages you, they'll appear here"
-                                    )
-                                } else {
-                                    conversationsListView
-                                }
-                            }
-                            .tag(0)
-
-                            // Sent tab
-                            Group {
-                                if sentConversations.isEmpty {
-                                    tabEmptyStateView(
-                                        icon: "arrow.up.circle",
-                                        title: "No Sent Messages",
-                                        subtitle: "Messages you've sent waiting for replies will appear here"
-                                    )
-                                } else {
-                                    conversationsListView
-                                }
-                            }
-                            .tag(1)
-                        }
-                        .tabViewStyle(.page(indexDisplayMode: .never))
+                        conversationsListView
                     }
                 }
             }
@@ -165,9 +113,6 @@ struct MessagesView: View {
             }
             .onChange(of: matchedUsers.count) { _, _ in
                 updateCachedConversations()
-            }
-            .onChange(of: selectedMessageTab) { _, _ in
-                updateFilteredConversations()
             }
             .onChange(of: searchDebouncer.debouncedText) { _, _ in
                 updateFilteredConversations()
@@ -251,23 +196,10 @@ struct MessagesView: View {
                             
                             HStack(spacing: 8) {
                                 HStack(spacing: 4) {
-                                    Image(systemName: "arrow.down.circle.fill")
+                                    Image(systemName: "bubble.left.and.bubble.right.fill")
                                         .font(.caption)
-                                    Text("\(receivedConversations.count)")
+                                    Text("\(conversations.count) chats")
                                         .fontWeight(.semibold)
-                                }
-
-                                if sentConversations.count > 0 {
-                                    Circle()
-                                        .fill(Color.white.opacity(0.5))
-                                        .frame(width: 4, height: 4)
-
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "arrow.up.circle.fill")
-                                            .font(.caption)
-                                        Text("\(sentConversations.count) sent")
-                                            .fontWeight(.semibold)
-                                    }
                                 }
 
                                 if totalUnread > 0 {
@@ -339,63 +271,6 @@ struct MessagesView: View {
             .padding(.bottom, 16)
         }
         .frame(height: 140)
-    }
-
-    // MARK: - Tab Selector
-
-    private var messageTabSelector: some View {
-        HStack(spacing: 0) {
-            ForEach(0..<tabs.count, id: \.self) { index in
-                Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        selectedMessageTab = index
-                    }
-                    HapticManager.shared.impact(.light)
-                } label: {
-                    VStack(spacing: 8) {
-                        HStack(spacing: 6) {
-                            Text(tabs[index])
-                                .font(.subheadline)
-                                .fontWeight(selectedMessageTab == index ? .bold : .medium)
-
-                            // Show count badge
-                            let count = index == 0 ? receivedConversations.count : sentConversations.count
-                            if count > 0 {
-                                Text("\(count)")
-                                    .font(.caption2)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(selectedMessageTab == index ? .white : .purple)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(
-                                        Capsule()
-                                            .fill(selectedMessageTab == index ? Color.purple : Color.purple.opacity(0.2))
-                                    )
-                            }
-                        }
-                        .foregroundColor(selectedMessageTab == index ? .primary : .secondary)
-
-                        // Indicator line
-                        Rectangle()
-                            .fill(
-                                selectedMessageTab == index ?
-                                LinearGradient(
-                                    colors: [.purple, .pink],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                ) :
-                                LinearGradient(colors: [Color.clear], startPoint: .leading, endPoint: .trailing)
-                            )
-                            .frame(height: 3)
-                            .cornerRadius(1.5)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-            }
-        }
-        .padding(.horizontal)
-        .padding(.top, 8)
-        .background(Color(.systemBackground))
     }
 
     // MARK: - Search Bar
@@ -564,9 +439,9 @@ struct MessagesView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - Tab Empty State
+    // MARK: - No Search Results
 
-    private func tabEmptyStateView(icon: String, title: String, subtitle: String) -> some View {
+    private var noSearchResultsView: some View {
         VStack(spacing: 20) {
             Spacer()
 
@@ -581,7 +456,7 @@ struct MessagesView: View {
                     )
                     .frame(width: 100, height: 100)
 
-                Image(systemName: icon)
+                Image(systemName: "magnifyingglass")
                     .font(.system(size: 40))
                     .foregroundStyle(
                         LinearGradient(
@@ -593,11 +468,11 @@ struct MessagesView: View {
             }
 
             VStack(spacing: 8) {
-                Text(title)
+                Text("No Results")
                     .font(.title3)
                     .fontWeight(.semibold)
 
-                Text(subtitle)
+                Text("No conversations match \"\(searchDebouncer.debouncedText)\"")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
