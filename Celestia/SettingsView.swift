@@ -15,6 +15,7 @@ struct SettingsView: View {
     @State private var showReferralDashboard = false
     @State private var showPremiumUpgrade = false
     @State private var showSeeWhoLikesYou = false
+    @State private var showAdminDashboard = false
 
     // CODE QUALITY FIX: Define URL constants to avoid force unwrapping
     private static let supportEmailURL = URL(string: "mailto:support@celestia.app")!
@@ -210,6 +211,26 @@ struct SettingsView: View {
                     }
                 }
                 
+                // Admin section - only visible for admin users
+                if isAdminUser {
+                    Section("Admin") {
+                        Button {
+                            showAdminDashboard = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "shield.checkered")
+                                    .foregroundColor(.red)
+                                Text("Moderation Dashboard")
+                                    .foregroundColor(.primary)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                    }
+                }
+
                 Section("Danger Zone") {
                     Button(role: .destructive) {
                         showDeleteConfirmation = true
@@ -256,7 +277,18 @@ struct SettingsView: View {
                 SeeWhoLikesYouView()
                     .environmentObject(authService)
             }
+            .sheet(isPresented: $showAdminDashboard) {
+                AdminModerationDashboard()
+            }
         }
+    }
+
+    // Check if current user is an admin
+    private var isAdminUser: Bool {
+        guard let email = authService.currentUser?.email else { return false }
+        // Add your admin email(s) here
+        let adminEmails = ["kperez42@gmail.com", "admin@celestia.app"]
+        return adminEmails.contains(email.lowercased())
     }
 }
 
