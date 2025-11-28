@@ -12,7 +12,8 @@ struct VerificationFlowView: View {
     @StateObject private var verificationService = VerificationService.shared
     @State private var selectedVerification: VerificationType?
     @State private var showingPhotoVerification = false
-    @State private var showingStripeIdentityVerification = false  // NEW: Stripe Identity (primary)
+    @State private var showingManualIDVerification = false  // Manual review for small apps
+    @State private var showingStripeIdentityVerification = false  // Stripe Identity (for scaling)
     @State private var showingIDVerification = false  // Legacy, kept for fallback
     @State private var showingBackgroundCheck = false
 
@@ -37,8 +38,11 @@ struct VerificationFlowView: View {
         .sheet(isPresented: $showingPhotoVerification) {
             PhotoVerificationSheet()
         }
+        .sheet(isPresented: $showingManualIDVerification) {
+            ManualIDVerificationView()  // Manual review for small apps
+        }
         .sheet(isPresented: $showingStripeIdentityVerification) {
-            StripeIdentityVerificationView()  // NEW: Stripe Identity sheet
+            StripeIdentityVerificationView()  // Stripe Identity (for scaling)
         }
         .sheet(isPresented: $showingIDVerification) {
             IDVerificationSheet()  // Legacy, kept for fallback
@@ -120,16 +124,27 @@ struct VerificationFlowView: View {
                 action: { showingPhotoVerification = true }
             )
 
-            // Stripe Identity - Primary ID verification method (recommended)
+            // Manual ID Verification - Primary for small apps (manual review)
             verificationOption(
-                type: .stripeIdentity,
+                type: .manualID,
                 title: "ID Verification",
-                description: "Fast & secure verification powered by Stripe",
-                points: "+35 points",
-                isCompleted: verificationService.stripeIdentityVerified || verificationService.idVerified,
+                description: "Submit ID + selfie for verification",
+                points: "+30 points",
+                isCompleted: verificationService.idVerified,
                 isRecommended: true,
-                action: { showingStripeIdentityVerification = true }
+                action: { showingManualIDVerification = true }
             )
+
+            // Stripe Identity - Alternative for auto-verification (future scaling)
+            // Uncomment when ready to use Stripe Identity
+            // verificationOption(
+            //     type: .stripeIdentity,
+            //     title: "Instant ID Verification",
+            //     description: "Fast & secure auto-verification powered by Stripe",
+            //     points: "+35 points",
+            //     isCompleted: verificationService.stripeIdentityVerified,
+            //     action: { showingStripeIdentityVerification = true }
+            // )
 
             verificationOption(
                 type: .background,
@@ -264,7 +279,8 @@ struct VerificationFlowView: View {
 
 enum VerificationType {
     case photo
-    case stripeIdentity  // NEW: Primary ID verification via Stripe
+    case manualID  // Manual ID verification with admin review
+    case stripeIdentity  // Auto ID verification via Stripe (for scaling)
     case id  // Legacy on-device ID verification
     case background
 
@@ -272,8 +288,10 @@ enum VerificationType {
         switch self {
         case .photo:
             return "camera.fill"
-        case .stripeIdentity:
+        case .manualID:
             return "person.text.rectangle.fill"
+        case .stripeIdentity:
+            return "bolt.shield.fill"
         case .id:
             return "person.text.rectangle"
         case .background:
