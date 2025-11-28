@@ -14,7 +14,6 @@ struct StripeIdentityVerificationView: View {
 
     @Environment(\.dismiss) private var dismiss
     @StateObject private var stripeManager = StripeIdentityManager.shared
-    @StateObject private var verificationService = VerificationService.shared
 
     @State private var showingError = false
     @State private var errorMessage = ""
@@ -344,7 +343,7 @@ struct StripeIdentityVerificationView: View {
                 }
 
                 // Start Stripe Identity verification
-                let result = try await verificationService.startStripeIdentityVerification(from: topController)
+                let result = try await stripeManager.startVerification(from: topController)
 
                 await MainActor.run {
                     isLoading = false
