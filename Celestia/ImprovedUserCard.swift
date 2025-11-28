@@ -121,9 +121,11 @@ struct ImprovedUserCard: View {
                                 .resizable()
                                 .interpolation(.high)
                                 .antialiased(true)
+                                .renderingMode(.original)
                                 .aspectRatio(contentMode: .fill)
                                 .frame(width: geometry.size.width, height: geometry.size.height)
                                 .clipped()
+                                .crispImageRendering()
                         },
                         placeholder: {
                             placeholderGradient

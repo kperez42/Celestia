@@ -156,6 +156,7 @@ class ImageCache {
     }
 
     /// High-quality image decoding using ImageIO to prevent automatic downsampling
+    /// Includes preparation for display and optional sharpening for crisp rendering
     static func decodeImageWithHighQuality(from data: Data) -> UIImage? {
         let options: [CFString: Any] = [
             kCGImageSourceShouldCache: true,
@@ -173,7 +174,42 @@ class ImageCache {
 
         // Create UIImage at native scale for Retina displays
         let scale = UIScreen.main.scale
-        return UIImage(cgImage: cgImage, scale: scale, orientation: .up)
+        let image = UIImage(cgImage: cgImage, scale: scale, orientation: .up)
+
+        // iOS 15+: Prepare image for display (optimizes for current screen)
+        if #available(iOS 15.0, *) {
+            return image.preparingForDisplay() ?? image
+        }
+
+        return image
+    }
+
+    /// Apply subtle sharpening to enhance image clarity (for card display)
+    static func sharpenImage(_ image: UIImage, intensity: Float = 0.4) -> UIImage? {
+        guard let ciImage = CIImage(image: image) else { return image }
+
+        // Use unsharp mask for natural-looking sharpness
+        guard let filter = CIFilter(name: "CIUnsharpMask") else { return image }
+        filter.setValue(ciImage, forKey: kCIInputImageKey)
+        filter.setValue(intensity, forKey: kCIInputIntensityKey)  // Subtle sharpening
+        filter.setValue(2.5, forKey: kCIInputRadiusKey)  // Sharpening radius
+
+        guard let outputImage = filter.outputImage else { return image }
+
+        let context = CIContext(options: [.useSoftwareRenderer: false])
+        guard let cgImage = context.createCGImage(outputImage, from: outputImage.extent) else {
+            return image
+        }
+
+        return UIImage(cgImage: cgImage, scale: image.scale, orientation: image.imageOrientation)
+    }
+
+    /// Decode and prepare image for crisp card display
+    static func decodeForCardDisplay(from data: Data) -> UIImage? {
+        guard let image = decodeImageWithHighQuality(from: data) else { return nil }
+
+        // Apply subtle sharpening for crisp card appearance
+        return sharpenImage(image, intensity: 0.3) ?? image
     }
 
     func removeImage(for key: String) {
@@ -1042,9 +1078,11 @@ struct CachedCardImage: View {
                         .resizable()
                         .interpolation(.high)
                         .antialiased(true)
+                        .renderingMode(.original)  // Preserve original colors
                         .aspectRatio(contentMode: .fill)
                         .frame(width: geometry.size.width, height: geometry.size.height)
                         .clipped()
+                        .crispImageRendering()  // GPU-accelerated crisp rendering
                         .opacity(imageOpacity)
                         .onAppear {
                             // Smooth fade-in for newly loaded images
@@ -1214,5 +1252,56 @@ struct CachedCardImage: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - High Quality Image View Modifier
+
+/// View modifier that applies CALayer settings for crisp image rendering
+struct HighQualityImageModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .background(
+                HighQualityLayerView()
+            )
+    }
+}
+
+/// UIViewRepresentable that configures CALayer for maximum image quality
+struct HighQualityLayerView: UIViewRepresentable {
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.backgroundColor = .clear
+        view.isUserInteractionEnabled = false
+
+        // Configure layer for high-quality rendering
+        view.layer.minificationFilter = .trilinear  // Best quality when scaling down
+        view.layer.magnificationFilter = .trilinear  // Best quality when scaling up
+        view.layer.allowsEdgeAntialiasing = true
+        view.layer.contentsScale = UIScreen.main.scale
+        view.layer.shouldRasterize = false  // Don't rasterize (keeps quality)
+        view.layer.drawsAsynchronously = true  // Better performance
+
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        // Update scale in case of display changes
+        uiView.layer.contentsScale = UIScreen.main.scale
+    }
+}
+
+extension View {
+    /// Apply high-quality layer settings for crisp image rendering
+    func highQualityRendering() -> some View {
+        self
+            .drawingGroup(opaque: false, colorMode: .extendedLinear)  // GPU-accelerated with extended color
+    }
+
+    /// Apply crisp rendering optimizations for card images
+    func crispImageRendering() -> some View {
+        self
+            .compositingGroup()  // Flatten for better rendering
+            .drawingGroup(opaque: false, colorMode: .nonLinear)  // GPU rendering
     }
 }
