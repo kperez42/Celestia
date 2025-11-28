@@ -758,6 +758,8 @@ struct CachedProfileImage: View {
             if let previousImage = previousImage {
                 Image(uiImage: previousImage)
                     .resizable()
+                    .interpolation(.high)
+                    .antialiased(true)
                     .aspectRatio(contentMode: .fill)
                     .frame(width: size, height: size)
                     .clipShape(Circle())
@@ -767,6 +769,8 @@ struct CachedProfileImage: View {
             if let image = image {
                 Image(uiImage: image)
                     .resizable()
+                    .interpolation(.high)
+                    .antialiased(true)
                     .aspectRatio(contentMode: .fill)
                     .frame(width: size, height: size)
                     .clipShape(Circle())
@@ -977,6 +981,8 @@ struct CachedCardImage: View {
                 if let image = image {
                     Image(uiImage: image)
                         .resizable()
+                        .interpolation(.high)
+                        .antialiased(true)
                         .aspectRatio(contentMode: .fill)
                         .frame(width: geometry.size.width, height: geometry.size.height)
                         .clipped()

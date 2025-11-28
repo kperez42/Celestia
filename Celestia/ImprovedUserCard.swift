@@ -119,6 +119,8 @@ struct ImprovedUserCard: View {
                         content: { image in
                             image
                                 .resizable()
+                                .interpolation(.high)
+                                .antialiased(true)
                                 .aspectRatio(contentMode: .fill)
                                 .frame(width: geometry.size.width, height: geometry.size.height)
                                 .clipped()

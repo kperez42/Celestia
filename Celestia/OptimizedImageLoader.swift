@@ -309,6 +309,8 @@ struct OptimizedProfileCardImage: View {
         ) { image in
             image
                 .resizable()
+                .interpolation(.high)
+                .antialiased(true)
                 .aspectRatio(contentMode: .fill)
                 .frame(width: width, height: height)
                 .clipped()
@@ -343,6 +345,8 @@ struct OptimizedThumbnailImage: View {
         ) { image in
             image
                 .resizable()
+                .interpolation(.high)
+                .antialiased(true)
                 .aspectRatio(contentMode: .fill)
                 .frame(width: size, height: size)
                 .clipShape(Circle())
