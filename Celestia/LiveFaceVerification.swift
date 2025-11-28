@@ -79,7 +79,7 @@ enum LivenessChallenge: String, CaseIterable {
 
 // MARK: - Verification Session State
 
-enum LiveVerificationState {
+enum LiveVerificationState: Equatable {
     case initializing
     case positioning      // Getting face in frame
     case capturingPoses   // Multi-angle capture
@@ -87,6 +87,22 @@ enum LiveVerificationState {
     case processing       // Comparing with profile
     case success
     case failure(String)
+
+    static func == (lhs: LiveVerificationState, rhs: LiveVerificationState) -> Bool {
+        switch (lhs, rhs) {
+        case (.initializing, .initializing),
+             (.positioning, .positioning),
+             (.capturingPoses, .capturingPoses),
+             (.livenessCheck, .livenessCheck),
+             (.processing, .processing),
+             (.success, .success):
+            return true
+        case (.failure(let lhsMessage), .failure(let rhsMessage)):
+            return lhsMessage == rhsMessage
+        default:
+            return false
+        }
+    }
 }
 
 // MARK: - Face Capture Data
