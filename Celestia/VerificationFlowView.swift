@@ -11,10 +11,7 @@ struct VerificationFlowView: View {
 
     @StateObject private var verificationService = VerificationService.shared
     @State private var selectedVerification: VerificationType?
-    @State private var showingPhotoVerification = false
-    @State private var showingManualIDVerification = false  // Manual review for small apps
-    @State private var showingStripeIdentityVerification = false  // Stripe Identity (for scaling)
-    @State private var showingIDVerification = false  // Legacy, kept for fallback
+    @State private var showingManualIDVerification = false  // Manual review
     @State private var showingBackgroundCheck = false
 
     var body: some View {
@@ -35,17 +32,8 @@ struct VerificationFlowView: View {
             .padding()
         }
         .navigationTitle("Verification")
-        .sheet(isPresented: $showingPhotoVerification) {
-            PhotoVerificationSheet()
-        }
         .sheet(isPresented: $showingManualIDVerification) {
-            ManualIDVerificationView()  // Manual review for small apps
-        }
-        .sheet(isPresented: $showingStripeIdentityVerification) {
-            StripeIdentityVerificationView()  // Stripe Identity (for scaling)
-        }
-        .sheet(isPresented: $showingIDVerification) {
-            IDVerificationSheet()  // Legacy, kept for fallback
+            ManualIDVerificationView()
         }
         .sheet(isPresented: $showingBackgroundCheck) {
             BackgroundCheckSheet()
@@ -115,36 +103,16 @@ struct VerificationFlowView: View {
 
     private var verificationOptions: some View {
         VStack(spacing: 16) {
-            verificationOption(
-                type: .photo,
-                title: "Photo Verification",
-                description: "Verify you match your profile photos",
-                points: "+25 points",
-                isCompleted: verificationService.photoVerified,
-                action: { showingPhotoVerification = true }
-            )
-
-            // Manual ID Verification - Primary for small apps (manual review)
+            // Manual ID Verification - Primary method (manual review)
             verificationOption(
                 type: .manualID,
                 title: "ID Verification",
-                description: "Submit ID + selfie for verification",
+                description: "Submit ID type, photo, and selfie for verification",
                 points: "+30 points",
                 isCompleted: verificationService.idVerified,
                 isRecommended: true,
                 action: { showingManualIDVerification = true }
             )
-
-            // Stripe Identity - Alternative for auto-verification (future scaling)
-            // Uncomment when ready to use Stripe Identity
-            // verificationOption(
-            //     type: .stripeIdentity,
-            //     title: "Instant ID Verification",
-            //     description: "Fast & secure auto-verification powered by Stripe",
-            //     points: "+35 points",
-            //     isCompleted: verificationService.stripeIdentityVerified,
-            //     action: { showingStripeIdentityVerification = true }
-            // )
 
             verificationOption(
                 type: .background,
@@ -278,115 +246,15 @@ struct VerificationFlowView: View {
 // MARK: - Verification Type
 
 enum VerificationType {
-    case photo
     case manualID  // Manual ID verification with admin review
-    case stripeIdentity  // Auto ID verification via Stripe (for scaling)
-    case id  // Legacy on-device ID verification
     case background
 
     var icon: String {
         switch self {
-        case .photo:
-            return "camera.fill"
         case .manualID:
             return "person.text.rectangle.fill"
-        case .stripeIdentity:
-            return "bolt.shield.fill"
-        case .id:
-            return "person.text.rectangle"
         case .background:
             return "shield.checkered"
-        }
-    }
-}
-
-// MARK: - Photo Verification Sheet
-
-struct PhotoVerificationSheet: View {
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationView {
-            VStack(spacing: 24) {
-                Text("Take a selfie to verify you match your profile photos")
-                    .font(.headline)
-                    .multilineTextAlignment(.center)
-                    .padding()
-
-                Image(systemName: "camera.fill")
-                    .font(.system(size: 80))
-                    .foregroundColor(.blue)
-
-                Button(action: {}) {
-                    Text("Take Selfie")
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .cornerRadius(12)
-                }
-                .padding()
-            }
-            .navigationTitle("Photo Verification")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Cancel") { dismiss() }
-                }
-            }
-        }
-    }
-}
-
-// MARK: - ID Verification Sheet
-
-struct IDVerificationSheet: View {
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationView {
-            VStack(spacing: 24) {
-                Text("Scan your government-issued ID")
-                    .font(.headline)
-                    .multilineTextAlignment(.center)
-                    .padding()
-
-                Image(systemName: "person.text.rectangle.fill")
-                    .font(.system(size: 80))
-                    .foregroundColor(.blue)
-
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Accepted IDs:")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-
-                    Text("• Driver's License")
-                    Text("• Passport")
-                    Text("• State ID")
-                    Text("• National ID")
-                }
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-
-                Button(action: {}) {
-                    Text("Scan ID")
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .cornerRadius(12)
-                }
-                .padding()
-            }
-            .navigationTitle("ID Verification")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Cancel") { dismiss() }
-                }
-            }
         }
     }
 }

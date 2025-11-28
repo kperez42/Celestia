@@ -21,7 +21,7 @@ struct ProfileView: View {
     @State private var showingSettings = false
     @State private var showingPremiumUpgrade = false
     @State private var showingPhotoViewer = false
-    @State private var showingPhotoVerification = false
+    @State private var showingIDVerification = false
     @State private var showingReferral = false
     @State private var selectedPhotoIndex = 0
     @State private var animateStats = false
@@ -227,10 +227,8 @@ struct ProfileView: View {
                     )
                 }
             }
-            .fullScreenCover(isPresented: $showingPhotoVerification) {
-                if let user = authService.currentUser, let userId = user.id {
-                    PhotoVerificationView(userId: userId)
-                }
+            .fullScreenCover(isPresented: $showingIDVerification) {
+                ManualIDVerificationView()
             }
             .sheet(isPresented: $showingReferral) {
                 ReferralDashboardView()
@@ -305,7 +303,7 @@ struct ProfileView: View {
 
         case .getVerified:
             // Open photo verification flow
-            showingPhotoVerification = true
+            showingIDVerification = true
         }
     }
 
@@ -796,7 +794,7 @@ struct ProfileView: View {
 
     private var verificationCard: some View {
         Button {
-            showingPhotoVerification = true
+            showingIDVerification = true
             HapticManager.shared.impact(.medium)
         } label: {
             HStack(spacing: 16) {

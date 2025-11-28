@@ -60,11 +60,8 @@ class SafetyManager: ObservableObject {
         score += 15
 
         // Active safety features (20 points)
-        if verificationService.photoVerified {
-            score += 5
-        }
         if verificationService.idVerified {
-            score += 5
+            score += 10
         }
         if verificationService.backgroundCheckCompleted {
             score += 5
@@ -110,10 +107,6 @@ class SafetyManager: ObservableObject {
         if fakeProfileAnalysis.isSuspicious {
             recommendations.append("Profile shows signs of being fake or suspicious")
             recommendations.append("Consider reporting this profile if behavior is concerning")
-        }
-
-        if !verificationService.photoVerified {
-            recommendations.append("This user is not photo verified")
         }
 
         if !verificationService.idVerified {

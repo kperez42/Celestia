@@ -26,6 +26,24 @@ struct ManualIDVerificationView: View {
         case id, selfie
     }
 
+    enum IDType: String, CaseIterable {
+        case driversLicense = "Driver's License"
+        case passport = "Passport"
+        case nationalID = "National ID"
+        case stateID = "State ID"
+        case other = "Other"
+
+        var icon: String {
+            switch self {
+            case .driversLicense: return "car.fill"
+            case .passport: return "globe"
+            case .nationalID: return "person.text.rectangle.fill"
+            case .stateID: return "building.columns.fill"
+            case .other: return "doc.fill"
+            }
+        }
+    }
+
     var body: some View {
         NavigationView {
             ZStack {
@@ -143,14 +161,17 @@ struct ManualIDVerificationView: View {
                     // Header
                     headerSection
 
-                    // Step 1: ID Photo
+                    // Step 1: ID Type Selection
+                    idTypeSelector
+
+                    // Step 2: ID Photo
                     photoUploadCard(
-                        step: 1,
-                        title: "Government ID",
-                        subtitle: "Driver's license, passport, or national ID",
-                        icon: "creditcard.fill",
+                        step: 2,
+                        title: "Government ID Photo",
+                        subtitle: viewModel.selectedIDType?.rawValue ?? "Select ID type first",
+                        icon: viewModel.selectedIDType?.icon ?? "creditcard.fill",
                         image: viewModel.idImage,
-                        isActive: currentStep >= 1,
+                        isActive: viewModel.selectedIDType != nil,
                         onTap: {
                             imageSourceType = .id
                             showingImageSourcePicker = true
@@ -158,14 +179,14 @@ struct ManualIDVerificationView: View {
                         onClear: { viewModel.idImage = nil }
                     )
 
-                    // Step 2: Selfie
+                    // Step 3: Selfie
                     photoUploadCard(
-                        step: 2,
+                        step: 3,
                         title: "Selfie Photo",
                         subtitle: "Clear photo of your face",
                         icon: "person.crop.circle.fill",
                         image: viewModel.selfieImage,
-                        isActive: currentStep >= 2 || viewModel.idImage != nil,
+                        isActive: viewModel.idImage != nil,
                         onTap: {
                             imageSourceType = .selfie
                             showingImageSourcePicker = true
@@ -189,16 +210,104 @@ struct ManualIDVerificationView: View {
         }
     }
 
+    // MARK: - ID Type Selector
+
+    private var idTypeSelector: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                // Step number
+                ZStack {
+                    Circle()
+                        .fill(viewModel.selectedIDType != nil ? Color.green : Color.purple)
+                        .frame(width: 28, height: 28)
+
+                    if viewModel.selectedIDType != nil {
+                        Image(systemName: "checkmark")
+                            .font(.caption.bold())
+                            .foregroundColor(.white)
+                    } else {
+                        Text("1")
+                            .font(.caption.bold())
+                            .foregroundColor(.white)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("ID Type")
+                        .font(.headline)
+                    Text("Select the type of ID you're submitting")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "doc.text.fill")
+                    .font(.title2)
+                    .foregroundColor(viewModel.selectedIDType != nil ? .green : .purple)
+            }
+            .padding()
+
+            // ID Type Options
+            VStack(spacing: 8) {
+                ForEach(IDType.allCases, id: \.self) { idType in
+                    Button(action: {
+                        HapticManager.shared.impact(.light)
+                        viewModel.selectedIDType = idType
+                    }) {
+                        HStack(spacing: 12) {
+                            Image(systemName: idType.icon)
+                                .font(.body)
+                                .foregroundColor(viewModel.selectedIDType == idType ? .white : .purple)
+                                .frame(width: 24)
+
+                            Text(idType.rawValue)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundColor(viewModel.selectedIDType == idType ? .white : .primary)
+
+                            Spacer()
+
+                            if viewModel.selectedIDType == idType {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(viewModel.selectedIDType == idType ?
+                                      LinearGradient(colors: [.purple, .pink], startPoint: .leading, endPoint: .trailing) :
+                                      LinearGradient(colors: [Color.purple.opacity(0.08), Color.purple.opacity(0.08)], startPoint: .leading, endPoint: .trailing))
+                        )
+                    }
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 12)
+        }
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+    }
+
     // MARK: - Progress Bar
 
     private var progressBar: some View {
         HStack(spacing: 8) {
-            // Step 1
+            // Step 1 - ID Type
+            RoundedRectangle(cornerRadius: 4)
+                .fill(viewModel.selectedIDType != nil ? Color.green : Color.gray.opacity(0.3))
+                .frame(height: 4)
+
+            // Step 2 - ID Photo
             RoundedRectangle(cornerRadius: 4)
                 .fill(viewModel.idImage != nil ? Color.green : Color.gray.opacity(0.3))
                 .frame(height: 4)
 
-            // Step 2
+            // Step 3 - Selfie
             RoundedRectangle(cornerRadius: 4)
                 .fill(viewModel.selfieImage != nil ? Color.green : Color.gray.opacity(0.3))
                 .frame(height: 4)
@@ -214,7 +323,7 @@ struct ManualIDVerificationView: View {
                 .font(.title2)
                 .fontWeight(.bold)
 
-            Text("Quick 2-step process • Usually approved same day")
+            Text("Quick 3-step process • Usually approved same day")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
         }
@@ -602,6 +711,7 @@ class ManualIDVerificationViewModel: ObservableObject {
     @Published var selfiePhotoItem: PhotosPickerItem?
     @Published var idImage: UIImage?
     @Published var selfieImage: UIImage?
+    @Published var selectedIDType: ManualIDVerificationView.IDType?
 
     @Published var showingIDPicker = false
     @Published var showingSelfiePicker = false
@@ -623,7 +733,7 @@ class ManualIDVerificationViewModel: ObservableObject {
     private let storage = Storage.storage()
 
     var canSubmit: Bool {
-        idImage != nil && selfieImage != nil && !isSubmitting
+        selectedIDType != nil && idImage != nil && selfieImage != nil && !isSubmitting
     }
 
     // MARK: - Check Status
@@ -665,6 +775,7 @@ class ManualIDVerificationViewModel: ObservableObject {
         // Clear rejection state and allow user to submit again
         wasRejected = false
         rejectionReason = nil
+        selectedIDType = nil
         idImage = nil
         selfieImage = nil
         idPhotoItem = nil
@@ -717,8 +828,9 @@ class ManualIDVerificationViewModel: ObservableObject {
     func submitVerification() async {
         guard let userId = Auth.auth().currentUser?.uid,
               let idImage = idImage,
-              let selfieImage = selfieImage else {
-            errorMessage = "Please upload both photos"
+              let selfieImage = selfieImage,
+              let idType = selectedIDType else {
+            errorMessage = "Please complete all steps"
             showingError = true
             return
         }
@@ -741,6 +853,7 @@ class ManualIDVerificationViewModel: ObservableObject {
                 "userId": userId,
                 "userName": userData["name"] as? String ?? "Unknown",
                 "userEmail": Auth.auth().currentUser?.email ?? "",
+                "idType": idType.rawValue,
                 "idPhotoURL": idPhotoURL,
                 "selfiePhotoURL": selfiePhotoURL,
                 "status": "pending",
@@ -754,7 +867,7 @@ class ManualIDVerificationViewModel: ObservableObject {
             showingSuccess = true
             pendingVerification = true
 
-            Logger.shared.info("ID verification submitted for review", category: .general)
+            Logger.shared.info("ID verification submitted for review - ID Type: \(idType.rawValue)", category: .general)
 
         } catch {
             isSubmitting = false

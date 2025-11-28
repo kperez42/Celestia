@@ -257,7 +257,6 @@ enum FeatureFlag: String, CaseIterable {
     // MARK: - Safety & Moderation
 
     case enableContentModeration = "enable_content_moderation"
-    case enablePhotoVerification = "enable_photo_verification"
     case enableProfileReview = "enable_profile_review"
     case autoModerateMessages = "auto_moderate_messages"
 
@@ -307,7 +306,6 @@ enum FeatureFlag: String, CaseIterable {
         case .enableGiphy: return true
         case .enableStickers: return true
         case .enableContentModeration: return true
-        case .enablePhotoVerification: return true
         case .enableProfileReview: return true
         case .autoModerateMessages: return true
         case .enableReferralProgram: return true
@@ -348,7 +346,6 @@ enum FeatureFlag: String, CaseIterable {
         case .enableGiphy: return "Enable Giphy integration"
         case .enableStickers: return "Enable stickers"
         case .enableContentModeration: return "Enable content moderation"
-        case .enablePhotoVerification: return "Enable photo verification"
         case .enableProfileReview: return "Enable profile review"
         case .autoModerateMessages: return "Auto moderate messages"
         case .enableReferralProgram: return "Enable referral program"

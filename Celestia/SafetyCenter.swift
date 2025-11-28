@@ -88,28 +88,12 @@ struct SafetyCenterView: View {
 
             VStack(spacing: 12) {
                 NavigationLink {
-                    if let userId = AuthService.shared.currentUser?.id {
-                        PhotoVerificationView(userId: userId)
-                    } else {
-                        Text("Please log in to verify")
-                    }
+                    ManualIDVerificationView()
                 } label: {
                     SafetyOptionRow(
-                        icon: "camera.fill",
-                        title: "Photo Verification",
-                        subtitle: "Verify you're a real person",
-                        color: .blue,
-                        isCompleted: viewModel.photoVerified
-                    )
-                }
-
-                NavigationLink {
-                    IDVerificationView()
-                } label: {
-                    SafetyOptionRow(
-                        icon: "person.text.rectangle",
-                        title: "Government ID",
-                        subtitle: "Verify your identity",
+                        icon: "person.text.rectangle.fill",
+                        title: "ID Verification",
+                        subtitle: "Submit ID and selfie for verification",
                         color: .purple,
                         isCompleted: viewModel.idVerified
                     )
@@ -392,7 +376,6 @@ struct SafetyOptionRow: View {
 
 @MainActor
 class SafetyCenterViewModel: ObservableObject {
-    @Published var photoVerified = false
     @Published var idVerified = false
     @Published var phoneVerified = false
     @Published var socialMediaVerified = false
@@ -409,7 +392,6 @@ class SafetyCenterViewModel: ObservableObject {
             // Load verification status
             let userDoc = try await db.collection("users").document(userId).getDocument()
             if let verificationData = userDoc.data()?["verificationStatus"] as? [String: Bool] {
-                photoVerified = verificationData["photoVerified"] ?? false
                 idVerified = verificationData["idVerified"] ?? false
                 phoneVerified = verificationData["phoneVerified"] ?? false
                 socialMediaVerified = verificationData["socialMediaVerified"] ?? false

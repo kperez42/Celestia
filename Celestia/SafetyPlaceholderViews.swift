@@ -4,7 +4,7 @@
 //
 //  Placeholder views for safety features not yet implemented
 //  NOTE: Phone verification is now functional - see PhoneVerificationView.swift
-//  NOTE: Photo verification is now functional - see PhotoVerificationView.swift
+//  NOTE: ID verification is now functional - see ManualIDVerificationView.swift
 //
 
 import SwiftUI
