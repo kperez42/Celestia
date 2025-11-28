@@ -166,7 +166,7 @@ struct SavedProfilesView: View {
     private var viewedTab: some View {
         Group {
             if viewModel.viewedProfiles.isEmpty {
-                emptyStateView(message: "No viewed profiles", hint: "Profiles you've viewed will appear here")
+                emptyStateView(message: "No profile views yet", hint: "When someone views your profile, they'll appear here")
             } else {
                 viewedProfilesGrid(profiles: viewModel.viewedProfiles)
             }
@@ -1077,7 +1077,7 @@ class SavedProfilesViewModel: ObservableObject {
         }
     }
 
-    /// Load profiles that the current user has viewed
+    /// Load profiles of people who viewed your profile
     func loadViewedProfiles() async {
         guard let currentUserId = AuthService.shared.currentUser?.effectiveId else {
             return
@@ -1092,24 +1092,24 @@ class SavedProfilesViewModel: ObservableObject {
         }
 
         do {
-            // Query for profiles the current user has viewed
+            // Query for profiles where others viewed the current user
             let snapshot = try await db.collection("profileViews")
-                .whereField("viewerUserId", isEqualTo: currentUserId)
+                .whereField("viewedUserId", isEqualTo: currentUserId)
                 .order(by: "timestamp", descending: true)
                 .limit(to: 50)
                 .getDocuments()
 
-            var metadata: [(id: String, viewedUserId: String, viewedAt: Date)] = []
+            var metadata: [(id: String, viewerUserId: String, viewedAt: Date)] = []
             var seenUserIds = Set<String>()
 
             for doc in snapshot.documents {
                 let data = doc.data()
-                if let viewedUserId = data["viewedUserId"] as? String,
+                if let viewerUserId = data["viewerUserId"] as? String,
                    let timestamp = (data["timestamp"] as? Timestamp)?.dateValue(),
-                   !seenUserIds.contains(viewedUserId) {
-                    // Only keep the most recent view of each profile
-                    seenUserIds.insert(viewedUserId)
-                    metadata.append((id: doc.documentID, viewedUserId: viewedUserId, viewedAt: timestamp))
+                   !seenUserIds.contains(viewerUserId) {
+                    // Only keep the most recent view from each viewer
+                    seenUserIds.insert(viewerUserId)
+                    metadata.append((id: doc.documentID, viewerUserId: viewerUserId, viewedAt: timestamp))
                 }
             }
 
@@ -1119,8 +1119,8 @@ class SavedProfilesViewModel: ObservableObject {
                 return
             }
 
-            // Batch fetch users
-            let userIds = metadata.map { $0.viewedUserId }
+            // Batch fetch users who viewed your profile
+            let userIds = metadata.map { $0.viewerUserId }
             var fetchedUsers: [String: User] = [:]
 
             for chunk in userIds.chunked(into: 10) {
@@ -1137,14 +1137,14 @@ class SavedProfilesViewModel: ObservableObject {
 
             var profiles: [ViewedProfile] = []
             for meta in metadata {
-                if let user = fetchedUsers[meta.viewedUserId] {
+                if let user = fetchedUsers[meta.viewerUserId] {
                     profiles.append(ViewedProfile(id: meta.id, user: user, viewedAt: meta.viewedAt))
                 }
             }
 
             viewedProfiles = profiles
             lastViewedFetchTime = Date()
-            Logger.shared.info("Loaded \(profiles.count) viewed profiles - cached for 5 min", category: .general)
+            Logger.shared.info("Loaded \(profiles.count) users who viewed your profile - cached for 5 min", category: .general)
         } catch {
             Logger.shared.error("Error loading viewed profiles", category: .general, error: error)
         }
