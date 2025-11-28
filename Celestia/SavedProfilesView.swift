@@ -294,9 +294,9 @@ struct SavedProfilesView: View {
     private func profilesGrid(profiles: [SavedProfile]) -> some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 20) {
-                // Saved profiles grid with staggered animation
+                // Saved profiles grid
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                    ForEach(Array(profiles.enumerated()), id: \.element.id) { index, saved in
+                    ForEach(profiles) { saved in
                         SavedProfileCard(
                             savedProfile: saved,
                             isUnsaving: viewModel.unsavingProfileId == saved.id,
@@ -315,15 +315,6 @@ struct SavedProfilesView: View {
                             // PERFORMANCE: Prefetch images as cards appear in viewport
                             ImageCache.shared.prefetchUserPhotosHighPriority(user: saved.user)
                         }
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.8).combined(with: .opacity),
-                            removal: .scale(scale: 0.8).combined(with: .opacity)
-                        ))
-                        .animation(
-                            .spring(response: 0.4, dampingFraction: 0.7)
-                            .delay(Double(index) * 0.05),
-                            value: profiles.count
-                        )
                     }
                 }
                 .padding(.horizontal)
@@ -344,7 +335,7 @@ struct SavedProfilesView: View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 20) {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                    ForEach(Array(profiles.enumerated()), id: \.element.id) { index, profile in
+                    ForEach(profiles) { profile in
                         SavedYouCard(
                             profile: profile,
                             onTap: {
@@ -356,15 +347,6 @@ struct SavedProfilesView: View {
                             // PERFORMANCE: Prefetch images as cards appear in viewport
                             ImageCache.shared.prefetchUserPhotosHighPriority(user: profile.user)
                         }
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.8).combined(with: .opacity),
-                            removal: .scale(scale: 0.8).combined(with: .opacity)
-                        ))
-                        .animation(
-                            .spring(response: 0.4, dampingFraction: 0.7)
-                            .delay(Double(index) * 0.05),
-                            value: profiles.count
-                        )
                     }
                 }
                 .padding(.horizontal)
@@ -385,7 +367,7 @@ struct SavedProfilesView: View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 20) {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                    ForEach(Array(profiles.enumerated()), id: \.element.id) { index, profile in
+                    ForEach(profiles) { profile in
                         ViewedProfileCard(
                             profile: profile,
                             onTap: {
@@ -397,15 +379,6 @@ struct SavedProfilesView: View {
                             // PERFORMANCE: Prefetch images as cards appear in viewport
                             ImageCache.shared.prefetchUserPhotosHighPriority(user: profile.user)
                         }
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.8).combined(with: .opacity),
-                            removal: .scale(scale: 0.8).combined(with: .opacity)
-                        ))
-                        .animation(
-                            .spring(response: 0.4, dampingFraction: 0.7)
-                            .delay(Double(index) * 0.05),
-                            value: profiles.count
-                        )
                     }
                 }
                 .padding(.horizontal)

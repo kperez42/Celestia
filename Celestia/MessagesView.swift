@@ -313,14 +313,11 @@ struct MessagesView: View {
     private var conversationsListView: some View {
         ScrollView(showsIndicators: false) {
             LazyVStack(spacing: 12) {
-                ForEach(Array(filteredConversations.enumerated()), id: \.element.0.id) { index, conversation in
-                    let (match, user) = conversation
-
+                ForEach(filteredConversations, id: \.0.id) { match, user in
                     ConversationRow(
                         match: match,
                         user: user,
-                        currentUserId: authService.currentUser?.id ?? "current_user",
-                        index: index
+                        currentUserId: authService.currentUser?.id ?? "current_user"
                     )
                     .onTapGesture {
                         HapticManager.shared.impact(.medium)
@@ -342,15 +339,8 @@ struct MessagesView: View {
     private var loadingView: some View {
         ScrollView(showsIndicators: false) {
             LazyVStack(spacing: 12) {
-                ForEach(0..<8, id: \.self) { index in
+                ForEach(0..<8, id: \.self) { _ in
                     ConversationRowSkeleton()
-                        // PREMIUM: Staggered skeleton appearance
-                        .transition(.scale(scale: 0.95).combined(with: .opacity))
-                        .animation(
-                            .spring(response: 0.4, dampingFraction: 0.7)
-                            .delay(Double(index) * 0.05),
-                            value: matchService.isLoading
-                        )
                 }
             }
             .padding(20)
@@ -531,7 +521,6 @@ struct ConversationRow: View {
     let match: Match
     let user: User
     let currentUserId: String
-    let index: Int
     
     private var unreadCount: Int {
         match.unreadCount[currentUserId] ?? 0
