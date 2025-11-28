@@ -325,7 +325,7 @@ class ABTestingManager: ObservableObject {
     // MARK: - Results Analysis (Admin)
 
     /// Gets experiment results for analysis
-    func getExperimentResults(experimentId: String) async throws -> ExperimentResults {
+    func getExperimentResults(experimentId: String) async throws -> ABTestExperimentResults {
         // Get all assignments
         let assignmentsSnapshot = try await db.collection("experiment_assignments")
             .whereField("experimentId", isEqualTo: experimentId)
@@ -369,7 +369,7 @@ class ABTestingManager: ObservableObject {
         // Determine winner (highest conversion rate)
         let winner = variantResults.max(by: { $0.conversionRate < $1.conversionRate })
 
-        return ExperimentResults(
+        return ABTestExperimentResults(
             experimentId: experimentId,
             totalAssignments: assignmentsSnapshot.documents.count,
             variantResults: variantResults,
@@ -451,7 +451,7 @@ struct Targeting: Codable {
     let countries: [String]?
 }
 
-struct ExperimentResults {
+struct ABTestExperimentResults {
     let experimentId: String
     let totalAssignments: Int
     let variantResults: [VariantResult]

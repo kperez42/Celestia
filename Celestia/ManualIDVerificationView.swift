@@ -81,7 +81,7 @@ struct ManualIDVerificationView: View {
                 Button("Cancel", role: .cancel) { }
             }
             .sheet(isPresented: $viewModel.showingCamera) {
-                CameraView(image: viewModel.cameraSourceType == .id ? $viewModel.idImage : $viewModel.selfieImage)
+                IDVerificationCameraView(image: viewModel.cameraSourceType == .id ? $viewModel.idImage : $viewModel.selfieImage)
             }
             .photosPicker(isPresented: $viewModel.showingIDPicker, selection: $viewModel.idPhotoItem, matching: .images)
             .photosPicker(isPresented: $viewModel.showingSelfiePicker, selection: $viewModel.selfiePhotoItem, matching: .images)
@@ -552,9 +552,9 @@ struct ManualIDVerificationView: View {
     }
 }
 
-// MARK: - Camera View
+// MARK: - ID Verification Camera View
 
-struct CameraView: UIViewControllerRepresentable {
+struct IDVerificationCameraView: UIViewControllerRepresentable {
     @Binding var image: UIImage?
     @Environment(\.dismiss) private var dismiss
 
@@ -573,9 +573,9 @@ struct CameraView: UIViewControllerRepresentable {
     }
 
     class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
-        let parent: CameraView
+        let parent: IDVerificationCameraView
 
-        init(_ parent: CameraView) {
+        init(_ parent: IDVerificationCameraView) {
             self.parent = parent
         }
 
