@@ -62,6 +62,16 @@ service firebase.storage {
       // Auto-delete after 7 days (handled by Cloud Function)
     }
 
+    // Manual ID verification uploads (ID photo + selfie for admin review)
+    match /verification/{userId}/{fileName} {
+      allow read: if isAuthenticated() && (isOwner(userId) || hasAdminRole());
+      allow write: if isAuthenticated()
+                   && isOwner(userId)
+                   && isEmailVerified()
+                   && isValidImageSize()
+                   && isValidImage();
+    }
+
     // Admin role check helper (requires custom claims)
     function hasAdminRole() {
       return request.auth.token.admin == true;
