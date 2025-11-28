@@ -82,6 +82,10 @@ struct PremiumUpgradeView: View {
                     floatingCTA
                 }
             }
+            .background(
+                Color(red: 0.1, green: 0.05, blue: 0.2)
+                    .ignoresSafeArea()
+            )
             .clipped()
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
@@ -757,9 +761,11 @@ struct PremiumUpgradeView: View {
             .foregroundColor(.white.opacity(0.5))
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
         .background(
-            Color(red: 0.1, green: 0.05, blue: 0.2).opacity(0.95)
+            Color(red: 0.1, green: 0.05, blue: 0.2)
+                .ignoresSafeArea(edges: .bottom)
         )
     }
 
