@@ -4,6 +4,7 @@
   "description": "Backend API for Celestia dating app",
   "main": "index.js",
   "scripts": {
+    "lint": "eslint .",
     "serve": "firebase emulators:start --only functions",
     "shell": "firebase functions:shell",
     "start": "npm run shell",
