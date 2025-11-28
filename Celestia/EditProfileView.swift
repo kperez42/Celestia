@@ -127,35 +127,40 @@ struct EditProfileView: View {
                     .ignoresSafeArea()
                 
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: 25) {
-                        // Hero Profile Photo Section
-                        profilePhotoSection
+                    VStack(spacing: 20) {
+                        // SECTION 1: Photos
+                        // Hero Profile Photo + Discovery Photos combined
+                        photosSection
 
-                        // Photo Gallery Section
-                        photoGallerySection
-
-                        // Progress Indicator
+                        // Progress Indicator - motivates users
                         profileCompletionProgress
 
-                        // Basic Info Card
+                        // SECTION 2: Basic Info
+                        // Name, Age, Gender, Location - essentials
                         basicInfoSection
-                        
-                        // About Me Card
+
+                        // SECTION 3: About Me
+                        // Bio - self expression
                         aboutMeSection
-                        
-                        // Preferences Card
+
+                        // SECTION 4: Dating Preferences
+                        // Looking For, Age Range - what they want
                         preferencesSection
 
-                        // Lifestyle & More Section
-                        lifestyleSection
+                        // SECTION 5: Personal Details
+                        // Height, Education, Religion, Relationship Goal
+                        personalDetailsSection
 
-                        // Languages Card
-                        languagesSection
-                        
-                        // Interests Card
-                        interestsSection
+                        // SECTION 6: Lifestyle Habits
+                        // Smoking, Drinking, Exercise, Diet, Pets
+                        lifestyleHabitsSection
 
-                        // Prompts Card
+                        // SECTION 7: Express Yourself
+                        // Languages & Interests combined
+                        expressYourselfSection
+
+                        // SECTION 8: Profile Prompts
+                        // Personality showcase
                         promptsSection
                     }
                     .padding(.horizontal, 20)
@@ -260,8 +265,301 @@ struct EditProfileView: View {
         }
     }
     
-    // MARK: - Profile Photo Section
-    
+    // MARK: - Combined Photos Section
+
+    private var photosSection: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                SectionHeader(icon: "camera.fill", title: "Your Photos", color: .purple)
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 16)
+
+            // Profile Photo - Main display photo
+            VStack(spacing: 12) {
+                HStack {
+                    Text("Profile Photo")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("Main display")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+                .padding(.horizontal, 20)
+
+                ZStack(alignment: .bottomTrailing) {
+                    Group {
+                        if let profileImage = profileImage {
+                            Image(uiImage: profileImage)
+                                .resizable()
+                                .scaledToFill()
+                        } else if let currentUser = authService.currentUser,
+                                  let imageURL = URL(string: currentUser.profileImageURL),
+                                  !currentUser.profileImageURL.isEmpty {
+                            CachedAsyncImage(
+                                url: imageURL,
+                                content: { image in
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                },
+                                placeholder: {
+                                    profilePlaceholderImage
+                                }
+                            )
+                        } else {
+                            profilePlaceholderImage
+                        }
+                    }
+                    .frame(width: 120, height: 120)
+                    .clipShape(Circle())
+                    .overlay {
+                        Circle()
+                            .stroke(
+                                LinearGradient(
+                                    colors: [.purple, .pink],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 3
+                            )
+                    }
+                    .shadow(color: .purple.opacity(0.25), radius: 12, y: 6)
+
+                    PhotosPicker(selection: $selectedImage, matching: .images) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.white)
+                                .frame(width: 38, height: 38)
+                                .shadow(color: .black.opacity(0.15), radius: 4)
+
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [.purple, .pink],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 34, height: 34)
+
+                            if isUploadingProfilePhoto {
+                                ProgressView()
+                                    .tint(.white)
+                                    .scaleEffect(0.7)
+                            } else {
+                                Image(systemName: "camera.fill")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.white)
+                            }
+                        }
+                    }
+                    .disabled(isUploadingProfilePhoto)
+                    .offset(x: 4, y: 4)
+                }
+            }
+
+            // Divider
+            Rectangle()
+                .fill(Color.gray.opacity(0.1))
+                .frame(height: 1)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+
+            // Discovery Photos Grid
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Discovery Photos")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.secondary)
+                        Text("Shown on your card in Discover")
+                            .font(.caption2)
+                            .foregroundColor(.gray)
+                    }
+
+                    Spacer()
+
+                    if isUploadingPhotos {
+                        uploadProgressBadge
+                    } else {
+                        Text("\(photos.count)/6")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.purple)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(Color.purple.opacity(0.1))
+                            .cornerRadius(12)
+                    }
+                }
+                .padding(.horizontal, 20)
+
+                // Photo Grid or Empty State
+                if photos.isEmpty && uploadingPhotoCount == 0 {
+                    emptyPhotosState
+                        .padding(.horizontal, 20)
+                } else {
+                    discoveryPhotosGrid
+                        .padding(.horizontal, 20)
+                }
+            }
+            .padding(.bottom, 20)
+        }
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
+        .onChange(of: selectedPhotoItems) { oldItems, newItems in
+            Logger.shared.info("📸 Photo picker changed: \(oldItems.count) → \(newItems.count) items", category: .general)
+            guard !newItems.isEmpty else { return }
+            Task {
+                await uploadNewPhotos(newItems)
+            }
+        }
+    }
+
+    private var profilePlaceholderImage: some View {
+        Circle()
+            .fill(
+                LinearGradient(
+                    colors: [.purple.opacity(0.6), .pink.opacity(0.6)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .overlay {
+                if !fullName.isEmpty {
+                    Text(fullName.prefix(1).uppercased())
+                        .font(.system(size: 50, weight: .bold))
+                        .foregroundColor(.white)
+                } else {
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 40))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+            }
+    }
+
+    private var uploadProgressBadge: some View {
+        HStack(spacing: 6) {
+            ZStack {
+                Circle()
+                    .stroke(Color.purple.opacity(0.2), lineWidth: 2)
+                    .frame(width: 20, height: 20)
+                Circle()
+                    .trim(from: 0, to: uploadProgress)
+                    .stroke(Color.purple, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    .frame(width: 20, height: 20)
+                    .rotationEffect(.degrees(-90))
+            }
+            Text("\(Int(uploadProgress * 100))%")
+                .font(.caption2)
+                .fontWeight(.bold)
+                .foregroundColor(.purple)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(Color.purple.opacity(0.1))
+        .cornerRadius(12)
+    }
+
+    private var emptyPhotosState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "photo.on.rectangle.angled")
+                .font(.system(size: 36))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.purple.opacity(0.5), .pink.opacity(0.5)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            Text("Add photos to get more matches!")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+
+            PhotosPicker(selection: $selectedPhotoItems, maxSelectionCount: 6, matching: .images) {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.subheadline)
+                    Text("Add Photos")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
+                .background(
+                    LinearGradient(
+                        colors: [.purple, .pink],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(10)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
+    }
+
+    private var discoveryPhotosGrid: some View {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+            ForEach(Array(photos.enumerated()), id: \.element) { index, photoURL in
+                DraggablePhotoGridItem(
+                    photoURL: photoURL,
+                    isDragging: draggingPhotoURL == photoURL,
+                    onDelete: { deletePhoto(at: index) }
+                )
+                .id(photoURL)
+                .onDrag {
+                    draggingPhotoURL = photoURL
+                    HapticManager.shared.impact(.medium)
+                    return NSItemProvider(object: photoURL as NSString)
+                }
+                .onDrop(of: [.text], delegate: PhotoDropDelegate(
+                    item: photoURL,
+                    items: $photos,
+                    draggingItem: $draggingPhotoURL,
+                    onReorder: { savePhotoOrder() }
+                ))
+            }
+
+            ForEach(0..<uploadingPhotoCount, id: \.self) { index in
+                UploadingPhotoPlaceholder(index: index)
+                    .transition(.scale.combined(with: .opacity))
+            }
+
+            if photos.count + uploadingPhotoCount < 6 {
+                PhotosPicker(selection: $selectedPhotoItems, maxSelectionCount: 6 - photos.count - uploadingPhotoCount, matching: .images) {
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.purple.opacity(0.3), style: StrokeStyle(lineWidth: 2, dash: [6]))
+                        .frame(height: 100)
+                        .overlay {
+                            VStack(spacing: 6) {
+                                Image(systemName: "plus")
+                                    .font(.title2)
+                                    .foregroundColor(.purple.opacity(0.6))
+                            }
+                        }
+                }
+                .disabled(isUploadingPhotos)
+                .opacity(isUploadingPhotos ? 0.5 : 1.0)
+            }
+        }
+    }
+
+    // MARK: - Profile Photo Section (Legacy - kept for reference)
+
     private var profilePhotoSection: some View {
         VStack(spacing: 15) {
             ZStack(alignment: .bottomTrailing) {
@@ -931,7 +1229,449 @@ struct EditProfileView: View {
         .shadow(color: .black.opacity(0.05), radius: 8)
     }
 
-    // MARK: - Lifestyle Section
+    // MARK: - Personal Details Section
+
+    private var personalDetailsSection: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                SectionHeader(icon: "person.text.rectangle", title: "Personal Details", color: .blue)
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 16)
+
+            VStack(spacing: 16) {
+                // Height with visual display
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Height")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        if let h = height {
+                            Text(heightToFeetInches(h))
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.blue.opacity(0.1))
+                                .cornerRadius(8)
+                        }
+                    }
+
+                    HStack(spacing: 8) {
+                        TextField("e.g., 170", value: $height, format: .number)
+                            .keyboardType(.numberPad)
+                            .padding()
+                            .background(Color(.systemGray6))
+                            .cornerRadius(12)
+
+                        Text("cm")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondary)
+                            .frame(width: 30)
+                    }
+                }
+                .padding(.horizontal, 20)
+
+                // Two column grid for related fields
+                HStack(spacing: 12) {
+                    // Education
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Education", systemImage: "graduationcap")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.secondary)
+
+                        Menu {
+                            ForEach(educationOptions, id: \.self) { option in
+                                Button(option) {
+                                    educationLevel = option == "Prefer not to say" ? nil : option
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text(educationLevel ?? "Select")
+                                    .font(.subheadline)
+                                    .foregroundColor(educationLevel == nil ? .gray : .primary)
+                                Spacer()
+                                Image(systemName: "chevron.down")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                            .padding()
+                            .background(Color(.systemGray6))
+                            .cornerRadius(12)
+                        }
+                    }
+
+                    // Relationship Goal
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Looking For", systemImage: "heart.circle")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.secondary)
+
+                        Menu {
+                            ForEach(relationshipGoalOptions, id: \.self) { option in
+                                Button(option) {
+                                    relationshipGoal = option == "Prefer not to say" ? nil : option
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text(relationshipGoal ?? "Select")
+                                    .font(.subheadline)
+                                    .foregroundColor(relationshipGoal == nil ? .gray : .primary)
+                                Spacer()
+                                Image(systemName: "chevron.down")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                            .padding()
+                            .background(Color(.systemGray6))
+                            .cornerRadius(12)
+                        }
+                    }
+                }
+                .padding(.horizontal, 20)
+
+                // Religion - Full width
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Religion / Spirituality", systemImage: "sparkles")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+
+                    Menu {
+                        ForEach(religionOptions, id: \.self) { option in
+                            Button(option) {
+                                religion = option == "Prefer not to say" ? nil : option
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Text(religion ?? "Select")
+                                .font(.subheadline)
+                                .foregroundColor(religion == nil ? .gray : .primary)
+                            Spacer()
+                            Image(systemName: "chevron.down")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+            .padding(.bottom, 20)
+        }
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 8)
+    }
+
+    // MARK: - Lifestyle Habits Section
+
+    private var lifestyleHabitsSection: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                SectionHeader(icon: "leaf.fill", title: "Lifestyle", color: .green)
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 16)
+
+            VStack(spacing: 12) {
+                // Row 1: Smoking & Drinking
+                HStack(spacing: 12) {
+                    lifestylePickerItem(
+                        icon: "smoke",
+                        label: "Smoking",
+                        value: $smoking,
+                        options: smokingOptions,
+                        color: .orange
+                    )
+
+                    lifestylePickerItem(
+                        icon: "wineglass",
+                        label: "Drinking",
+                        value: $drinking,
+                        options: drinkingOptions,
+                        color: .purple
+                    )
+                }
+
+                // Row 2: Exercise & Diet
+                HStack(spacing: 12) {
+                    lifestylePickerItem(
+                        icon: "figure.run",
+                        label: "Exercise",
+                        value: $exercise,
+                        options: exerciseOptions,
+                        color: .blue
+                    )
+
+                    lifestylePickerItem(
+                        icon: "fork.knife",
+                        label: "Diet",
+                        value: $diet,
+                        options: dietOptions,
+                        color: .green
+                    )
+                }
+
+                // Row 3: Pets - Full width with special treatment
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Pets", systemImage: "pawprint.fill")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+
+                    Menu {
+                        ForEach(petsOptions, id: \.self) { option in
+                            Button(option) {
+                                pets = option == "Prefer not to say" ? nil : option
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            if let petsValue = pets {
+                                HStack(spacing: 6) {
+                                    Image(systemName: getPetIcon(petsValue))
+                                        .foregroundColor(.orange)
+                                    Text(petsValue)
+                                        .font(.subheadline)
+                                        .foregroundColor(.primary)
+                                }
+                            } else {
+                                Text("Select")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.down")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+                    }
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 20)
+        }
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 8)
+    }
+
+    private func lifestylePickerItem(
+        icon: String,
+        label: String,
+        value: Binding<String?>,
+        options: [String],
+        color: Color
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(label, systemImage: icon)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundColor(.secondary)
+
+            Menu {
+                ForEach(options, id: \.self) { option in
+                    Button(option) {
+                        value.wrappedValue = option == "Prefer not to say" ? nil : option
+                    }
+                }
+            } label: {
+                HStack {
+                    Text(value.wrappedValue ?? "Select")
+                        .font(.subheadline)
+                        .foregroundColor(value.wrappedValue == nil ? .gray : .primary)
+                        .lineLimit(1)
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 12)
+                .background(Color(.systemGray6))
+                .cornerRadius(10)
+            }
+        }
+    }
+
+    private func getPetIcon(_ pet: String) -> String {
+        switch pet.lowercased() {
+        case "dog": return "dog.fill"
+        case "cat": return "cat.fill"
+        case "both": return "pawprint.fill"
+        case "other pets": return "hare.fill"
+        case "want pets": return "heart.fill"
+        case "no pets": return "xmark.circle"
+        default: return "pawprint"
+        }
+    }
+
+    // MARK: - Express Yourself Section (Languages & Interests)
+
+    private var expressYourselfSection: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                SectionHeader(icon: "sparkles", title: "Express Yourself", color: .purple)
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 16)
+
+            VStack(spacing: 20) {
+                // Languages subsection
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        HStack(spacing: 6) {
+                            Image(systemName: "globe")
+                                .font(.subheadline)
+                                .foregroundColor(.purple)
+                            Text("Languages")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.secondary)
+                        }
+
+                        Spacer()
+
+                        Button {
+                            showLanguagePicker = true
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.caption)
+                                Text("Add")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                            }
+                            .foregroundColor(.purple)
+                        }
+                    }
+
+                    if languages.isEmpty {
+                        Button {
+                            showLanguagePicker = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "globe")
+                                    .foregroundColor(.gray.opacity(0.5))
+                                Text("Add languages you speak")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(10)
+                        }
+                    } else {
+                        FlowLayoutImproved(spacing: 8) {
+                            ForEach(languages, id: \.self) { language in
+                                TagChip(
+                                    text: language,
+                                    color: .purple,
+                                    onRemove: { languages.removeAll { $0 == language } }
+                                )
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 20)
+
+                // Divider
+                Rectangle()
+                    .fill(Color.gray.opacity(0.1))
+                    .frame(height: 1)
+                    .padding(.horizontal, 20)
+
+                // Interests subsection
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        HStack(spacing: 6) {
+                            Image(systemName: "star.fill")
+                                .font(.subheadline)
+                                .foregroundColor(.pink)
+                            Text("Interests")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.secondary)
+                        }
+
+                        Spacer()
+
+                        Button {
+                            showInterestPicker = true
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.caption)
+                                Text("Add")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                            }
+                            .foregroundColor(.pink)
+                        }
+                    }
+
+                    if interests.isEmpty {
+                        Button {
+                            showInterestPicker = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "star.fill")
+                                    .foregroundColor(.gray.opacity(0.5))
+                                Text("Add your interests")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(10)
+                        }
+                    } else {
+                        FlowLayoutImproved(spacing: 8) {
+                            ForEach(interests, id: \.self) { interest in
+                                TagChip(
+                                    text: interest,
+                                    color: .pink,
+                                    onRemove: { interests.removeAll { $0 == interest } }
+                                )
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+            .padding(.bottom, 20)
+        }
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 8)
+    }
+
+    // MARK: - Lifestyle Section (Legacy - kept for reference)
 
     private var lifestyleSection: some View {
         VStack(spacing: 20) {
