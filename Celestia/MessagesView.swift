@@ -330,16 +330,6 @@ struct MessagesView: View {
                         // PERFORMANCE: Prefetch user images as conversations appear
                         ImageCache.shared.prefetchUserPhotosHighPriority(user: user)
                     }
-                    // PREMIUM: Staggered entrance animation
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .trailing).combined(with: .opacity),
-                        removal: .move(edge: .leading).combined(with: .opacity)
-                    ))
-                    .animation(
-                        .spring(response: 0.4, dampingFraction: 0.7)
-                        .delay(Double(index) * 0.03), // Stagger by 30ms
-                        value: filteredConversations.count
-                    )
                 }
             }
             .padding(20)
@@ -543,8 +533,6 @@ struct ConversationRow: View {
     let currentUserId: String
     let index: Int
     
-    @State private var appeared = false
-    
     private var unreadCount: Int {
         match.unreadCount[currentUserId] ?? 0
     }
@@ -679,13 +667,6 @@ struct ConversationRow: View {
                     lineWidth: 1.5
                 )
         )
-        .offset(x: appeared ? 0 : 300)
-        .opacity(appeared ? 1 : 0)
-        .onAppear {
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(Double(index) * 0.05)) {
-                appeared = true
-            }
-        }
     }
     
     private var profileImage: some View {
