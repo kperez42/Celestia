@@ -17,7 +17,7 @@ struct SavedProfilesView: View {
     @State private var showClearAllConfirmation = false
     @State private var selectedTab = 0
 
-    private let tabs = ["All Saved", "Recent", "Saved You"]
+    private let tabs = ["All Saved", "Viewed", "Saved You"]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -40,7 +40,7 @@ struct SavedProfilesView: View {
                 } else {
                     TabView(selection: $selectedTab) {
                         allSavedTab.tag(0)
-                        recentTab.tag(1)
+                        viewedTab.tag(1)
                         savedYouTab.tag(2)
                     }
                     .tabViewStyle(.page(indexDisplayMode: .never))
@@ -50,6 +50,7 @@ struct SavedProfilesView: View {
         .navigationBarHidden(true)
         .task {
             await viewModel.loadSavedProfiles()
+            await viewModel.loadViewedProfiles()
             await viewModel.loadSavedYouProfiles()
         }
         .onAppear {
@@ -58,6 +59,7 @@ struct SavedProfilesView: View {
             if !viewModel.isLoading {
                 Task {
                     await viewModel.loadSavedProfiles()
+                    await viewModel.loadViewedProfiles()
                     await viewModel.loadSavedYouProfiles()
                 }
             }
@@ -143,7 +145,7 @@ struct SavedProfilesView: View {
     private func countForTab(_ index: Int) -> Int {
         switch index {
         case 0: return viewModel.savedProfiles.count
-        case 1: return viewModel.recentProfiles.count
+        case 1: return viewModel.viewedProfiles.count
         case 2: return viewModel.savedYouProfiles.count
         default: return 0
         }
@@ -161,12 +163,12 @@ struct SavedProfilesView: View {
         }
     }
 
-    private var recentTab: some View {
+    private var viewedTab: some View {
         Group {
-            if viewModel.recentProfiles.isEmpty {
-                emptyStateView(message: "No recent saves", hint: "Profiles saved this week will appear here")
+            if viewModel.viewedProfiles.isEmpty {
+                emptyStateView(message: "No viewed profiles", hint: "Profiles you've viewed will appear here")
             } else {
-                profilesGrid(profiles: viewModel.recentProfiles)
+                viewedProfilesGrid(profiles: viewModel.viewedProfiles)
             }
         }
     }
@@ -239,15 +241,15 @@ struct SavedProfilesView: View {
                                         .fontWeight(.semibold)
                                 }
 
-                                if viewModel.recentProfiles.count > 0 {
+                                if viewModel.viewedProfiles.count > 0 {
                                     Circle()
                                         .fill(Color.white.opacity(0.5))
                                         .frame(width: 4, height: 4)
 
                                     HStack(spacing: 4) {
-                                        Image(systemName: "clock")
+                                        Image(systemName: "eye")
                                             .font(.caption)
-                                        Text("\(viewModel.recentProfiles.count) recent")
+                                        Text("\(viewModel.viewedProfiles.count) viewed")
                                             .fontWeight(.semibold)
                                     }
                                 }
@@ -382,6 +384,47 @@ struct SavedProfilesView: View {
         .refreshable {
             HapticManager.shared.impact(.light)
             await viewModel.loadSavedYouProfiles()
+            HapticManager.shared.notification(.success)
+        }
+    }
+
+    // MARK: - Viewed Profiles Grid (profiles the current user has viewed)
+
+    private func viewedProfilesGrid(profiles: [ViewedProfile]) -> some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 20) {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                    ForEach(Array(profiles.enumerated()), id: \.element.id) { index, profile in
+                        ViewedProfileCard(
+                            profile: profile,
+                            onTap: {
+                                selectedUser = profile.user
+                                HapticManager.shared.impact(.light)
+                            }
+                        )
+                        .onAppear {
+                            // PERFORMANCE: Prefetch images as cards appear in viewport
+                            ImageCache.shared.prefetchUserPhotosHighPriority(user: profile.user)
+                        }
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.8).combined(with: .opacity),
+                            removal: .scale(scale: 0.8).combined(with: .opacity)
+                        ))
+                        .animation(
+                            .spring(response: 0.4, dampingFraction: 0.7)
+                            .delay(Double(index) * 0.05),
+                            value: profiles.count
+                        )
+                    }
+                }
+                .padding(.horizontal)
+            }
+            .padding(.top)
+            .padding(.bottom, 20)
+        }
+        .refreshable {
+            HapticManager.shared.impact(.light)
+            await viewModel.loadViewedProfiles()
             HapticManager.shared.notification(.success)
         }
     }
@@ -664,6 +707,14 @@ struct SavedYouProfile: Identifiable, Equatable {
     let savedAt: Date
 }
 
+// MARK: - Viewed Profile Model (profiles the current user has viewed)
+
+struct ViewedProfile: Identifiable, Equatable {
+    let id: String
+    let user: User
+    let viewedAt: Date
+}
+
 // MARK: - Saved You Card (simpler card for people who saved your profile)
 
 struct SavedYouCard: View {
@@ -737,6 +788,79 @@ struct SavedYouCard: View {
     }
 }
 
+// MARK: - Viewed Profile Card (for profiles the current user has viewed)
+
+struct ViewedProfileCard: View {
+    let profile: ViewedProfile
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 0) {
+                // Profile image section - fixed height for consistent card sizes
+                Group {
+                    if let imageURL = profile.user.photos.first, let url = URL(string: imageURL) {
+                        CachedCardImage(url: url)
+                    } else {
+                        LinearGradient(
+                            colors: [.green.opacity(0.6), .teal.opacity(0.5)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        .overlay {
+                            Image(systemName: "person.fill")
+                                .font(.system(size: 50))
+                                .foregroundColor(.white.opacity(0.5))
+                        }
+                    }
+                }
+                .frame(height: 180)
+                .frame(maxWidth: .infinity)
+                .clipped()
+                .cornerRadius(16, corners: [.topLeft, .topRight])
+
+                // User info section with white background
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text(profile.user.fullName)
+                            .font(.system(size: 17, weight: .semibold))
+                            .lineLimit(1)
+
+                        Text("\(profile.user.age)")
+                            .font(.system(size: 17))
+                            .foregroundColor(.secondary)
+
+                        Spacer()
+
+                        if profile.user.isVerified {
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(.system(size: 16))
+                                .foregroundColor(.blue)
+                        }
+                    }
+
+                    HStack(spacing: 4) {
+                        Image(systemName: "eye.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(.green)
+                        Text(profile.viewedAt.timeAgoDisplay())
+                            .font(.system(size: 13))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.white)
+            }
+            .background(Color.white)
+            .cornerRadius(16)
+            .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
+        }
+        .buttonStyle(ScaleButtonStyle())
+    }
+}
+
 // MARK: - Saved Profile Model
 
 struct SavedProfile: Identifiable, Equatable {
@@ -760,37 +884,18 @@ class SavedProfilesViewModel: ObservableObject {
     // Singleton instance for shared state across views
     static let shared = SavedProfilesViewModel()
 
-    @Published var savedProfiles: [SavedProfile] = [] {
-        didSet {
-            // PERFORMANCE: Update cached filtered arrays when savedProfiles changes
-            updateCachedProfiles()
-        }
-    }
+    @Published var savedProfiles: [SavedProfile] = []
     @Published var savedYouProfiles: [SavedYouProfile] = []
+    @Published var viewedProfiles: [ViewedProfile] = []
     @Published var isLoading = false
     @Published var errorMessage = ""
     @Published var unsavingProfileId: String?
-
-    // PERFORMANCE: Cache filtered arrays to avoid O(n) filtering on every tab switch
-    @Published private(set) var recentProfiles: [SavedProfile] = []
-
-    var savedThisWeek: Int {
-        recentProfiles.count
-    }
-
-    /// Update cached filtered arrays (called when savedProfiles changes)
-    private func updateCachedProfiles() {
-        guard let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) else {
-            recentProfiles = savedProfiles
-            return
-        }
-        recentProfiles = savedProfiles.filter { $0.savedAt >= weekAgo }
-    }
 
     private let db = Firestore.firestore()
 
     // PERFORMANCE: Cache management to reduce database reads
     private var lastFetchTime: Date?
+    private var lastViewedFetchTime: Date?
     private let cacheDuration: TimeInterval = 300 // 5 minutes
     private var cachedForUserId: String?
 
@@ -910,6 +1015,7 @@ class SavedProfilesViewModel: ObservableObject {
     /// Clear cache and force reload
     func clearCache() {
         lastFetchTime = nil
+        lastViewedFetchTime = nil
         cachedForUserId = nil
         Logger.shared.info("SavedProfiles cache cleared", category: .performance)
     }
@@ -968,6 +1074,79 @@ class SavedProfilesViewModel: ObservableObject {
             Logger.shared.info("Loaded \(profiles.count) users who saved your profile", category: .general)
         } catch {
             Logger.shared.error("Error loading saved you profiles", category: .general, error: error)
+        }
+    }
+
+    /// Load profiles that the current user has viewed
+    func loadViewedProfiles() async {
+        guard let currentUserId = AuthService.shared.currentUser?.effectiveId else {
+            return
+        }
+
+        // Check cache first
+        if let lastFetch = lastViewedFetchTime,
+           !viewedProfiles.isEmpty,
+           Date().timeIntervalSince(lastFetch) < cacheDuration {
+            Logger.shared.debug("ViewedProfiles cache HIT - using cached data", category: .performance)
+            return
+        }
+
+        do {
+            // Query for profiles the current user has viewed
+            let snapshot = try await db.collection("profileViews")
+                .whereField("viewerUserId", isEqualTo: currentUserId)
+                .order(by: "timestamp", descending: true)
+                .limit(to: 50)
+                .getDocuments()
+
+            var metadata: [(id: String, viewedUserId: String, viewedAt: Date)] = []
+            var seenUserIds = Set<String>()
+
+            for doc in snapshot.documents {
+                let data = doc.data()
+                if let viewedUserId = data["viewedUserId"] as? String,
+                   let timestamp = (data["timestamp"] as? Timestamp)?.dateValue(),
+                   !seenUserIds.contains(viewedUserId) {
+                    // Only keep the most recent view of each profile
+                    seenUserIds.insert(viewedUserId)
+                    metadata.append((id: doc.documentID, viewedUserId: viewedUserId, viewedAt: timestamp))
+                }
+            }
+
+            guard !metadata.isEmpty else {
+                viewedProfiles = []
+                lastViewedFetchTime = Date()
+                return
+            }
+
+            // Batch fetch users
+            let userIds = metadata.map { $0.viewedUserId }
+            var fetchedUsers: [String: User] = [:]
+
+            for chunk in userIds.chunked(into: 10) {
+                let usersSnapshot = try await db.collection("users")
+                    .whereField(FieldPath.documentID(), in: chunk)
+                    .getDocuments()
+
+                for userDoc in usersSnapshot.documents {
+                    if let user = try? userDoc.data(as: User.self), let userId = user.id {
+                        fetchedUsers[userId] = user
+                    }
+                }
+            }
+
+            var profiles: [ViewedProfile] = []
+            for meta in metadata {
+                if let user = fetchedUsers[meta.viewedUserId] {
+                    profiles.append(ViewedProfile(id: meta.id, user: user, viewedAt: meta.viewedAt))
+                }
+            }
+
+            viewedProfiles = profiles
+            lastViewedFetchTime = Date()
+            Logger.shared.info("Loaded \(profiles.count) viewed profiles - cached for 5 min", category: .general)
+        } catch {
+            Logger.shared.error("Error loading viewed profiles", category: .general, error: error)
         }
     }
 
