@@ -125,67 +125,122 @@ struct AdminVerificationReviewView: View {
     }
 }
 
-// MARK: - Verification Row View
+// MARK: - Verification Row View (Enhanced with inline photos)
 
 struct VerificationRowView: View {
     let verification: PendingVerification
+    var onQuickApprove: (() -> Void)? = nil
+    var onQuickReject: (() -> Void)? = nil
 
     var body: some View {
-        HStack(spacing: 12) {
-            // Thumbnail
-            AsyncImage(url: URL(string: verification.selfiePhotoURL)) { image in
-                image
-                    .resizable()
-                    .scaledToFill()
-            } placeholder: {
-                Image(systemName: "person.circle.fill")
-                    .font(.system(size: 40))
-                    .foregroundColor(.gray)
-            }
-            .frame(width: 50, height: 50)
-            .clipShape(Circle())
-
-            VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 12) {
+            // User info header
+            HStack(spacing: 10) {
                 Text(verification.userName)
                     .font(.headline)
 
-                Text(verification.userEmail)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                Spacer()
 
                 if let date = verification.submittedAt {
-                    Text("Submitted \(date.formatted(.relative(presentation: .named)))")
-                        .font(.caption2)
+                    Text(date.formatted(.relative(presentation: .named)))
+                        .font(.caption)
                         .foregroundColor(.secondary)
                 }
             }
 
-            Spacer()
+            // Side-by-side photo previews
+            HStack(spacing: 12) {
+                // ID Photo
+                VStack(spacing: 4) {
+                    AsyncImage(url: URL(string: verification.idPhotoURL)) { image in
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    } placeholder: {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.2))
+                            .overlay(
+                                ProgressView()
+                                    .scaleEffect(0.7)
+                            )
+                    }
+                    .frame(width: 120, height: 80)
+                    .cornerRadius(8)
+                    .clipped()
 
-            // Status badge
-            statusBadge
+                    Text("ID")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+
+                // Selfie Photo
+                VStack(spacing: 4) {
+                    AsyncImage(url: URL(string: verification.selfiePhotoURL)) { image in
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    } placeholder: {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.2))
+                            .overlay(
+                                ProgressView()
+                                    .scaleEffect(0.7)
+                            )
+                    }
+                    .frame(width: 120, height: 80)
+                    .cornerRadius(8)
+                    .clipped()
+
+                    Text("Selfie")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+            }
+
+            // Quick action buttons (if callbacks provided)
+            if onQuickApprove != nil || onQuickReject != nil {
+                HStack(spacing: 12) {
+                    // Approve button
+                    if let approve = onQuickApprove {
+                        Button(action: approve) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "checkmark.circle.fill")
+                                Text("Approve")
+                            }
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(Color.green)
+                            .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    // Reject button
+                    if let reject = onQuickReject {
+                        Button(action: reject) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "xmark.circle.fill")
+                                Text("Reject")
+                            }
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(Color.red)
+                            .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
         }
-        .padding(.vertical, 4)
-    }
-
-    private var statusBadge: some View {
-        Text(verification.status.capitalized)
-            .font(.caption2)
-            .fontWeight(.medium)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(statusColor.opacity(0.2))
-            .foregroundColor(statusColor)
-            .cornerRadius(8)
-    }
-
-    private var statusColor: Color {
-        switch verification.status {
-        case "pending": return .orange
-        case "approved": return .green
-        case "rejected": return .red
-        default: return .gray
-        }
+        .padding(.vertical, 8)
     }
 }
 
@@ -649,6 +704,7 @@ struct IDVerificationReviewEmbeddedView: View {
     @StateObject private var viewModel = AdminVerificationReviewViewModel()
     @State private var showingQuickRejectAlert = false
     @State private var verificationToReject: PendingVerification?
+    @State private var showApprovalSuccess = false
 
     var body: some View {
         Group {
@@ -667,55 +723,84 @@ struct IDVerificationReviewEmbeddedView: View {
                     Text("No pending ID verifications to review")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
+
+                    Button(action: {
+                        Task { await viewModel.loadPendingVerifications() }
+                    }) {
+                        Label("Refresh", systemImage: "arrow.clockwise")
+                            .font(.subheadline)
+                    }
+                    .padding(.top, 8)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                List {
-                    Section {
+                ScrollView {
+                    LazyVStack(spacing: 16) {
+                        // Header
                         HStack {
-                            Text("\(viewModel.pendingVerifications.count) pending review")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
+                            Text("\(viewModel.pendingVerifications.count) pending")
+                                .font(.headline)
                             Spacer()
-                            Text("Swipe for quick actions")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
+                            Button(action: {
+                                Task { await viewModel.loadPendingVerifications() }
+                            }) {
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.subheadline)
+                            }
                         }
-                    }
+                        .padding(.horizontal)
+                        .padding(.top, 8)
 
-                    ForEach(viewModel.pendingVerifications) { verification in
-                        NavigationLink(destination: VerificationDetailView(
-                            verification: verification,
-                            onApprove: { await viewModel.approveVerification(verification) },
-                            onReject: { reason in await viewModel.rejectVerification(verification, reason: reason) }
-                        )) {
-                            VerificationRowView(verification: verification)
-                        }
-                        // Quick approve swipe action (swipe right)
-                        .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                            Button {
-                                Task { await viewModel.approveVerification(verification) }
-                            } label: {
-                                Label("Approve", systemImage: "checkmark.circle.fill")
-                            }
-                            .tint(.green)
-                        }
-                        // Quick reject swipe action (swipe left)
-                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            Button(role: .destructive) {
-                                verificationToReject = verification
-                                showingQuickRejectAlert = true
-                            } label: {
-                                Label("Reject", systemImage: "xmark.circle.fill")
-                            }
+                        // Verification cards
+                        ForEach(viewModel.pendingVerifications) { verification in
+                            VerificationCardView(
+                                verification: verification,
+                                onApprove: {
+                                    Task {
+                                        await viewModel.approveVerification(verification)
+                                        showApprovalSuccess = true
+                                        // Auto-dismiss after 1.5 seconds
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                                            showApprovalSuccess = false
+                                        }
+                                    }
+                                },
+                                onReject: {
+                                    verificationToReject = verification
+                                    showingQuickRejectAlert = true
+                                }
+                            )
+                            .padding(.horizontal)
                         }
                     }
+                    .padding(.bottom, 20)
                 }
-                .listStyle(.insetGrouped)
             }
         }
         .task {
             await viewModel.loadPendingVerifications()
+        }
+        .overlay {
+            // Success toast
+            if showApprovalSuccess {
+                VStack {
+                    Spacer()
+                    HStack(spacing: 10) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.white)
+                        Text("Verified! Photos deleted.")
+                            .foregroundColor(.white)
+                            .fontWeight(.medium)
+                    }
+                    .padding()
+                    .background(Color.green)
+                    .cornerRadius(12)
+                    .shadow(radius: 10)
+                    .padding(.bottom, 40)
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .animation(.spring(), value: showApprovalSuccess)
+            }
         }
         .alert("Reject Verification", isPresented: $showingQuickRejectAlert) {
             Button("ID Blurry") {
@@ -736,6 +821,140 @@ struct IDVerificationReviewEmbeddedView: View {
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("Select a reason for rejection")
+        }
+    }
+}
+
+// MARK: - Verification Card View (Clean card layout for admin)
+
+struct VerificationCardView: View {
+    let verification: PendingVerification
+    let onApprove: () -> Void
+    let onReject: () -> Void
+    @State private var showingFullPhoto = false
+    @State private var selectedPhotoURL: String = ""
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verification.userName)
+                        .font(.headline)
+                    Text(verification.userEmail)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                if let date = verification.submittedAt {
+                    Text(date.formatted(.relative(presentation: .named)))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Color.orange.opacity(0.15))
+                        .cornerRadius(6)
+                }
+            }
+            .padding()
+
+            // Photos - side by side comparison
+            HStack(spacing: 2) {
+                // ID Photo
+                Button(action: {
+                    selectedPhotoURL = verification.idPhotoURL
+                    showingFullPhoto = true
+                }) {
+                    VStack(spacing: 0) {
+                        AsyncImage(url: URL(string: verification.idPhotoURL)) { image in
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        } placeholder: {
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.2))
+                                .overlay(ProgressView())
+                        }
+                        .frame(height: 150)
+                        .clipped()
+
+                        Text("ID Document")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                            .background(Color.blue)
+                    }
+                }
+
+                // Selfie Photo
+                Button(action: {
+                    selectedPhotoURL = verification.selfiePhotoURL
+                    showingFullPhoto = true
+                }) {
+                    VStack(spacing: 0) {
+                        AsyncImage(url: URL(string: verification.selfiePhotoURL)) { image in
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        } placeholder: {
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.2))
+                                .overlay(ProgressView())
+                        }
+                        .frame(height: 150)
+                        .clipped()
+
+                        Text("Selfie")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                            .background(Color.purple)
+                    }
+                }
+            }
+
+            // Action buttons
+            HStack(spacing: 0) {
+                // Approve
+                Button(action: onApprove) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle.fill")
+                        Text("Approve")
+                    }
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color.green)
+                }
+
+                // Reject
+                Button(action: onReject) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "xmark.circle.fill")
+                        Text("Reject")
+                    }
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color.red)
+                }
+            }
+        }
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
+        .fullScreenCover(isPresented: $showingFullPhoto) {
+            FullScreenImageView(imageURL: selectedPhotoURL)
         }
     }
 }

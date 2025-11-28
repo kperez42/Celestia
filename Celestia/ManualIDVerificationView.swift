@@ -3,7 +3,7 @@
 //  Celestia
 //
 //  Manual ID verification - user submits photos for admin review
-//  Simple alternative to Stripe Identity for small apps
+//  Clean, smooth step-by-step flow
 //
 
 import SwiftUI
@@ -12,49 +12,73 @@ import FirebaseFirestore
 import FirebaseAuth
 import FirebaseStorage
 
-// MARK: - Manual ID Verification View (User Submission)
+// MARK: - Manual ID Verification View
 
 struct ManualIDVerificationView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = ManualIDVerificationViewModel()
+    @State private var currentStep = 1
+    @State private var showingImageSourcePicker = false
+    @State private var imageSourceType: ImageSourceType = .id
+
+    enum ImageSourceType {
+        case id, selfie
+    }
 
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 24) {
-                    // Header
-                    headerSection
+            ZStack {
+                Color(.systemGroupedBackground)
+                    .ignoresSafeArea()
 
-                    // Status check
-                    if viewModel.pendingVerification {
-                        pendingStatusSection
-                    } else if viewModel.isVerified {
-                        verifiedStatusSection
-                    } else {
-                        // Photo upload sections
-                        idPhotoSection
-                        selfiePhotoSection
-
-                        // Submit button
-                        submitButton
-                    }
-
-                    // Instructions
-                    instructionsSection
+                if viewModel.isVerified {
+                    verifiedView
+                } else if viewModel.pendingVerification {
+                    pendingView
+                } else {
+                    mainContent
                 }
-                .padding()
             }
-            .navigationTitle("ID Verification")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Cancel") { dismiss() }
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark")
+                            .font(.body.weight(.medium))
+                            .foregroundColor(.primary)
+                    }
                 }
             }
-            .alert("Verification Submitted", isPresented: $viewModel.showingSuccess) {
-                Button("OK") { dismiss() }
+            .confirmationDialog("Choose Photo Source", isPresented: $showingImageSourcePicker) {
+                Button("Take Photo") {
+                    viewModel.showingCamera = true
+                    viewModel.cameraSourceType = imageSourceType
+                }
+                Button("Choose from Library") {
+                    if imageSourceType == .id {
+                        viewModel.showingIDPicker = true
+                    } else {
+                        viewModel.showingSelfiePicker = true
+                    }
+                }
+                Button("Cancel", role: .cancel) { }
+            }
+            .sheet(isPresented: $viewModel.showingCamera) {
+                CameraView(image: viewModel.cameraSourceType == .id ? $viewModel.idImage : $viewModel.selfieImage)
+            }
+            .photosPicker(isPresented: $viewModel.showingIDPicker, selection: $viewModel.idPhotoItem, matching: .images)
+            .photosPicker(isPresented: $viewModel.showingSelfiePicker, selection: $viewModel.selfiePhotoItem, matching: .images)
+            .onChange(of: viewModel.idPhotoItem) { _ in
+                Task { await viewModel.loadIDPhoto() }
+            }
+            .onChange(of: viewModel.selfiePhotoItem) { _ in
+                Task { await viewModel.loadSelfiePhoto() }
+            }
+            .alert("Submitted!", isPresented: $viewModel.showingSuccess) {
+                Button("Done") { dismiss() }
             } message: {
-                Text("Your ID verification is pending review. You'll be notified once approved.")
+                Text("Your verification is being reviewed. We'll notify you when approved!")
             }
             .alert("Error", isPresented: $viewModel.showingError) {
                 Button("OK") { }
@@ -67,171 +91,223 @@ struct ManualIDVerificationView: View {
         }
     }
 
+    // MARK: - Main Content
+
+    private var mainContent: some View {
+        VStack(spacing: 0) {
+            // Progress indicator
+            progressBar
+                .padding(.top, 8)
+
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 24) {
+                    // Header
+                    headerSection
+
+                    // Step 1: ID Photo
+                    photoUploadCard(
+                        step: 1,
+                        title: "Government ID",
+                        subtitle: "Driver's license, passport, or national ID",
+                        icon: "creditcard.fill",
+                        image: viewModel.idImage,
+                        isActive: currentStep >= 1,
+                        onTap: {
+                            imageSourceType = .id
+                            showingImageSourcePicker = true
+                        },
+                        onClear: { viewModel.idImage = nil }
+                    )
+
+                    // Step 2: Selfie
+                    photoUploadCard(
+                        step: 2,
+                        title: "Selfie Photo",
+                        subtitle: "Clear photo of your face",
+                        icon: "person.crop.circle.fill",
+                        image: viewModel.selfieImage,
+                        isActive: currentStep >= 2 || viewModel.idImage != nil,
+                        onTap: {
+                            imageSourceType = .selfie
+                            showingImageSourcePicker = true
+                        },
+                        onClear: { viewModel.selfieImage = nil }
+                    )
+
+                    // Privacy notice
+                    privacyNotice
+
+                    // Submit button
+                    if viewModel.canSubmit {
+                        submitButton
+                    }
+
+                    Spacer(minLength: 40)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+            }
+        }
+    }
+
+    // MARK: - Progress Bar
+
+    private var progressBar: some View {
+        HStack(spacing: 8) {
+            // Step 1
+            RoundedRectangle(cornerRadius: 4)
+                .fill(viewModel.idImage != nil ? Color.green : Color.gray.opacity(0.3))
+                .frame(height: 4)
+
+            // Step 2
+            RoundedRectangle(cornerRadius: 4)
+                .fill(viewModel.selfieImage != nil ? Color.green : Color.gray.opacity(0.3))
+                .frame(height: 4)
+        }
+        .padding(.horizontal, 20)
+    }
+
     // MARK: - Header
 
     private var headerSection: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "person.text.rectangle.fill")
-                .font(.system(size: 50))
-                .foregroundColor(.purple)
-
+        VStack(spacing: 8) {
             Text("Verify Your Identity")
                 .font(.title2)
                 .fontWeight(.bold)
 
-            Text("Upload a photo of your ID and a selfie for manual review")
+            Text("Quick 2-step process • Usually approved same day")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
         }
+        .padding(.vertical, 8)
     }
 
-    // MARK: - Pending Status
+    // MARK: - Photo Upload Card
 
-    private var pendingStatusSection: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "clock.fill")
-                .font(.system(size: 50))
-                .foregroundColor(.orange)
+    private func photoUploadCard(
+        step: Int,
+        title: String,
+        subtitle: String,
+        icon: String,
+        image: UIImage?,
+        isActive: Bool,
+        onTap: @escaping () -> Void,
+        onClear: @escaping () -> Void
+    ) -> some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                // Step number
+                ZStack {
+                    Circle()
+                        .fill(image != nil ? Color.green : (isActive ? Color.purple : Color.gray.opacity(0.3)))
+                        .frame(width: 28, height: 28)
 
-            Text("Verification Pending")
-                .font(.title3)
-                .fontWeight(.semibold)
+                    if image != nil {
+                        Image(systemName: "checkmark")
+                            .font(.caption.bold())
+                            .foregroundColor(.white)
+                    } else {
+                        Text("\(step)")
+                            .font(.caption.bold())
+                            .foregroundColor(isActive ? .white : .gray)
+                    }
+                }
 
-            Text("Your verification is being reviewed. This usually takes 24-48 hours.")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.headline)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
 
-            if let submittedAt = viewModel.submittedAt {
-                Text("Submitted: \(submittedAt.formatted())")
+                Spacer()
+
+                Image(systemName: icon)
+                    .font(.title2)
+                    .foregroundColor(image != nil ? .green : .purple)
+            }
+            .padding()
+
+            // Photo area
+            if let image = image {
+                // Show uploaded photo
+                ZStack(alignment: .topTrailing) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(height: 180)
+                        .clipped()
+
+                    // Remove button
+                    Button(action: onClear) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                            .shadow(radius: 2)
+                    }
+                    .padding(12)
+                }
+                .onTapGesture(perform: onTap)
+            } else if isActive {
+                // Upload button
+                Button(action: onTap) {
+                    VStack(spacing: 12) {
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 32))
+                            .foregroundColor(.purple)
+
+                        Text("Tap to add photo")
+                            .font(.subheadline)
+                            .foregroundColor(.purple)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 140)
+                    .background(Color.purple.opacity(0.08))
+                }
+            } else {
+                // Inactive state
+                VStack(spacing: 12) {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(.gray)
+
+                    Text("Complete step \(step - 1) first")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 100)
+                .background(Color.gray.opacity(0.1))
+            }
+        }
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+    }
+
+    // MARK: - Privacy Notice
+
+    private var privacyNotice: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "trash.circle.fill")
+                .font(.title2)
+                .foregroundColor(.green)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Photos Auto-Deleted")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+
+                Text("Your photos are deleted immediately after review. We only store your verified status.")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
         }
         .padding()
-        .background(Color.orange.opacity(0.1))
-        .cornerRadius(12)
-    }
-
-    // MARK: - Verified Status
-
-    private var verifiedStatusSection: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "checkmark.seal.fill")
-                .font(.system(size: 50))
-                .foregroundColor(.green)
-
-            Text("You're Verified!")
-                .font(.title3)
-                .fontWeight(.semibold)
-                .foregroundColor(.green)
-
-            Text("Your identity has been verified. You have a verified badge on your profile.")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-
-            Button("Done") {
-                dismiss()
-            }
-            .buttonStyle(.borderedProminent)
-        }
-        .padding()
         .background(Color.green.opacity(0.1))
         .cornerRadius(12)
-    }
-
-    // MARK: - ID Photo Section
-
-    private var idPhotoSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("Government ID", systemImage: "creditcard.fill")
-                .font(.headline)
-
-            PhotosPicker(selection: $viewModel.idPhotoItem, matching: .images) {
-                if let idImage = viewModel.idImage {
-                    Image(uiImage: idImage)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(height: 180)
-                        .clipped()
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.green, lineWidth: 2)
-                        )
-                } else {
-                    photoPlaceholder(
-                        icon: "creditcard",
-                        text: "Tap to upload ID photo"
-                    )
-                }
-            }
-            .onChange(of: viewModel.idPhotoItem) { _ in
-                Task { await viewModel.loadIDPhoto() }
-            }
-
-            Text("Driver's license, passport, or national ID")
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-    }
-
-    // MARK: - Selfie Section
-
-    private var selfiePhotoSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("Selfie Photo", systemImage: "person.crop.circle.fill")
-                .font(.headline)
-
-            PhotosPicker(selection: $viewModel.selfiePhotoItem, matching: .images) {
-                if let selfieImage = viewModel.selfieImage {
-                    Image(uiImage: selfieImage)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(height: 180)
-                        .clipped()
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.green, lineWidth: 2)
-                        )
-                } else {
-                    photoPlaceholder(
-                        icon: "person.crop.circle",
-                        text: "Tap to upload selfie"
-                    )
-                }
-            }
-            .onChange(of: viewModel.selfiePhotoItem) { _ in
-                Task { await viewModel.loadSelfiePhoto() }
-            }
-
-            Text("Clear photo of your face matching the ID")
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-    }
-
-    private func photoPlaceholder(icon: String, text: String) -> some View {
-        VStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 40))
-                .foregroundColor(.gray)
-            Text(text)
-                .font(.subheadline)
-                .foregroundColor(.gray)
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 180)
-        .background(Color(.secondarySystemBackground))
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(style: StrokeStyle(lineWidth: 2, dash: [8]))
-                .foregroundColor(.gray.opacity(0.5))
-        )
     }
 
     // MARK: - Submit Button
@@ -240,7 +316,7 @@ struct ManualIDVerificationView: View {
         Button(action: {
             Task { await viewModel.submitVerification() }
         }) {
-            HStack {
+            HStack(spacing: 10) {
                 if viewModel.isSubmitting {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
@@ -249,69 +325,153 @@ struct ManualIDVerificationView: View {
                     Text("Submit for Review")
                 }
             }
-            .fontWeight(.semibold)
+            .font(.headline)
             .foregroundColor(.white)
             .frame(maxWidth: .infinity)
-            .padding()
-            .background(viewModel.canSubmit ? Color.purple : Color.gray)
-            .cornerRadius(12)
+            .padding(.vertical, 16)
+            .background(
+                LinearGradient(
+                    colors: [.purple, .pink],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            .cornerRadius(14)
+            .shadow(color: .purple.opacity(0.3), radius: 8, y: 4)
         }
-        .disabled(!viewModel.canSubmit || viewModel.isSubmitting)
+        .disabled(viewModel.isSubmitting)
+        .scaleEffect(viewModel.isSubmitting ? 0.98 : 1.0)
+        .animation(.spring(response: 0.3), value: viewModel.isSubmitting)
     }
 
-    // MARK: - Instructions
+    // MARK: - Verified View
 
-    private var instructionsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Requirements")
-                .font(.headline)
+    private var verifiedView: some View {
+        VStack(spacing: 24) {
+            Spacer()
 
-            instructionRow(icon: "doc.text.fill", text: "ID must be valid and not expired")
-            instructionRow(icon: "eye.fill", text: "All text must be clearly readable")
-            instructionRow(icon: "person.fill", text: "Selfie must clearly show your face")
-            instructionRow(icon: "light.max", text: "Good lighting, no glare")
+            Image(systemName: "checkmark.seal.fill")
+                .font(.system(size: 80))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.green, .mint],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
 
-            Divider()
+            Text("You're Verified!")
+                .font(.title)
+                .fontWeight(.bold)
 
-            // Privacy notice - photos deleted after review
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: "trash.circle.fill")
-                        .foregroundColor(.green)
-                    Text("Photos Auto-Deleted")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.green)
-                }
-
-                Text("Your ID and selfie photos are automatically deleted immediately after review. We only store your verification status, not your documents.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            .padding()
-            .background(Color.green.opacity(0.1))
-            .cornerRadius(8)
-
-            HStack {
-                Image(systemName: "lock.shield.fill")
-                    .foregroundColor(.blue)
-                Text("Encrypted and secure during the review process.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-        }
-        .padding()
-        .background(Color(.secondarySystemBackground))
-        .cornerRadius(12)
-    }
-
-    private func instructionRow(icon: String, text: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .foregroundColor(.purple)
-                .frame(width: 24)
-            Text(text)
+            Text("Your identity has been verified.\nYou now have the verified badge!")
                 .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+
+            Spacer()
+
+            Button("Done") {
+                dismiss()
+            }
+            .font(.headline)
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(Color.green)
+            .cornerRadius(14)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 40)
+        }
+    }
+
+    // MARK: - Pending View
+
+    private var pendingView: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            ZStack {
+                Circle()
+                    .fill(Color.orange.opacity(0.15))
+                    .frame(width: 120, height: 120)
+
+                Image(systemName: "clock.fill")
+                    .font(.system(size: 50))
+                    .foregroundColor(.orange)
+            }
+
+            Text("Under Review")
+                .font(.title)
+                .fontWeight(.bold)
+
+            Text("Your verification is being reviewed.\nThis usually takes less than 24 hours.")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+
+            if let date = viewModel.submittedAt {
+                Text("Submitted \(date.formatted(.relative(presentation: .named)))")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .padding(.top, 8)
+            }
+
+            Spacer()
+
+            Button("Close") {
+                dismiss()
+            }
+            .font(.headline)
+            .foregroundColor(.orange)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(Color.orange.opacity(0.15))
+            .cornerRadius(14)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 40)
+        }
+    }
+}
+
+// MARK: - Camera View
+
+struct CameraView: UIViewControllerRepresentable {
+    @Binding var image: UIImage?
+    @Environment(\.dismiss) private var dismiss
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.delegate = context.coordinator
+        picker.allowsEditing = true
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let parent: CameraView
+
+        init(_ parent: CameraView) {
+            self.parent = parent
+        }
+
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+            if let edited = info[.editedImage] as? UIImage {
+                parent.image = edited
+            } else if let original = info[.originalImage] as? UIImage {
+                parent.image = original
+            }
+            parent.dismiss()
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.dismiss()
         }
     }
 }
@@ -324,6 +484,11 @@ class ManualIDVerificationViewModel: ObservableObject {
     @Published var selfiePhotoItem: PhotosPickerItem?
     @Published var idImage: UIImage?
     @Published var selfieImage: UIImage?
+
+    @Published var showingIDPicker = false
+    @Published var showingSelfiePicker = false
+    @Published var showingCamera = false
+    var cameraSourceType: ManualIDVerificationView.ImageSourceType = .id
 
     @Published var isSubmitting = false
     @Published var showingSuccess = false
@@ -350,7 +515,7 @@ class ManualIDVerificationViewModel: ObservableObject {
             let doc = try await db.collection("users").document(userId).getDocument()
             let data = doc.data() ?? [:]
 
-            isVerified = data["idVerified"] as? Bool ?? false
+            isVerified = (data["isVerified"] as? Bool ?? false) || (data["idVerified"] as? Bool ?? false)
 
             // Check for pending verification
             let verificationDoc = try await db.collection("pendingVerifications").document(userId).getDocument()
