@@ -212,6 +212,35 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Pending Verifications Collection (ID verification submissions)
+    match /pendingVerifications/{verificationId} {
+      // Admin helper function
+      function isAdmin() {
+        return request.auth.token.email in ['perezkevin640@gmail.com', 'admin@celestia.app'];
+      }
+
+      // Users can read their own verification status, admin can read all
+      allow read: if isAuthenticated()
+        && isEmailVerified()
+        && (verificationId == request.auth.uid || isAdmin());
+
+      // Users can create their own verification submission
+      allow create: if isAuthenticated()
+        && isEmailVerified()
+        && verificationId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'pending';
+
+      // Users can update their own pending verification (to resubmit)
+      // Admin can update any verification (to change status)
+      allow update: if isAuthenticated()
+        && isEmailVerified()
+        && (verificationId == request.auth.uid || isAdmin());
+
+      // Only admin can delete verifications (after review)
+      allow delete: if isAuthenticated() && isEmailVerified() && isAdmin();
+    }
+
     // Default: Deny all other access
     match /{document=**} {
       allow read, write: if false;
