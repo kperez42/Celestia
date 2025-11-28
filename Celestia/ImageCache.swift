@@ -399,7 +399,7 @@ class ImageCache {
     }
 
     private func saveToDisk(image: UIImage, key: String) async {
-        guard let data = image.jpegData(compressionQuality: 0.9) else { return } // Higher quality cache
+        guard let data = image.jpegData(compressionQuality: 0.95) else { return } // High quality cache for sharp images
 
         let fileURL = cacheDirectory.appendingPathComponent(key.sha256())
         try? data.write(to: fileURL)

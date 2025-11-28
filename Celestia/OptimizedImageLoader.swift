@@ -30,20 +30,28 @@ class OptimizedImageLoader: ObservableObject {
     // MARK: - Image Size Selection
 
     /// Determine appropriate image size based on view dimensions
+    /// Updated thresholds to prefer higher quality images for better visual fidelity
     func selectAppropriateSize(for viewSize: CGSize) -> String {
         let scale = UIScreen.main.scale
         let pixelWidth = viewSize.width * scale
 
-        // Select size based on pixel width
-        if pixelWidth <= 150 {
+        // More aggressive size selection for sharper images
+        // Always prefer larger images to avoid blurriness
+        if pixelWidth <= 100 {
             return "thumbnail"
-        } else if pixelWidth <= 375 {
+        } else if pixelWidth <= 250 {
             return "small"
-        } else if pixelWidth <= 750 {
+        } else if pixelWidth <= 500 {
             return "medium"
         } else {
             return "large"
         }
+    }
+
+    /// Select the highest quality image size for card displays
+    /// Cards should always use large images for crisp display
+    func selectCardImageSize() -> String {
+        return "large"
     }
 
     // MARK: - Load Optimized Image
