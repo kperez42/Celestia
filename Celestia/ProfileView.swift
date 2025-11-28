@@ -32,6 +32,12 @@ struct ProfileView: View {
     @State private var hasAnimatedStats = false
     @State private var showingProfileViewers = false
 
+    // Accurate stats from database
+    @State private var accurateMatchCount = 0
+    @State private var accurateLikesReceived = 0
+    @State private var accurateProfileViews = 0
+    @State private var isLoadingStats = true
+
     // Static date formatter for performance
     private static let memberSinceDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -259,6 +265,11 @@ struct ProfileView: View {
                 }
                 updateProfileCompletion()
                 VoiceOverAnnouncement.screenChanged(to: "Profile view")
+
+                // Load accurate stats from database
+                Task {
+                    await loadAccurateStats()
+                }
             }
             .onChange(of: authService.currentUser) { oldValue, newValue in
                 updateProfileCompletion()
@@ -591,7 +602,7 @@ struct ProfileView: View {
         HStack(spacing: 0) {
             statCard(
                 icon: "heart.fill",
-                value: "\(user.matchCount)",
+                value: isLoadingStats ? "-" : "\(accurateMatchCount)",
                 label: "Matches",
                 color: .pink
             )
@@ -606,7 +617,7 @@ struct ProfileView: View {
             } label: {
                 statCard(
                     icon: "eye.fill",
-                    value: "\(user.profileViews)",
+                    value: isLoadingStats ? "-" : "\(accurateProfileViews)",
                     label: "Views",
                     color: .blue
                 )
@@ -619,7 +630,7 @@ struct ProfileView: View {
 
             statCard(
                 icon: "hand.thumbsup.fill",
-                value: "\(user.likesReceived)",
+                value: isLoadingStats ? "-" : "\(accurateLikesReceived)",
                 label: "Likes",
                 color: .purple
             )
@@ -1771,8 +1782,39 @@ struct ProfileView: View {
                 }
                 Logger.shared.info("Profile data refreshed successfully", category: .general)
             }
+
+            // Also refresh accurate stats
+            await loadAccurateStats()
         } catch {
             Logger.shared.error("Failed to refresh profile data", category: .general, error: error)
+        }
+    }
+
+    private func loadAccurateStats() async {
+        guard let userId = authService.currentUser?.id else { return }
+
+        isLoadingStats = true
+
+        do {
+            let stats = try await ProfileStatsService.shared.getAccurateStats(userId: userId)
+            await MainActor.run {
+                accurateMatchCount = stats.matchCount
+                accurateLikesReceived = stats.likesReceived
+                accurateProfileViews = stats.profileViews
+                isLoadingStats = false
+            }
+            Logger.shared.info("Accurate stats loaded - Matches: \(stats.matchCount), Likes: \(stats.likesReceived), Views: \(stats.profileViews)", category: .general)
+        } catch {
+            Logger.shared.error("Failed to load accurate stats", category: .general, error: error)
+            // Fall back to user's stored counts on error
+            await MainActor.run {
+                if let user = authService.currentUser {
+                    accurateMatchCount = user.matchCount
+                    accurateLikesReceived = user.likesReceived
+                    accurateProfileViews = user.profileViews
+                }
+                isLoadingStats = false
+            }
         }
     }
 }
