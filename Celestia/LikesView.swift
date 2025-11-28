@@ -444,12 +444,9 @@ struct LikeProfileCard: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Profile image
+            // Profile image - fixed height for consistent card sizes
             ZStack(alignment: .topTrailing) {
                 profileImage
-                    .frame(height: 200)
-                    .frame(maxWidth: .infinity)
-                    .clipped()
 
                 // Verified badge
                 if user.isVerified {
@@ -528,14 +525,14 @@ struct LikeProfileCard: View {
         Group {
             if let imageURL = URL(string: user.profileImageURL), !user.profileImageURL.isEmpty {
                 CachedCardImage(url: imageURL)
-                    .frame(height: 200)
-                    .clipped()
+                    .aspectRatio(contentMode: .fill)
             } else {
                 placeholderImage
-                    .frame(height: 200)
             }
         }
+        .frame(height: 180)
         .frame(maxWidth: .infinity)
+        .clipped()
     }
 
     private var placeholderImage: some View {
@@ -562,7 +559,7 @@ struct LikeCardSkeleton: View {
         VStack(spacing: 0) {
             Rectangle()
                 .fill(Color.gray.opacity(0.2))
-                .frame(height: 200)
+                .frame(height: 180)
 
             VStack(alignment: .leading, spacing: 8) {
                 RoundedRectangle(cornerRadius: 4)
