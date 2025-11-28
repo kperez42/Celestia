@@ -83,7 +83,7 @@ struct ProfileView: View {
                                 }
                                 .padding(.top, 20)
 
-                                // ===== PROFILE STATUS SECTION =====
+                                // ===== PROFILE STATUS & INSIGHTS SECTION =====
                                 VStack(spacing: 16) {
                                     // Profile completion
                                     if profileCompletion < 100 {
@@ -101,14 +101,10 @@ struct ProfileView: View {
                                     } else {
                                         premiumUpgradeCard
                                     }
-                                }
 
-                                // ===== INSIGHTS SECTION =====
-                                VStack(spacing: 12) {
-                                    sectionDivider()
+                                    // Profile Insights (same spacing as above cards)
                                     profileInsightsCard
                                 }
-                                .padding(.top, 8)
 
                                 // ===== ABOUT ME SECTION =====
                                 VStack(spacing: 16) {
@@ -152,7 +148,7 @@ struct ProfileView: View {
                                 // ===== INTERESTS & LANGUAGES SECTION =====
                                 VStack(spacing: 16) {
                                     sectionDivider()
-                                    sectionHeader(title: "Interests & Languages", icon: "sparkles")
+                                    sectionHeader(title: "Interests", icon: "sparkles")
 
                                     // Languages
                                     if !user.languages.isEmpty {
@@ -169,7 +165,7 @@ struct ProfileView: View {
                                 // ===== PREFERENCES & ACTIVITY SECTION =====
                                 VStack(spacing: 16) {
                                     sectionDivider()
-                                    sectionHeader(title: "Preferences & Activity", icon: "slider.horizontal.3")
+                                    sectionHeader(title: "Preferences", icon: "slider.horizontal.3")
 
                                     // Preferences
                                     preferencesCard(user: user)
