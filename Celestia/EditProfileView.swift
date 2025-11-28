@@ -1732,9 +1732,9 @@ struct EditProfileView: View {
     // MARK: - Image Optimization
 
     private func optimizeImageForUpload(_ image: UIImage) -> UIImage {
-        // PERFORMANCE: Higher quality for better looking photos
-        let maxDimension: CGFloat = 1536  // Higher resolution for quality
-        let compressionQuality: CGFloat = 0.85  // Higher quality for better photos
+        // PERFORMANCE: Higher quality for sharper photos on cards
+        let maxDimension: CGFloat = 2000  // Higher resolution for crisp display on all devices
+        let compressionQuality: CGFloat = 0.92  // Higher quality to prevent blurriness
 
         // Calculate new size maintaining aspect ratio
         let size = image.size

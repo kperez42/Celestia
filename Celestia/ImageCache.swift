@@ -140,6 +140,42 @@ class ImageCache {
         }
     }
 
+    /// Store raw image data directly without re-encoding (preserves original quality)
+    func setImageData(_ data: Data, for key: String) {
+        // Decode with high quality settings
+        if let image = Self.decodeImageWithHighQuality(from: data) {
+            if !isUnderMemoryPressure {
+                memoryCache.setObject(image, forKey: key as NSString)
+            }
+        }
+
+        // Store original data on disk (no re-encoding = no quality loss)
+        Task {
+            await saveDataToDisk(data: data, key: key)
+        }
+    }
+
+    /// High-quality image decoding using ImageIO to prevent automatic downsampling
+    static func decodeImageWithHighQuality(from data: Data) -> UIImage? {
+        let options: [CFString: Any] = [
+            kCGImageSourceShouldCache: true,
+            kCGImageSourceShouldAllowFloat: true
+        ]
+
+        guard let source = CGImageSourceCreateWithData(data as CFData, options as CFDictionary),
+              let cgImage = CGImageSourceCreateImageAtIndex(source, 0, [
+                kCGImageSourceShouldCacheImmediately: true,
+                kCGImageSourceCreateThumbnailFromImageAlways: false  // Don't create thumbnail, use full image
+              ] as CFDictionary) else {
+            // Fallback to standard UIImage decoding
+            return UIImage(data: data)
+        }
+
+        // Create UIImage at native scale for Retina displays
+        let scale = UIScreen.main.scale
+        return UIImage(cgImage: cgImage, scale: scale, orientation: .up)
+    }
+
     func removeImage(for key: String) {
         memoryCache.removeObject(forKey: key as NSString)
 
@@ -170,6 +206,7 @@ class ImageCache {
 
     /// Load image with deduplication - prevents multiple network requests for same URL
     /// PERFORMANCE: Supports priority levels for faster user-initiated loads
+    /// QUALITY: Uses high-quality decoding and preserves original data without re-encoding
     func loadImageAsync(for url: URL, priority: ImageLoadPriority = .normal) async -> UIImage? {
         let cacheKey = url.absoluteString
 
@@ -192,8 +229,10 @@ class ImageCache {
 
                 guard !Task.isCancelled else { return nil }
 
-                if let downloadedImage = UIImage(data: data) {
-                    setImage(downloadedImage, for: cacheKey)
+                // QUALITY: Use high-quality decoding to prevent downsampling
+                if let downloadedImage = Self.decodeImageWithHighQuality(from: data) {
+                    // QUALITY: Save raw data without re-encoding to preserve original quality
+                    setImageData(data, for: cacheKey)
                     return downloadedImage
                 }
             } catch {
@@ -387,8 +426,12 @@ class ImageCache {
     private func loadFromDisk(key: String) -> UIImage? {
         let fileURL = cacheDirectory.appendingPathComponent(key.sha256())
 
-        guard let data = try? Data(contentsOf: fileURL),
-              let image = UIImage(data: data) else {
+        guard let data = try? Data(contentsOf: fileURL) else {
+            return nil
+        }
+
+        // QUALITY: Use high-quality decoding to prevent downsampling
+        guard let image = Self.decodeImageWithHighQuality(from: data) else {
             return nil
         }
 
@@ -399,8 +442,20 @@ class ImageCache {
     }
 
     private func saveToDisk(image: UIImage, key: String) async {
-        guard let data = image.jpegData(compressionQuality: 0.9) else { return } // Higher quality cache
+        guard let data = image.jpegData(compressionQuality: 0.95) else { return } // High quality cache for sharp images
 
+        let fileURL = cacheDirectory.appendingPathComponent(key.sha256())
+        try? data.write(to: fileURL)
+
+        // Check if we need to clean cache
+        let cacheSize = await getCacheSize()
+        if cacheSize > maxDiskCacheSize {
+            await cleanOldestCache()
+        }
+    }
+
+    /// Save raw image data directly to disk (preserves original quality - no re-encoding)
+    private func saveDataToDisk(data: Data, key: String) async {
         let fileURL = cacheDirectory.appendingPathComponent(key.sha256())
         try? data.write(to: fileURL)
 
@@ -657,9 +712,11 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
                     return
                 }
 
-                if let downloadedImage = UIImage(data: data) {
+                // QUALITY: Use high-quality decoding to prevent downsampling
+                if let downloadedImage = ImageCache.decodeImageWithHighQuality(from: data) {
                     await MainActor.run {
-                        ImageCache.shared.setImage(downloadedImage, for: cacheKey)
+                        // QUALITY: Save raw data without re-encoding
+                        ImageCache.shared.setImageData(data, for: cacheKey)
                         self.image = downloadedImage
                         self.isLoading = false
                         // Smooth crossfade animation
@@ -900,9 +957,11 @@ struct CachedProfileImage: View {
                     return
                 }
 
-                if let downloadedImage = UIImage(data: data) {
+                // QUALITY: Use high-quality decoding to prevent downsampling
+                if let downloadedImage = ImageCache.decodeImageWithHighQuality(from: data) {
                     await MainActor.run {
-                        ImageCache.shared.setImage(downloadedImage, for: cacheKey)
+                        // QUALITY: Save raw data without re-encoding
+                        ImageCache.shared.setImageData(data, for: cacheKey)
                         self.image = downloadedImage
                         self.isLoading = false
                         // Smooth crossfade animation

@@ -38,11 +38,11 @@ class ImageOptimizer {
 
         var compressionQuality: CGFloat {
             switch self {
-            case .thumbnail: return 0.8
-            case .small: return 0.85
-            case .medium: return 0.88
-            case .large: return 0.92
-            case .original: return 0.95
+            case .thumbnail: return 0.85
+            case .small: return 0.88
+            case .medium: return 0.92   // Higher quality for profile cards
+            case .large: return 0.95    // Near-original quality for full screen
+            case .original: return 0.98
             }
         }
     }
@@ -361,9 +361,9 @@ struct ProcessedImage {
 // MARK: - UIImage Extension
 
 extension UIImage {
-    /// Get base64 encoded string
+    /// Get base64 encoded string with high quality
     func base64EncodedString() -> String? {
-        return jpegData(compressionQuality: 0.8)?.base64EncodedString()
+        return jpegData(compressionQuality: 0.9)?.base64EncodedString()
     }
 
     /// Compress to specific size
