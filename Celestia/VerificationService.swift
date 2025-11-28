@@ -2,11 +2,13 @@
 //  VerificationService.swift
 //  Celestia
 //
-//  Core service for managing user verification (photo, ID, background checks)
+//  Core service for managing user verification (ID, background checks)
 //  Coordinates between different verification types and maintains verification status
 //
 //  SECURITY: Verification status is persisted to Firestore (server-side) as source of truth.
 //  Local UserDefaults is only used as a cache and is validated against server on load.
+//
+//  NOTE: Face verification has been removed. ID verification is now manual review only.
 //
 
 import Foundation
@@ -26,18 +28,13 @@ class VerificationService: ObservableObject {
     // MARK: - Published Properties
 
     @Published var verificationStatus: VerificationStatus = .unverified
-    @Published var photoVerified: Bool = false
     @Published var idVerified: Bool = false
-    @Published var stripeIdentityVerified: Bool = false  // NEW: Stripe Identity verification
     @Published var backgroundCheckCompleted: Bool = false
     @Published var trustScore: Int = 0 // 0-100
     @Published var isLoadingVerification: Bool = false
 
     // MARK: - Private Properties
 
-    private let photoVerifier = PhotoVerificationManager.shared
-    private let idVerifier = IDVerificationManager.shared  // Kept for legacy/fallback
-    private let stripeIdentityManager = StripeIdentityManager.shared  // NEW: Primary ID verification
     private let backgroundChecker = BackgroundCheckManager.shared
     private let defaults = UserDefaults.standard
     private let db = Firestore.firestore()
@@ -45,9 +42,7 @@ class VerificationService: ObservableObject {
     // MARK: - Keys (Cache only - source of truth is Firestore)
 
     private enum CacheKeys {
-        static let photoVerified = "cache_verification_photo"
         static let idVerified = "cache_verification_id"
-        static let stripeIdentityVerified = "cache_verification_stripe_identity"  // NEW
         static let backgroundCheckCompleted = "cache_verification_background"
         static let lastSyncTimestamp = "cache_verification_sync_timestamp"
     }
@@ -55,13 +50,8 @@ class VerificationService: ObservableObject {
     // MARK: - Firestore Fields
 
     private enum FirestoreFields {
-        static let photoVerified = "photoVerified"
-        static let photoVerifiedAt = "photoVerifiedAt"
-        static let idVerified = "idVerified"  // Legacy on-device verification
+        static let idVerified = "idVerified"
         static let idVerifiedAt = "idVerifiedAt"
-        static let stripeIdentityVerified = "stripeIdentityVerified"  // NEW: Stripe Identity
-        static let stripeIdentityVerifiedAt = "stripeIdentityVerifiedAt"
-        static let stripeSessionId = "stripeIdentitySessionId"
         static let backgroundCheckCompleted = "backgroundCheckCompleted"
         static let backgroundCheckAt = "backgroundCheckAt"
         static let isVerified = "isVerified"  // Main verification badge field
@@ -84,184 +74,14 @@ class VerificationService: ObservableObject {
         }
     }
 
-    // MARK: - Photo Verification
+    // MARK: - ID Verification (Manual Review)
+    // Note: ID verification is now handled through ManualIDVerificationView
+    // Admin reviews submissions in the admin panel and approves/rejects them
+    // This service just tracks the verification status from the server
 
-    /// Start photo verification flow
-    /// SECURITY: Verification result is persisted to Firestore (server-side)
-    func startPhotoVerification(profilePhotos: [UIImage]) async throws -> PhotoVerificationResult {
-        guard let userId = Auth.auth().currentUser?.uid else {
-            throw VerificationError.notAuthenticated
-        }
-
-        Logger.shared.info("Starting photo verification", category: .general)
-
-        // Perform verification
-        let result = try await photoVerifier.verifyUser(profilePhotos: profilePhotos)
-
-        if result.isVerified {
-            // SECURITY FIX: Persist verification to Firestore (server-side source of truth)
-            try await persistPhotoVerification(userId: userId, confidence: result.confidence)
-
-            // Update local state after successful server persistence
-            photoVerified = true
-            updateLocalCache()
-            updateVerificationStatus()
-            updateTrustScore()
-
-            // Track analytics
-            AnalyticsManager.shared.logEvent(.verificationCompleted, parameters: [
-                "type": "photo",
-                "confidence": result.confidence
-            ])
-
-            Logger.shared.info("Photo verification completed and persisted to server", category: .general)
-        } else {
-            Logger.shared.warning("Photo verification failed: \(result.failureReason ?? "Unknown")", category: .general)
-        }
-
-        return result
-    }
-
-    /// Persist photo verification to Firestore
-    private func persistPhotoVerification(userId: String, confidence: Double) async throws {
-        let updateData: [String: Any] = [
-            FirestoreFields.photoVerified: true,
-            FirestoreFields.photoVerifiedAt: FieldValue.serverTimestamp(),
-            FirestoreFields.verificationMethods: FieldValue.arrayUnion(["photo"])
-        ]
-
-        try await db.collection("users").document(userId).updateData(updateData)
-
-        // Update the main isVerified field based on new status
-        try await updateServerVerificationStatus(userId: userId)
-
-        Logger.shared.info("Photo verification persisted to Firestore", category: .general)
-    }
-
-    // MARK: - ID Verification
-
-    /// Start ID verification flow
-    /// SECURITY: Verification result is persisted to Firestore (server-side)
-    func startIDVerification(idImage: UIImage, selfieImage: UIImage) async throws -> IDVerificationResult {
-        guard let userId = Auth.auth().currentUser?.uid else {
-            throw VerificationError.notAuthenticated
-        }
-
-        Logger.shared.info("Starting ID verification", category: .general)
-
-        // Perform verification
-        let result = try await idVerifier.verifyID(idImage: idImage, selfieImage: selfieImage)
-
-        if result.isVerified {
-            // SECURITY FIX: Persist verification to Firestore (server-side source of truth)
-            try await persistIDVerification(userId: userId, documentType: result.documentType, confidence: result.confidence)
-
-            // Update local state after successful server persistence
-            idVerified = true
-            updateLocalCache()
-            updateVerificationStatus()
-            updateTrustScore()
-
-            // Track analytics
-            AnalyticsManager.shared.logEvent(.verificationCompleted, parameters: [
-                "type": "id",
-                "document_type": result.documentType.rawValue
-            ])
-
-            Logger.shared.info("ID verification completed and persisted to server", category: .general)
-        } else {
-            Logger.shared.warning("ID verification failed: \(result.failureReason ?? "Unknown")", category: .general)
-        }
-
-        return result
-    }
-
-    /// Persist ID verification to Firestore (Legacy - kept for backwards compatibility)
-    private func persistIDVerification(userId: String, documentType: DocumentType, confidence: Double) async throws {
-        let updateData: [String: Any] = [
-            FirestoreFields.idVerified: true,
-            FirestoreFields.idVerifiedAt: FieldValue.serverTimestamp(),
-            FirestoreFields.verificationMethods: FieldValue.arrayUnion(["id_\(documentType.rawValue)"])
-        ]
-
-        try await db.collection("users").document(userId).updateData(updateData)
-
-        // Update the main isVerified field based on new status
-        try await updateServerVerificationStatus(userId: userId)
-
-        Logger.shared.info("ID verification persisted to Firestore", category: .general)
-    }
-
-    // MARK: - Stripe Identity Verification (Primary ID Verification)
-
-    /// Start Stripe Identity verification flow (RECOMMENDED)
-    /// This is the primary and recommended method for ID verification
-    /// Uses Stripe's robust third-party verification service
-    ///
-    /// - Parameter presentingViewController: The view controller to present from
-    /// - Returns: StripeIdentityResult with verification outcome
-    func startStripeIdentityVerification(from presentingViewController: UIViewController) async throws -> StripeIdentityResult {
-        guard let userId = Auth.auth().currentUser?.uid else {
-            throw VerificationError.notAuthenticated
-        }
-
-        Logger.shared.info("Starting Stripe Identity verification (primary method)", category: .general)
-
-        // Perform verification using Stripe Identity
-        let result = try await stripeIdentityManager.startVerification(from: presentingViewController)
-
-        if result.isVerified {
-            // Persist verification to Firestore
-            try await persistStripeIdentityVerification(userId: userId, sessionId: result.sessionId)
-
-            // Update local state after successful server persistence
-            stripeIdentityVerified = true
-            idVerified = true  // Also set legacy flag for compatibility
-            updateLocalCache()
-            updateVerificationStatus()
-            updateTrustScore()
-
-            // Track analytics
-            AnalyticsManager.shared.logEvent(.verificationCompleted, parameters: [
-                "type": "stripe_identity",
-                "session_id": result.sessionId
-            ])
-
-            Logger.shared.info("Stripe Identity verification completed and persisted to server", category: .general)
-        } else {
-            Logger.shared.warning("Stripe Identity verification not completed: \(result.failureReason ?? "Unknown")", category: .general)
-        }
-
-        return result
-    }
-
-    /// Persist Stripe Identity verification to Firestore
-    private func persistStripeIdentityVerification(userId: String, sessionId: String) async throws {
-        let updateData: [String: Any] = [
-            FirestoreFields.stripeIdentityVerified: true,
-            FirestoreFields.stripeIdentityVerifiedAt: FieldValue.serverTimestamp(),
-            FirestoreFields.stripeSessionId: sessionId,
-            FirestoreFields.idVerified: true,  // Set legacy flag for compatibility
-            FirestoreFields.idVerifiedAt: FieldValue.serverTimestamp(),
-            FirestoreFields.verificationMethods: FieldValue.arrayUnion(["stripe_identity"])
-        ]
-
-        try await db.collection("users").document(userId).updateData(updateData)
-
-        // Update the main isVerified field based on new status
-        try await updateServerVerificationStatus(userId: userId)
-
-        Logger.shared.info("Stripe Identity verification persisted to Firestore", category: .general)
-    }
-
-    /// Check if user has completed Stripe Identity verification
-    var isStripeIdentityVerified: Bool {
-        return stripeIdentityVerified
-    }
-
-    /// Check if user has any form of ID verification (Stripe or legacy)
+    /// Check if user has ID verification
     var hasIDVerification: Bool {
-        return stripeIdentityVerified || idVerified
+        return idVerified
     }
 
     // MARK: - Background Check
@@ -325,18 +145,10 @@ class VerificationService: ObservableObject {
     // MARK: - Verification Status
 
     private func updateVerificationStatus() {
-        // Check for any form of ID verification (Stripe Identity preferred, legacy as fallback)
-        let hasIDVerification = stripeIdentityVerified || idVerified
-
-        if photoVerified && hasIDVerification && backgroundCheckCompleted {
+        if idVerified && backgroundCheckCompleted {
             verificationStatus = .fullyVerified
-        } else if photoVerified && hasIDVerification {
+        } else if idVerified {
             verificationStatus = .verified
-        } else if stripeIdentityVerified {
-            // Stripe Identity alone grants verified status (more trusted than photo)
-            verificationStatus = .verified
-        } else if photoVerified {
-            verificationStatus = .photoVerified
         } else {
             verificationStatus = .unverified
         }
@@ -351,42 +163,28 @@ class VerificationService: ObservableObject {
         let doc = try await db.collection("users").document(userId).getDocument()
         let data = doc.data() ?? [:]
 
-        let serverPhotoVerified = data[FirestoreFields.photoVerified] as? Bool ?? false
-        let serverStripeIdentityVerified = data[FirestoreFields.stripeIdentityVerified] as? Bool ?? false
         let serverIdVerified = data[FirestoreFields.idVerified] as? Bool ?? false
         let serverBackgroundCheck = data[FirestoreFields.backgroundCheckCompleted] as? Bool ?? false
-
-        // Check for any form of ID verification (Stripe Identity preferred)
-        let hasIDVerification = serverStripeIdentityVerified || serverIdVerified
 
         // Calculate verification status
         let newStatus: VerificationStatus
         let isVerified: Bool
 
-        if serverPhotoVerified && hasIDVerification && serverBackgroundCheck {
+        if serverIdVerified && serverBackgroundCheck {
             newStatus = .fullyVerified
             isVerified = true
-        } else if serverPhotoVerified && hasIDVerification {
+        } else if serverIdVerified {
             newStatus = .verified
             isVerified = true
-        } else if serverStripeIdentityVerified {
-            // Stripe Identity alone grants verified status (more trusted than photo-only)
-            newStatus = .verified
-            isVerified = true
-        } else if serverPhotoVerified {
-            newStatus = .photoVerified
-            isVerified = true  // Photo verification grants basic verified badge
         } else {
             newStatus = .unverified
             isVerified = false
         }
 
-        // Calculate trust score
-        var score = 20 // Base score
-        if serverPhotoVerified { score += 25 }
-        if serverStripeIdentityVerified { score += 35 }  // Stripe Identity worth more (more reliable)
-        else if serverIdVerified { score += 30 }  // Legacy ID verification
-        if serverBackgroundCheck { score += 20 }
+        // Calculate trust score (ID verification + background check)
+        var score = 20 // Base score for having an account
+        if serverIdVerified { score += 50 }  // ID verification is worth the most
+        if serverBackgroundCheck { score += 30 }
         let newTrustScore = min(100, score)
 
         // Update server with calculated values
@@ -404,24 +202,17 @@ class VerificationService: ObservableObject {
     private func updateTrustScore() {
         var score = 0
 
-        // Base score for completed profile
+        // Base score for having an account
         score += 20
 
-        // Photo verification
-        if photoVerified {
-            score += 25
-        }
-
-        // ID verification (Stripe Identity is worth more than legacy)
-        if stripeIdentityVerified {
-            score += 35  // Stripe Identity is more reliable
-        } else if idVerified {
-            score += 30  // Legacy on-device verification
+        // ID verification (manual review)
+        if idVerified {
+            score += 50  // ID verification is worth the most
         }
 
         // Background check
         if backgroundCheckCompleted {
-            score += 20
+            score += 30
         }
 
         trustScore = min(100, score)
@@ -434,8 +225,6 @@ class VerificationService: ObservableObject {
         switch verificationStatus {
         case .unverified:
             return .none
-        case .photoVerified:
-            return .photo
         case .verified:
             return .verified
         case .fullyVerified:
@@ -461,19 +250,11 @@ class VerificationService: ObservableObject {
             let data = doc.data() ?? [:]
 
             // SECURITY: Server values override local cache
-            let serverPhotoVerified = data[FirestoreFields.photoVerified] as? Bool ?? false
-            let serverStripeIdentityVerified = data[FirestoreFields.stripeIdentityVerified] as? Bool ?? false
             let serverIdVerified = data[FirestoreFields.idVerified] as? Bool ?? false
             let serverBackgroundCheck = data[FirestoreFields.backgroundCheckCompleted] as? Bool ?? false
             let serverTrustScore = data[FirestoreFields.trustScore] as? Int ?? 0
 
             // Check for client-side spoofing attempt
-            if photoVerified && !serverPhotoVerified {
-                Logger.shared.warning("SECURITY: Client claimed photoVerified=true but server says false. Reverting.", category: .security)
-            }
-            if stripeIdentityVerified && !serverStripeIdentityVerified {
-                Logger.shared.warning("SECURITY: Client claimed stripeIdentityVerified=true but server says false. Reverting.", category: .security)
-            }
             if idVerified && !serverIdVerified {
                 Logger.shared.warning("SECURITY: Client claimed idVerified=true but server says false. Reverting.", category: .security)
             }
@@ -482,8 +263,6 @@ class VerificationService: ObservableObject {
             }
 
             // Update local state from server
-            photoVerified = serverPhotoVerified
-            stripeIdentityVerified = serverStripeIdentityVerified
             idVerified = serverIdVerified
             backgroundCheckCompleted = serverBackgroundCheck
             trustScore = serverTrustScore
@@ -507,8 +286,6 @@ class VerificationService: ObservableObject {
     /// Load cached verification status for immediate UI display
     /// SECURITY: This is only a cache - server is authoritative
     private func loadCachedStatus() {
-        photoVerified = defaults.bool(forKey: CacheKeys.photoVerified)
-        stripeIdentityVerified = defaults.bool(forKey: CacheKeys.stripeIdentityVerified)
         idVerified = defaults.bool(forKey: CacheKeys.idVerified)
         backgroundCheckCompleted = defaults.bool(forKey: CacheKeys.backgroundCheckCompleted)
 
@@ -520,8 +297,6 @@ class VerificationService: ObservableObject {
 
     /// Update local cache to match current state
     private func updateLocalCache() {
-        defaults.set(photoVerified, forKey: CacheKeys.photoVerified)
-        defaults.set(stripeIdentityVerified, forKey: CacheKeys.stripeIdentityVerified)
         defaults.set(idVerified, forKey: CacheKeys.idVerified)
         defaults.set(backgroundCheckCompleted, forKey: CacheKeys.backgroundCheckCompleted)
         defaults.set(Date().timeIntervalSince1970, forKey: CacheKeys.lastSyncTimestamp)
@@ -529,8 +304,6 @@ class VerificationService: ObservableObject {
 
     /// Clear local cache (forces re-sync from server)
     func clearCache() {
-        defaults.removeObject(forKey: CacheKeys.photoVerified)
-        defaults.removeObject(forKey: CacheKeys.stripeIdentityVerified)
         defaults.removeObject(forKey: CacheKeys.idVerified)
         defaults.removeObject(forKey: CacheKeys.backgroundCheckCompleted)
         defaults.removeObject(forKey: CacheKeys.lastSyncTimestamp)
@@ -551,9 +324,6 @@ class VerificationService: ObservableObject {
         do {
             // Reset on server first
             try await db.collection("users").document(userId).updateData([
-                FirestoreFields.photoVerified: false,
-                FirestoreFields.stripeIdentityVerified: false,
-                FirestoreFields.stripeSessionId: FieldValue.delete(),
                 FirestoreFields.idVerified: false,
                 FirestoreFields.backgroundCheckCompleted: false,
                 FirestoreFields.isVerified: false,
@@ -563,8 +333,6 @@ class VerificationService: ObservableObject {
             ])
 
             // Then reset local state
-            photoVerified = false
-            stripeIdentityVerified = false
             idVerified = false
             backgroundCheckCompleted = false
             verificationStatus = .unverified
@@ -584,7 +352,6 @@ class VerificationService: ObservableObject {
 
 enum VerificationStatus: String, Codable {
     case unverified = "unverified"
-    case photoVerified = "photo_verified"
     case verified = "verified"
     case fullyVerified = "fully_verified"
 
@@ -592,8 +359,6 @@ enum VerificationStatus: String, Codable {
         switch self {
         case .unverified:
             return "Not Verified"
-        case .photoVerified:
-            return "Photo Verified"
         case .verified:
             return "Verified"
         case .fullyVerified:
@@ -605,8 +370,6 @@ enum VerificationStatus: String, Codable {
         switch self {
         case .unverified:
             return "xmark.shield"
-        case .photoVerified:
-            return "checkmark.shield"
         case .verified:
             return "checkmark.shield.fill"
         case .fullyVerified:
@@ -619,7 +382,6 @@ enum VerificationStatus: String, Codable {
 
 enum VerificationBadge {
     case none
-    case photo
     case verified
     case premium
 
@@ -627,8 +389,6 @@ enum VerificationBadge {
         switch self {
         case .none:
             return ""
-        case .photo:
-            return "checkmark.circle.fill"
         case .verified:
             return "checkmark.seal.fill"
         case .premium:
@@ -640,8 +400,6 @@ enum VerificationBadge {
         switch self {
         case .none:
             return "gray"
-        case .photo:
-            return "blue"
         case .verified:
             return "green"
         case .premium:
@@ -654,12 +412,9 @@ enum VerificationBadge {
 
 enum VerificationError: LocalizedError {
     case consentRequired
-    case noProfilePhotos
     case verificationFailed
     case networkError
     case invalidID
-    case faceNotDetected
-    case facesMismatch
     case notAuthenticated
     case serverPersistFailed
 
@@ -667,18 +422,12 @@ enum VerificationError: LocalizedError {
         switch self {
         case .consentRequired:
             return "User consent is required for background checks"
-        case .noProfilePhotos:
-            return "No profile photos available for verification"
         case .verificationFailed:
             return "Verification failed. Please try again."
         case .networkError:
             return "Network error during verification"
         case .invalidID:
             return "Invalid ID document"
-        case .faceNotDetected:
-            return "Face not detected in photo"
-        case .facesMismatch:
-            return "Faces do not match"
         case .notAuthenticated:
             return "You must be logged in to verify your identity"
         case .serverPersistFailed:

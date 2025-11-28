@@ -2,7 +2,8 @@
 //  ImageUploadService.swift
 //  Celestia
 //
-//  Enhanced with comprehensive error handling, retry logic, and background processing
+//  Enhanced with comprehensive error handling, retry logic, background processing,
+//  and content moderation to prevent inappropriate uploads
 //
 
 import Foundation
@@ -18,13 +19,28 @@ class ImageUploadService {
     private let maxDimension: CGFloat = 3000 // Higher resolution for sharper images
     private let compressionQuality: CGFloat = 0.92 // High quality to prevent blurry images
 
+    // Content moderation
+    private let moderationService = ContentModerationService.shared
+
+    // Whether to pre-check content before upload (can be disabled for performance)
+    var enablePreModeration = true
+
     private init() {}
 
-    // MARK: - Upload with Validation and Retry
+    // MARK: - Upload with Validation, Moderation, and Retry
 
-    func uploadImage(_ image: UIImage, path: String) async throws -> String {
+    func uploadImage(_ image: UIImage, path: String, skipModeration: Bool = false) async throws -> String {
         // Validate image on current thread (fast check)
         try validateImage(image)
+
+        // Pre-check content for inappropriate material (if enabled)
+        if enablePreModeration && !skipModeration {
+            let moderationResult = await moderationService.preCheckPhoto(image)
+            if !moderationResult.approved {
+                Logger.shared.warning("Image rejected by content moderation: \(moderationResult.message)", category: .general)
+                throw CelestiaError.contentNotAllowed(moderationResult.message)
+            }
+        }
 
         // Optimize image on background thread (CPU-intensive)
         let imageData = try await optimizeImageAsync(image)

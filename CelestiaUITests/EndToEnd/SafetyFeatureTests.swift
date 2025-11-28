@@ -235,10 +235,10 @@ final class SafetyFeatureTests: XCTestCase {
         }
     }
 
-    // MARK: - Photo Verification
+    // MARK: - ID Verification (Manual Review)
 
     @MainActor
-    func testPhotoVerificationFlow() throws {
+    func testIDVerificationFlow() throws {
         loginTestUser()
 
         // Navigate to profile
@@ -258,57 +258,16 @@ final class SafetyFeatureTests: XCTestCase {
         }
 
         // Verify verification screen appears
-        XCTAssertTrue(waitForElement(app.staticTexts["PhotoVerification"], timeout: 5))
+        XCTAssertTrue(waitForElement(app.staticTexts["IDVerification"], timeout: 5) ||
+                     waitForElement(app.staticTexts["Verify Your Identity"], timeout: 5))
+
+        // Check for ID type selection step
+        let hasIDTypeStep = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'ID Type' OR label CONTAINS 'type of ID'")).count > 0
+        XCTAssertTrue(hasIDTypeStep, "ID type selection should be displayed")
 
         // Check instructions are shown
-        let hasInstructions = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'selfie' OR label CONTAINS 'Selfie'")).count > 0
+        let hasInstructions = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'selfie' OR label CONTAINS 'Selfie' OR label CONTAINS 'ID'")).count > 0
         XCTAssertTrue(hasInstructions, "Verification instructions should be displayed")
-
-        // Tap take selfie button
-        if app.buttons["TakeSelfie"].exists {
-            app.buttons["TakeSelfie"].tap()
-
-            // In test mode, camera permission or test photo is used
-            sleep(1)
-
-            // Handle camera permission alert if it appears
-            if app.alerts.element.exists {
-                let allowButton = app.alerts.buttons["OK"]
-                if allowButton.exists {
-                    allowButton.tap()
-                }
-            }
-
-            // In UI testing, camera view will appear
-            // We can verify the UI elements exist
-            sleep(2)
-
-            // Look for capture button
-            if app.buttons["CaptureButton"].exists || app.buttons["TakePhoto"].exists {
-                if app.buttons["CaptureButton"].exists {
-                    app.buttons["CaptureButton"].tap()
-                } else {
-                    app.buttons["TakePhoto"].tap()
-                }
-
-                sleep(2)
-
-                // Use photo button
-                if app.buttons["UsePhoto"].exists {
-                    app.buttons["UsePhoto"].tap()
-                }
-
-                // Wait for verification processing
-                sleep(3)
-
-                // Verify result screen appears
-                let verificationComplete = app.staticTexts["VerificationComplete"].exists ||
-                                          app.staticTexts["Verified"].exists ||
-                                          app.staticTexts["VerificationFailed"].exists
-
-                XCTAssertTrue(verificationComplete, "Verification result should be displayed")
-            }
-        }
     }
 
     @MainActor
@@ -359,7 +318,7 @@ final class SafetyFeatureTests: XCTestCase {
             "SafetyTips",
             "ReportingGuidelines",
             "BlockedUsers",
-            "PhotoVerification",
+            "IDVerification",
             "CommunityGuidelines"
         ]
 

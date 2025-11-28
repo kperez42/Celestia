@@ -78,6 +78,7 @@ enum CelestiaError: LocalizedError, Identifiable {
     case invalidImageFormat
     case tooManyImages
     case storageQuotaExceeded
+    case contentNotAllowed(String)
 
     // Premium Errors
     case premiumRequired
@@ -212,6 +213,8 @@ enum CelestiaError: LocalizedError, Identifiable {
             return "You've reached the maximum number of photos (6)."
         case .storageQuotaExceeded:
             return "Storage quota exceeded. Please contact support."
+        case .contentNotAllowed(let message):
+            return message.isEmpty ? "This content is not allowed. Please choose appropriate content." : message
 
         // Premium
         case .premiumRequired:
@@ -269,6 +272,8 @@ enum CelestiaError: LocalizedError, Identifiable {
             return "Upgrade to Premium to unlock this feature."
         case .imageTooBig:
             return "Reduce image size or quality before uploading."
+        case .contentNotAllowed:
+            return "Choose a different photo that follows our community guidelines."
         case .profileIncomplete:
             return "Complete your profile in Settings."
         case .batchOperationFailed:
@@ -302,6 +307,8 @@ enum CelestiaError: LocalizedError, Identifiable {
             return "crown"
         case .imageUploadFailed, .uploadFailed, .imageTooBig, .invalidImageFormat, .storageQuotaExceeded:
             return "photo"
+        case .contentNotAllowed:
+            return "exclamationmark.triangle.fill"
         case .messageNotSent, .batchOperationFailed, .messageDeliveryFailed:
             return "message.badge.exclamationmark"
         case .messageQueuedForDelivery:

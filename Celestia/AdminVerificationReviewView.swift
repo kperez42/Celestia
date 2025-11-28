@@ -18,6 +18,7 @@ struct PendingVerification: Identifiable {
     let userId: String
     let userName: String
     let userEmail: String
+    let idType: String
     let idPhotoURL: String
     let selfiePhotoURL: String
     let status: String
@@ -29,6 +30,7 @@ struct PendingVerification: Identifiable {
         self.userId = data["userId"] as? String ?? ""
         self.userName = data["userName"] as? String ?? "Unknown"
         self.userEmail = data["userEmail"] as? String ?? ""
+        self.idType = data["idType"] as? String ?? "Unknown"
         self.idPhotoURL = data["idPhotoURL"] as? String ?? ""
         self.selfiePhotoURL = data["selfiePhotoURL"] as? String ?? ""
         self.status = data["status"] as? String ?? "pending"
@@ -38,6 +40,16 @@ struct PendingVerification: Identifiable {
             self.submittedAt = timestamp.dateValue()
         } else {
             self.submittedAt = nil
+        }
+    }
+
+    var idTypeIcon: String {
+        switch idType {
+        case "Driver's License": return "car.fill"
+        case "Passport": return "globe"
+        case "National ID": return "person.text.rectangle.fill"
+        case "State ID": return "building.columns.fill"
+        default: return "doc.fill"
         }
     }
 }
@@ -141,6 +153,19 @@ struct VerificationRowView: View {
 
                 Spacer()
 
+                // ID Type badge
+                HStack(spacing: 4) {
+                    Image(systemName: verification.idTypeIcon)
+                        .font(.caption2)
+                    Text(verification.idType)
+                        .font(.caption)
+                }
+                .foregroundColor(.purple)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.purple.opacity(0.1))
+                .cornerRadius(6)
+
                 if let date = verification.submittedAt {
                     Text(date.formatted(.relative(presentation: .named)))
                         .font(.caption)
@@ -168,7 +193,7 @@ struct VerificationRowView: View {
                     .cornerRadius(8)
                     .clipped()
 
-                    Text("ID")
+                    Text(verification.idType)
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
@@ -307,6 +332,21 @@ struct VerificationDetailView: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
 
+            // ID Type badge
+            HStack(spacing: 6) {
+                Image(systemName: verification.idTypeIcon)
+                Text(verification.idType)
+            }
+            .font(.subheadline)
+            .fontWeight(.medium)
+            .foregroundColor(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+                LinearGradient(colors: [.purple, .pink], startPoint: .leading, endPoint: .trailing)
+            )
+            .cornerRadius(8)
+
             if let date = verification.submittedAt {
                 Text("Submitted: \(date.formatted())")
                     .font(.caption)
@@ -324,7 +364,7 @@ struct VerificationDetailView: View {
 
             // ID Photo
             VStack(alignment: .leading, spacing: 8) {
-                Label("Government ID", systemImage: "creditcard.fill")
+                Label(verification.idType, systemImage: verification.idTypeIcon)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
 
@@ -858,6 +898,19 @@ struct VerificationCardView: View {
 
                 Spacer()
 
+                // ID Type badge
+                HStack(spacing: 4) {
+                    Image(systemName: verification.idTypeIcon)
+                        .font(.caption2)
+                    Text(verification.idType)
+                        .font(.caption)
+                }
+                .foregroundColor(.purple)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.purple.opacity(0.1))
+                .cornerRadius(6)
+
                 if let date = verification.submittedAt {
                     Text(date.formatted(.relative(presentation: .named)))
                         .font(.caption)
@@ -890,7 +943,7 @@ struct VerificationCardView: View {
                         .frame(height: 150)
                         .clipped()
 
-                        Text("ID Document")
+                        Text(verification.idType)
                             .font(.caption2)
                             .fontWeight(.medium)
                             .foregroundColor(.white)
