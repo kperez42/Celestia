@@ -561,9 +561,10 @@ class AdminVerificationReviewViewModel: ObservableObject {
 
     func approveVerification(_ verification: PendingVerification) async {
         do {
-            // Update user document
+            // Update user document - set both isVerified (for badge) and idVerified (for tracking)
             try await db.collection("users").document(verification.userId).updateData([
-                "idVerified": true,
+                "isVerified": true,  // This makes the badge show on profile
+                "idVerified": true,  // This tracks ID verification specifically
                 "idVerifiedAt": FieldValue.serverTimestamp(),
                 "idVerificationMethod": "manual",
                 "verificationMethods": FieldValue.arrayUnion(["manual_id"]),
@@ -646,6 +647,8 @@ class AdminVerificationReviewViewModel: ObservableObject {
 
 struct IDVerificationReviewEmbeddedView: View {
     @StateObject private var viewModel = AdminVerificationReviewViewModel()
+    @State private var showingQuickRejectAlert = false
+    @State private var verificationToReject: PendingVerification?
 
     var body: some View {
         Group {
@@ -669,9 +672,15 @@ struct IDVerificationReviewEmbeddedView: View {
             } else {
                 List {
                     Section {
-                        Text("\(viewModel.pendingVerifications.count) pending review")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                        HStack {
+                            Text("\(viewModel.pendingVerifications.count) pending review")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text("Swipe for quick actions")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
                     }
 
                     ForEach(viewModel.pendingVerifications) { verification in
@@ -682,6 +691,24 @@ struct IDVerificationReviewEmbeddedView: View {
                         )) {
                             VerificationRowView(verification: verification)
                         }
+                        // Quick approve swipe action (swipe right)
+                        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                            Button {
+                                Task { await viewModel.approveVerification(verification) }
+                            } label: {
+                                Label("Approve", systemImage: "checkmark.circle.fill")
+                            }
+                            .tint(.green)
+                        }
+                        // Quick reject swipe action (swipe left)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                verificationToReject = verification
+                                showingQuickRejectAlert = true
+                            } label: {
+                                Label("Reject", systemImage: "xmark.circle.fill")
+                            }
+                        }
                     }
                 }
                 .listStyle(.insetGrouped)
@@ -689,6 +716,26 @@ struct IDVerificationReviewEmbeddedView: View {
         }
         .task {
             await viewModel.loadPendingVerifications()
+        }
+        .alert("Reject Verification", isPresented: $showingQuickRejectAlert) {
+            Button("ID Blurry") {
+                if let v = verificationToReject {
+                    Task { await viewModel.rejectVerification(v, reason: "ID photo is blurry or unreadable") }
+                }
+            }
+            Button("Doesn't Match") {
+                if let v = verificationToReject {
+                    Task { await viewModel.rejectVerification(v, reason: "Selfie doesn't match ID photo") }
+                }
+            }
+            Button("Fake/Invalid") {
+                if let v = verificationToReject {
+                    Task { await viewModel.rejectVerification(v, reason: "ID appears to be fake or invalid") }
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Select a reason for rejection")
         }
     }
 }

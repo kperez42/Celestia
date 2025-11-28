@@ -273,10 +273,29 @@ struct ManualIDVerificationView: View {
 
             Divider()
 
+            // Privacy notice - photos deleted after review
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Image(systemName: "trash.circle.fill")
+                        .foregroundColor(.green)
+                    Text("Photos Auto-Deleted")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.green)
+                }
+
+                Text("Your ID and selfie photos are automatically deleted immediately after review. We only store your verification status, not your documents.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding()
+            .background(Color.green.opacity(0.1))
+            .cornerRadius(8)
+
             HStack {
                 Image(systemName: "lock.shield.fill")
-                    .foregroundColor(.green)
-                Text("Your photos are stored securely and only used for verification.")
+                    .foregroundColor(.blue)
+                Text("Encrypted and secure during the review process.")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
