@@ -2,7 +2,7 @@
 //  LikesView.swift
 //  Celestia
 //
-//  Likes view with two tabs: Likes (received) and Matches (mutual)
+//  Likes view with three tabs: Liked Me, My Likes, Mutual Likes
 //
 
 import SwiftUI
@@ -26,7 +26,7 @@ struct LikesView: View {
         let user: User
     }
 
-    private let tabs = ["Likes", "Matches"]
+    private let tabs = ["Liked Me", "My Likes", "Mutual Likes"]
 
     var body: some View {
         NavigationStack {
@@ -46,8 +46,9 @@ struct LikesView: View {
                         loadingView
                     } else {
                         TabView(selection: $selectedTab) {
-                            likesTab.tag(0)
-                            matchesTab.tag(1)
+                            likedMeTab.tag(0)
+                            myLikesTab.tag(1)
+                            mutualLikesTab.tag(2)
                         }
                         .tabViewStyle(.page(indexDisplayMode: .never))
                     }
@@ -160,7 +161,18 @@ struct LikesView: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "heart.fill")
                                     .font(.caption)
-                                Text("\(viewModel.totalLikesReceived) likes")
+                                Text("\(viewModel.totalLikesReceived)")
+                                    .fontWeight(.semibold)
+                            }
+
+                            Circle()
+                                .fill(Color.white.opacity(0.5))
+                                .frame(width: 4, height: 4)
+
+                            HStack(spacing: 4) {
+                                Image(systemName: "heart")
+                                    .font(.caption)
+                                Text("\(viewModel.totalLikesSent) sent")
                                     .fontWeight(.semibold)
                             }
 
@@ -172,7 +184,7 @@ struct LikesView: View {
                                 HStack(spacing: 4) {
                                     Image(systemName: "heart.circle.fill")
                                         .font(.caption)
-                                    Text("\(viewModel.mutualLikes.count) matches")
+                                    Text("\(viewModel.mutualLikes.count) mutual")
                                         .fontWeight(.semibold)
                                 }
                             }
@@ -268,14 +280,15 @@ struct LikesView: View {
     private func getCountForTab(_ index: Int) -> Int {
         switch index {
         case 0: return viewModel.usersWhoLikedMe.count
-        case 1: return viewModel.mutualLikes.count
+        case 1: return viewModel.usersILiked.count
+        case 2: return viewModel.mutualLikes.count
         default: return 0
         }
     }
 
-    // MARK: - Likes Tab (People who liked you)
+    // MARK: - Liked Me Tab
 
-    private var likesTab: some View {
+    private var likedMeTab: some View {
         Group {
             if viewModel.usersWhoLikedMe.isEmpty {
                 emptyStateView(
@@ -289,15 +302,31 @@ struct LikesView: View {
         }
     }
 
-    // MARK: - Matches Tab (Mutual likes)
+    // MARK: - My Likes Tab
 
-    private var matchesTab: some View {
+    private var myLikesTab: some View {
+        Group {
+            if viewModel.usersILiked.isEmpty {
+                emptyStateView(
+                    icon: "heart",
+                    title: "No Likes Sent",
+                    message: "Start swiping on the Discover page to like profiles!"
+                )
+            } else {
+                likesGrid(users: viewModel.usersILiked, showLikeBack: false)
+            }
+        }
+    }
+
+    // MARK: - Mutual Likes Tab
+
+    private var mutualLikesTab: some View {
         Group {
             if viewModel.mutualLikes.isEmpty {
                 emptyStateView(
                     icon: "heart.circle.fill",
-                    title: "No Matches Yet",
-                    message: "When you and someone like each other, you'll match here!"
+                    title: "No Mutual Likes",
+                    message: "When you and someone else both like each other, you'll see them here!"
                 )
             } else {
                 likesGrid(users: viewModel.mutualLikes, showMessage: true)
