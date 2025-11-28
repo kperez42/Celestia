@@ -96,15 +96,12 @@ struct ProfileView: View {
                                         verificationCard
                                     }
 
-                                    // Premium badge or upgrade
+                                    // Subscription - consolidated: upgrade for free users, manage for premium
                                     if user.isPremium {
-                                        premiumBadgeCard
+                                        subscriptionManagementCard
                                     } else {
                                         premiumUpgradeCard
                                     }
-
-                                    // Subscription management card - swipeable tabs view
-                                    subscriptionManagementCard
 
                                     // Profile Insights (same spacing as above cards)
                                     profileInsightsCard
@@ -875,61 +872,6 @@ struct ProfileView: View {
         .padding(.horizontal, 20)
     }
 
-    // MARK: - Premium Badge Card
-
-    private var premiumBadgeCard: some View {
-        HStack(spacing: 16) {
-            ZStack {
-                Circle()
-                    .fill(Color.yellow.opacity(0.2))
-                    .frame(width: 60, height: 60)
-                
-                Image(systemName: "crown.fill")
-                    .font(.title)
-                    .foregroundColor(.yellow)
-            }
-            
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Text("Premium Member")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    Image(systemName: "checkmark.seal.fill")
-                        .font(.caption)
-                        .foregroundColor(.yellow)
-                }
-                
-                Text("Enjoying all premium features")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-        }
-        .padding(20)
-        .background(
-            LinearGradient(
-                colors: [Color.yellow.opacity(0.15), Color.orange.opacity(0.1)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .cornerRadius(16)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(
-                    LinearGradient(
-                        colors: [Color.yellow.opacity(0.5), Color.orange.opacity(0.3)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 2
-                )
-        )
-        .padding(.horizontal, 20)
-    }
-    
     // MARK: - Premium Upgrade Card
     
     private var premiumUpgradeCard: some View {
