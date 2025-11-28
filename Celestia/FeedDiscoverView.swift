@@ -179,8 +179,8 @@ struct FeedDiscoverView: View {
                     CurrentUserProfileCard(user: currentUser) {
                         showOwnProfileDetail = true
                     }
-                    .transition(.scale(scale: 0.95).combined(with: .opacity))
-                    .animation(.spring(response: 0.5, dampingFraction: 0.7), value: authService.currentUser)
+                    .transition(.opacity)
+                    .animation(.quick, value: authService.currentUser)
                 }
 
                 ForEach(Array(displayedUsers.enumerated()), id: \.element.effectiveId) { index, user in
@@ -217,19 +217,12 @@ struct FeedDiscoverView: View {
                             loadMoreUsers()
                         }
                     }
-                    // PREMIUM: Staggered card entrance animation (optimized for smoothness)
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.95).combined(with: .opacity),
-                        removal: .scale(scale: 0.98).combined(with: .opacity)
-                    ))
-                    .animation(
-                        .spring(response: 0.35, dampingFraction: 0.8)
-                        .delay(Double(min(index, 4)) * 0.02), // Cap at 5 cards, 20ms stagger for snappy feel
-                        value: displayedUsers.count
-                    )
+                    // Instant card appearance - smooth as butter
+                    .transition(.opacity)
+                    .animation(.quick, value: displayedUsers.count)
                 }
 
-                // PREMIUM: Loading indicator with animation
+                // Loading indicator with instant appearance
                 if isLoading {
                     HStack(spacing: 12) {
                         ProgressView()
@@ -245,7 +238,7 @@ struct FeedDiscoverView: View {
                             .fill(Color(.systemBackground))
                             .shadow(color: Color.black.opacity(0.05), radius: 8)
                     )
-                    .transition(.scale.combined(with: .opacity))
+                    .transition(.opacity)
                 }
 
                 // End of results
@@ -315,7 +308,7 @@ struct FeedDiscoverView: View {
                 if toastIcon == "star.fill" && toastColor == .orange {
                     HapticManager.shared.impact(.medium)
                     selectedTab = 3
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                    withAnimation(.quick) {
                         showActionToast = false
                     }
                 }
@@ -323,7 +316,7 @@ struct FeedDiscoverView: View {
 
             Spacer()
         }
-        .transition(.move(edge: .top).combined(with: .opacity))
+        .transition(.opacity)
     }
 
     @ToolbarContentBuilder
@@ -380,13 +373,9 @@ struct FeedDiscoverView: View {
             LazyVStack(spacing: 16) {
                 ForEach(0..<3, id: \.self) { index in
                     ProfileFeedCardSkeleton()
-                        // PREMIUM: Staggered skeleton appearance (optimized)
-                        .transition(.scale(scale: 0.97).combined(with: .opacity))
-                        .animation(
-                            .spring(response: 0.3, dampingFraction: 0.8)
-                            .delay(Double(index) * 0.03),
-                            value: isInitialLoad
-                        )
+                        // Instant skeleton appearance
+                        .transition(.opacity)
+                        .animation(.quick, value: isInitialLoad)
                 }
             }
             .padding(.horizontal)
@@ -689,13 +678,13 @@ struct FeedDiscoverView: View {
         toastIcon = icon
         toastColor = color
 
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+        withAnimation(.quick) {
             showActionToast = true
         }
 
         // Auto-hide after 2 seconds
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+            withAnimation(.quick) {
                 showActionToast = false
             }
         }

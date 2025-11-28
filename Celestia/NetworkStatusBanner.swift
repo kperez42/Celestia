@@ -34,8 +34,8 @@ struct NetworkStatusBanner: View {
                 .padding(.vertical, DesignSystem.Spacing.xs)
                 .background(Color.orange)
             }
-            .transition(.move(edge: .top).combined(with: .opacity))
-            .animation(.easeInOut(duration: 0.3), value: networkMonitor.isConnected)
+            .transition(.opacity)
+            .animation(.quick, value: networkMonitor.isConnected)
         }
     }
 }

@@ -11,47 +11,63 @@ import SwiftUI
 // MARK: - Custom Transitions
 
 extension AnyTransition {
+    /// Instant fade transition - no sliding, appears immediately
     static var slideAndFade: AnyTransition {
-        .asymmetric(
-            insertion: .move(edge: .trailing).combined(with: .opacity),
-            removal: .move(edge: .leading).combined(with: .opacity)
-        )
+        .opacity
     }
 
+    /// Quick scale with fade for subtle pop effect
     static var scaleAndFade: AnyTransition {
-        .scale.combined(with: .opacity)
+        .opacity
     }
 
+    /// Instant pop-in - just opacity for smooth appearance
     static var popIn: AnyTransition {
-        .scale(scale: 0.8).combined(with: .opacity)
+        .opacity
     }
 
+    /// Instant appearance from bottom - opacity only
     static var slideUp: AnyTransition {
-        .move(edge: .bottom).combined(with: .opacity)
+        .opacity
     }
 
+    /// Instant appearance from top - opacity only
     static var slideDown: AnyTransition {
-        .move(edge: .top).combined(with: .opacity)
+        .opacity
+    }
+
+    /// Truly instant transition with no animation
+    static var instant: AnyTransition {
+        .identity
     }
 }
 
 // MARK: - Custom Animations
 
 extension Animation {
+    /// Ultra-smooth instant animation - butter smooth
     static var smooth: Animation {
-        .spring(response: 0.4, dampingFraction: 0.7)
+        .easeOut(duration: 0.15)
     }
 
+    /// Quick bouncy feel without excessive movement
     static var bouncy: Animation {
-        .spring(response: 0.5, dampingFraction: 0.6)
+        .easeOut(duration: 0.12)
     }
 
+    /// Nearly instant - for snappy interactions
     static var quick: Animation {
-        .spring(response: 0.3, dampingFraction: 0.8)
+        .easeOut(duration: 0.1)
     }
 
+    /// Gentle fade - still fast but slightly softer
     static var gentle: Animation {
-        .spring(response: 0.6, dampingFraction: 0.8)
+        .easeOut(duration: 0.18)
+    }
+
+    /// Truly instant - no visible animation
+    static var instant: Animation {
+        .linear(duration: 0)
     }
 }
 
@@ -390,8 +406,8 @@ struct SlideInModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .transition(.move(edge: edge).combined(with: .opacity))
-            .animation(.smooth, value: isPresented)
+            .transition(.opacity)
+            .animation(.quick, value: isPresented)
     }
 }
 

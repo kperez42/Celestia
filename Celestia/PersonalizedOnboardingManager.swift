@@ -432,7 +432,7 @@ struct OnboardingGoalSelectionView: View {
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 32)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .transition(.opacity)
             }
         }
         .background(

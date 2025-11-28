@@ -536,7 +536,7 @@ struct EditProfileView: View {
 
             ForEach(0..<uploadingPhotoCount, id: \.self) { index in
                 UploadingPhotoPlaceholder(index: index)
-                    .transition(.scale.combined(with: .opacity))
+                    .transition(.opacity)
             }
 
             if photos.count + uploadingPhotoCount < 6 {
@@ -795,8 +795,8 @@ struct EditProfileView: View {
                                 lineWidth: 1
                             )
                     )
-                    .transition(.scale.combined(with: .opacity))
-                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isUploadingPhotos)
+                    .transition(.opacity)
+                    .animation(.quick, value: isUploadingPhotos)
                 }
             }
 
@@ -871,10 +871,10 @@ struct EditProfileView: View {
                         ))
                     }
 
-                    // Show uploading placeholders with smooth animation
+                    // Show uploading placeholders with instant appearance
                     ForEach(0..<uploadingPhotoCount, id: \.self) { index in
                         UploadingPhotoPlaceholder(index: index)
-                            .transition(.scale.combined(with: .opacity))
+                            .transition(.opacity)
                     }
 
                     // Add photo button

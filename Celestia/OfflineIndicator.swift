@@ -17,10 +17,10 @@ struct OfflineIndicator: View {
         VStack(spacing: 0) {
             if !networkMonitor.isConnected {
                 offlineBanner
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .transition(.opacity)
             }
         }
-        .animation(.spring(response: 0.4), value: networkMonitor.isConnected)
+        .animation(.quick, value: networkMonitor.isConnected)
     }
     
     private var offlineBanner: some View {

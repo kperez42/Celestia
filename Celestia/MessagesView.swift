@@ -79,7 +79,7 @@ struct MessagesView: View {
                     // Search bar
                     if showSearch {
                         searchBar
-                            .transition(.move(edge: .top).combined(with: .opacity))
+                            .transition(.opacity)
                     }
 
                     // Content - single unified list of all conversations
@@ -227,7 +227,7 @@ struct MessagesView: View {
                     HStack(spacing: 12) {
                         // Search toggle
                         Button {
-                            withAnimation(.spring(response: 0.3)) {
+                            withAnimation(.quick) {
                                 showSearch.toggle()
                                 if !showSearch {
                                     searchText = ""

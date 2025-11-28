@@ -136,7 +136,7 @@ struct ReferralDashboardView: View {
                         .shadow(color: .black.opacity(0.2), radius: 10, y: 5)
                         .padding(.bottom, 100)
                     }
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .transition(.opacity)
                 }
             }
         }
