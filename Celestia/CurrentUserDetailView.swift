@@ -32,13 +32,16 @@ struct CurrentUserDetailView: View {
                     TabView(selection: $selectedPhotoIndex) {
                         ForEach(validPhotos.indices, id: \.self) { index in
                             CachedCardImage(url: URL(string: validPhotos[index]))
+                                .frame(height: 400)
+                                .frame(maxWidth: .infinity)
+                                .clipped()
                                 .onTapGesture {
                                     showingPhotoViewer = true
                                 }
                                 .tag(index)
                         }
                     }
-                    .frame(height: 450)
+                    .frame(height: 400)
                     .tabViewStyle(.page(indexDisplayMode: .always))
                     .indexViewStyle(.page(backgroundDisplayMode: .always))
 

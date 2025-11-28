@@ -111,6 +111,9 @@ struct UserDetailView: View {
                     url: URL(string: photoURL),
                     priority: .immediate
                 )
+                .frame(height: 400)
+                .frame(maxWidth: .infinity)
+                .clipped()
                 .onTapGesture {
                     selectedPhotoIndex = index
                     showFullScreenPhotos = true
@@ -119,7 +122,7 @@ struct UserDetailView: View {
                 .tag(index)
             }
         }
-        .frame(height: 450)
+        .frame(height: 400)
         .tabViewStyle(.page)
         // PERFORMANCE: Preload adjacent photos when swiping
         .onChange(of: selectedPhotoIndex) { _, newIndex in
