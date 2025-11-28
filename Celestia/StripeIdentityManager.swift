@@ -296,11 +296,9 @@ class StripeIdentityManager: ObservableObject {
 
         Logger.shared.info("Presenting Stripe Identity verification sheet", category: .general)
 
-        // Configure the verification sheet with optional brand logo
-        var configuration = IdentityVerificationSheet.Configuration()
-        if let brandLogo = UIImage(named: "AppIcon") ?? UIImage(named: "app_logo") {
-            configuration.brandLogo = brandLogo
-        }
+        // Configure the verification sheet with brand logo
+        let brandLogo = UIImage(named: "AppIcon") ?? UIImage(named: "app_logo") ?? UIImage()
+        let configuration = IdentityVerificationSheet.Configuration(brandLogo: brandLogo)
 
         // Create the Identity Verification Sheet
         let sheet = IdentityVerificationSheet(
@@ -330,6 +328,14 @@ class StripeIdentityManager: ObservableObject {
                     continuation.resume(returning: StripeSheetResult(
                         status: .failed,
                         failureReason: error.localizedDescription
+                    ))
+
+                @unknown default:
+                    // Handle future SDK cases
+                    Logger.shared.warning("Unknown Stripe Identity result", category: .general)
+                    continuation.resume(returning: StripeSheetResult(
+                        status: .unknown,
+                        failureReason: "Unknown verification result"
                     ))
                 }
             }

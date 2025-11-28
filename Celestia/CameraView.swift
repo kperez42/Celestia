@@ -294,8 +294,9 @@ class CameraManager: NSObject, ObservableObject {
     }
 
     func stopSession() {
-        sessionQueue.async { [weak self] in
-            self?.session.stopRunning()
+        let session = self.session
+        sessionQueue.async {
+            session.stopRunning()
         }
     }
 
