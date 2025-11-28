@@ -3,6 +3,7 @@
 //  Celestia
 //
 //  Complete photo verification flow with camera and results
+//  Now supports advanced Face ID-style verification with liveness detection
 //
 
 import SwiftUI
@@ -19,6 +20,7 @@ struct PhotoVerificationView: View {
     @State private var verificationResult: VerificationResult?
     @State private var showingSuccess = false
     @State private var scanLineOffset: CGFloat = -60
+    @State private var showingLiveVerification = false
 
     enum VerificationState {
         case instructions
@@ -70,6 +72,13 @@ struct PhotoVerificationView: View {
                     }
                 }
             }
+            .fullScreenCover(isPresented: $showingLiveVerification) {
+                LiveFaceVerificationView(userId: userId) { success in
+                    if success {
+                        verificationState = .success
+                    }
+                }
+            }
         }
     }
 
@@ -78,7 +87,7 @@ struct PhotoVerificationView: View {
     private var instructionsView: some View {
         ScrollView {
             VStack(spacing: 32) {
-                // Hero icon
+                // Hero icon - Face ID style
                 ZStack {
                     Circle()
                         .fill(
@@ -90,7 +99,7 @@ struct PhotoVerificationView: View {
                         )
                         .frame(width: 140, height: 140)
 
-                    Image(systemName: "checkmark.seal.fill")
+                    Image(systemName: "faceid")
                         .font(.system(size: 70))
                         .foregroundStyle(
                             LinearGradient(
@@ -109,7 +118,7 @@ struct PhotoVerificationView: View {
                         .fontWeight(.bold)
                         .multilineTextAlignment(.center)
 
-                    Text("Verified profiles get 3x more matches")
+                    Text("Advanced face verification for your safety")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
@@ -120,25 +129,25 @@ struct PhotoVerificationView: View {
                 VStack(spacing: 20) {
                     VerificationBenefitRow(
                         icon: "checkmark.shield.fill",
-                        title: "Build Trust",
-                        description: "Show you're real and serious about dating"
+                        title: "Bank-Level Security",
+                        description: "Face ID-style verification ensures you're real"
                     )
 
                     VerificationBenefitRow(
-                        icon: "eye.fill",
-                        title: "Stand Out",
-                        description: "Get priority visibility in Discovery"
+                        icon: "faceid",
+                        title: "Liveness Detection",
+                        description: "Prevents fake photos and catfishing"
                     )
 
                     VerificationBenefitRow(
                         icon: "heart.fill",
-                        title: "More Matches",
-                        description: "People prefer verified profiles"
+                        title: "3x More Matches",
+                        description: "Verified profiles get priority visibility"
                     )
                 }
                 .padding(.horizontal, 24)
 
-                // Instructions
+                // Instructions - Face ID style
                 VStack(alignment: .leading, spacing: 16) {
                     Text("How it works:")
                         .font(.headline)
@@ -146,29 +155,46 @@ struct PhotoVerificationView: View {
 
                     InstructionStep(
                         number: 1,
-                        text: "Take a selfie following our guidelines"
+                        text: "Position your face in the circle"
                     )
 
                     InstructionStep(
                         number: 2,
-                        text: "We'll verify your face matches your profile"
+                        text: "Move your head slowly left and right"
                     )
 
                     InstructionStep(
                         number: 3,
-                        text: "Get your blue checkmark instantly"
+                        text: "Complete quick liveness checks (blink & smile)"
+                    )
+
+                    InstructionStep(
+                        number: 4,
+                        text: "We verify your face matches your profile"
                     )
                 }
                 .padding(.horizontal, 24)
 
-                // Start button
+                // Security note
+                HStack(spacing: 12) {
+                    Image(systemName: "lock.shield.fill")
+                        .font(.title3)
+                        .foregroundColor(.green)
+
+                    Text("Your face data is processed on-device and never stored")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 24)
+
+                // Start button - launches new live verification
                 Button {
                     HapticManager.shared.impact(.medium)
-                    verificationState = .camera
+                    showingLiveVerification = true
                 } label: {
                     HStack(spacing: 12) {
-                        Image(systemName: "camera.fill")
-                        Text("Start Verification")
+                        Image(systemName: "faceid")
+                        Text("Start Face Verification")
                             .fontWeight(.semibold)
                     }
                     .frame(maxWidth: .infinity)
@@ -184,6 +210,16 @@ struct PhotoVerificationView: View {
                     .cornerRadius(16)
                 }
                 .padding(.horizontal, 24)
+
+                // Legacy option (simple photo)
+                Button {
+                    HapticManager.shared.impact(.light)
+                    verificationState = .camera
+                } label: {
+                    Text("Use simple photo instead")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
                 .padding(.bottom, 40)
             }
         }
