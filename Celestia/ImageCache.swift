@@ -481,6 +481,11 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
     @State private var loadTask: Task<Void, Never>?
     // PERFORMANCE: Track if we've checked cache to avoid re-checking
     @State private var hasCheckedCache = false
+    // SMOOTH TRANSITION: Crossfade animation states
+    @State private var imageOpacity: Double = 1.0
+    @State private var previousImage: UIImage?
+    @State private var previousImageOpacity: Double = 0
+    @State private var currentURL: URL?
 
     init(
         url: URL?,
@@ -497,14 +502,23 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
             if let cachedImage = ImageCache.shared.image(for: cacheKey) {
                 _image = State(initialValue: cachedImage)
                 _hasCheckedCache = State(initialValue: true)
+                _imageOpacity = State(initialValue: 1.0)
+                _currentURL = State(initialValue: url)
             }
         }
     }
 
     var body: some View {
-        Group {
+        ZStack {
+            // SMOOTH TRANSITION: Show previous image during crossfade
+            if let previousImage = previousImage {
+                content(Image(uiImage: previousImage))
+                    .opacity(previousImageOpacity)
+            }
+
             if let image = image {
                 content(Image(uiImage: image))
+                    .opacity(imageOpacity)
             } else if loadError != nil {
                 // Error state with retry button
                 VStack(spacing: 12) {
@@ -546,6 +560,45 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
             loadTask?.cancel()
             loadTask = nil
         }
+        // SMOOTH TRANSITION: Detect URL changes and reload with crossfade
+        .onChange(of: url) { oldURL, newURL in
+            guard newURL != currentURL else { return }
+
+            // Store current image for crossfade
+            if let currentImage = image {
+                previousImage = currentImage
+                previousImageOpacity = 1.0
+            }
+
+            // Reset state for new image
+            currentURL = newURL
+            image = nil
+            imageOpacity = 0
+            loadError = nil
+            hasCheckedCache = false
+            loadTask?.cancel()
+
+            // Check if new image is already cached (instant display)
+            if let newURL = newURL {
+                let cacheKey = newURL.absoluteString
+                if let cachedImage = ImageCache.shared.image(for: cacheKey) {
+                    // Instant crossfade for cached images
+                    image = cachedImage
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        imageOpacity = 1.0
+                        previousImageOpacity = 0
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                        self.previousImage = nil
+                    }
+                    hasCheckedCache = true
+                    return
+                }
+            }
+
+            // Load new image from network
+            loadImage()
+        }
     }
 
     private func loadImage() {
@@ -553,10 +606,19 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
 
         let cacheKey = url.absoluteString
         hasCheckedCache = true
+        currentURL = url
 
         // Check cache first (double-check in case init didn't catch it)
         if let cachedImage = ImageCache.shared.image(for: cacheKey) {
             self.image = cachedImage
+            // Smooth crossfade from previous image
+            withAnimation(.easeOut(duration: 0.2)) {
+                self.imageOpacity = 1.0
+                self.previousImageOpacity = 0
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                self.previousImage = nil
+            }
             return
         }
 
@@ -581,6 +643,14 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
                         ImageCache.shared.setImage(downloadedImage, for: cacheKey)
                         self.image = downloadedImage
                         self.isLoading = false
+                        // Smooth crossfade animation
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            self.imageOpacity = 1.0
+                            self.previousImageOpacity = 0
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                            self.previousImage = nil
+                        }
                     }
                 } else {
                     await MainActor.run {
@@ -619,6 +689,8 @@ extension CachedAsyncImage where Placeholder == ProgressView<EmptyView, EmptyVie
             if let cachedImage = ImageCache.shared.image(for: cacheKey) {
                 _image = State(initialValue: cachedImage)
                 _hasCheckedCache = State(initialValue: true)
+                _imageOpacity = State(initialValue: 1.0)
+                _currentURL = State(initialValue: url)
             }
         }
     }
@@ -639,6 +711,11 @@ struct CachedProfileImage: View {
     @State private var loadTask: Task<Void, Never>?
     // PERFORMANCE: Track if we've checked cache to avoid re-checking
     @State private var hasCheckedCache = false
+    // SMOOTH TRANSITION: Crossfade animation states
+    @State private var imageOpacity: Double = 1.0
+    @State private var previousImage: UIImage?
+    @State private var previousImageOpacity: Double = 0
+    @State private var currentURL: URL?
 
     // PERFORMANCE: Check cache immediately on init for instant display
     init(url: URL?, size: CGFloat) {
@@ -650,18 +727,31 @@ struct CachedProfileImage: View {
             if let cachedImage = ImageCache.shared.image(for: cacheKey) {
                 _image = State(initialValue: cachedImage)
                 _hasCheckedCache = State(initialValue: true)
+                _imageOpacity = State(initialValue: 1.0)
+                _currentURL = State(initialValue: url)
             }
         }
     }
 
     var body: some View {
-        Group {
+        ZStack {
+            // SMOOTH TRANSITION: Show previous image during crossfade
+            if let previousImage = previousImage {
+                Image(uiImage: previousImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
+                    .opacity(previousImageOpacity)
+            }
+
             if let image = image {
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .frame(width: size, height: size)
                     .clipShape(Circle())
+                    .opacity(imageOpacity)
             } else if loadError != nil {
                 // Error state with retry button
                 ZStack {
@@ -709,6 +799,45 @@ struct CachedProfileImage: View {
             loadTask?.cancel()
             loadTask = nil
         }
+        // SMOOTH TRANSITION: Detect URL changes and reload with crossfade
+        .onChange(of: url) { oldURL, newURL in
+            guard newURL != currentURL else { return }
+
+            // Store current image for crossfade
+            if let currentImage = image {
+                previousImage = currentImage
+                previousImageOpacity = 1.0
+            }
+
+            // Reset state for new image
+            currentURL = newURL
+            image = nil
+            imageOpacity = 0
+            loadError = nil
+            hasCheckedCache = false
+            loadTask?.cancel()
+
+            // Check if new image is already cached (instant display)
+            if let newURL = newURL {
+                let cacheKey = newURL.absoluteString
+                if let cachedImage = ImageCache.shared.image(for: cacheKey) {
+                    // Instant crossfade for cached images
+                    image = cachedImage
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        imageOpacity = 1.0
+                        previousImageOpacity = 0
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                        self.previousImage = nil
+                    }
+                    hasCheckedCache = true
+                    return
+                }
+            }
+
+            // Load new image from network
+            loadImage()
+        }
     }
 
     private func loadImage() {
@@ -716,10 +845,19 @@ struct CachedProfileImage: View {
 
         let cacheKey = url.absoluteString
         hasCheckedCache = true
+        currentURL = url
 
         // Check cache first (double-check in case init didn't catch it)
         if let cachedImage = ImageCache.shared.image(for: cacheKey) {
             self.image = cachedImage
+            // Smooth crossfade from previous image
+            withAnimation(.easeOut(duration: 0.2)) {
+                self.imageOpacity = 1.0
+                self.previousImageOpacity = 0
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                self.previousImage = nil
+            }
             return
         }
 
@@ -744,6 +882,14 @@ struct CachedProfileImage: View {
                         ImageCache.shared.setImage(downloadedImage, for: cacheKey)
                         self.image = downloadedImage
                         self.isLoading = false
+                        // Smooth crossfade animation
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            self.imageOpacity = 1.0
+                            self.previousImageOpacity = 0
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                            self.previousImage = nil
+                        }
                     }
                 } else {
                     await MainActor.run {
@@ -784,6 +930,11 @@ struct CachedCardImage: View {
     @State private var hasCheckedCache = false
     // PERFORMANCE: Smooth fade-in animation state
     @State private var imageOpacity: Double = 0
+    // SMOOTH TRANSITION: Track previous image for crossfade
+    @State private var previousImage: UIImage?
+    @State private var previousImageOpacity: Double = 0
+    // Track current URL to detect changes
+    @State private var currentURL: URL?
 
     // PERFORMANCE: Check cache immediately on init for instant display
     init(url: URL?, priority: ImageLoadPriority = .normal) {
@@ -796,26 +947,44 @@ struct CachedCardImage: View {
                 _image = State(initialValue: cachedImage)
                 _hasCheckedCache = State(initialValue: true)
                 _imageOpacity = State(initialValue: 1.0) // No animation needed for cached
+                _currentURL = State(initialValue: url)
             }
         }
     }
 
     var body: some View {
         Group {
-            if let image = image {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .opacity(imageOpacity)
-                    .onAppear {
-                        // Smooth fade-in for newly loaded images
-                        if imageOpacity < 1.0 {
-                            withAnimation(.easeOut(duration: 0.15)) {
-                                imageOpacity = 1.0
+            ZStack {
+                // SMOOTH TRANSITION: Show previous image during crossfade
+                if let previousImage = previousImage {
+                    Image(uiImage: previousImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .opacity(previousImageOpacity)
+                }
+
+                if let image = image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .opacity(imageOpacity)
+                        .onAppear {
+                            // Smooth fade-in for newly loaded images
+                            if imageOpacity < 1.0 {
+                                withAnimation(.easeOut(duration: 0.2)) {
+                                    imageOpacity = 1.0
+                                    previousImageOpacity = 0
+                                }
+                                // Clean up previous image after animation
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                                    self.previousImage = nil
+                                }
                             }
                         }
-                    }
-            } else if loadError != nil {
+                }
+            }
+
+            if image == nil && loadError != nil {
                 // Error state with elegant retry button
                 VStack(spacing: 12) {
                     Image(systemName: "photo.badge.exclamationmark")
@@ -857,7 +1026,7 @@ struct CachedCardImage: View {
                         endPoint: .bottomTrailing
                     )
                 )
-            } else {
+            if image == nil && loadError == nil {
                 // Loading state with brand gradient - optimized shimmer
                 ZStack {
                     LinearGradient(
@@ -886,6 +1055,45 @@ struct CachedCardImage: View {
         .onDisappear {
             loadTask?.cancel()
             loadTask = nil
+        }
+        // SMOOTH TRANSITION: Detect URL changes and reload with crossfade
+        .onChange(of: url) { oldURL, newURL in
+            guard newURL != currentURL else { return }
+
+            // Store current image for crossfade
+            if let currentImage = image {
+                previousImage = currentImage
+                previousImageOpacity = 1.0
+            }
+
+            // Reset state for new image
+            currentURL = newURL
+            image = nil
+            imageOpacity = 0
+            loadError = nil
+            hasCheckedCache = false
+            loadTask?.cancel()
+
+            // Check if new image is already cached (instant display)
+            if let newURL = newURL {
+                let cacheKey = newURL.absoluteString
+                if let cachedImage = ImageCache.shared.image(for: cacheKey) {
+                    // Instant crossfade for cached images
+                    image = cachedImage
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        imageOpacity = 1.0
+                        previousImageOpacity = 0
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                        self.previousImage = nil
+                    }
+                    hasCheckedCache = true
+                    return
+                }
+            }
+
+            // Load new image from network
+            loadImage()
         }
     }
 
