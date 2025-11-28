@@ -22,7 +22,7 @@ struct ProfileView: View {
     @State private var showingPremiumUpgrade = false
     @State private var showingPhotoViewer = false
     @State private var showingPhotoVerification = false
-    @State private var showingInsights = false
+    @State private var showingReferral = false
     @State private var selectedPhotoIndex = 0
     @State private var animateStats = false
     @State private var profileCompletion = 0
@@ -103,8 +103,8 @@ struct ProfileView: View {
                                         premiumUpgradeCard
                                     }
 
-                                    // Profile Insights (same spacing as above cards)
-                                    profileInsightsCard
+                                    // Referral card (same spacing as above cards)
+                                    referralCard
                                 }
 
                                 // ===== ABOUT ME SECTION =====
@@ -232,8 +232,8 @@ struct ProfileView: View {
                     PhotoVerificationView(userId: userId)
                 }
             }
-            .sheet(isPresented: $showingInsights) {
-                ProfileInsightsView()
+            .sheet(isPresented: $showingReferral) {
+                ReferralDashboardView()
                     .environmentObject(authService)
             }
             .sheet(isPresented: $showingProfileViewers) {
@@ -669,11 +669,11 @@ struct ProfileView: View {
         .frame(maxWidth: .infinity)
     }
     
-    // MARK: - Profile Insights Card
+    // MARK: - Referral Card
 
-    private var profileInsightsCard: some View {
+    private var referralCard: some View {
         Button {
-            showingInsights = true
+            showingReferral = true
             HapticManager.shared.impact(.medium)
         } label: {
             HStack(spacing: 16) {
@@ -681,18 +681,18 @@ struct ProfileView: View {
                     Circle()
                         .fill(
                             LinearGradient(
-                                colors: [.purple.opacity(0.2), .pink.opacity(0.2)],
+                                colors: [.green.opacity(0.2), .mint.opacity(0.2)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
                         .frame(width: 60, height: 60)
 
-                    Image(systemName: "chart.bar.fill")
+                    Image(systemName: "gift.fill")
                         .font(.title)
                         .foregroundStyle(
                             LinearGradient(
-                                colors: [.purple, .pink],
+                                colors: [.green, .mint],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
@@ -701,16 +701,16 @@ struct ProfileView: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 6) {
-                        Text("Profile Insights")
+                        Text("Invite Friends")
                             .font(.headline)
                             .foregroundColor(.primary)
 
                         Image(systemName: "sparkles")
                             .font(.caption)
-                            .foregroundColor(.purple)
+                            .foregroundColor(.green)
                     }
 
-                    Text("See who viewed your profile & performance analytics")
+                    Text("Earn free premium days for each friend you refer")
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .lineLimit(2)
@@ -722,7 +722,7 @@ struct ProfileView: View {
                     .font(.title2)
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [.purple, .pink],
+                            colors: [.green, .mint],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -731,7 +731,7 @@ struct ProfileView: View {
             .padding(20)
             .background(
                 LinearGradient(
-                    colors: [Color.purple.opacity(0.08), Color.pink.opacity(0.06)],
+                    colors: [Color.green.opacity(0.08), Color.mint.opacity(0.06)],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
@@ -741,17 +741,17 @@ struct ProfileView: View {
                 RoundedRectangle(cornerRadius: 16)
                     .stroke(
                         LinearGradient(
-                            colors: [Color.purple.opacity(0.3), Color.pink.opacity(0.2)],
+                            colors: [Color.green.opacity(0.3), Color.mint.opacity(0.2)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),
                         lineWidth: 2
                     )
             )
-            .shadow(color: .purple.opacity(0.15), radius: 15, y: 8)
+            .shadow(color: .green.opacity(0.15), radius: 15, y: 8)
         }
-        .accessibilityLabel("Profile Insights")
-        .accessibilityHint("View your profile performance analytics and see who viewed your profile")
+        .accessibilityLabel("Invite Friends")
+        .accessibilityHint("Open referral dashboard to invite friends and earn free premium days")
         .padding(.horizontal, 20)
     }
 
