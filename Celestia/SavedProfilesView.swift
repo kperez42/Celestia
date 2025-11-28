@@ -529,13 +529,12 @@ struct SavedProfileCard: View {
     var body: some View {
         Button(action: onTap) {
             VStack(spacing: 0) {
-                // Profile image section
+                // Profile image section - fixed height for consistent card sizes
                 ZStack {
                     Group {
                         if let imageURL = savedProfile.user.photos.first, let url = URL(string: imageURL) {
                             CachedCardImage(url: url)
-                                .frame(height: 200)
-                                .clipped()
+                                .aspectRatio(contentMode: .fill)
                         } else {
                             LinearGradient(
                                 colors: [.purple.opacity(0.6), .pink.opacity(0.5)],
@@ -547,7 +546,6 @@ struct SavedProfileCard: View {
                                     .font(.system(size: 50))
                                     .foregroundColor(.white.opacity(0.5))
                             }
-                            .frame(height: 200)
                         }
                     }
 
@@ -567,11 +565,10 @@ struct SavedProfileCard: View {
                                     .foregroundColor(.white)
                             }
                         }
-                        .frame(height: 200)
                         .transition(.opacity)
                     }
                 }
-                .frame(height: 200)
+                .frame(height: 180)
                 .frame(maxWidth: .infinity)
                 .clipped()
                 .cornerRadius(16, corners: [.topLeft, .topRight])
@@ -625,9 +622,9 @@ struct SavedProfileCard: View {
 struct SavedProfileCardSkeleton: View {
     var body: some View {
         VStack(spacing: 0) {
-            // Image area skeleton
+            // Image area skeleton - matching card height
             SkeletonView()
-                .frame(height: 200)
+                .frame(height: 180)
                 .clipped()
 
             // User info skeleton
@@ -677,12 +674,11 @@ struct SavedYouCard: View {
     var body: some View {
         Button(action: onTap) {
             VStack(spacing: 0) {
-                // Profile image section
+                // Profile image section - fixed height for consistent card sizes
                 Group {
                     if let imageURL = profile.user.photos.first, let url = URL(string: imageURL) {
                         CachedCardImage(url: url)
-                            .frame(height: 200)
-                            .clipped()
+                            .aspectRatio(contentMode: .fill)
                     } else {
                         LinearGradient(
                             colors: [.blue.opacity(0.6), .purple.opacity(0.5)],
@@ -694,10 +690,9 @@ struct SavedYouCard: View {
                                 .font(.system(size: 50))
                                 .foregroundColor(.white.opacity(0.5))
                         }
-                        .frame(height: 200)
                     }
                 }
-                .frame(height: 200)
+                .frame(height: 180)
                 .frame(maxWidth: .infinity)
                 .clipped()
                 .cornerRadius(16, corners: [.topLeft, .topRight])
