@@ -31,6 +31,7 @@ struct ProfileView: View {
     @State private var isRefreshing = false
     @State private var hasAnimatedStats = false
     @State private var showingProfileViewers = false
+    @State private var showingSubscriptions = false
 
     // Accurate stats from database
     @State private var accurateMatchCount = 0
@@ -101,6 +102,9 @@ struct ProfileView: View {
                                     } else {
                                         premiumUpgradeCard
                                     }
+
+                                    // Subscription management card - swipeable tabs view
+                                    subscriptionManagementCard
 
                                     // Profile Insights (same spacing as above cards)
                                     profileInsightsCard
@@ -237,6 +241,10 @@ struct ProfileView: View {
             }
             .sheet(isPresented: $showingProfileViewers) {
                 ProfileViewersView()
+                    .environmentObject(authService)
+            }
+            .sheet(isPresented: $showingSubscriptions) {
+                ProfileSubscriptionsView()
                     .environmentObject(authService)
             }
             .confirmationDialog("Are you sure you want to sign out?", isPresented: $showingLogoutConfirmation, titleVisibility: .visible) {
@@ -999,6 +1007,92 @@ struct ProfileView: View {
         }
         .accessibilityLabel("Upgrade to Premium")
         .accessibilityHint("Unlock unlimited likes, see who likes you, and access all premium features")
+        .padding(.horizontal, 20)
+    }
+
+    // MARK: - Subscription Management Card
+
+    private var subscriptionManagementCard: some View {
+        Button {
+            showingSubscriptions = true
+            HapticManager.shared.impact(.medium)
+        } label: {
+            HStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.purple.opacity(0.2), Color.pink.opacity(0.15)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 60, height: 60)
+
+                    Image(systemName: "creditcard.fill")
+                        .font(.title)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 6) {
+                        Text("Manage Subscription")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+
+                        Image(systemName: "hand.tap.fill")
+                            .font(.caption)
+                            .foregroundColor(.purple)
+                    }
+
+                    Text("View plans, features & account details")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                }
+
+                Spacer()
+
+                Image(systemName: "arrow.right.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+            .padding(20)
+            .background(
+                LinearGradient(
+                    colors: [Color.purple.opacity(0.08), Color.pink.opacity(0.06)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .cornerRadius(16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(
+                        LinearGradient(
+                            colors: [Color.purple.opacity(0.3), Color.pink.opacity(0.2)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 2
+                    )
+            )
+            .shadow(color: .purple.opacity(0.15), radius: 15, y: 8)
+        }
+        .accessibilityLabel("Manage Subscription")
+        .accessibilityHint("View subscription plans, features, and account details with swipeable tabs")
         .padding(.horizontal, 20)
     }
 
