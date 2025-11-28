@@ -49,20 +49,11 @@ struct SavedProfilesView: View {
         }
         .navigationBarHidden(true)
         .task {
+            // Load data once when view first appears
+            // Silent refresh (no skeleton) if we already have cached data
             await viewModel.loadSavedProfiles()
             await viewModel.loadViewedProfiles()
             await viewModel.loadSavedYouProfiles()
-        }
-        .onAppear {
-            // Refresh data when tab becomes visible, but only if not currently loading
-            // LazyTabContent caches views, so we need this for tab switches
-            if !viewModel.isLoading {
-                Task {
-                    await viewModel.loadSavedProfiles()
-                    await viewModel.loadViewedProfiles()
-                    await viewModel.loadSavedYouProfiles()
-                }
-            }
         }
         .sheet(item: $selectedUser) { user in
             UserDetailView(user: user)
@@ -939,9 +930,18 @@ class SavedProfilesViewModel: ObservableObject {
 
         Logger.shared.debug("SavedProfiles cache MISS - fetching from database", category: .performance)
 
-        isLoading = true
+        // Only show loading skeleton if we have no existing data to display
+        // This prevents flickering when refreshing with cached data already visible
+        let shouldShowLoading = savedProfiles.isEmpty
+        if shouldShowLoading {
+            isLoading = true
+        }
         errorMessage = ""
-        defer { isLoading = false }
+        defer {
+            if shouldShowLoading {
+                isLoading = false
+            }
+        }
 
         do {
             // Step 1: Fetch all saved profile references
