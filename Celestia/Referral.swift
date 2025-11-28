@@ -52,6 +52,10 @@ struct Referral: Identifiable, Codable {
     var completedAt: Date?           // When referred user signed up
     var rewardClaimed: Bool = false  // Whether reward was claimed by referrer
 
+    // Transient properties (not stored in Firestore, fetched separately)
+    var referredUserName: String?    // Name of referred user (for display)
+    var referredUserPhotoURL: String? // Photo URL of referred user
+
     enum CodingKeys: String, CodingKey {
         case id
         case referrerUserId
@@ -61,6 +65,8 @@ struct Referral: Identifiable, Codable {
         case createdAt
         case completedAt
         case rewardClaimed
+        // Note: referredUserName and referredUserPhotoURL are NOT in CodingKeys
+        // They are transient properties fetched separately
     }
 
     // Custom encoding to handle nil values properly for Firebase
@@ -75,6 +81,20 @@ struct Referral: Identifiable, Codable {
         try container.encode(createdAt, forKey: .createdAt)
         try container.encodeIfPresent(completedAt, forKey: .completedAt)
         try container.encode(rewardClaimed, forKey: .rewardClaimed)
+        // Don't encode transient properties
+    }
+
+    /// Helper to check if referral is recent (within last 7 days)
+    var isRecent: Bool {
+        let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+        return createdAt > sevenDaysAgo
+    }
+
+    /// Formatted date string for display
+    var formattedDate: String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: createdAt, relativeTo: Date())
     }
 }
 

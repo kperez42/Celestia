@@ -101,13 +101,15 @@ class ReferralManager: ObservableObject {
         }
 
         let referrerId = referrerDoc.documentID
+        let referrerData = referrerDoc.data()
+        let referrerName = referrerData["fullName"] as? String ?? "Someone"
+
         guard referrerId != newUserId else {
             Logger.shared.warning("User attempted to refer themselves", category: .referral)
             throw ReferralError.selfReferral
         }
 
         // Step 1.5: Check if referrer has reached max referrals
-        let referrerData = referrerDoc.data()
         let referrerStatsDict = referrerData["referralStats"] as? [String: Any] ?? [:]
         let currentReferrals = referrerStatsDict["totalReferrals"] as? Int ?? 0
 
@@ -116,33 +118,13 @@ class ReferralManager: ObservableObject {
             throw ReferralError.maxReferralsReached
         }
 
-        // Step 2: Check if this user has already been referred (with fallback for missing index)
-        var alreadyReferred = false
-        do {
-            let existingReferralSnapshot = try await db.collection("referrals")
-                .whereField("referredUserId", isEqualTo: newUserId)
-                .whereField("status", isEqualTo: ReferralStatus.completed.rawValue)
-                .limit(to: 1)
-                .getDocuments()
+        // Step 2: Use a unique document ID to prevent duplicate referrals
+        // This provides database-level duplicate prevention
+        let referralDocId = "\(referrerId)_\(newUserId)"
+        let existingReferralDoc = try await db.collection("referrals").document(referralDocId).getDocument()
 
-            alreadyReferred = !existingReferralSnapshot.documents.isEmpty
-        } catch {
-            // Fallback: fetch referrals for this user and filter locally
-            Logger.shared.warning("Falling back to local filtering for existing referral check", category: .referral)
-
-            let referralsSnapshot = try await db.collection("referrals")
-                .whereField("referredUserId", isEqualTo: newUserId)
-                .limit(to: 10)
-                .getDocuments()
-
-            alreadyReferred = referralsSnapshot.documents.contains { doc in
-                let data = doc.data()
-                return (data["status"] as? String) == ReferralStatus.completed.rawValue
-            }
-        }
-
-        if alreadyReferred {
-            Logger.shared.warning("User has already been referred", category: .referral)
+        if existingReferralDoc.exists {
+            Logger.shared.warning("Duplicate referral attempt detected", category: .referral)
             throw ReferralError.alreadyReferred
         }
 
@@ -165,7 +147,7 @@ class ReferralManager: ObservableObject {
             throw ReferralError.emailAlreadyReferred
         }
 
-        // Step 4: Create referral record
+        // Step 4: Create referral record with deterministic ID to prevent duplicates
         let referral = Referral(
             referrerUserId: referrerId,
             referredUserId: newUserId,
@@ -176,19 +158,50 @@ class ReferralManager: ObservableObject {
             rewardClaimed: false
         )
 
-        // Save referral
-        try await db.collection("referrals").addDocument(from: referral)
+        // Use setData with the deterministic ID
+        let referralData = try Firestore.Encoder().encode(referral)
+        try await db.collection("referrals").document(referralDocId).setData(referralData)
 
-        // Step 5: Award bonus days to new user
+        // Step 5: Award bonus days to new user (with retry)
         try await awardPremiumDays(userId: newUserId, days: ReferralRewards.newUserBonusDays, reason: "referral_signup")
 
-        // Step 6: Award bonus days to referrer
+        // Step 6: Award bonus days to referrer (with retry)
         try await awardPremiumDays(userId: referrerId, days: ReferralRewards.referrerBonusDays, reason: "successful_referral")
 
         // Step 7: Update referrer stats
         try await updateReferrerStats(userId: referrerId)
 
+        // Step 8: Send notification to referrer about successful referral
+        await sendReferralSuccessNotification(
+            referrerId: referrerId,
+            referredUserName: newUser.fullName,
+            daysAwarded: ReferralRewards.referrerBonusDays
+        )
+
         Logger.shared.info("Referral processed successfully: \(referralCode)", category: .referral)
+    }
+
+    // MARK: - Referral Success Notification
+
+    private func sendReferralSuccessNotification(referrerId: String, referredUserName: String, daysAwarded: Int) async {
+        do {
+            let notificationData: [String: Any] = [
+                "userId": referrerId,
+                "type": "referral_success",
+                "title": "New Referral! 🎉",
+                "body": "\(referredUserName) just signed up with your code! You earned \(daysAwarded) days of Premium!",
+                "data": [
+                    "referredUserName": referredUserName,
+                    "daysAwarded": daysAwarded
+                ],
+                "timestamp": Timestamp(date: Date()),
+                "isRead": false
+            ]
+            try await db.collection("users").document(referrerId).collection("notifications").addDocument(data: notificationData)
+            Logger.shared.info("Sent referral success notification to referrer", category: .referral)
+        } catch {
+            Logger.shared.error("Failed to send referral success notification", category: .referral, error: error)
+        }
     }
 
     // MARK: - Award Premium Days
@@ -367,6 +380,8 @@ class ReferralManager: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
+        var referrals: [Referral] = []
+
         do {
             // Try with ordering first (requires composite index)
             let snapshot = try await db.collection("referrals")
@@ -375,12 +390,11 @@ class ReferralManager: ObservableObject {
                 .limit(to: 50)
                 .getDocuments()
 
-            userReferrals = snapshot.documents.compactMap { doc in
+            referrals = snapshot.documents.compactMap { doc in
                 try? doc.data(as: Referral.self)
             }
         } catch {
             // Fallback: fetch without ordering if index doesn't exist
-            // This handles the case where composite index is not yet created
             Logger.shared.warning("Falling back to unordered referral query - composite index may be missing", category: .referral)
 
             let snapshot = try await db.collection("referrals")
@@ -389,12 +403,108 @@ class ReferralManager: ObservableObject {
                 .getDocuments()
 
             // Sort locally instead
-            var referrals = snapshot.documents.compactMap { doc in
+            referrals = snapshot.documents.compactMap { doc in
                 try? doc.data(as: Referral.self)
             }
             referrals.sort { $0.createdAt > $1.createdAt }
-            userReferrals = referrals
         }
+
+        // Fetch referred user names for each referral
+        userReferrals = await enrichReferralsWithUserInfo(referrals)
+    }
+
+    /// Enriches referrals with referred user information (name, photo)
+    private func enrichReferralsWithUserInfo(_ referrals: [Referral]) async -> [Referral] {
+        var enrichedReferrals = referrals
+
+        // Collect all referred user IDs
+        let userIds = referrals.compactMap { $0.referredUserId }
+        guard !userIds.isEmpty else { return referrals }
+
+        // Fetch user info in batches of 10 (Firestore limit for 'in' queries)
+        var userInfoMap: [String: (name: String, photoURL: String)] = [:]
+
+        for batch in stride(from: 0, to: userIds.count, by: 10) {
+            let endIndex = min(batch + 10, userIds.count)
+            let batchIds = Array(userIds[batch..<endIndex])
+
+            do {
+                let usersSnapshot = try await db.collection("users")
+                    .whereField(FieldPath.documentID(), in: batchIds)
+                    .getDocuments()
+
+                for doc in usersSnapshot.documents {
+                    let data = doc.data()
+                    let name = data["fullName"] as? String ?? "Anonymous"
+                    let photoURL = data["profileImageURL"] as? String ?? ""
+                    userInfoMap[doc.documentID] = (name: name, photoURL: photoURL)
+                }
+            } catch {
+                Logger.shared.warning("Failed to fetch user info for referrals", category: .referral)
+            }
+        }
+
+        // Enrich referrals with user info
+        for index in enrichedReferrals.indices {
+            if let referredUserId = enrichedReferrals[index].referredUserId,
+               let userInfo = userInfoMap[referredUserId] {
+                enrichedReferrals[index].referredUserName = userInfo.name
+                enrichedReferrals[index].referredUserPhotoURL = userInfo.photoURL
+            }
+        }
+
+        return enrichedReferrals
+    }
+
+    // MARK: - Real-time Referral Listener
+
+    private var referralListener: ListenerRegistration?
+
+    /// Starts listening for new referrals in real-time
+    func startReferralListener(for userId: String) {
+        // Remove any existing listener
+        stopReferralListener()
+
+        referralListener = db.collection("referrals")
+            .whereField("referrerUserId", isEqualTo: userId)
+            .order(by: "createdAt", descending: true)
+            .limit(to: 50)
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self else { return }
+
+                if let error = error {
+                    Logger.shared.error("Referral listener error", category: .referral, error: error)
+                    return
+                }
+
+                guard let documents = snapshot?.documents else { return }
+
+                let referrals = documents.compactMap { doc in
+                    try? doc.data(as: Referral.self)
+                }
+
+                // Check for new referrals
+                let oldCount = self.userReferrals.count
+                let newCount = referrals.count
+
+                Task {
+                    self.userReferrals = await self.enrichReferralsWithUserInfo(referrals)
+
+                    // If there's a new referral, haptic feedback
+                    if newCount > oldCount && oldCount > 0 {
+                        HapticManager.shared.notification(.success)
+                        Logger.shared.info("New referral detected via listener", category: .referral)
+                    }
+                }
+            }
+
+        Logger.shared.info("Started referral listener for user", category: .referral)
+    }
+
+    /// Stops the real-time referral listener
+    func stopReferralListener() {
+        referralListener?.remove()
+        referralListener = nil
     }
 
     // MARK: - Leaderboard

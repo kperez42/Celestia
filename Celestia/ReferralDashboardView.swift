@@ -109,6 +109,15 @@ struct ReferralDashboardView: View {
                 withAnimation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.1)) {
                     animateStats = true
                 }
+
+                // Start real-time listener for updates
+                if let userId = authService.currentUser?.id {
+                    referralManager.startReferralListener(for: userId)
+                }
+            }
+            .onDisappear {
+                // Stop listener when view disappears
+                referralManager.stopReferralListener()
             }
             .overlay {
                 if copiedToClipboard {
@@ -587,19 +596,36 @@ struct ReferralDashboardView: View {
     }
 
     private func referralRow(referral: Referral) -> some View {
-        let isNew = referral.status == .completed &&
-                    referral.completedAt.map { Date().timeIntervalSince($0) < 86400 } ?? false // 24 hours
+        let isNew = referral.isRecent && referral.status == .completed
+        let userName = referral.referredUserName ?? "Friend"
 
         return HStack(spacing: 16) {
-            // Status Icon
+            // User avatar or status icon
             ZStack {
-                Circle()
-                    .fill(referral.status == .completed ? Color.green.opacity(0.2) : Color.orange.opacity(0.2))
+                if let photoURL = referral.referredUserPhotoURL, !photoURL.isEmpty {
+                    AsyncImage(url: URL(string: photoURL)) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        default:
+                            Image(systemName: "person.fill")
+                                .font(.title3)
+                                .foregroundColor(.purple)
+                        }
+                    }
                     .frame(width: 50, height: 50)
+                    .clipShape(Circle())
+                } else {
+                    Circle()
+                        .fill(referral.status == .completed ? Color.green.opacity(0.2) : Color.orange.opacity(0.2))
+                        .frame(width: 50, height: 50)
 
-                Image(systemName: referral.status == .completed ? "checkmark.circle.fill" : "clock.fill")
-                    .font(.title3)
-                    .foregroundColor(referral.status == .completed ? .green : .orange)
+                    Image(systemName: referral.status == .completed ? "person.fill.checkmark" : "clock.fill")
+                        .font(.title3)
+                        .foregroundColor(referral.status == .completed ? .green : .orange)
+                }
 
                 // New badge
                 if isNew {
@@ -616,9 +642,10 @@ struct ReferralDashboardView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
-                    Text(referral.status == .completed ? "Completed" : "Pending")
+                    Text(userName)
                         .font(.headline)
                         .foregroundColor(.primary)
+                        .lineLimit(1)
 
                     if isNew {
                         Image(systemName: "sparkles")
@@ -627,9 +654,15 @@ struct ReferralDashboardView: View {
                     }
                 }
 
-                Text(referral.createdAt.formatted(date: .abbreviated, time: .omitted))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                HStack(spacing: 4) {
+                    Image(systemName: referral.status == .completed ? "checkmark.circle.fill" : "clock.fill")
+                        .font(.caption2)
+                        .foregroundColor(referral.status == .completed ? .green : .orange)
+
+                    Text(referral.formattedDate)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
 
             Spacer()
