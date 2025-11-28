@@ -108,7 +108,7 @@ class ImageOptimizer {
 
     // MARK: - Resizing
 
-    /// Resize image to specified size
+    /// Resize image to specified size with high-quality interpolation
     func resize(_ image: UIImage, to size: ImageSize) -> UIImage? {
         let maxDimension = size.maxDimension
 
@@ -126,9 +126,19 @@ class ImageOptimizer {
             newSize = CGSize(width: maxDimension * aspectRatio, height: maxDimension)
         }
 
-        // Use high-quality rendering
-        let renderer = UIGraphicsImageRenderer(size: newSize)
+        // Use high-quality rendering with optimal settings
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = UIScreen.main.scale  // Match device scale for Retina
+        format.opaque = false
+        format.preferredRange = .extended  // Extended color range for better quality
+
+        let renderer = UIGraphicsImageRenderer(size: newSize, format: format)
         let resizedImage = renderer.image { context in
+            // Set high-quality interpolation
+            context.cgContext.interpolationQuality = .high
+            context.cgContext.setShouldAntialias(true)
+            context.cgContext.setAllowsAntialiasing(true)
+
             image.draw(in: CGRect(origin: .zero, size: newSize))
         }
 
@@ -137,11 +147,22 @@ class ImageOptimizer {
         return resizedImage
     }
 
-    /// Resize image to exact dimensions (may crop)
+    /// Resize image to exact dimensions (may crop) with high-quality interpolation
     func resize(_ image: UIImage, toExact size: CGSize, contentMode: UIView.ContentMode = .scaleAspectFill) -> UIImage? {
-        let renderer = UIGraphicsImageRenderer(size: size)
+        // Use high-quality rendering settings
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = UIScreen.main.scale
+        format.opaque = false
+        format.preferredRange = .extended
+
+        let renderer = UIGraphicsImageRenderer(size: size, format: format)
 
         return renderer.image { context in
+            // Set high-quality interpolation
+            context.cgContext.interpolationQuality = .high
+            context.cgContext.setShouldAntialias(true)
+            context.cgContext.setAllowsAntialiasing(true)
+
             let aspectWidth = size.width / image.size.width
             let aspectHeight = size.height / image.size.height
 
