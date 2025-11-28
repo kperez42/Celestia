@@ -9,6 +9,7 @@ import SwiftUI
 import Firebase
 import FirebaseFirestore
 import FirebaseAnalytics
+import StripeIdentity
 
 @main
 struct CelestiaApp: App {
@@ -24,6 +25,9 @@ struct CelestiaApp: App {
         // NOTE: This is the SINGLE initialization point for Firebase
         // Do NOT call FirebaseApp.configure() anywhere else in the app
         FirebaseApp.configure()
+
+        // Configure Stripe Identity SDK for ID verification
+        StripeConfig.configure()
 
         // Keep analytics disabled to prevent memory issues
         // App uses AnalyticsServiceEnhanced for analytics instead

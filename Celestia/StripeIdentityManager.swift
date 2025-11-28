@@ -18,14 +18,18 @@ import SwiftUI
 import FirebaseFirestore
 import FirebaseAuth
 import FirebaseFunctions
-// TODO: Uncomment after adding StripeIdentity SDK via SPM
-// import StripeIdentity
+import StripeIdentity
 
 // MARK: - Stripe Configuration
 
 enum StripeConfig {
     /// Stripe Publishable Key (safe to include in app)
     static let publishableKey = "pk_live_51Il3uhFgeBuSpm7JQHQEi7J8FdQnbkzndYl2Jeq0EKOjmZidgEwd7wacFpWgujpnAbCrLDOiiPESLPjNAQZ9V2h000FbzP66S5"
+
+    /// Configure Stripe SDK - call this in AppDelegate/App init
+    static func configure() {
+        STPAPIClient.shared.publishableKey = publishableKey
+    }
 }
 
 // MARK: - Stripe Identity Manager
@@ -283,52 +287,52 @@ class StripeIdentityManager: ObservableObject {
     }
 
     /// Present the Stripe Identity verification sheet
-    /// NOTE: This requires the StripeIdentity SDK to be properly configured
+    /// Uses the real Stripe Identity SDK to verify user's ID + selfie
     private func presentVerificationSheet(
         verificationSessionId: String,
         ephemeralKeySecret: String,
         from viewController: UIViewController
     ) async throws -> StripeSheetResult {
 
-        // STRIPE IDENTITY SDK INTEGRATION
-        // The actual implementation requires importing StripeIdentity and using:
-        //
-        // let sheet = IdentityVerificationSheet(
-        //     verificationSessionId: verificationSessionId,
-        //     ephemeralKeySecret: ephemeralKeySecret,
-        //     configuration: IdentityVerificationSheet.Configuration(
-        //         brandLogo: UIImage(named: "app_logo")!
-        //     )
-        // )
-        //
-        // return await withCheckedContinuation { continuation in
-        //     sheet.present(from: viewController) { result in
-        //         switch result {
-        //         case .flowCompleted:
-        //             continuation.resume(returning: StripeSheetResult(status: .verified))
-        //         case .flowCanceled:
-        //             continuation.resume(returning: StripeSheetResult(status: .canceled))
-        //         case .flowFailed(let error):
-        //             continuation.resume(returning: StripeSheetResult(
-        //                 status: .failed,
-        //                 failureReason: error.localizedDescription
-        //             ))
-        //         }
-        //     }
-        // }
+        Logger.shared.info("Presenting Stripe Identity verification sheet", category: .general)
 
-        // TEMPORARY: Simulated flow for development/testing
-        // Remove this and uncomment above when StripeIdentity SDK is added
-        Logger.shared.info("Presenting Stripe Identity verification sheet (simulated)", category: .general)
+        // Configure the verification sheet with optional brand logo
+        var configuration = IdentityVerificationSheet.Configuration()
+        if let brandLogo = UIImage(named: "AppIcon") ?? UIImage(named: "app_logo") {
+            configuration.brandLogo = brandLogo
+        }
 
-        try await Task.sleep(nanoseconds: 2_000_000_000) // Simulate verification time
+        // Create the Identity Verification Sheet
+        let sheet = IdentityVerificationSheet(
+            verificationSessionId: verificationSessionId,
+            ephemeralKeySecret: ephemeralKeySecret,
+            configuration: configuration
+        )
 
-        // For testing, randomly succeed or require more time
-        let randomSuccess = Bool.random()
-        if randomSuccess {
-            return StripeSheetResult(status: .verified)
-        } else {
-            return StripeSheetResult(status: .processing, failureReason: "Verification is being reviewed")
+        // Present the sheet and wait for result
+        return await withCheckedContinuation { continuation in
+            sheet.present(from: viewController) { result in
+                switch result {
+                case .flowCompleted:
+                    // User completed the verification flow
+                    // Note: This doesn't mean verified yet - Stripe may still be processing
+                    Logger.shared.info("Stripe Identity flow completed", category: .general)
+                    continuation.resume(returning: StripeSheetResult(status: .verified))
+
+                case .flowCanceled:
+                    // User dismissed the sheet
+                    Logger.shared.info("Stripe Identity flow canceled by user", category: .general)
+                    continuation.resume(returning: StripeSheetResult(status: .canceled))
+
+                case .flowFailed(let error):
+                    // An error occurred
+                    Logger.shared.error("Stripe Identity flow failed", category: .general, error: error)
+                    continuation.resume(returning: StripeSheetResult(
+                        status: .failed,
+                        failureReason: error.localizedDescription
+                    ))
+                }
+            }
         }
     }
 
