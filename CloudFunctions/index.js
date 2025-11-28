@@ -28,6 +28,7 @@ const adminSecurity = require('./modules/adminSecurity');
 const photoVerification = require('./modules/photoVerification');
 const performanceMonitoring = require('./modules/performanceMonitoring');
 const imageOptimization = require('./modules/imageOptimization');
+const stripeIdentity = require('./modules/stripeIdentity');
 
 // ============================================================================
 // API ENDPOINTS
@@ -1799,6 +1800,42 @@ exports.banUserDirectly = functions.https.onCall(async (data, context) => {
     functions.logger.error('Error banning user', { adminId, userId, error: error.message });
     throw new functions.https.HttpsError('internal', `Failed to ban user: ${error.message}`);
   }
+});
+
+// ============================================================================
+// STRIPE IDENTITY VERIFICATION
+// ============================================================================
+
+/**
+ * Create a Stripe Identity verification session
+ * Called by the iOS app to initiate ID verification
+ *
+ * SETUP REQUIRED:
+ * 1. npm install stripe
+ * 2. firebase functions:config:set stripe.secret_key="sk_live_..."
+ * 3. firebase functions:config:set stripe.webhook_secret="whsec_..."
+ */
+exports.createStripeIdentitySession = functions.https.onCall(async (data, context) => {
+  return stripeIdentity.createVerificationSession(data, context);
+});
+
+/**
+ * Check Stripe Identity verification status
+ * Called to get the current status of a verification session
+ */
+exports.checkStripeIdentityStatus = functions.https.onCall(async (data, context) => {
+  return stripeIdentity.checkVerificationStatus(data, context);
+});
+
+/**
+ * Stripe webhook endpoint for verification status updates
+ * Called by Stripe when verification status changes
+ *
+ * SETUP: Configure webhook URL in Stripe Dashboard:
+ * https://us-central1-YOUR_PROJECT.cloudfunctions.net/stripeIdentityWebhook
+ */
+exports.stripeIdentityWebhook = functions.https.onRequest(async (req, res) => {
+  return stripeIdentity.handleStripeWebhook(req, res);
 });
 
 // Export admin object for use in modules

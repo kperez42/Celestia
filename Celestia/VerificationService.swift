@@ -28,6 +28,7 @@ class VerificationService: ObservableObject {
     @Published var verificationStatus: VerificationStatus = .unverified
     @Published var photoVerified: Bool = false
     @Published var idVerified: Bool = false
+    @Published var stripeIdentityVerified: Bool = false  // NEW: Stripe Identity verification
     @Published var backgroundCheckCompleted: Bool = false
     @Published var trustScore: Int = 0 // 0-100
     @Published var isLoadingVerification: Bool = false
@@ -35,7 +36,8 @@ class VerificationService: ObservableObject {
     // MARK: - Private Properties
 
     private let photoVerifier = PhotoVerificationManager.shared
-    private let idVerifier = IDVerificationManager.shared
+    private let idVerifier = IDVerificationManager.shared  // Kept for legacy/fallback
+    private let stripeIdentityManager = StripeIdentityManager.shared  // NEW: Primary ID verification
     private let backgroundChecker = BackgroundCheckManager.shared
     private let defaults = UserDefaults.standard
     private let db = Firestore.firestore()
@@ -45,6 +47,7 @@ class VerificationService: ObservableObject {
     private enum CacheKeys {
         static let photoVerified = "cache_verification_photo"
         static let idVerified = "cache_verification_id"
+        static let stripeIdentityVerified = "cache_verification_stripe_identity"  // NEW
         static let backgroundCheckCompleted = "cache_verification_background"
         static let lastSyncTimestamp = "cache_verification_sync_timestamp"
     }
@@ -54,8 +57,11 @@ class VerificationService: ObservableObject {
     private enum FirestoreFields {
         static let photoVerified = "photoVerified"
         static let photoVerifiedAt = "photoVerifiedAt"
-        static let idVerified = "idVerified"
+        static let idVerified = "idVerified"  // Legacy on-device verification
         static let idVerifiedAt = "idVerifiedAt"
+        static let stripeIdentityVerified = "stripeIdentityVerified"  // NEW: Stripe Identity
+        static let stripeIdentityVerifiedAt = "stripeIdentityVerifiedAt"
+        static let stripeSessionId = "stripeIdentitySessionId"
         static let backgroundCheckCompleted = "backgroundCheckCompleted"
         static let backgroundCheckAt = "backgroundCheckAt"
         static let isVerified = "isVerified"  // Main verification badge field
@@ -170,7 +176,7 @@ class VerificationService: ObservableObject {
         return result
     }
 
-    /// Persist ID verification to Firestore
+    /// Persist ID verification to Firestore (Legacy - kept for backwards compatibility)
     private func persistIDVerification(userId: String, documentType: DocumentType, confidence: Double) async throws {
         let updateData: [String: Any] = [
             FirestoreFields.idVerified: true,
@@ -184,6 +190,78 @@ class VerificationService: ObservableObject {
         try await updateServerVerificationStatus(userId: userId)
 
         Logger.shared.info("ID verification persisted to Firestore", category: .general)
+    }
+
+    // MARK: - Stripe Identity Verification (Primary ID Verification)
+
+    /// Start Stripe Identity verification flow (RECOMMENDED)
+    /// This is the primary and recommended method for ID verification
+    /// Uses Stripe's robust third-party verification service
+    ///
+    /// - Parameter presentingViewController: The view controller to present from
+    /// - Returns: StripeIdentityResult with verification outcome
+    func startStripeIdentityVerification(from presentingViewController: UIViewController) async throws -> StripeIdentityResult {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            throw VerificationError.notAuthenticated
+        }
+
+        Logger.shared.info("Starting Stripe Identity verification (primary method)", category: .general)
+
+        // Perform verification using Stripe Identity
+        let result = try await stripeIdentityManager.startVerification(from: presentingViewController)
+
+        if result.isVerified {
+            // Persist verification to Firestore
+            try await persistStripeIdentityVerification(userId: userId, sessionId: result.sessionId)
+
+            // Update local state after successful server persistence
+            stripeIdentityVerified = true
+            idVerified = true  // Also set legacy flag for compatibility
+            updateLocalCache()
+            updateVerificationStatus()
+            updateTrustScore()
+
+            // Track analytics
+            AnalyticsManager.shared.logEvent(.verificationCompleted, parameters: [
+                "type": "stripe_identity",
+                "session_id": result.sessionId
+            ])
+
+            Logger.shared.info("Stripe Identity verification completed and persisted to server", category: .general)
+        } else {
+            Logger.shared.warning("Stripe Identity verification not completed: \(result.failureReason ?? "Unknown")", category: .general)
+        }
+
+        return result
+    }
+
+    /// Persist Stripe Identity verification to Firestore
+    private func persistStripeIdentityVerification(userId: String, sessionId: String) async throws {
+        let updateData: [String: Any] = [
+            FirestoreFields.stripeIdentityVerified: true,
+            FirestoreFields.stripeIdentityVerifiedAt: FieldValue.serverTimestamp(),
+            FirestoreFields.stripeSessionId: sessionId,
+            FirestoreFields.idVerified: true,  // Set legacy flag for compatibility
+            FirestoreFields.idVerifiedAt: FieldValue.serverTimestamp(),
+            FirestoreFields.verificationMethods: FieldValue.arrayUnion(["stripe_identity"])
+        ]
+
+        try await db.collection("users").document(userId).updateData(updateData)
+
+        // Update the main isVerified field based on new status
+        try await updateServerVerificationStatus(userId: userId)
+
+        Logger.shared.info("Stripe Identity verification persisted to Firestore", category: .general)
+    }
+
+    /// Check if user has completed Stripe Identity verification
+    var isStripeIdentityVerified: Bool {
+        return stripeIdentityVerified
+    }
+
+    /// Check if user has any form of ID verification (Stripe or legacy)
+    var hasIDVerification: Bool {
+        return stripeIdentityVerified || idVerified
     }
 
     // MARK: - Background Check
@@ -247,9 +325,15 @@ class VerificationService: ObservableObject {
     // MARK: - Verification Status
 
     private func updateVerificationStatus() {
-        if photoVerified && idVerified && backgroundCheckCompleted {
+        // Check for any form of ID verification (Stripe Identity preferred, legacy as fallback)
+        let hasIDVerification = stripeIdentityVerified || idVerified
+
+        if photoVerified && hasIDVerification && backgroundCheckCompleted {
             verificationStatus = .fullyVerified
-        } else if photoVerified && idVerified {
+        } else if photoVerified && hasIDVerification {
+            verificationStatus = .verified
+        } else if stripeIdentityVerified {
+            // Stripe Identity alone grants verified status (more trusted than photo)
             verificationStatus = .verified
         } else if photoVerified {
             verificationStatus = .photoVerified
@@ -268,17 +352,25 @@ class VerificationService: ObservableObject {
         let data = doc.data() ?? [:]
 
         let serverPhotoVerified = data[FirestoreFields.photoVerified] as? Bool ?? false
+        let serverStripeIdentityVerified = data[FirestoreFields.stripeIdentityVerified] as? Bool ?? false
         let serverIdVerified = data[FirestoreFields.idVerified] as? Bool ?? false
         let serverBackgroundCheck = data[FirestoreFields.backgroundCheckCompleted] as? Bool ?? false
+
+        // Check for any form of ID verification (Stripe Identity preferred)
+        let hasIDVerification = serverStripeIdentityVerified || serverIdVerified
 
         // Calculate verification status
         let newStatus: VerificationStatus
         let isVerified: Bool
 
-        if serverPhotoVerified && serverIdVerified && serverBackgroundCheck {
+        if serverPhotoVerified && hasIDVerification && serverBackgroundCheck {
             newStatus = .fullyVerified
             isVerified = true
-        } else if serverPhotoVerified && serverIdVerified {
+        } else if serverPhotoVerified && hasIDVerification {
+            newStatus = .verified
+            isVerified = true
+        } else if serverStripeIdentityVerified {
+            // Stripe Identity alone grants verified status (more trusted than photo-only)
             newStatus = .verified
             isVerified = true
         } else if serverPhotoVerified {
@@ -291,8 +383,9 @@ class VerificationService: ObservableObject {
 
         // Calculate trust score
         var score = 20 // Base score
-        if serverPhotoVerified { score += 30 }
-        if serverIdVerified { score += 30 }
+        if serverPhotoVerified { score += 25 }
+        if serverStripeIdentityVerified { score += 35 }  // Stripe Identity worth more (more reliable)
+        else if serverIdVerified { score += 30 }  // Legacy ID verification
         if serverBackgroundCheck { score += 20 }
         let newTrustScore = min(100, score)
 
@@ -316,12 +409,14 @@ class VerificationService: ObservableObject {
 
         // Photo verification
         if photoVerified {
-            score += 30
+            score += 25
         }
 
-        // ID verification
-        if idVerified {
-            score += 30
+        // ID verification (Stripe Identity is worth more than legacy)
+        if stripeIdentityVerified {
+            score += 35  // Stripe Identity is more reliable
+        } else if idVerified {
+            score += 30  // Legacy on-device verification
         }
 
         // Background check
@@ -367,6 +462,7 @@ class VerificationService: ObservableObject {
 
             // SECURITY: Server values override local cache
             let serverPhotoVerified = data[FirestoreFields.photoVerified] as? Bool ?? false
+            let serverStripeIdentityVerified = data[FirestoreFields.stripeIdentityVerified] as? Bool ?? false
             let serverIdVerified = data[FirestoreFields.idVerified] as? Bool ?? false
             let serverBackgroundCheck = data[FirestoreFields.backgroundCheckCompleted] as? Bool ?? false
             let serverTrustScore = data[FirestoreFields.trustScore] as? Int ?? 0
@@ -374,6 +470,9 @@ class VerificationService: ObservableObject {
             // Check for client-side spoofing attempt
             if photoVerified && !serverPhotoVerified {
                 Logger.shared.warning("SECURITY: Client claimed photoVerified=true but server says false. Reverting.", category: .security)
+            }
+            if stripeIdentityVerified && !serverStripeIdentityVerified {
+                Logger.shared.warning("SECURITY: Client claimed stripeIdentityVerified=true but server says false. Reverting.", category: .security)
             }
             if idVerified && !serverIdVerified {
                 Logger.shared.warning("SECURITY: Client claimed idVerified=true but server says false. Reverting.", category: .security)
@@ -384,6 +483,7 @@ class VerificationService: ObservableObject {
 
             // Update local state from server
             photoVerified = serverPhotoVerified
+            stripeIdentityVerified = serverStripeIdentityVerified
             idVerified = serverIdVerified
             backgroundCheckCompleted = serverBackgroundCheck
             trustScore = serverTrustScore
@@ -408,6 +508,7 @@ class VerificationService: ObservableObject {
     /// SECURITY: This is only a cache - server is authoritative
     private func loadCachedStatus() {
         photoVerified = defaults.bool(forKey: CacheKeys.photoVerified)
+        stripeIdentityVerified = defaults.bool(forKey: CacheKeys.stripeIdentityVerified)
         idVerified = defaults.bool(forKey: CacheKeys.idVerified)
         backgroundCheckCompleted = defaults.bool(forKey: CacheKeys.backgroundCheckCompleted)
 
@@ -420,6 +521,7 @@ class VerificationService: ObservableObject {
     /// Update local cache to match current state
     private func updateLocalCache() {
         defaults.set(photoVerified, forKey: CacheKeys.photoVerified)
+        defaults.set(stripeIdentityVerified, forKey: CacheKeys.stripeIdentityVerified)
         defaults.set(idVerified, forKey: CacheKeys.idVerified)
         defaults.set(backgroundCheckCompleted, forKey: CacheKeys.backgroundCheckCompleted)
         defaults.set(Date().timeIntervalSince1970, forKey: CacheKeys.lastSyncTimestamp)
@@ -428,6 +530,7 @@ class VerificationService: ObservableObject {
     /// Clear local cache (forces re-sync from server)
     func clearCache() {
         defaults.removeObject(forKey: CacheKeys.photoVerified)
+        defaults.removeObject(forKey: CacheKeys.stripeIdentityVerified)
         defaults.removeObject(forKey: CacheKeys.idVerified)
         defaults.removeObject(forKey: CacheKeys.backgroundCheckCompleted)
         defaults.removeObject(forKey: CacheKeys.lastSyncTimestamp)
@@ -449,6 +552,8 @@ class VerificationService: ObservableObject {
             // Reset on server first
             try await db.collection("users").document(userId).updateData([
                 FirestoreFields.photoVerified: false,
+                FirestoreFields.stripeIdentityVerified: false,
+                FirestoreFields.stripeSessionId: FieldValue.delete(),
                 FirestoreFields.idVerified: false,
                 FirestoreFields.backgroundCheckCompleted: false,
                 FirestoreFields.isVerified: false,
@@ -459,6 +564,7 @@ class VerificationService: ObservableObject {
 
             // Then reset local state
             photoVerified = false
+            stripeIdentityVerified = false
             idVerified = false
             backgroundCheckCompleted = false
             verificationStatus = .unverified
