@@ -192,6 +192,30 @@ class StripeIdentityManager: ObservableObject {
                     status: .processing,
                     failureReason: "Verification is being processed"
                 )
+
+            case .unverified:
+                verificationStatus = .unverified
+
+                Logger.shared.info("Stripe Identity verification not completed", category: .general)
+
+                return StripeIdentityResult(
+                    isVerified: false,
+                    sessionId: sessionData.sessionId,
+                    status: .unverified,
+                    failureReason: "Verification not completed"
+                )
+
+            case .unknown:
+                verificationStatus = .unknown
+
+                Logger.shared.warning("Stripe Identity verification returned unknown status", category: .general)
+
+                return StripeIdentityResult(
+                    isVerified: false,
+                    sessionId: sessionData.sessionId,
+                    status: .unknown,
+                    failureReason: "Unknown verification status"
+                )
             }
 
         } catch {
