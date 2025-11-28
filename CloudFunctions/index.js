@@ -1893,14 +1893,39 @@ exports.onPhotoUploaded = functions.storage.object().onFinalize(async (object) =
       reason: moderationResult.reason
     });
 
-    // Extract userId from path (e.g., "verification/{userId}/id_photo.jpg" or "photos/{userId}/...")
+    // Extract userId from path
+    // Supported paths:
+    // - verification/{userId}/... - ID verification photos
+    // - profile_images/{userId}/... - Profile photos
+    // - gallery_photos/{userId}/... - Gallery photos
+    // - chat_images/{matchId}/... - Chat images (matchId, not userId)
+    // - photos/{userId}/... - Generic photos
+    // - profile-photos/{userId}/... - Alternative profile photos
+    // - user-photos/{userId}/... - User photos
     const pathParts = filePath.split('/');
     let userId = null;
+    let photoType = 'unknown';
 
     if (pathParts.length >= 2) {
-      // Common patterns: verification/{userId}/..., photos/{userId}/..., profile-photos/{userId}/...
-      if (['verification', 'photos', 'profile-photos', 'user-photos'].includes(pathParts[0])) {
+      const folderName = pathParts[0];
+
+      // Map folder to photo type and extract userId
+      const userIdFolders = [
+        'verification', 'profile_images', 'gallery_photos',
+        'photos', 'profile-photos', 'user-photos'
+      ];
+
+      if (userIdFolders.includes(folderName)) {
         userId = pathParts[1];
+        photoType = folderName;
+      } else if (folderName === 'chat_images') {
+        // Chat images use matchId - we'll still moderate but can't link to specific user
+        photoType = 'chat';
+        // Try to extract userId from metadata if available
+      } else if (folderName === 'temp-moderation') {
+        // Skip temp files used for pre-checking
+        functions.logger.info('Skipping temp moderation file', { filePath });
+        return null;
       }
     }
 
@@ -1908,6 +1933,7 @@ exports.onPhotoUploaded = functions.storage.object().onFinalize(async (object) =
     await db.collection('moderation_logs').add({
       filePath,
       userId: userId || 'unknown',
+      photoType,
       result: moderationResult,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
       fileSize: object.size,
@@ -1931,6 +1957,7 @@ exports.onPhotoUploaded = functions.storage.object().onFinalize(async (object) =
       await db.collection('flagged_content').add({
         userId: userId || 'unknown',
         contentType: 'photo',
+        photoType,
         filePath,
         reason: moderationResult.reason,
         severity: moderationResult.severity,
@@ -1940,44 +1967,86 @@ exports.onPhotoUploaded = functions.storage.object().onFinalize(async (object) =
         reviewed: false
       });
 
-      // If this was a verification photo, update the pending verification
-      if (filePath.includes('verification/') && userId) {
-        await db.collection('pendingVerifications').doc(userId).update({
-          status: 'rejected',
-          rejectionReason: 'Photo did not pass content moderation: ' + moderationResult.reason,
-          reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
-          reviewedBy: 'auto_moderation'
-        });
-
-        // Update user document with rejection
-        await db.collection('users').doc(userId).update({
-          idVerificationRejected: true,
-          idVerificationRejectedAt: admin.firestore.FieldValue.serverTimestamp(),
-          idVerificationRejectionReason: 'Photo content not appropriate. Please submit appropriate photos.'
-        });
-
-        functions.logger.info('Updated verification status to rejected', { userId });
-      }
-
-      // Send notification to user
+      // Handle rejection based on photo type
       if (userId) {
+        // Verification photos - update pending verification
+        if (photoType === 'verification') {
+          await db.collection('pendingVerifications').doc(userId).update({
+            status: 'rejected',
+            rejectionReason: 'Photo did not pass content moderation: ' + moderationResult.reason,
+            reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+            reviewedBy: 'auto_moderation'
+          });
+
+          await db.collection('users').doc(userId).update({
+            idVerificationRejected: true,
+            idVerificationRejectedAt: admin.firestore.FieldValue.serverTimestamp(),
+            idVerificationRejectionReason: 'Photo content not appropriate. Please submit appropriate photos.'
+          });
+
+          functions.logger.info('Updated verification status to rejected', { userId });
+        }
+
+        // Profile photos - flag user for review if severe
+        if (photoType === 'profile_images' && moderationResult.severity === 'high') {
+          await db.collection('users').doc(userId).update({
+            profileFlagged: true,
+            profileFlaggedAt: admin.firestore.FieldValue.serverTimestamp(),
+            profileFlagReason: 'Inappropriate profile photo uploaded'
+          });
+
+          // Add to moderation queue for admin review
+          await db.collection('moderationQueue').add({
+            userId,
+            type: 'inappropriate_profile_photo',
+            reason: moderationResult.reason,
+            severity: moderationResult.severity,
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            status: 'pending'
+          });
+
+          functions.logger.info('User profile flagged for review', { userId });
+        }
+
+        // Gallery photos - similar handling
+        if (photoType === 'gallery_photos' && moderationResult.severity === 'high') {
+          await db.collection('moderationQueue').add({
+            userId,
+            type: 'inappropriate_gallery_photo',
+            reason: moderationResult.reason,
+            severity: moderationResult.severity,
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            status: 'pending'
+          });
+        }
+
+        // Send notification to user
+        let notificationMessage = 'Your photo was not accepted because it does not meet our community guidelines.';
+        if (photoType === 'profile_images' || photoType === 'gallery_photos') {
+          notificationMessage = 'Your profile photo was not accepted. Please upload appropriate photos that show your face clearly and follow our community guidelines.';
+        } else if (photoType === 'chat') {
+          notificationMessage = 'Your image was not sent because it does not meet our community guidelines.';
+        }
+
         await db.collection('notifications').add({
           userId,
           type: 'photo_rejected',
           title: 'Photo Not Accepted',
-          message: 'Your photo was not accepted because it does not meet our community guidelines. Please upload an appropriate photo.',
+          message: notificationMessage,
+          photoType,
           timestamp: admin.firestore.FieldValue.serverTimestamp(),
           read: false,
           data: {
             reason: moderationResult.reason,
-            severity: moderationResult.severity
+            severity: moderationResult.severity,
+            photoType
           }
         });
       }
 
-      // If high severity, warn the user
+      // If high severity, warn the user (increases warning count)
       if (moderationResult.severity === 'high' && userId) {
-        await warnUser(userId, `Inappropriate photo upload: ${moderationResult.reason}`);
+        await warnUser(userId, `Inappropriate ${photoType} photo upload: ${moderationResult.reason}`);
       }
 
       return { approved: false, reason: moderationResult.reason };
