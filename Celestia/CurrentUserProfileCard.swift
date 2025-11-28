@@ -25,8 +25,7 @@ struct CurrentUserProfileCard: View {
             // Profile Image with badge
             ZStack(alignment: .topTrailing) {
                 CachedCardImage(url: URL(string: displayPhotoURL))
-                    .frame(height: 400)
-                    .clipped()
+                    .frame(maxWidth: .infinity, maxHeight: 400)
                     .cornerRadius(16, corners: [.topLeft, .topRight])
 
                 // "Your Profile" badge

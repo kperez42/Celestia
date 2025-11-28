@@ -2159,6 +2159,8 @@ struct PhotoGridItem: View {
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)
+                        .frame(maxWidth: .infinity)
+                        .clipped()
                 },
                 placeholder: {
                     Rectangle()
