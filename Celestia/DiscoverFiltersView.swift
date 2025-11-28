@@ -488,7 +488,7 @@ struct DiscoverFiltersView: View {
 
             FlowLayout(spacing: 8) {
                 ForEach(commonInterests, id: \.self) { interest in
-                    FilterChip(
+                    SelectableFilterChip(
                         title: interest,
                         isSelected: filters.selectedInterests.contains(interest)
                     ) {
@@ -522,7 +522,7 @@ struct DiscoverFiltersView: View {
 
             FlowLayout(spacing: 8) {
                 ForEach(educationOptions, id: \.self) { option in
-                    FilterChip(
+                    SelectableFilterChip(
                         title: option,
                         isSelected: filters.educationLevels.contains(option)
                     ) {
@@ -615,7 +615,7 @@ struct DiscoverFiltersView: View {
 
             FlowLayout(spacing: 8) {
                 ForEach(religionOptions, id: \.self) { option in
-                    FilterChip(
+                    SelectableFilterChip(
                         title: option,
                         isSelected: filters.religions.contains(option)
                     ) {
@@ -649,7 +649,7 @@ struct DiscoverFiltersView: View {
 
             FlowLayout(spacing: 8) {
                 ForEach(relationshipGoalOptions, id: \.self) { option in
-                    FilterChip(
+                    SelectableFilterChip(
                         title: option,
                         isSelected: filters.relationshipGoals.contains(option)
                     ) {
@@ -687,7 +687,7 @@ struct DiscoverFiltersView: View {
 
             FlowLayout(spacing: 8) {
                 ForEach(options, id: \.self) { option in
-                    FilterChip(
+                    SelectableFilterChip(
                         title: option,
                         isSelected: selected.wrappedValue.contains(option)
                     ) {
@@ -851,9 +851,9 @@ struct QuickFilterChip: View {
     }
 }
 
-// MARK: - Filter Chip
+// MARK: - Selectable Filter Chip
 
-struct FilterChip: View {
+struct SelectableFilterChip: View {
     let title: String
     let isSelected: Bool
     let action: () -> Void
@@ -892,7 +892,7 @@ struct InterestChip: View {
     let action: () -> Void
 
     var body: some View {
-        FilterChip(title: interest, isSelected: isSelected, action: action)
+        SelectableFilterChip(title: interest, isSelected: isSelected, action: action)
     }
 }
 
