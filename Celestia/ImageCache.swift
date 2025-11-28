@@ -954,31 +954,17 @@ struct CachedCardImage: View {
 
     var body: some View {
         Group {
-            ZStack {
-                // SMOOTH TRANSITION: Show previous image during crossfade
-                if let previousImage = previousImage {
-                    Image(uiImage: previousImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .opacity(previousImageOpacity)
-                }
-
-                if let image = image {
-                    Image(uiImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .opacity(imageOpacity)
-                        .onAppear {
-                            // Smooth fade-in for newly loaded images
-                            if imageOpacity < 1.0 {
-                                withAnimation(.easeOut(duration: 0.2)) {
-                                    imageOpacity = 1.0
-                                    previousImageOpacity = 0
-                                }
-                                // Clean up previous image after animation
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                                    self.previousImage = nil
-                                }
+            if let image = image {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .clipped()
+                    .opacity(imageOpacity)
+                    .onAppear {
+                        // Smooth fade-in for newly loaded images
+                        if imageOpacity < 1.0 {
+                            withAnimation(.easeOut(duration: 0.15)) {
+                                imageOpacity = 1.0
                             }
                         }
                 }
