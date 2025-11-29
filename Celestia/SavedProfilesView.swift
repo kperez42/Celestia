@@ -33,7 +33,10 @@ struct SavedProfilesView: View {
                 Color(.systemGroupedBackground)
                     .ignoresSafeArea()
 
-                if viewModel.isLoading {
+                // PERFORMANCE: Only show loading skeleton on first load when we have no cached data
+                // If cached data exists, show it instantly while refresh happens in background
+                let hasAnyData = !viewModel.savedProfiles.isEmpty || !viewModel.viewedProfiles.isEmpty || !viewModel.savedYouProfiles.isEmpty
+                if viewModel.isLoading && !hasAnyData {
                     loadingView
                 } else if !viewModel.errorMessage.isEmpty {
                     errorStateView

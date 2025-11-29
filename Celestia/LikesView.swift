@@ -57,20 +57,17 @@ struct LikesView: View {
             .navigationTitle("")
             .navigationBarHidden(true)
             .task {
+                // PERFORMANCE: Initial load with cache check
                 await viewModel.loadAllLikes()
             }
             .onAppear {
-                // Refresh data when tab becomes visible, but only if not currently loading
-                // LazyTabContent caches views, so we need this for tab switches
-                if !viewModel.isLoading {
-                    Task {
-                        await viewModel.loadAllLikes()
-                    }
-                }
+                // PERFORMANCE: Skip reload if cache is still fresh (within 2 minutes)
+                // This prevents the glitchy loading state on tab switches
+                // Users can still pull-to-refresh for fresh data
             }
             .refreshable {
                 HapticManager.shared.impact(.light)
-                await viewModel.loadAllLikes()
+                await viewModel.loadAllLikes(forceRefresh: true)
                 HapticManager.shared.notification(.success)
             }
             .sheet(item: $selectedUserForDetail) { user in
@@ -665,12 +662,33 @@ class LikesViewModel: ObservableObject {
     private let db = Firestore.firestore()
     private var matchesCache: [String: Match] = [:]
 
+    // PERFORMANCE: Cache management to prevent reloads on every tab switch
+    private var lastFetchTime: Date?
+    private let cacheDuration: TimeInterval = 120 // 2 minutes cache
+
     var totalLikesReceived: Int { usersWhoLikedMe.count }
     var totalLikesSent: Int { usersILiked.count }
 
-    func loadAllLikes() async {
-        isLoading = true
-        defer { isLoading = false }
+    func loadAllLikes(forceRefresh: Bool = false) async {
+        // PERFORMANCE: Check cache first - skip fetch if we have recent data
+        if !forceRefresh,
+           let lastFetch = lastFetchTime,
+           !usersWhoLikedMe.isEmpty || !usersILiked.isEmpty,
+           Date().timeIntervalSince(lastFetch) < cacheDuration {
+            Logger.shared.debug("LikesView cache HIT - using cached data", category: .performance)
+            return // Use cached data - instant display
+        }
+
+        // Only show loading skeleton if we have no cached data
+        let shouldShowLoading = usersWhoLikedMe.isEmpty && usersILiked.isEmpty
+        if shouldShowLoading {
+            isLoading = true
+        }
+        defer {
+            if shouldShowLoading {
+                isLoading = false
+            }
+        }
 
         guard let currentUserId = AuthService.shared.currentUser?.effectiveId else {
             return
@@ -698,9 +716,11 @@ class LikesViewModel: ObservableObject {
                 self.usersWhoLikedMe = likesReceivedUsers
                 self.usersILiked = likesSentUsers
                 self.mutualLikes = mutualUsers
+                // PERFORMANCE: Update cache timestamp after successful fetch
+                self.lastFetchTime = Date()
             }
 
-            Logger.shared.info("Loaded likes - Received: \(likesReceivedUsers.count), Sent: \(likesSentUsers.count), Mutual: \(mutualUsers.count)", category: .matching)
+            Logger.shared.info("Loaded likes - Received: \(likesReceivedUsers.count), Sent: \(likesSentUsers.count), Mutual: \(mutualUsers.count) - cached for 2 min", category: .matching)
 
             // PERFORMANCE: Eagerly prefetch images for all loaded likes
             // This ensures images are cached when users tap cards
