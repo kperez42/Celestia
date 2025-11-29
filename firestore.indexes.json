@@ -325,26 +325,6 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "referralStats.totalReferrals",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "users",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "referralStats.referralCode",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "users",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
           "fieldPath": "showMeInSearch",
           "order": "ASCENDING"
         },
@@ -615,16 +595,6 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "timestamp",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "admin_audit_logs",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
           "fieldPath": "adminId",
           "order": "ASCENDING"
         },
@@ -726,16 +696,6 @@
           "fieldPath": "acknowledged",
           "order": "ASCENDING"
         },
-        {
-          "fieldPath": "timestamp",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "refund_history",
-      "queryScope": "COLLECTION",
-      "fields": [
         {
           "fieldPath": "timestamp",
           "order": "DESCENDING"
@@ -946,16 +906,6 @@
       ]
     },
     {
-      "collectionGroup": "purchases",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "transactionId",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
       "collectionGroup": "fraud_logs",
       "queryScope": "COLLECTION",
       "fields": [
@@ -1034,16 +984,6 @@
         {
           "fieldPath": "timestamp",
           "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "users",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "deviceFingerprint",
-          "order": "ASCENDING"
         }
       ]
     },

@@ -403,6 +403,140 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && isAdmin();
     }
 
+    // Moderation Queue Collection (admin dashboard)
+    match /moderation_queue/{itemId} {
+      // Admin helper function for moderation collections
+      function isModerator() {
+        return request.auth.token.email in ['perezkevin640@gmail.com', 'admin@celestia.app'];
+      }
+
+      // Only admin can read moderation queue
+      allow read: if isAuthenticated() && isModerator();
+
+      // Only admin can create/update/delete
+      allow create, update, delete: if isAuthenticated() && isModerator();
+    }
+
+    // Flagged Content Collection (content moderation)
+    match /flagged_content/{contentId} {
+      function isModerator() {
+        return request.auth.token.email in ['perezkevin640@gmail.com', 'admin@celestia.app'];
+      }
+
+      allow read: if isAuthenticated() && isModerator();
+      allow create, update, delete: if isAuthenticated() && isModerator();
+    }
+
+    // User Warnings Collection
+    match /user_warnings/{warningId} {
+      function isModerator() {
+        return request.auth.token.email in ['perezkevin640@gmail.com', 'admin@celestia.app'];
+      }
+
+      // Users can read their own warnings, admin can read all
+      allow read: if isAuthenticated()
+        && (resource.data.userId == request.auth.uid || isModerator());
+
+      // Only admin can create/update/delete warnings
+      allow create, update, delete: if isAuthenticated() && isModerator();
+    }
+
+    // Admin Audit Logs Collection
+    match /admin_audit_logs/{logId} {
+      function isModerator() {
+        return request.auth.token.email in ['perezkevin640@gmail.com', 'admin@celestia.app'];
+      }
+
+      // Only admin can read audit logs
+      allow read: if isAuthenticated() && isModerator();
+
+      // System creates logs
+      allow create: if isAuthenticated() && isModerator();
+
+      // No updates or deletes on audit logs
+      allow update, delete: if false;
+    }
+
+    // Admin Alerts Collection
+    match /admin_alerts/{alertId} {
+      function isModerator() {
+        return request.auth.token.email in ['perezkevin640@gmail.com', 'admin@celestia.app'];
+      }
+
+      allow read: if isAuthenticated() && isModerator();
+      allow create, update: if isAuthenticated() && isModerator();
+      allow delete: if false;
+    }
+
+    // Fraud Logs Collection
+    match /fraud_logs/{logId} {
+      function isModerator() {
+        return request.auth.token.email in ['perezkevin640@gmail.com', 'admin@celestia.app'];
+      }
+
+      allow read: if isAuthenticated() && isModerator();
+      allow create: if isAuthenticated();
+      allow update, delete: if false;
+    }
+
+    // Flagged Transactions Collection
+    match /flagged_transactions/{transactionId} {
+      function isModerator() {
+        return request.auth.token.email in ['perezkevin640@gmail.com', 'admin@celestia.app'];
+      }
+
+      allow read: if isAuthenticated() && isModerator();
+      allow create, update: if isAuthenticated() && isModerator();
+      allow delete: if false;
+    }
+
+    // Security Logs Collection
+    match /security_logs/{logId} {
+      function isModerator() {
+        return request.auth.token.email in ['perezkevin640@gmail.com', 'admin@celestia.app'];
+      }
+
+      allow read: if isAuthenticated() && isModerator();
+      allow create: if isAuthenticated();
+      allow update, delete: if false;
+    }
+
+    // Purchases Collection
+    match /purchases/{purchaseId} {
+      function isModerator() {
+        return request.auth.token.email in ['perezkevin640@gmail.com', 'admin@celestia.app'];
+      }
+
+      // Users can read their own purchases, admin can read all
+      allow read: if isAuthenticated()
+        && (resource.data.userId == request.auth.uid || isModerator());
+
+      // System creates purchases
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid;
+
+      // Admin can update (for refunds)
+      allow update: if isAuthenticated() && isModerator();
+
+      // No deletes
+      allow delete: if false;
+    }
+
+    // Refund History Collection
+    match /refund_history/{refundId} {
+      function isModerator() {
+        return request.auth.token.email in ['perezkevin640@gmail.com', 'admin@celestia.app'];
+      }
+
+      // Users can read their own refunds, admin can read all
+      allow read: if isAuthenticated()
+        && (resource.data.userId == request.auth.uid || isModerator());
+
+      // Only admin can create/update refunds
+      allow create, update: if isAuthenticated() && isModerator();
+      allow delete: if false;
+    }
+
     // Default: Deny all other access
     match /{document=**} {
       allow read, write: if false;
