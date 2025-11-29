@@ -16,6 +16,8 @@ enum LegalDocumentType: String, CaseIterable {
     case communityGuidelines = "Community Guidelines"
     case safetyTips = "Dating Safety Tips"
     case cookiePolicy = "Cookie & Data Policy"
+    case eula = "End User License Agreement"
+    case accessibility = "Accessibility Statement"
 
     var icon: String {
         switch self {
@@ -24,6 +26,8 @@ enum LegalDocumentType: String, CaseIterable {
         case .communityGuidelines: return "person.3.fill"
         case .safetyTips: return "shield.checkered"
         case .cookiePolicy: return "server.rack"
+        case .eula: return "doc.badge.gearshape"
+        case .accessibility: return "accessibility"
         }
     }
 
@@ -34,6 +38,8 @@ enum LegalDocumentType: String, CaseIterable {
         case .communityGuidelines: return .green
         case .safetyTips: return .orange
         case .cookiePolicy: return .gray
+        case .eula: return .indigo
+        case .accessibility: return .teal
         }
     }
 
@@ -102,6 +108,10 @@ struct LegalDocumentView: View {
             safetyTipsContent
         case .cookiePolicy:
             cookiePolicyContent
+        case .eula:
+            eulaContent
+        case .accessibility:
+            accessibilityContent
         }
     }
 }
@@ -188,7 +198,88 @@ extension LegalDocumentView {
             }
 
             LegalSection(title: "International Data Transfers") {
-                Text("Your information may be transferred to and processed in countries other than your own. We ensure appropriate safeguards are in place for such transfers in compliance with applicable data protection laws.")
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Your information may be transferred to and processed in countries other than your own, including the United States. We ensure appropriate safeguards are in place for such transfers, including:")
+                        .font(.subheadline)
+                    BulletPoint("Standard Contractual Clauses (SCCs) approved by the European Commission")
+                    BulletPoint("Data Processing Agreements with all third-party processors")
+                    BulletPoint("Encryption of data in transit and at rest")
+                    BulletPoint("Compliance with EU-US Data Privacy Framework where applicable")
+                }
+            }
+
+            LegalSection(title: "Legal Bases for Processing (GDPR)") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("We process your personal data under the following legal bases:")
+                        .font(.subheadline)
+                    BulletPoint("Contract: To provide our dating services as agreed in our Terms of Service")
+                    BulletPoint("Consent: For marketing communications and optional features")
+                    BulletPoint("Legitimate Interests: For fraud prevention, security, and service improvement")
+                    BulletPoint("Legal Obligation: To comply with applicable laws and regulations")
+                }
+            }
+
+            LegalSection(title: "Data Protection Officer") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("For GDPR-related inquiries, you may contact our Data Protection Officer:")
+                        .font(.subheadline)
+                    HStack {
+                        Image(systemName: "envelope")
+                            .foregroundColor(.blue)
+                        Text("dpo@celestia.app")
+                    }
+                    .font(.subheadline)
+                    Text("EU Representative: Available upon request for EU/EEA residents")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            LegalSection(title: "State-Specific Privacy Rights") {
+                VStack(alignment: .leading, spacing: 12) {
+                    LegalSubsection(title: "California (CCPA/CPRA)") {
+                        VStack(alignment: .leading, spacing: 4) {
+                            BulletPoint("Right to know what personal information is collected")
+                            BulletPoint("Right to delete personal information")
+                            BulletPoint("Right to opt-out of sale/sharing of personal information")
+                            BulletPoint("Right to correct inaccurate personal information")
+                            BulletPoint("Right to limit use of sensitive personal information")
+                            BulletPoint("Right to non-discrimination for exercising rights")
+                            Text("We do not sell or share your personal information for cross-context behavioral advertising.")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .padding(.top, 4)
+                        }
+                    }
+
+                    LegalSubsection(title: "Virginia (VCDPA)") {
+                        VStack(alignment: .leading, spacing: 4) {
+                            BulletPoint("Right to access, correct, and delete personal data")
+                            BulletPoint("Right to data portability")
+                            BulletPoint("Right to opt-out of targeted advertising and profiling")
+                        }
+                    }
+
+                    LegalSubsection(title: "Colorado (CPA), Connecticut (CTDPA), Utah (UCPA)") {
+                        Text("Residents of these states have similar rights to access, delete, correct, and opt-out of certain data processing. Contact privacy@celestia.app to exercise your rights.")
+                            .font(.caption)
+                    }
+                }
+            }
+
+            LegalSection(title: "Data Breach Notification") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("In the event of a data breach affecting your personal information, we will:")
+                        .font(.subheadline)
+                    BulletPoint("Notify affected users within 72 hours of discovery (as required by GDPR)")
+                    BulletPoint("Notify relevant supervisory authorities as required by law")
+                    BulletPoint("Provide information about the breach and steps you can take")
+                    BulletPoint("Offer appropriate remediation such as credit monitoring if applicable")
+                }
+            }
+
+            LegalSection(title: "Automated Decision-Making") {
+                Text("We may use automated systems to help detect fraud, enforce our policies, and improve matching algorithms. You have the right to request human review of decisions that significantly affect you. Matching suggestions are based on your stated preferences and are not final decisions about your eligibility for any service.")
             }
 
             LegalSection(title: "Changes to This Policy") {
@@ -275,14 +366,71 @@ extension LegalDocumentView {
                 }
             }
 
-            LegalSection(title: "Premium Services") {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Celestia offers premium subscription features:")
+            LegalSection(title: "Premium Services & Subscriptions") {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Celestia offers premium subscription features. By purchasing a subscription, you agree to the following:")
                         .font(.subheadline)
-                    BulletPoint("Subscriptions are billed through Apple's App Store")
-                    BulletPoint("Subscriptions auto-renew unless cancelled 24 hours before the end of the current period")
-                    BulletPoint("Refunds are subject to Apple's refund policy")
-                    BulletPoint("Premium features may change with notice")
+
+                    LegalSubsection(title: "Billing & Payment") {
+                        VStack(alignment: .leading, spacing: 4) {
+                            BulletPoint("Payment is charged to your Apple ID account at confirmation of purchase")
+                            BulletPoint("Prices are in US dollars unless otherwise stated")
+                            BulletPoint("Prices may vary by location and are subject to change")
+                        }
+                    }
+
+                    LegalSubsection(title: "Auto-Renewal Terms") {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("YOUR SUBSCRIPTION WILL AUTOMATICALLY RENEW UNLESS AUTO-RENEW IS TURNED OFF AT LEAST 24 HOURS BEFORE THE END OF THE CURRENT BILLING PERIOD.")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.red)
+                            BulletPoint("Your account will be charged for renewal within 24 hours prior to the end of the current period")
+                            BulletPoint("The renewal charge will be the same as the initial subscription price unless you are notified of a price change")
+                        }
+                    }
+
+                    LegalSubsection(title: "Managing Subscriptions") {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("You may manage or cancel your subscription at any time through your Apple ID account settings:")
+                                .font(.caption)
+                            BulletPoint("Go to Settings > [Your Name] > Subscriptions on your iOS device")
+                            BulletPoint("Select Celestia and choose Cancel Subscription")
+                            BulletPoint("Cancellation takes effect at the end of the current billing period")
+                        }
+                    }
+
+                    LegalSubsection(title: "Refund Policy") {
+                        VStack(alignment: .leading, spacing: 4) {
+                            BulletPoint("Refunds are subject to Apple's refund policy")
+                            BulletPoint("No refunds for partial subscription periods")
+                            BulletPoint("Request refunds through Apple at reportaproblem.apple.com")
+                            Text("Deleting the app does not cancel your subscription.")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.orange)
+                        }
+                    }
+
+                    LegalSubsection(title: "Free Trials") {
+                        VStack(alignment: .leading, spacing: 4) {
+                            BulletPoint("Free trials automatically convert to paid subscriptions")
+                            BulletPoint("Cancel before the trial ends to avoid charges")
+                            BulletPoint("Unused portion of free trial is forfeited upon subscription purchase")
+                        }
+                    }
+                }
+            }
+
+            LegalSection(title: "Virtual Items & Consumables") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Celestia may offer virtual items (such as Super Likes or Boosts) for purchase:")
+                        .font(.subheadline)
+                    BulletPoint("Virtual items have no cash value and cannot be exchanged for cash")
+                    BulletPoint("Virtual items are non-refundable and non-transferable")
+                    BulletPoint("Virtual items may expire or be modified at our discretion")
+                    BulletPoint("Unused virtual items are forfeited upon account termination")
+                    BulletPoint("We reserve the right to modify virtual item pricing and availability")
                 }
             }
 
@@ -347,12 +495,83 @@ extension LegalDocumentView {
                     .font(.caption)
             }
 
-            LegalSection(title: "Dispute Resolution") {
-                Text("Any disputes arising from these terms or your use of Celestia shall be resolved through binding arbitration in accordance with applicable arbitration rules. You agree to waive any right to a jury trial or to participate in a class action lawsuit.")
+            LegalSection(title: "Binding Arbitration Agreement") {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("PLEASE READ THIS SECTION CAREFULLY. IT AFFECTS YOUR LEGAL RIGHTS.")
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundColor(.red)
+
+                    Text("You and Celestia agree that any dispute, claim, or controversy arising out of or relating to these Terms or your use of the Service shall be resolved exclusively through final and binding arbitration, rather than in court.")
+                        .font(.caption)
+
+                    LegalSubsection(title: "Arbitration Rules") {
+                        VStack(alignment: .leading, spacing: 4) {
+                            BulletPoint("Arbitration shall be administered by the American Arbitration Association (AAA) under its Consumer Arbitration Rules")
+                            BulletPoint("The arbitration will be conducted in the English language")
+                            BulletPoint("The arbitrator's decision shall be final and binding")
+                            BulletPoint("Judgment on the award may be entered in any court of competent jurisdiction")
+                        }
+                    }
+
+                    LegalSubsection(title: "Arbitration Fees") {
+                        Text("For claims under $10,000, Celestia will reimburse your filing fees and pay the arbitrator's fees. For claims above $10,000, fees will be allocated according to AAA rules.")
+                            .font(.caption)
+                    }
+
+                    LegalSubsection(title: "Opt-Out Right") {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("You may opt out of this arbitration agreement within 30 days of creating your account by sending written notice to:")
+                                .font(.caption)
+                            Text("legal@celestia.app")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                            Text("Include your name, email, and a statement that you wish to opt out of the arbitration agreement.")
+                                .font(.caption)
+                        }
+                    }
+
+                    LegalSubsection(title: "Exceptions") {
+                        Text("Either party may bring claims in small claims court if eligible. Either party may seek injunctive relief in court for intellectual property infringement or unauthorized access to the Service.")
+                            .font(.caption)
+                    }
+                }
             }
 
-            LegalSection(title: "Governing Law") {
-                Text("These Terms shall be governed by and construed in accordance with the laws of the United States, without regard to conflict of law principles.")
+            LegalSection(title: "Class Action Waiver") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("YOU AND CELESTIA AGREE THAT EACH MAY BRING CLAIMS AGAINST THE OTHER ONLY IN YOUR OR ITS INDIVIDUAL CAPACITY AND NOT AS A PLAINTIFF OR CLASS MEMBER IN ANY PURPORTED CLASS, CONSOLIDATED, OR REPRESENTATIVE ACTION.")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+
+                    Text("The arbitrator may not consolidate more than one person's claims and may not preside over any form of representative or class proceeding. If this class action waiver is found to be unenforceable, then the entirety of the arbitration agreement shall be null and void.")
+                        .font(.caption)
+                }
+            }
+
+            LegalSection(title: "Governing Law & Jurisdiction") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("These Terms shall be governed by and construed in accordance with the laws of the State of Delaware, United States, without regard to conflict of law principles.")
+                        .font(.subheadline)
+
+                    Text("For any disputes not subject to arbitration, you agree to submit to the exclusive jurisdiction of the state and federal courts located in Delaware.")
+                        .font(.caption)
+                }
+            }
+
+            LegalSection(title: "Electronic Communications Consent") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("By creating an account, you consent to receive electronic communications from us, including:")
+                        .font(.subheadline)
+                    BulletPoint("Account notifications and security alerts")
+                    BulletPoint("Service updates and policy changes")
+                    BulletPoint("Match notifications and messages from other users")
+                    BulletPoint("Marketing communications (which you may opt out of)")
+
+                    Text("These electronic communications satisfy any legal requirement that communications be in writing. You may withdraw consent by deleting your account.")
+                        .font(.caption)
+                        .padding(.top, 4)
+                }
             }
 
             LegalSection(title: "Changes to Terms") {
@@ -382,6 +601,40 @@ extension LegalDocumentView {
 
             LegalSection(title: "No Waiver") {
                 Text("Our failure to enforce any right or provision of these Terms shall not constitute a waiver of such right or provision. Any waiver must be in writing and signed by an authorized representative of Celestia.")
+            }
+
+            LegalSection(title: "Force Majeure") {
+                Text("Celestia shall not be liable for any failure or delay in performance resulting from causes beyond our reasonable control, including but not limited to: acts of God, natural disasters, pandemic, war, terrorism, riots, embargoes, acts of civil or military authorities, fire, floods, accidents, strikes, labor disputes, equipment failures, internet or telecommunications failures, or actions of third-party service providers.")
+                    .font(.caption)
+            }
+
+            LegalSection(title: "Third-Party Services") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Celestia may contain links to or integrate with third-party services. We are not responsible for:")
+                        .font(.subheadline)
+                    BulletPoint("The content, accuracy, or practices of third-party websites or services")
+                    BulletPoint("Any damages arising from your use of third-party services")
+                    BulletPoint("The privacy practices of third parties")
+
+                    Text("Your use of third-party services is governed by their respective terms and privacy policies.")
+                        .font(.caption)
+                        .padding(.top, 4)
+                }
+            }
+
+            LegalSection(title: "Export Controls") {
+                Text("You agree to comply with all applicable export and import laws and regulations. You represent that you are not located in, under the control of, or a national or resident of any country subject to US trade sanctions, and you are not on any government restricted party list.")
+                    .font(.caption)
+            }
+
+            LegalSection(title: "Assignment") {
+                Text("You may not assign or transfer these Terms or your rights hereunder without our prior written consent. Celestia may assign these Terms without restriction. Subject to the foregoing, these Terms will bind and inure to the benefit of the parties and their successors and assigns.")
+                    .font(.caption)
+            }
+
+            LegalSection(title: "Survival") {
+                Text("Sections relating to intellectual property, disclaimers, limitation of liability, indemnification, arbitration, and any other provisions that by their nature should survive termination shall survive the termination of these Terms.")
+                    .font(.caption)
             }
 
             LegalSection(title: "Contact") {
@@ -866,6 +1119,306 @@ struct ResourceLink: View {
         .padding(12)
         .background(Color(.systemGray6))
         .cornerRadius(8)
+    }
+}
+
+// MARK: - EULA Content
+
+extension LegalDocumentView {
+    private var eulaContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            LegalSection(title: "End User License Agreement") {
+                Text("This End User License Agreement (\"EULA\") is a legal agreement between you and Celestia for the use of the Celestia mobile application. By installing or using Celestia, you agree to be bound by the terms of this EULA.")
+            }
+
+            LegalSection(title: "License Grant") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Subject to your compliance with this EULA, Celestia grants you a limited, non-exclusive, non-transferable, revocable license to:")
+                        .font(.subheadline)
+                    BulletPoint("Download and install the app on devices you own or control")
+                    BulletPoint("Use the app for personal, non-commercial purposes")
+                    BulletPoint("Access the features available to your account type")
+
+                    Text("This license does not allow you to use the app on any device you do not own or control, and you may not distribute or make the app available over a network.")
+                        .font(.caption)
+                        .padding(.top, 4)
+                }
+            }
+
+            LegalSection(title: "License Restrictions") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("You agree NOT to:")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                    BulletPoint("Copy, modify, or distribute the app or its content")
+                    BulletPoint("Reverse engineer, decompile, or disassemble the app")
+                    BulletPoint("Remove or alter any proprietary notices or labels")
+                    BulletPoint("Use the app for any illegal or unauthorized purpose")
+                    BulletPoint("Sublicense, rent, lease, or loan the app to third parties")
+                    BulletPoint("Use automated systems to access the app (bots, scrapers)")
+                    BulletPoint("Circumvent or disable security features")
+                }
+            }
+
+            LegalSection(title: "Intellectual Property Rights") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Celestia and its licensors own all intellectual property rights in the app, including:")
+                        .font(.subheadline)
+                    BulletPoint("Software code, algorithms, and architecture")
+                    BulletPoint("User interface design and visual elements")
+                    BulletPoint("Trademarks, logos, and brand identity")
+                    BulletPoint("Documentation and other materials")
+
+                    Text("All rights not expressly granted in this EULA are reserved by Celestia.")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .padding(.top, 4)
+                }
+            }
+
+            LegalSection(title: "Open Source Components") {
+                Text("Celestia may include open source software components subject to their respective licenses. A list of open source components and their licenses is available in the app settings. Open source licenses take precedence over this EULA for those specific components.")
+            }
+
+            LegalSection(title: "Updates and Modifications") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Celestia may release updates that modify the app's functionality:")
+                        .font(.subheadline)
+                    BulletPoint("Updates may be downloaded and installed automatically")
+                    BulletPoint("Some updates may be required to continue using the app")
+                    BulletPoint("We may discontinue features with or without notice")
+                    BulletPoint("Your continued use after updates constitutes acceptance")
+                }
+            }
+
+            LegalSection(title: "Data Collection & Privacy") {
+                Text("Your use of the app is also governed by our Privacy Policy, which describes how we collect, use, and protect your personal information. By using the app, you consent to our data practices as described in the Privacy Policy.")
+            }
+
+            LegalSection(title: "Apple App Store Terms") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("If you downloaded the app from Apple's App Store, you also agree to:")
+                        .font(.subheadline)
+                    BulletPoint("Apple's Licensed Application End User License Agreement")
+                    BulletPoint("Apple's App Store Terms of Service")
+
+                    Text("In case of conflict between this EULA and Apple's terms regarding Apple-specific provisions, Apple's terms shall govern.")
+                        .font(.caption)
+                        .padding(.top, 4)
+                }
+            }
+
+            LegalSection(title: "Third-Party Acknowledgments") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("You acknowledge that:")
+                        .font(.subheadline)
+                    BulletPoint("Apple is not responsible for the app or its content")
+                    BulletPoint("Apple has no obligation to provide maintenance or support")
+                    BulletPoint("Apple is not liable for any claims related to the app")
+                    BulletPoint("Apple is a third-party beneficiary of this EULA")
+                }
+            }
+
+            LegalSection(title: "Termination") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("This EULA is effective until terminated. Your rights automatically terminate if you:")
+                        .font(.subheadline)
+                    BulletPoint("Fail to comply with any term of this EULA")
+                    BulletPoint("Delete your account or uninstall the app")
+
+                    Text("Upon termination, you must cease all use of the app and delete all copies.")
+                        .font(.caption)
+                        .padding(.top, 4)
+                }
+            }
+
+            LegalSection(title: "Disclaimer of Warranties") {
+                Text("THE APP IS PROVIDED \"AS IS\" AND \"AS AVAILABLE\" WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. CELESTIA DOES NOT WARRANT THAT THE APP WILL BE UNINTERRUPTED, ERROR-FREE, OR FREE OF HARMFUL COMPONENTS.")
+                    .font(.caption)
+            }
+
+            LegalSection(title: "Limitation of Liability") {
+                Text("TO THE FULLEST EXTENT PERMITTED BY LAW, CELESTIA SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES ARISING OUT OF OR RELATED TO YOUR USE OF THE APP, REGARDLESS OF WHETHER SUCH DAMAGES ARE BASED ON CONTRACT, TORT, STRICT LIABILITY, OR ANY OTHER THEORY.")
+                    .font(.caption)
+            }
+
+            LegalSection(title: "Export Compliance") {
+                Text("You represent and warrant that you are not located in a country subject to a U.S. Government embargo or designated as a \"terrorist supporting\" country, and you are not listed on any U.S. Government list of prohibited or restricted parties.")
+            }
+
+            LegalSection(title: "Government End Users") {
+                Text("If you are a U.S. Government end user, the app is a \"Commercial Item\" as defined in 48 C.F.R. §2.101, and is licensed with only those rights granted to all other end users pursuant to this EULA.")
+                    .font(.caption)
+            }
+
+            LegalSection(title: "Contact Information") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("For questions about this EULA:")
+                        .font(.subheadline)
+                    HStack {
+                        Image(systemName: "envelope")
+                            .foregroundColor(.indigo)
+                        Text("legal@celestia.app")
+                    }
+                    .font(.subheadline)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Accessibility Statement Content
+
+extension LegalDocumentView {
+    private var accessibilityContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            LegalSection(title: "Our Commitment to Accessibility") {
+                Text("Celestia is committed to ensuring digital accessibility for people with disabilities. We continually improve the user experience for everyone and apply the relevant accessibility standards to ensure we provide equal access to all users.")
+            }
+
+            LegalSection(title: "Accessibility Standards") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("We aim to conform to the following standards:")
+                        .font(.subheadline)
+                    BulletPoint("Web Content Accessibility Guidelines (WCAG) 2.1 Level AA")
+                    BulletPoint("Apple's Human Interface Guidelines for Accessibility")
+                    BulletPoint("Section 508 of the Rehabilitation Act (where applicable)")
+                    BulletPoint("Americans with Disabilities Act (ADA) requirements")
+                }
+            }
+
+            LegalSection(title: "Accessibility Features") {
+                VStack(alignment: .leading, spacing: 12) {
+                    LegalSubsection(title: "VoiceOver Support") {
+                        VStack(alignment: .leading, spacing: 4) {
+                            BulletPoint("Full VoiceOver compatibility throughout the app")
+                            BulletPoint("Descriptive labels for all interactive elements")
+                            BulletPoint("Logical reading order and navigation")
+                            BulletPoint("Meaningful image descriptions")
+                        }
+                    }
+
+                    LegalSubsection(title: "Visual Accommodations") {
+                        VStack(alignment: .leading, spacing: 4) {
+                            BulletPoint("Support for Dynamic Type (adjustable text sizes)")
+                            BulletPoint("High contrast color combinations")
+                            BulletPoint("Respect for system-wide Dark Mode preferences")
+                            BulletPoint("No reliance on color alone to convey information")
+                        }
+                    }
+
+                    LegalSubsection(title: "Motor Accessibility") {
+                        VStack(alignment: .leading, spacing: 4) {
+                            BulletPoint("Support for Switch Control")
+                            BulletPoint("Adequate touch target sizes (minimum 44x44 points)")
+                            BulletPoint("No time-limited interactions required")
+                            BulletPoint("Alternative navigation methods supported")
+                        }
+                    }
+
+                    LegalSubsection(title: "Cognitive Accessibility") {
+                        VStack(alignment: .leading, spacing: 4) {
+                            BulletPoint("Clear and consistent navigation")
+                            BulletPoint("Simple, understandable language")
+                            BulletPoint("Predictable interface behavior")
+                            BulletPoint("Support for Reduce Motion preference")
+                        }
+                    }
+                }
+            }
+
+            LegalSection(title: "Assistive Technologies Supported") {
+                VStack(alignment: .leading, spacing: 8) {
+                    BulletPoint("VoiceOver screen reader")
+                    BulletPoint("Voice Control")
+                    BulletPoint("Switch Control")
+                    BulletPoint("AssistiveTouch")
+                    BulletPoint("Full Keyboard Access")
+                    BulletPoint("Zoom magnification")
+                    BulletPoint("Spoken Content (Speak Selection, Speak Screen)")
+                }
+            }
+
+            LegalSection(title: "Known Limitations") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("We are working to address the following areas:")
+                        .font(.subheadline)
+                    BulletPoint("Some user-uploaded images may lack alternative text")
+                    BulletPoint("Complex gesture interactions have keyboard alternatives being developed")
+                    BulletPoint("Third-party content may not meet our accessibility standards")
+
+                    Text("We are actively working to resolve these issues and improve accessibility across all features.")
+                        .font(.caption)
+                        .padding(.top, 4)
+                }
+            }
+
+            LegalSection(title: "Accessibility Testing") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Our accessibility program includes:")
+                        .font(.subheadline)
+                    BulletPoint("Regular automated accessibility testing")
+                    BulletPoint("Manual testing with assistive technologies")
+                    BulletPoint("User feedback incorporation")
+                    BulletPoint("Ongoing staff training on accessibility best practices")
+                }
+            }
+
+            LegalSection(title: "Feedback & Assistance") {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("We welcome your feedback on the accessibility of Celestia. If you encounter accessibility barriers or need assistance, please contact us:")
+                        .font(.subheadline)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Image(systemName: "envelope")
+                                .foregroundColor(.teal)
+                            Text("accessibility@celestia.app")
+                        }
+                        .font(.subheadline)
+
+                        HStack {
+                            Image(systemName: "phone")
+                                .foregroundColor(.green)
+                            Text("Relay service users: Please use your preferred relay service")
+                        }
+                        .font(.caption)
+                    }
+
+                    Text("When contacting us, please include:")
+                        .font(.subheadline)
+                        .padding(.top, 8)
+                    BulletPoint("Description of the accessibility issue")
+                    BulletPoint("The assistive technology you are using")
+                    BulletPoint("Your device type and iOS version")
+                    BulletPoint("Steps to reproduce the issue")
+                }
+            }
+
+            LegalSection(title: "Response Time") {
+                Text("We aim to respond to accessibility feedback within 5 business days and to resolve accessibility issues as quickly as possible. For urgent accessibility needs, please indicate \"Urgent\" in your subject line.")
+            }
+
+            LegalSection(title: "Alternative Formats") {
+                Text("If you need this accessibility statement or other information in an alternative format (such as large print, audio, or braille), please contact us and we will do our best to accommodate your request.")
+            }
+
+            LegalSection(title: "Continuous Improvement") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("We are committed to continuous improvement of our accessibility:")
+                        .font(.subheadline)
+                    BulletPoint("Regular accessibility audits are conducted")
+                    BulletPoint("User feedback is reviewed and incorporated")
+                    BulletPoint("New features are designed with accessibility in mind")
+                    BulletPoint("Development team receives ongoing accessibility training")
+                }
+            }
+
+            LegalSection(title: "Legal Information") {
+                Text("This statement was last updated on November 29, 2025. Celestia strives to comply with applicable accessibility laws and regulations. If you believe you have experienced discrimination based on disability in accessing our services, you may file a complaint with the appropriate regulatory authority in your jurisdiction.")
+                    .font(.caption)
+            }
+        }
     }
 }
 
