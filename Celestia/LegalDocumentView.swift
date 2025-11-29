@@ -290,6 +290,45 @@ extension LegalDocumentView {
                 Text("We reserve the right to suspend or terminate your account at any time for violations of these terms, fraudulent activity, or any other reason at our sole discretion. You may delete your account at any time through the app settings.")
             }
 
+            LegalSection(title: "Assumption of Risk") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("YOU ACKNOWLEDGE AND AGREE THAT:")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.red)
+
+                    BulletPoint("Online dating involves inherent risks including meeting strangers")
+                    BulletPoint("You are solely responsible for your interactions with other users")
+                    BulletPoint("Celestia does not conduct criminal background checks on users")
+                    BulletPoint("We cannot guarantee the identity, intentions, or conduct of any user")
+                    BulletPoint("You should take appropriate safety precautions when meeting anyone in person")
+                    BulletPoint("Any meetings or relationships that result from the app are at your own risk")
+                }
+            }
+
+            LegalSection(title: "No Background Checks") {
+                Text("CELESTIA DOES NOT CONDUCT CRIMINAL BACKGROUND CHECKS OR IDENTITY VERIFICATION ON ALL USERS. We are not responsible for the conduct of any user, whether online or offline. You are solely responsible for your safety and should exercise caution when communicating with or meeting other users.")
+                    .font(.caption)
+            }
+
+            LegalSection(title: "User Representations") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("By using Celestia, you represent and warrant that:")
+                        .font(.subheadline)
+                    BulletPoint("You are at least 18 years old")
+                    BulletPoint("You are legally permitted to use the service in your jurisdiction")
+                    BulletPoint("You have not been convicted of a felony or sex crime")
+                    BulletPoint("You are not required to register as a sex offender")
+                    BulletPoint("All information you provide is accurate and truthful")
+                    BulletPoint("You will comply with all applicable laws while using the service")
+                }
+            }
+
+            LegalSection(title: "Indemnification") {
+                Text("You agree to indemnify, defend, and hold harmless Celestia, its officers, directors, employees, agents, and affiliates from any claims, damages, losses, liabilities, costs, and expenses (including reasonable attorney fees) arising from: (a) your use of the service; (b) your violation of these Terms; (c) your violation of any rights of another person or entity; (d) your conduct in connection with the service; or (e) any content you submit to the service.")
+                    .font(.caption)
+            }
+
             LegalSection(title: "Disclaimers") {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("CELESTIA IS PROVIDED \"AS IS\" WITHOUT WARRANTIES OF ANY KIND. WE DO NOT GUARANTEE:")
@@ -320,13 +359,48 @@ extension LegalDocumentView {
                 Text("We may modify these Terms at any time. Material changes will be notified through the app or email. Continued use after changes constitutes acceptance of the modified terms.")
             }
 
-            LegalSection(title: "Contact") {
-                HStack {
-                    Image(systemName: "envelope")
-                        .foregroundColor(.purple)
-                    Text("support@celestia.app")
+            LegalSection(title: "Copyright & DMCA") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("If you believe content on Celestia infringes your copyright, please send a DMCA notice to support@celestia.app including:")
+                        .font(.subheadline)
+                    BulletPoint("Identification of the copyrighted work")
+                    BulletPoint("Identification of the infringing material")
+                    BulletPoint("Your contact information")
+                    BulletPoint("A statement of good faith belief")
+                    BulletPoint("A statement of accuracy under penalty of perjury")
+                    BulletPoint("Your physical or electronic signature")
                 }
-                .font(.subheadline)
+            }
+
+            LegalSection(title: "Severability") {
+                Text("If any provision of these Terms is found to be invalid or unenforceable, that provision shall be limited or eliminated to the minimum extent necessary, and the remaining provisions shall remain in full force and effect.")
+            }
+
+            LegalSection(title: "Entire Agreement") {
+                Text("These Terms, together with our Privacy Policy and Community Guidelines, constitute the entire agreement between you and Celestia regarding your use of the service and supersede all prior agreements and understandings.")
+            }
+
+            LegalSection(title: "No Waiver") {
+                Text("Our failure to enforce any right or provision of these Terms shall not constitute a waiver of such right or provision. Any waiver must be in writing and signed by an authorized representative of Celestia.")
+            }
+
+            LegalSection(title: "Contact") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("For questions about these Terms:")
+                        .font(.subheadline)
+                    HStack {
+                        Image(systemName: "envelope")
+                            .foregroundColor(.purple)
+                        Text("support@celestia.app")
+                    }
+                    .font(.subheadline)
+                    HStack {
+                        Image(systemName: "doc.text")
+                            .foregroundColor(.blue)
+                        Text("legal@celestia.app")
+                    }
+                    .font(.subheadline)
+                }
             }
         }
     }
