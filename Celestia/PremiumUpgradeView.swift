@@ -27,6 +27,10 @@ struct PremiumUpgradeView: View {
     @State private var currentShowcaseIndex = 0
     @State private var showLimitedOffer = true
 
+    // Countdown timer state
+    @State private var timeRemaining: Int = 23 * 3600 + 47 * 60 + 32 // 23:47:32
+    let countdownTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
     // Timer for showcase rotation
     let showcaseTimer = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
 
@@ -66,8 +70,14 @@ struct PremiumUpgradeView: View {
                                     limitedTimeBanner
                                 }
 
+                                // Who liked you preview (FOMO section)
+                                whoLikedYouPreview
+
                                 // Live feature showcase
                                 liveFeatureShowcase
+
+                                // Premium badge highlight
+                                premiumBadgeSection
 
                                 // Stats that matter
                                 impactStats
@@ -150,6 +160,11 @@ struct PremiumUpgradeView: View {
                 .onReceive(showcaseTimer) { _ in
                     withAnimation(.easeInOut(duration: 0.5)) {
                         currentShowcaseIndex = (currentShowcaseIndex + 1) % 4
+                    }
+                }
+                .onReceive(countdownTimer) { _ in
+                    if timeRemaining > 0 {
+                        timeRemaining -= 1
                     }
                 }
             }
@@ -334,43 +349,85 @@ struct PremiumUpgradeView: View {
 
     // MARK: - Limited Time Banner
 
+    private var formattedTime: String {
+        let hours = timeRemaining / 3600
+        let minutes = (timeRemaining % 3600) / 60
+        let seconds = timeRemaining % 60
+        return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+    }
+
     private var limitedTimeBanner: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(Color.orange.opacity(0.15))
-                    .frame(width: 40, height: 40)
-                Image(systemName: "clock.fill")
-                    .font(.body)
-                    .foregroundColor(.orange)
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                // Fire icon for urgency
+                Image(systemName: "flame.fill")
+                    .font(.title3)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.orange, .red],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Flash Sale: 50% Off")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundColor(.primary)
+
+                    Text("Limited spots available in California")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                Button {
+                    withAnimation {
+                        showLimitedOffer = false
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
             }
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Limited Time: 50% Off Annual")
-                    .font(.subheadline.weight(.bold))
-                    .foregroundColor(.primary)
+            // Countdown timer
+            HStack(spacing: 8) {
+                Image(systemName: "clock.fill")
+                    .font(.caption)
+                    .foregroundColor(.red)
 
-                Text("Offer ends soon")
+                Text("Offer expires in:")
                     .font(.caption)
                     .foregroundColor(.secondary)
-            }
 
-            Spacer()
+                Text(formattedTime)
+                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                    .foregroundColor(.red)
 
-            Button {
-                withAnimation {
-                    showLimitedOffer = false
+                Spacer()
+
+                // Urgency indicator
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 6, height: 6)
+                    Text("12 people viewing")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
                 }
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.caption)
-                    .foregroundColor(.gray)
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color.red.opacity(0.08))
+            .cornerRadius(8)
         }
         .padding(16)
         .background(
             LinearGradient(
-                colors: [Color.orange.opacity(0.12), Color.yellow.opacity(0.08)],
+                colors: [Color.orange.opacity(0.1), Color.red.opacity(0.06)],
                 startPoint: .leading,
                 endPoint: .trailing
             )
@@ -382,6 +439,208 @@ struct PremiumUpgradeView: View {
                 .stroke(Color.orange.opacity(0.25), lineWidth: 1)
         )
         .shadow(color: .orange.opacity(0.1), radius: 8, y: 4)
+    }
+
+    // MARK: - Who Liked You Preview (FOMO Section)
+
+    private var whoLikedYouPreview: some View {
+        VStack(spacing: 16) {
+            // Header
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text("People Who Like You")
+                            .font(.title3.weight(.bold))
+                            .foregroundColor(.primary)
+
+                        // Notification badge
+                        Text("23")
+                            .font(.caption.weight(.bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.pink)
+                            .clipShape(Capsule())
+                    }
+
+                    Text("Unlock to see who's interested in you")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "lock.fill")
+                    .font(.title3)
+                    .foregroundColor(.gray.opacity(0.5))
+            }
+
+            // Blurred profile previews
+            HStack(spacing: -12) {
+                ForEach(0..<5) { index in
+                    ZStack {
+                        // Blurred avatar placeholder
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: blurredAvatarColors(for: index),
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 56, height: 56)
+                            .blur(radius: 6)
+
+                        // Overlay blur effect
+                        Circle()
+                            .fill(Color.white.opacity(0.3))
+                            .frame(width: 56, height: 56)
+
+                        // Lock icon on last one
+                        if index == 4 {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.black.opacity(0.4))
+                                    .frame(width: 56, height: 56)
+
+                                VStack(spacing: 2) {
+                                    Image(systemName: "lock.fill")
+                                        .font(.caption)
+                                        .foregroundColor(.white)
+                                    Text("+18")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(.white)
+                                }
+                            }
+                        }
+                    }
+                    .overlay(
+                        Circle()
+                            .stroke(Color.white, lineWidth: 3)
+                    )
+                    .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
+
+            // CTA Button
+            Button {
+                // Scroll to pricing
+            } label: {
+                HStack {
+                    Image(systemName: "eye.fill")
+                        .font(.subheadline)
+                    Text("See Who Likes You")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(
+                    LinearGradient(
+                        colors: [.pink, .purple],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(12)
+            }
+        }
+        .padding(20)
+        .background(Color.white)
+        .cornerRadius(20)
+        .shadow(color: .pink.opacity(0.15), radius: 15, y: 8)
+    }
+
+    private func blurredAvatarColors(for index: Int) -> [Color] {
+        let colorSets: [[Color]] = [
+            [.pink, .purple],
+            [.blue, .cyan],
+            [.orange, .yellow],
+            [.green, .mint],
+            [.purple, .indigo]
+        ]
+        return colorSets[index % colorSets.count]
+    }
+
+    // MARK: - Premium Badge Section
+
+    private var premiumBadgeSection: some View {
+        HStack(spacing: 16) {
+            // Badge preview
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.purple.opacity(0.2), .pink.opacity(0.15)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 70, height: 70)
+
+                // Premium badge icon
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 50, height: 50)
+
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.title2)
+                        .foregroundColor(.white)
+                }
+                .shadow(color: .purple.opacity(0.4), radius: 8, y: 4)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Get the Premium Badge")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundColor(.primary)
+
+                Text("Stand out with a verified premium badge on your profile. Members with badges get 2.5x more matches!")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(3)
+
+                // Social proof
+                HStack(spacing: 4) {
+                    Image(systemName: "person.2.fill")
+                        .font(.caption2)
+                        .foregroundColor(.purple)
+                    Text("1,247 members upgraded today")
+                        .font(.caption2)
+                        .foregroundColor(.purple)
+                }
+            }
+        }
+        .padding(18)
+        .background(
+            LinearGradient(
+                colors: [Color.purple.opacity(0.08), Color.pink.opacity(0.05)],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        )
+        .background(Color.white)
+        .cornerRadius(16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(
+                    LinearGradient(
+                        colors: [.purple.opacity(0.3), .pink.opacity(0.2)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
+        .shadow(color: .purple.opacity(0.1), radius: 10, y: 5)
     }
 
     // MARK: - Live Feature Showcase
