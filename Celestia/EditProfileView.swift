@@ -2980,10 +2980,17 @@ struct DraggablePhotoGridItem: View {
             .contentShape(RoundedRectangle(cornerRadius: 12))
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(isDragging ? Color.purple : Color.clear, lineWidth: 3)
+                    .stroke(
+                        LinearGradient(
+                            colors: isDragging ? [.purple, .pink] : [.clear, .clear],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: isDragging ? 3 : 0
+                    )
             )
 
-            // Delete button
+            // Delete button - hide when dragging for cleaner look
             Button {
                 showDeleteConfirmation = true
             } label: {
@@ -2998,17 +3005,25 @@ struct DraggablePhotoGridItem: View {
                     .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
             }
             .padding(6)
+            .opacity(isDragging ? 0 : 1)
 
             // Drag hint overlay (shows on long press)
             if isDragging {
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.purple.opacity(0.2))
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.purple.opacity(0.15), Color.pink.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
                     .frame(height: 120)
             }
         }
-        .scaleEffect(isDragging ? 1.05 : 1.0)
-        .shadow(color: isDragging ? .purple.opacity(0.4) : .clear, radius: 10, y: 5)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isDragging)
+        .scaleEffect(isDragging ? 1.08 : 1.0)
+        .rotation3DEffect(.degrees(isDragging ? 2 : 0), axis: (x: 0, y: 1, z: 0))
+        .shadow(color: isDragging ? .purple.opacity(0.5) : .black.opacity(0.08), radius: isDragging ? 16 : 4, y: isDragging ? 8 : 2)
+        .animation(.interpolatingSpring(stiffness: 350, damping: 18), value: isDragging)
         .confirmationDialog("Delete this photo?", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
             Button("Delete", role: .destructive) {
                 onDelete()
