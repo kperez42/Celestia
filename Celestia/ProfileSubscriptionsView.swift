@@ -59,14 +59,6 @@ struct ProfileSubscriptionsView: View {
             benefit: "Skip the guessing game"
         ),
         FeatureCardItem(
-            icon: "arrow.uturn.left",
-            title: "Rewind Swipes",
-            description: "Accidentally passed on someone special? Go back and give them another chance!",
-            color: .blue,
-            gradient: [Color.blue, Color.cyan],
-            benefit: "Never miss out on The One"
-        ),
-        FeatureCardItem(
             icon: "star.fill",
             title: "Super Likes",
             description: "Stand out from the crowd and show you're really interested. Get 3x more matches!",
@@ -459,7 +451,6 @@ struct ProfileSubscriptionsView: View {
                 benefitRow(icon: "flame.fill", text: "Daily profile discovery", included: true)
                 benefitRow(icon: "heart.fill", text: "Unlimited likes", included: authService.currentUser?.isPremium == true)
                 benefitRow(icon: "eye.fill", text: "See who likes you", included: authService.currentUser?.isPremium == true)
-                benefitRow(icon: "arrow.uturn.left", text: "Rewind swipes", included: authService.currentUser?.isPremium == true)
                 benefitRow(icon: "star.fill", text: "Super likes", included: authService.currentUser?.isPremium == true)
                 benefitRow(icon: "bolt.fill", text: "Profile boost", included: authService.currentUser?.isPremium == true)
             }
