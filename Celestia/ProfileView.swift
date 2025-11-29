@@ -596,24 +596,28 @@ struct ProfileView: View {
 
     private func statsRow(user: User) -> some View {
         HStack(spacing: 0) {
-            // Likes - tappable, opens subscription
+            // Liked Me
             Button {
-                showingPremiumUpgrade = true
+                if user.isPremium {
+                    showingPremiumUpgrade = true // Could show likes list if implemented
+                } else {
+                    showingPremiumUpgrade = true
+                }
                 HapticManager.shared.impact(.light)
             } label: {
                 statCard(
                     icon: "heart.fill",
                     value: isLoadingStats ? "-" : "\(accurateLikesReceived)",
-                    label: "Likes",
-                    color: .pink,
-                    locked: !user.isPremium
+                    line1: "Liked",
+                    line2: "Me",
+                    color: .pink
                 )
             }
 
             Divider()
-                .frame(height: 40)
+                .frame(height: 50)
 
-            // Views - tappable
+            // Viewed Me
             Button {
                 if user.isPremium {
                     showingProfileViewers = true
@@ -625,26 +629,30 @@ struct ProfileView: View {
                 statCard(
                     icon: "eye.fill",
                     value: isLoadingStats ? "-" : "\(accurateProfileViews)",
-                    label: "Views",
-                    color: .blue,
-                    locked: !user.isPremium
+                    line1: "Viewed",
+                    line2: "Me",
+                    color: .blue
                 )
             }
 
             Divider()
-                .frame(height: 40)
+                .frame(height: 50)
 
-            // Matches - tappable
+            // Saved Me
             Button {
-                showingPremiumUpgrade = true
+                if user.isPremium {
+                    showingPremiumUpgrade = true // Could show saves list if implemented
+                } else {
+                    showingPremiumUpgrade = true
+                }
                 HapticManager.shared.impact(.light)
             } label: {
                 statCard(
-                    icon: "heart.circle.fill",
+                    icon: "bookmark.fill",
                     value: isLoadingStats ? "-" : "\(accurateMatchCount)",
-                    label: "Matches",
-                    color: .purple,
-                    locked: false
+                    line1: "Saved",
+                    line2: "Me",
+                    color: .purple
                 )
             }
         }
@@ -657,8 +665,8 @@ struct ProfileView: View {
         .opacity(animateStats ? 1 : 0)
     }
 
-    private func statCard(icon: String, value: String, label: String, color: Color, locked: Bool = false) -> some View {
-        VStack(spacing: 10) {
+    private func statCard(icon: String, value: String, line1: String, line2: String, color: Color) -> some View {
+        VStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.title2)
                 .foregroundStyle(
@@ -669,23 +677,21 @@ struct ProfileView: View {
                     )
                 )
 
-            ZStack {
-                Text(value)
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.primary)
-                    .blur(radius: locked ? 4 : 0)
+            Text(value)
+                .font(.title2)
+                .fontWeight(.bold)
+                .foregroundColor(.primary)
 
-                if locked {
-                    Image(systemName: "lock.fill")
-                        .font(.caption2)
-                        .foregroundColor(.orange)
-                }
+            VStack(spacing: 0) {
+                Text(line1)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
+                Text(line2)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
             }
-
-            Text(label)
-                .font(.caption)
-                .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity)
     }
