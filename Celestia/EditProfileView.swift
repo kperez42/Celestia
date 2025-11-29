@@ -2955,26 +2955,29 @@ struct DraggablePhotoGridItem: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            // Photo - PERFORMANCE: Use CachedAsyncImage
-            CachedAsyncImage(
-                url: URL(string: photoURL),
-                content: { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(maxWidth: .infinity)
-                        .clipped()
-                },
-                placeholder: {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.1))
-                        .overlay {
-                            ProgressView()
-                        }
-                }
-            )
+            // Photo container with fixed dimensions
+            GeometryReader { geometry in
+                CachedAsyncImage(
+                    url: URL(string: photoURL),
+                    content: { image in
+                        image
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: geometry.size.width, height: geometry.size.height)
+                            .clipped()
+                    },
+                    placeholder: {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.1))
+                            .overlay {
+                                ProgressView()
+                            }
+                    }
+                )
+            }
             .frame(height: 120)
             .clipShape(RoundedRectangle(cornerRadius: 12))
+            .contentShape(RoundedRectangle(cornerRadius: 12))
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(isDragging ? Color.purple : Color.clear, lineWidth: 3)
