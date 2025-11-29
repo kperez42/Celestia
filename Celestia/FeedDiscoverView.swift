@@ -31,6 +31,7 @@ struct FeedDiscoverView: View {
 
     // Direct messaging state - using dedicated struct for item-based presentation
     @State private var chatPresentation: ChatPresentation?
+    @State private var showPremiumUpgrade = false
 
     struct ChatPresentation: Identifiable {
         let id = UUID()
@@ -156,6 +157,10 @@ struct FeedDiscoverView: View {
                         ChatView(match: presentation.match, otherUser: presentation.user)
                             .environmentObject(authService)
                     }
+                }
+                .sheet(isPresented: $showPremiumUpgrade) {
+                    PremiumUpgradeView()
+                        .environmentObject(authService)
                 }
         }
     }
@@ -891,6 +896,13 @@ struct FeedDiscoverView: View {
     }
 
     private func handleMessage(user: User) {
+        // Premium check - messaging requires subscription
+        guard authService.currentUser?.isPremium == true else {
+            HapticManager.shared.impact(.medium)
+            showPremiumUpgrade = true
+            return
+        }
+
         guard let currentUserId = authService.currentUser?.effectiveId,
               let userId = user.effectiveId else {
             showToast(

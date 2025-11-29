@@ -78,9 +78,6 @@ struct ProfileView: View {
 
                                     // Primary action - Edit Profile
                                     editButton
-
-                                    // Secondary action - Profile Boost
-                                    ProfileBoostButton()
                                 }
                                 .padding(.top, 20)
 
