@@ -326,9 +326,9 @@ service cloud.firestore {
 
     // Saved Profiles Collection
     match /saved_profiles/{savedId} {
-      // Users can read their own saved profiles
+      // Users can read their own saved profiles OR see who saved them
       allow read: if isAuthenticated()
-        && resource.data.userId == request.auth.uid;
+        && (resource.data.userId == request.auth.uid || resource.data.savedUserId == request.auth.uid);
 
       // Users can save profiles
       allow create: if isAuthenticated()
@@ -345,7 +345,7 @@ service cloud.firestore {
 
     // Profile Views Collection
     match /profileViews/{viewId} {
-      // Users can read views of their own profile
+      // Users can read views of their own profile or views they made
       allow read: if isAuthenticated()
         && (resource.data.viewedUserId == request.auth.uid || resource.data.viewerUserId == request.auth.uid);
 
@@ -353,8 +353,12 @@ service cloud.firestore {
       allow create: if isAuthenticated()
         && request.resource.data.viewerUserId == request.auth.uid;
 
-      // Don't allow updates or deletes
-      allow update, delete: if false;
+      // Allow updates for merge operations (timestamp updates on re-views)
+      allow update: if isAuthenticated()
+        && resource.data.viewerUserId == request.auth.uid;
+
+      // Don't allow deletes
+      allow delete: if false;
     }
 
     // Pending Verifications Collection (ID verification submissions)
