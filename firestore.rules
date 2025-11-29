@@ -230,6 +230,61 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    // Referral Shares Collection (tracking share events)
+    match /referralShares/{shareId} {
+      // Users can read their own share history
+      allow read: if isAuthenticated()
+        && resource.data.userId == request.auth.uid;
+
+      // Users can create share events for themselves
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid;
+
+      // No updates or deletes
+      allow update, delete: if false;
+    }
+
+    // Referral Milestones Collection
+    match /referralMilestones/{milestoneId} {
+      // Users can read their own milestones
+      allow read: if isAuthenticated()
+        && resource.data.userId == request.auth.uid;
+
+      // System creates milestones
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid;
+
+      // No updates or deletes
+      allow update, delete: if false;
+    }
+
+    // Referral Codes Collection
+    match /referralCodes/{codeId} {
+      // Users can read their own codes
+      allow read: if isAuthenticated()
+        && resource.data.userId == request.auth.uid;
+
+      // Users can create codes for themselves
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid;
+
+      // No updates or deletes
+      allow update, delete: if false;
+    }
+
+    // Referral Rewards Collection
+    match /referralRewards/{rewardId} {
+      // Users can read their own rewards
+      allow read: if isAuthenticated()
+        && resource.data.userId == request.auth.uid;
+
+      // System creates rewards
+      allow create: if isAuthenticated();
+
+      // No updates or deletes
+      allow update, delete: if false;
+    }
+
     // Likes Collection
     match /likes/{likeId} {
       // Users can read likes they sent or received
