@@ -490,11 +490,11 @@ struct PremiumUpgradeView: View {
                                 )
                             )
                             .frame(width: 56, height: 56)
-                            .blur(radius: 6)
+                            .blur(radius: 3) // Light blur - enough to tease but still see shapes
 
-                        // Overlay blur effect
+                        // Subtle overlay - let them see more
                         Circle()
-                            .fill(Color.white.opacity(0.3))
+                            .fill(Color.white.opacity(0.15))
                             .frame(width: 56, height: 56)
 
                         // Lock icon on last one
