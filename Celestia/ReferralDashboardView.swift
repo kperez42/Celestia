@@ -106,7 +106,7 @@ struct ReferralDashboardView: View {
             }
             .task {
                 await loadData()
-                withAnimation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.1)) {
+                withAnimation(.butterSmooth.delay(0.1)) {
                     animateStats = true
                 }
 
@@ -136,9 +136,13 @@ struct ReferralDashboardView: View {
                         .shadow(color: .black.opacity(0.2), radius: 10, y: 5)
                         .padding(.bottom, 100)
                     }
-                    .transition(.opacity)
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.8).combined(with: .opacity),
+                        removal: .opacity
+                    ))
                 }
             }
+            .animation(.butterSmooth, value: copiedToClipboard)
         }
     }
 
@@ -224,11 +228,12 @@ struct ReferralDashboardView: View {
                     .background(referralCode.isEmpty ? Color.gray.opacity(0.1) : Color.purple.opacity(0.1))
                     .cornerRadius(12)
                 }
+                .buttonStyle(.springy)
                 .disabled(referralCode.isEmpty || isInitializingCode)
 
                 Button {
                     showShareSheet = true
-                    HapticManager.shared.impact(.medium)
+                    HapticManager.shared.celebration()
 
                     // Track share event
                     if let user = authService.currentUser {
@@ -258,6 +263,7 @@ struct ReferralDashboardView: View {
                     )
                     .cornerRadius(12)
                 }
+                .buttonStyle(.springy)
                 .disabled(referralCode.isEmpty || isInitializingCode)
             }
         }
@@ -265,6 +271,7 @@ struct ReferralDashboardView: View {
         .background(Color.white)
         .cornerRadius(24)
         .shadow(color: .black.opacity(0.08), radius: 15, y: 8)
+        .gpuAccelerated()
     }
 
     // MARK: - Milestone Progress
@@ -335,7 +342,7 @@ struct ReferralDashboardView: View {
                                     )
                                 )
                                 .frame(width: geometry.size.width * progress, height: 12)
-                                .animation(.spring(response: 0.5), value: progress)
+                                .animation(.butterSmooth, value: progress)
                         }
                     }
                     .frame(height: 12)
@@ -455,9 +462,9 @@ struct ReferralDashboardView: View {
     private var tabSelector: some View {
         HStack(spacing: 0) {
             Button {
-                withAnimation(.spring(response: 0.3)) {
+                withAnimation(.butterSmooth) {
                     selectedTab = 0
-                    HapticManager.shared.selection()
+                    HapticManager.shared.tabSwitch()
                 }
             } label: {
                 Text("My Referrals")
@@ -479,9 +486,9 @@ struct ReferralDashboardView: View {
             }
 
             Button {
-                withAnimation(.spring(response: 0.3)) {
+                withAnimation(.butterSmooth) {
                     selectedTab = 1
-                    HapticManager.shared.selection()
+                    HapticManager.shared.tabSwitch()
                 }
             } label: {
                 Text("Leaderboard")
@@ -515,8 +522,9 @@ struct ReferralDashboardView: View {
             if referralManager.userReferrals.isEmpty {
                 emptyReferralsCard
             } else {
-                ForEach(referralManager.userReferrals) { referral in
+                ForEach(Array(referralManager.userReferrals.enumerated()), id: \.element.id) { index, referral in
                     referralRow(referral: referral)
+                        .smoothRowAppearance(delay: Double(index) * 0.05)
                 }
             }
         }
@@ -698,8 +706,9 @@ struct ReferralDashboardView: View {
             if referralManager.leaderboard.isEmpty {
                 emptyLeaderboardCard
             } else {
-                ForEach(referralManager.leaderboard) { entry in
+                ForEach(Array(referralManager.leaderboard.enumerated()), id: \.element.id) { index, entry in
                     leaderboardRow(entry: entry)
+                        .smoothRowAppearance(delay: Double(index) * 0.05)
                 }
             }
         }
@@ -950,12 +959,12 @@ struct ReferralDashboardView: View {
         UIPasteboard.general.string = referralCode
         HapticManager.shared.notification(.success)
 
-        withAnimation {
+        withAnimation(.butterSmooth) {
             copiedToClipboard = true
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            withAnimation {
+            withAnimation(.butterSmooth) {
                 copiedToClipboard = false
             }
         }

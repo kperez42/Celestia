@@ -1,9 +1,10 @@
 /**
  * Main Dashboard Page
  * Displays platform statistics and key metrics
+ * PERFORMANCE: Memoized components and smooth transitions
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo, useCallback } from 'react';
 import {
   Box,
   Grid,
@@ -11,7 +12,10 @@ import {
   Typography,
   CircularProgress,
   Alert,
-  Button
+  Button,
+  Fade,
+  Grow,
+  Skeleton
 } from '@mui/material';
 import {
   People,
@@ -50,10 +54,31 @@ export default function Dashboard() {
     }
   };
 
+  // PERFORMANCE: Show skeleton loaders instead of spinner for better perceived performance
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-        <CircularProgress />
+      <Box sx={{ p: 3 }}>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+          <Skeleton variant="text" width={200} height={40} />
+          <Skeleton variant="rounded" width={100} height={36} />
+        </Box>
+        <Grid container spacing={3}>
+          {[1, 2, 3, 4].map((i) => (
+            <Grid item xs={12} md={3} key={i}>
+              <Fade in timeout={100 * i}>
+                <Box>
+                  <StatCardSkeleton />
+                </Box>
+              </Fade>
+            </Grid>
+          ))}
+          <Grid item xs={12} md={6}>
+            <Skeleton variant="rounded" height={200} />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <Skeleton variant="rounded" height={200} />
+          </Grid>
+        </Grid>
       </Box>
     );
   }
@@ -62,28 +87,36 @@ export default function Dashboard() {
     return <Alert severity="error">{error}</Alert>;
   }
 
-  const handleLogout = async () => {
+  // PERFORMANCE: Memoized logout handler
+  const handleLogout = useCallback(async () => {
     try {
       await signOut(auth);
     } catch (error) {
       console.error('Logout error:', error);
     }
-  };
+  }, []);
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">
-          Platform Overview
-        </Typography>
-        <Button
-          variant="outlined"
-          startIcon={<Logout />}
-          onClick={handleLogout}
-        >
-          Logout
-        </Button>
-      </Box>
+    <Fade in timeout={300}>
+      <Box sx={{ p: 3 }}>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+          <Typography variant="h4">
+            Platform Overview
+          </Typography>
+          <Button
+            variant="outlined"
+            startIcon={<Logout />}
+            onClick={handleLogout}
+            sx={{
+              transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+              '&:hover': {
+                transform: 'translateY(-1px)',
+              },
+            }}
+          >
+            Logout
+          </Button>
+        </Box>
 
       <Grid container spacing={3}>
         {/* User Stats */}
@@ -222,20 +255,55 @@ export default function Dashboard() {
           </Paper>
         </Grid>
       </Grid>
-    </Box>
+      </Box>
+    </Fade>
   );
 }
 
-// Helper component for metric rows
-function MetricRow({ label, value, color = "text.primary" }) {
+// PERFORMANCE: Memoized MetricRow to prevent unnecessary re-renders
+const MetricRow = memo(function MetricRow({ label, value, color = "text.primary" }) {
   return (
-    <Box display="flex" justifyContent="space-between" mb={1}>
-      <Typography variant="body2" color="text.secondary">
-        {label}
-      </Typography>
-      <Typography variant="body1" fontWeight="medium" color={color}>
-        {value}
-      </Typography>
-    </Box>
+    <Fade in timeout={200}>
+      <Box
+        display="flex"
+        justifyContent="space-between"
+        mb={1}
+        sx={{
+          transition: 'background-color 0.15s ease',
+          borderRadius: 1,
+          px: 0.5,
+          mx: -0.5,
+          '&:hover': {
+            backgroundColor: 'action.hover',
+          },
+        }}
+      >
+        <Typography variant="body2" color="text.secondary">
+          {label}
+        </Typography>
+        <Typography
+          variant="body1"
+          fontWeight="medium"
+          color={color}
+          sx={{ transition: 'color 0.2s ease' }}
+        >
+          {value}
+        </Typography>
+      </Box>
+    </Fade>
+  );
+});
+
+// Skeleton loader for stat cards during loading
+function StatCardSkeleton() {
+  return (
+    <Paper sx={{ p: 3, height: '100%' }}>
+      <Box display="flex" alignItems="center" mb={2}>
+        <Skeleton variant="rounded" width={40} height={40} sx={{ mr: 2 }} />
+        <Skeleton variant="text" width={80} />
+      </Box>
+      <Skeleton variant="text" width={120} height={40} />
+      <Skeleton variant="text" width={100} sx={{ mt: 1 }} />
+    </Paper>
   );
 }

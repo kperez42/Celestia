@@ -26,6 +26,8 @@ struct SettingsView: View {
     @State private var showCommunityGuidelines = false
     @State private var showSafetyTips = false
     @State private var showCookiePolicy = false
+    @State private var showEULA = false
+    @State private var showAccessibility = false
 
     var body: some View {
         NavigationStack {
@@ -281,6 +283,36 @@ struct SettingsView: View {
                                 .foregroundColor(.gray)
                         }
                     }
+
+                    Button {
+                        showEULA = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "doc.badge.gearshape")
+                                .foregroundColor(.indigo)
+                            Text("End User License Agreement")
+                                .foregroundColor(.primary)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                    }
+
+                    Button {
+                        showAccessibility = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "accessibility")
+                                .foregroundColor(.teal)
+                            Text("Accessibility Statement")
+                                .foregroundColor(.primary)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                    }
                 }
                 
                 // Admin section - only visible for admin users
@@ -366,6 +398,12 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showCookiePolicy) {
                 LegalDocumentView(documentType: .cookiePolicy)
+            }
+            .sheet(isPresented: $showEULA) {
+                LegalDocumentView(documentType: .eula)
+            }
+            .sheet(isPresented: $showAccessibility) {
+                LegalDocumentView(documentType: .accessibility)
             }
         }
     }

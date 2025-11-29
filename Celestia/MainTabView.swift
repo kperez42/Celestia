@@ -67,7 +67,7 @@ struct MainTabView: View {
         .ignoresSafeArea(.keyboard)
         .onChange(of: selectedTab) { oldValue, newValue in
             previousTab = oldValue
-            HapticManager.shared.selection()
+            HapticManager.shared.tabSwitch()
         }
         .onChange(of: matchService.matches) { _, newMatches in
             // AUDIT FIX: Calculate both counts from authoritative Match data
@@ -297,9 +297,9 @@ struct TabBarButton: View {
             .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
         }
         .buttonStyle(PlainButtonStyle())
-        .animation(.spring(response: 0.2, dampingFraction: 0.8), value: isPressed)
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isSelected)
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: badgeCount)
+        .animation(.microSpring, value: isPressed)
+        .animation(.tabSwitch, value: isSelected)
+        .animation(.butterSmooth, value: badgeCount)
     }
 }
 
@@ -323,7 +323,7 @@ struct AnimatedTabIndicator: View {
                 )
                 .frame(width: tabWidth * 0.5, height: 3)
                 .offset(x: tabWidth * CGFloat(selectedTab) + tabWidth * 0.25)
-                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: selectedTab)
+                .animation(.tabSwitch, value: selectedTab)
         }
         .frame(height: 3)
     }
