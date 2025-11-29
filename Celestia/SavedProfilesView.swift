@@ -16,8 +16,13 @@ struct SavedProfilesView: View {
     @State private var showUserDetail = false
     @State private var showClearAllConfirmation = false
     @State private var selectedTab = 0
+    @State private var showPremiumUpgrade = false
 
     private let tabs = ["My Saves", "Viewed Me", "Saved Me"]
+
+    private var isPremium: Bool {
+        authService.currentUser?.isPremium ?? false
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -60,6 +65,10 @@ struct SavedProfilesView: View {
         }
         .sheet(item: $selectedUser) { user in
             UserDetailView(user: user)
+                .environmentObject(authService)
+        }
+        .sheet(isPresented: $showPremiumUpgrade) {
+            PremiumUpgradeView()
                 .environmentObject(authService)
         }
         .confirmationDialog(
@@ -342,8 +351,12 @@ struct SavedProfilesView: View {
                         SavedYouCard(
                             profile: profile,
                             onTap: {
-                                selectedUser = profile.user
                                 HapticManager.shared.impact(.light)
+                                if isPremium {
+                                    selectedUser = profile.user
+                                } else {
+                                    showPremiumUpgrade = true
+                                }
                             }
                         )
                         .onAppear {
@@ -374,8 +387,12 @@ struct SavedProfilesView: View {
                         ViewedProfileCard(
                             profile: profile,
                             onTap: {
-                                selectedUser = profile.user
                                 HapticManager.shared.impact(.light)
+                                if isPremium {
+                                    selectedUser = profile.user
+                                } else {
+                                    showPremiumUpgrade = true
+                                }
                             }
                         )
                         .onAppear {
