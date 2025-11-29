@@ -32,6 +32,10 @@ struct MessagesView: View {
     @State private var cachedConversations: [(Match, User)] = []
     @State private var cachedFilteredConversations: [(Match, User)] = []
 
+    // PERFORMANCE: Cache management to prevent reloads on every tab switch
+    @State private var lastFetchTime: Date?
+    private let cacheDuration: TimeInterval = 60 // 1 minute cache for messages (more time-sensitive)
+
     // PERFORMANCE: Use cached values
     var conversations: [(Match, User)] { cachedConversations }
     var filteredConversations: [(Match, User)] { cachedFilteredConversations }
@@ -98,13 +102,22 @@ struct MessagesView: View {
             .navigationTitle("")
             .navigationBarHidden(true)
             .task {
+                // PERFORMANCE: Check cache first - skip fetch if we have recent data
+                if let lastFetch = lastFetchTime,
+                   !cachedConversations.isEmpty,
+                   Date().timeIntervalSince(lastFetch) < cacheDuration {
+                    Logger.shared.debug("MessagesView cache HIT - using cached data", category: .performance)
+                    return // Use cached data - instant display
+                }
                 await loadData()
                 updateCachedConversations()
+                lastFetchTime = Date()
             }
             .refreshable {
                 HapticManager.shared.impact(.light)
                 await loadData()
                 updateCachedConversations()
+                lastFetchTime = Date()
                 HapticManager.shared.notification(.success)
             }
             // PERFORMANCE: Update cached conversations only when dependencies change

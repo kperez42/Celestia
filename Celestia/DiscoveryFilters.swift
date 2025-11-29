@@ -301,7 +301,8 @@ class DiscoveryFilters: ObservableObject {
     }
 
     var hasActiveFilters: Bool {
-        return maxDistance < 100 || minAge > 18 || maxAge < 65 || showVerifiedOnly || !selectedInterests.isEmpty ||
+        // Removed distance from active filters check - not using location-based filtering
+        return minAge > 18 || maxAge < 65 || showVerifiedOnly || !selectedInterests.isEmpty ||
                !educationLevels.isEmpty || minHeight != nil || maxHeight != nil ||
                !religions.isEmpty || !relationshipGoals.isEmpty ||
                !smokingPreferences.isEmpty || !drinkingPreferences.isEmpty ||

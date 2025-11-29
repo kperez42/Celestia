@@ -3,6 +3,7 @@
 //  Celestia
 //
 //  Lazy view wrapper for performance optimization
+//  PERFORMANCE: Pre-renders adjacent tabs for instant switching
 //
 
 import SwiftUI
@@ -21,7 +22,9 @@ struct LazyView<Content: View>: View {
     }
 }
 
-/// Tab content wrapper that only loads when the tab is first selected
+/// Tab content wrapper that pre-loads adjacent tabs for instant switching
+/// PERFORMANCE FIX: Instead of showing blank Color.clear and waiting for selection,
+/// this now pre-renders tabs within 1 position of current tab so they're ready instantly
 struct LazyTabContent<Content: View>: View {
     let tabIndex: Int
     let currentTab: Int
@@ -35,23 +38,36 @@ struct LazyTabContent<Content: View>: View {
         self.content = content
     }
 
+    /// Check if this tab should be pre-rendered (current or adjacent)
+    private var shouldPreRender: Bool {
+        // Always load if it's the current tab
+        if tabIndex == currentTab { return true }
+        // Pre-render adjacent tabs (within 1 position) for instant switching
+        let distance = abs(tabIndex - currentTab)
+        return distance <= 1
+    }
+
     var body: some View {
         Group {
             if hasBeenLoaded {
                 content()
             } else {
-                // Show placeholder until tab is selected
-                Color.clear
+                // PERFORMANCE: Show background color matching system background
+                // instead of Color.clear to avoid blank flash
+                Color(.systemGroupedBackground)
                     .onAppear {
-                        // Load immediately if this is the current tab
-                        if tabIndex == currentTab {
+                        // Load immediately if this is the current tab or adjacent
+                        if shouldPreRender {
                             hasBeenLoaded = true
                         }
                     }
                     .onChange(of: currentTab) { _, newTab in
-                        // Load when user switches to this tab
-                        if newTab == tabIndex && !hasBeenLoaded {
-                            hasBeenLoaded = true
+                        // Pre-render when user gets close to this tab
+                        if !hasBeenLoaded {
+                            let distance = abs(tabIndex - newTab)
+                            if distance <= 1 {
+                                hasBeenLoaded = true
+                            }
                         }
                     }
             }

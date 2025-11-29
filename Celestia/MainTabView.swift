@@ -89,8 +89,8 @@ struct MainTabView: View {
             // This eliminates battery drain from constant polling
             guard let userId = authService.currentUser?.id else { return }
 
-            // Allow the UI to render first before setting up listeners
-            try? await Task.sleep(nanoseconds: 500_000_000) // 500ms delay
+            // PERFORMANCE: Removed 500ms delay - set up listeners immediately
+            // The delay was causing tab navigation to feel sluggish
 
             // Set up real-time listener for matches
             // AUDIT FIX: This single listener now handles both:
