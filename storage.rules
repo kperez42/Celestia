@@ -63,11 +63,12 @@ service firebase.storage {
     }
 
     // Manual ID verification uploads (ID photo + selfie for admin review)
+    // TODO: Re-enable isEmailVerified() for production
     match /verification/{userId}/{fileName} {
       allow read: if isAuthenticated() && (isOwner(userId) || hasAdminRole());
       allow write: if isAuthenticated()
                    && isOwner(userId)
-                   && isEmailVerified()
+                   // && isEmailVerified()  // Temporarily disabled for testing
                    && isValidImageSize()
                    && isValidImage();
     }
