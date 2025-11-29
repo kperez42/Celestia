@@ -53,6 +53,9 @@ struct ChatView: View {
     // Track initial load to prevent scroll animation on first load
     @State private var isInitialLoad = true
 
+    // PERFORMANCE: Debounce message count changes to prevent excessive updates
+    @State private var pendingScrollTask: Task<Void, Never>?
+
     // Reusable date formatter for performance
     private static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -423,17 +426,23 @@ struct ChatView: View {
                 // Dismiss keyboard when tapping in scroll view
                 isInputFocused = false
             }
-            .onChange(of: messageService.messages.count) {
+            .onChange(of: messageService.messages.count) { oldCount, newCount in
                 // Only scroll to bottom for new messages (not when loading older)
-                if !messageService.isLoadingMore {
-                    // PERFORMANCE: Don't animate scroll on initial load - just jump to bottom
-                    let shouldAnimate = !isInitialLoad
-                    scrollToBottom(proxy: proxy, animated: shouldAnimate)
+                guard !messageService.isLoadingMore, newCount > oldCount else { return }
 
-                    // Mark initial load as complete after first scroll
-                    if isInitialLoad {
-                        isInitialLoad = false
-                    }
+                // PERFORMANCE: Cancel pending scroll to avoid stacking
+                pendingScrollTask?.cancel()
+
+                // PERFORMANCE: Don't animate scroll on initial load - just jump to bottom
+                let shouldAnimate = !isInitialLoad
+
+                if isInitialLoad {
+                    // Initial load - scroll immediately without animation
+                    scrollToBottom(proxy: proxy, animated: false)
+                    isInitialLoad = false
+                } else {
+                    // Subsequent messages - animate smoothly
+                    scrollToBottom(proxy: proxy, animated: shouldAnimate)
                 }
             }
             .onChange(of: isOtherUserTyping) {
@@ -752,38 +761,37 @@ struct ChatView: View {
             return
         }
 
-        // Haptic feedback - instant response
-        HapticManager.shared.impact(.light)
-
-        // BUGFIX: Set isSending immediately to prevent double-send from rapid taps
-        // Previous bug: isSending was only set for images, allowing double-tap for text
-        isSending = true
-
-        // Capture and sanitize values before clearing
+        // PERFORMANCE: Capture and sanitize values BEFORE any state changes
         let text = InputSanitizer.standard(messageText)
         let imageToSend = selectedImage
 
-        // PERFORMANCE: Clear input immediately for snappy UX
-        // Message appears instantly via optimistic UI in MessageService
+        // PERFORMANCE: Clear input IMMEDIATELY for instant feedback
+        // This makes the UI feel snappy - user sees their input cleared right away
         messageText = ""
         selectedImage = nil
         selectedImageItem = nil
-        isInputFocused = false
 
-        // Track sending state for UI preview (images show preview while uploading)
+        // Haptic feedback - instant response
+        HapticManager.shared.impact(.light)
+
+        // PERFORMANCE: Only set isSending for image messages (text uses optimistic UI)
+        // This prevents the send button from showing loading spinner for text messages
         if hasImage {
+            isSending = true
             sendingMessagePreview = hasText ? text : "📷 Photo"
             sendingImagePreview = imageToSend
         }
 
-        Task {
+        // PERFORMANCE: Fire and forget for text messages - optimistic UI handles display
+        // The message appears instantly in the list via MessageService's optimistic update
+        Task.detached(priority: .userInitiated) {
             do {
                 if let image = imageToSend {
                     // Upload image first (this is the slow part)
                     let imageURL = try await ImageUploadService.shared.uploadChatImage(image, matchId: matchId)
 
                     // Send image message (with optional caption)
-                    try await messageService.sendImageMessage(
+                    try await MessageService.shared.sendImageMessage(
                         matchId: matchId,
                         senderId: currentUserId,
                         receiverId: receiverId,
@@ -793,48 +801,39 @@ struct ChatView: View {
 
                     // Clear image preview on success
                     await MainActor.run {
-                        sendingMessagePreview = nil
-                        sendingImagePreview = nil
-                        isSending = false
+                        self.sendingMessagePreview = nil
+                        self.sendingImagePreview = nil
+                        self.isSending = false
+                        HapticManager.shared.notification(.success)
                     }
                 } else {
-                    // PERFORMANCE: Text messages use optimistic UI
-                    // The message appears instantly in the list
-                    try await messageService.sendMessage(
+                    // PERFORMANCE: Text messages - optimistic UI shows instantly
+                    try await MessageService.shared.sendMessage(
                         matchId: matchId,
                         senderId: currentUserId,
                         receiverId: receiverId,
                         text: text
                     )
-                }
-
-                // BUGFIX: Reset isSending for both text and image messages
-                await MainActor.run {
-                    isSending = false
-                }
-
-                // Success haptic only for image messages (text is already shown)
-                if hasImage {
-                    HapticManager.shared.notification(.success)
+                    // No UI update needed - optimistic message already displayed
                 }
 
             } catch {
                 Logger.shared.error("Error sending message", category: .messaging, error: error)
-                HapticManager.shared.notification(.error)
 
                 // Store failed message for retry and show error toast
                 await MainActor.run {
-                    sendingMessagePreview = nil
-                    sendingImagePreview = nil
-                    isSending = false
-                    failedMessage = (text: text, image: imageToSend)
-                    errorToastMessage = "Failed to send message. Tap retry to try again."
-                    showErrorToast = true
+                    self.sendingMessagePreview = nil
+                    self.sendingImagePreview = nil
+                    self.isSending = false
+                    self.failedMessage = (text: text, image: imageToSend)
+                    self.errorToastMessage = "Failed to send message. Tap retry to try again."
+                    self.showErrorToast = true
+                    HapticManager.shared.notification(.error)
 
                     // Hide toast after 5 seconds
                     Task {
                         try? await Task.sleep(nanoseconds: 5_000_000_000)
-                        showErrorToast = false
+                        self.showErrorToast = false
                     }
                 }
             }

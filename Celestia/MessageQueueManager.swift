@@ -31,7 +31,23 @@ class MessageQueueManager: ObservableObject {
     private init() {
         loadQueuedMessages()
         setupNetworkObserver()
-        startSyncTimer()
+        // PERFORMANCE: Only start timer if queue has items
+        ensureTimerRunningIfNeeded()
+    }
+
+    // PERFORMANCE: Smart timer management - only run when queue has items
+    private func ensureTimerRunningIfNeeded() {
+        if !queuedMessages.isEmpty && syncTimer == nil {
+            startSyncTimer()
+        } else if queuedMessages.isEmpty && syncTimer != nil {
+            stopSyncTimer()
+        }
+    }
+
+    private func stopSyncTimer() {
+        syncTimer?.invalidate()
+        syncTimer = nil
+        Logger.shared.debug("MessageQueueManager: Timer stopped - queue empty", category: .messaging)
     }
 
     // MARK: - Public Methods
@@ -60,6 +76,9 @@ class MessageQueueManager: ObservableObject {
         saveQueuedMessages()
 
         Logger.shared.info("Message queued - messageId: \(queuedMessage.id)", category: .messaging)
+
+        // PERFORMANCE: Start timer now that we have items
+        ensureTimerRunningIfNeeded()
 
         // Try to send immediately if online
         if networkMonitor.isConnected {
@@ -143,6 +162,9 @@ class MessageQueueManager: ObservableObject {
         // Save queue state
         saveQueuedMessages()
 
+        // PERFORMANCE: Stop timer if queue is now empty
+        ensureTimerRunningIfNeeded()
+
         isSyncing = false
         Logger.shared.info("Queue processing complete", category: .messaging)
     }
@@ -171,6 +193,8 @@ class MessageQueueManager: ObservableObject {
         queuedMessages.removeAll()
         saveQueuedMessages()
         failedMessageCount = 0
+        // PERFORMANCE: Stop timer since queue is now empty
+        ensureTimerRunningIfNeeded()
     }
 
     // MARK: - Private Methods

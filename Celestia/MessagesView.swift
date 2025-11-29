@@ -34,7 +34,11 @@ struct MessagesView: View {
 
     // PERFORMANCE: Cache management to prevent reloads on every tab switch
     @State private var lastFetchTime: Date?
-    private let cacheDuration: TimeInterval = 60 // 1 minute cache for messages (more time-sensitive)
+    // PERFORMANCE: Increased cache duration - data updates via real-time listeners anyway
+    private let cacheDuration: TimeInterval = 300 // 5 minute cache - real-time updates handle freshness
+
+    // PERFORMANCE: Track if initial load is complete for instant subsequent displays
+    @State private var hasCompletedInitialLoad = false
 
     // PERFORMANCE: Use cached values
     var conversations: [(Match, User)] { cachedConversations }
@@ -102,16 +106,32 @@ struct MessagesView: View {
             .navigationTitle("")
             .navigationBarHidden(true)
             .task {
-                // PERFORMANCE: Check cache first - skip fetch if we have recent data
-                if let lastFetch = lastFetchTime,
-                   !cachedConversations.isEmpty,
-                   Date().timeIntervalSince(lastFetch) < cacheDuration {
-                    Logger.shared.debug("MessagesView cache HIT - using cached data", category: .performance)
-                    return // Use cached data - instant display
+                // PERFORMANCE: Show cached data immediately, fetch in background if stale
+                if hasCompletedInitialLoad && !cachedConversations.isEmpty {
+                    // Cache hit - show cached data instantly
+                    Logger.shared.debug("MessagesView cache HIT - instant display", category: .performance)
+
+                    // Background refresh if cache is stale (non-blocking)
+                    if let lastFetch = lastFetchTime,
+                       Date().timeIntervalSince(lastFetch) > cacheDuration {
+                        Task.detached(priority: .background) {
+                            await MainActor.run {
+                                Task {
+                                    await loadData()
+                                    updateCachedConversations()
+                                    lastFetchTime = Date()
+                                }
+                            }
+                        }
+                    }
+                    return
                 }
+
+                // First load - fetch data
                 await loadData()
                 updateCachedConversations()
                 lastFetchTime = Date()
+                hasCompletedInitialLoad = true
             }
             .refreshable {
                 HapticManager.shared.impact(.light)
