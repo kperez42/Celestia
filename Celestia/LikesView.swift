@@ -775,7 +775,7 @@ struct LikeCardSkeleton: View {
     }
 }
 
-// MARK: - Blurred Like Card (Premium Locked)
+// MARK: - Teaser Like Card (Shows profile, tapping opens subscription)
 
 struct BlurredLikeCard: View {
     let user: User
@@ -783,87 +783,54 @@ struct BlurredLikeCard: View {
 
     private let imageHeight: CGFloat = 180
 
-    // Consistent purple/pink brand gradient
-    private var gradientColors: [Color] {
-        [.purple, .pink]
-    }
-
     var body: some View {
         VStack(spacing: 0) {
-            // Blurred profile image with lock overlay
-            ZStack {
-                // Background image (blurred)
+            // Profile image - visible, no blur
+            ZStack(alignment: .topTrailing) {
                 if let imageURL = URL(string: user.profileImageURL), !user.profileImageURL.isEmpty {
                     CachedCardImage(url: imageURL)
                         .frame(height: imageHeight)
-                        .blur(radius: 20)
-                        .clipped()
                 } else {
-                    // Gradient placeholder
                     LinearGradient(
-                        colors: gradientColors.map { $0.opacity(0.7) },
+                        colors: [.purple.opacity(0.7), .pink.opacity(0.6)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                     .frame(height: imageHeight)
-                    .blur(radius: 10)
-                }
-
-                // Gradient overlay for depth
-                LinearGradient(
-                    colors: [
-                        gradientColors[0].opacity(0.3),
-                        gradientColors[1].opacity(0.5)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-
-                // Lock icon
-                VStack(spacing: 8) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.white.opacity(0.2))
-                            .frame(width: 56, height: 56)
-
-                        Image(systemName: "lock.fill")
-                            .font(.system(size: 24))
+                    .overlay {
+                        Text(user.fullName.prefix(1))
+                            .font(.system(size: 48, weight: .bold))
                             .foregroundColor(.white)
                     }
+                }
 
-                    Text("Premium")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(
-                            Capsule()
-                                .fill(Color.white.opacity(0.2))
-                        )
+                // Verified badge
+                if user.isVerified {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(.blue)
+                        .background(Circle().fill(.white).padding(-2))
+                        .padding(8)
                 }
             }
             .frame(height: imageHeight)
             .clipped()
             .cornerRadius(16, corners: [.topLeft, .topRight])
 
-            // Blurred user info
+            // User info - visible
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    // Blurred name placeholder
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(
-                            LinearGradient(
-                                colors: gradientColors.map { $0.opacity(0.3) },
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: 100, height: 20)
+                    Text(user.fullName)
+                        .font(.system(size: 17, weight: .semibold))
+                        .lineLimit(1)
+
+                    Text("\(user.age)")
+                        .font(.system(size: 17))
+                        .foregroundColor(.secondary)
 
                     Spacer()
 
-                    // Heart indicator
+                    // Heart indicator showing they liked you
                     Image(systemName: "heart.fill")
                         .foregroundColor(.pink)
                         .font(.caption)
@@ -872,40 +839,19 @@ struct BlurredLikeCard: View {
                 HStack(spacing: 4) {
                     Image(systemName: "mappin.circle.fill")
                         .font(.system(size: 12))
-                        .foregroundColor(.gray.opacity(0.5))
-
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(Color.gray.opacity(0.2))
-                        .frame(width: 60, height: 14)
+                        .foregroundColor(.purple)
+                    Text(user.location)
+                        .font(.system(size: 13))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
                 }
-
-                // Tap to unlock hint
-                HStack {
-                    Spacer()
-                    Text("Tap to unlock")
-                        .font(.caption2)
-                        .foregroundColor(.pink)
-                    Spacer()
-                }
-                .padding(.top, 4)
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(Color(.systemBackground))
         .cornerRadius(16)
-        .shadow(color: .purple.opacity(0.2), radius: 12, y: 4)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(
-                    LinearGradient(
-                        colors: [.purple.opacity(0.3), .pink.opacity(0.3)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-        )
+        .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
     }
 }
 

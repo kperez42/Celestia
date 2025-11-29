@@ -24,9 +24,7 @@ struct ProfileViewersView: View {
                 Color(.systemGroupedBackground)
                     .ignoresSafeArea()
 
-                if !isPremium {
-                    premiumRequiredView
-                } else if viewModel.isLoading {
+                if viewModel.isLoading {
                     loadingView
                 } else if viewModel.viewers.isEmpty {
                     emptyStateView
@@ -47,14 +45,10 @@ struct ProfileViewersView: View {
                 }
             }
             .task {
-                if isPremium {
-                    await viewModel.loadViewers()
-                }
+                await viewModel.loadViewers()
             }
             .refreshable {
-                if isPremium {
-                    await viewModel.loadViewers()
-                }
+                await viewModel.loadViewers()
             }
             .sheet(isPresented: $showUpgradeSheet) {
                 PremiumUpgradeView()
@@ -231,14 +225,23 @@ struct ProfileViewerCard: View {
     let viewer: ViewerInfo
     @EnvironmentObject var authService: AuthService
     @State private var showUserDetail = false
+    @State private var showUpgrade = false
+
+    private var isPremium: Bool {
+        authService.currentUser?.isPremium ?? false
+    }
 
     var body: some View {
         Button {
-            showUserDetail = true
             HapticManager.shared.impact(.light)
+            if isPremium {
+                showUserDetail = true
+            } else {
+                showUpgrade = true
+            }
         } label: {
             HStack(spacing: 12) {
-                // Profile image
+                // Profile image - always visible
                 Group {
                     if let imageURL = viewer.user.photos.first, let url = URL(string: imageURL) {
                         CachedProfileImage(url: url, size: 60)
@@ -253,7 +256,7 @@ struct ProfileViewerCard: View {
                     }
                 }
 
-                // User info
+                // User info - always visible
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
                         Text(viewer.user.fullName)
@@ -286,6 +289,10 @@ struct ProfileViewerCard: View {
         .buttonStyle(ScaleButtonStyle())
         .sheet(isPresented: $showUserDetail) {
             UserDetailView(user: viewer.user)
+                .environmentObject(authService)
+        }
+        .sheet(isPresented: $showUpgrade) {
+            PremiumUpgradeView()
                 .environmentObject(authService)
         }
     }
