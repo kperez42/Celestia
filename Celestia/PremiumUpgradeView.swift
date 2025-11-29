@@ -159,7 +159,7 @@ struct PremiumUpgradeView: View {
                 }
                 .onReceive(showcaseTimer) { _ in
                     withAnimation(.easeInOut(duration: 0.5)) {
-                        currentShowcaseIndex = (currentShowcaseIndex + 1) % 4
+                        currentShowcaseIndex = (currentShowcaseIndex + 1) % 3
                     }
                 }
                 .onReceive(countdownTimer) { _ in
@@ -284,7 +284,7 @@ struct PremiumUpgradeView: View {
 
     private var miniPreviewCards: some View {
         HStack(spacing: -15) {
-            ForEach(0..<4) { index in
+            ForEach(0..<3) { index in
                 RoundedRectangle(cornerRadius: 14)
                     .fill(Color.white)
                     .frame(width: 72, height: 92)
@@ -325,8 +325,7 @@ struct PremiumUpgradeView: View {
         switch index {
         case 0: return [.purple, .purple.opacity(0.7)]
         case 1: return [.pink, .pink.opacity(0.7)]
-        case 2: return [.orange, .orange.opacity(0.7)]
-        default: return [.cyan, .cyan.opacity(0.7)]
+        default: return [.orange, .orange.opacity(0.7)]
         }
     }
 
@@ -334,8 +333,7 @@ struct PremiumUpgradeView: View {
         switch index {
         case 0: return "infinity"
         case 1: return "eye.fill"
-        case 2: return "message.fill"
-        default: return "star.fill"
+        default: return "message.fill"
         }
     }
 
@@ -343,8 +341,7 @@ struct PremiumUpgradeView: View {
         switch index {
         case 0: return "Unlimited"
         case 1: return "See Likes"
-        case 2: return "Message"
-        default: return "Super Like"
+        default: return "Message"
         }
     }
 
@@ -682,7 +679,6 @@ struct PremiumUpgradeView: View {
         let showcases = [
             ("23 people liked you today", "heart.circle.fill", Color.pink, "See who they are with Premium"),
             ("You're missing 15+ profiles", "eye.slash.fill", Color.purple, "Get unlimited browsing"),
-            ("5 Super Likes ready to use", "star.circle.fill", Color.orange, "Stand out in their feed"),
             ("Send unlimited messages", "message.circle.fill", Color.blue, "Connect with anyone you like")
         ]
 
@@ -801,8 +797,6 @@ struct PremiumUpgradeView: View {
                     comparisonRow(feature: "Send Messages", free: "Limited", premium: "Unlimited", icon: "message.fill")
                     comparisonRow(feature: "Daily Likes", free: "50/day", premium: "Unlimited", icon: "heart.fill")
                     comparisonRow(feature: "See Who Likes You", free: "Hidden", premium: "Full Access", icon: "eye.fill")
-                    comparisonRow(feature: "Super Likes", free: "1/day", premium: "5/day", icon: "star.fill")
-                    comparisonRow(feature: "Rewind Profiles", free: "No", premium: "Unlimited", icon: "arrow.uturn.backward")
                     comparisonRow(feature: "Advanced Filters", free: "Basic", premium: "All Filters", icon: "slider.horizontal.3")
                     comparisonRow(feature: "Read Receipts", free: "No", premium: "Yes", icon: "checkmark.message.fill")
                     comparisonRow(feature: "Priority in Feed", free: "Standard", premium: "Top Priority", icon: "arrow.up.circle.fill")
