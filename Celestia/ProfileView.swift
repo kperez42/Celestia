@@ -905,10 +905,10 @@ struct ProfileView: View {
                             .foregroundColor(.yellow)
                     }
                     
-                    Text("Unlock unlimited likes & see who likes you")
+                    Text("Unlimited likes & see admirers")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                        .lineLimit(2)
+                        .lineLimit(1)
                 }
                 
                 Spacer()
