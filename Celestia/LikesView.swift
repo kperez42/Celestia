@@ -16,6 +16,7 @@ struct LikesView: View {
     @State private var selectedTab = 0
     @State private var selectedUserForDetail: User?
     @State private var showChatWithUser: User?
+    @State private var showPremiumUpgrade = false
 
     // Direct messaging state - using dedicated struct for item-based presentation
     @State private var chatPresentation: ChatPresentation?
@@ -27,6 +28,11 @@ struct LikesView: View {
     }
 
     private let tabs = ["Liked Me", "My Likes", "Mutual Likes"]
+
+    // Check if user has premium access
+    private var isPremium: Bool {
+        authService.currentUser?.isPremium == true
+    }
 
     var body: some View {
         NavigationStack {
@@ -88,6 +94,10 @@ struct LikesView: View {
                     ChatView(match: presentation.match, otherUser: presentation.user)
                         .environmentObject(authService)
                 }
+            }
+            .sheet(isPresented: $showPremiumUpgrade) {
+                PremiumUpgradeView()
+                    .environmentObject(authService)
             }
         }
         .networkStatusBanner()
@@ -293,9 +303,181 @@ struct LikesView: View {
                     title: "No Likes Yet",
                     message: "When someone likes you, they'll appear here. Keep swiping!"
                 )
-            } else {
+            } else if isPremium {
+                // Premium users see full profiles
                 likesGrid(users: viewModel.usersWhoLikedMe, showLikeBack: true)
+            } else {
+                // Free users see blurred/locked view with upgrade CTA
+                premiumLockedLikesView
             }
+        }
+    }
+
+    // MARK: - Premium Locked View
+
+    private var premiumLockedLikesView: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 24) {
+                // Blurred preview grid
+                blurredProfilesGrid
+
+                // Unlock CTA Card
+                premiumUnlockCard
+
+                // Features preview
+                premiumFeaturesPreview
+            }
+            .padding(16)
+            .padding(.bottom, 100)
+        }
+    }
+
+    private var blurredProfilesGrid: some View {
+        VStack(spacing: 12) {
+            // Show up to 4 blurred profiles in a grid
+            LazyVGrid(columns: [
+                GridItem(.flexible(), spacing: 12),
+                GridItem(.flexible(), spacing: 12)
+            ], spacing: 12) {
+                ForEach(Array(viewModel.usersWhoLikedMe.prefix(4).enumerated()), id: \.1.effectiveId) { index, user in
+                    BlurredLikeCard(user: user, index: index)
+                        .onTapGesture {
+                            HapticManager.shared.impact(.medium)
+                            showPremiumUpgrade = true
+                        }
+                }
+            }
+
+            // "And X more..." indicator if there are more likes
+            if viewModel.usersWhoLikedMe.count > 4 {
+                HStack(spacing: 8) {
+                    Image(systemName: "plus.circle.fill")
+                        .foregroundColor(.pink)
+                    Text("And \(viewModel.usersWhoLikedMe.count - 4) more people liked you!")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.top, 8)
+            }
+        }
+    }
+
+    private var premiumUnlockCard: some View {
+        VStack(spacing: 20) {
+            // Icon with glow effect
+            ZStack {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [Color.pink.opacity(0.3), Color.clear],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: 60
+                        )
+                    )
+                    .frame(width: 120, height: 120)
+
+                Image(systemName: "eye.fill")
+                    .font(.system(size: 44))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.pink, .purple],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+
+            VStack(spacing: 8) {
+                Text("\(viewModel.usersWhoLikedMe.count) people liked you!")
+                    .font(.title2)
+                    .fontWeight(.bold)
+
+                Text("Upgrade to Premium to see who they are and match instantly")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 20)
+            }
+
+            // Unlock button
+            Button {
+                HapticManager.shared.impact(.medium)
+                showPremiumUpgrade = true
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "crown.fill")
+                        .font(.body)
+
+                    Text("Unlock Who Likes You")
+                        .fontWeight(.semibold)
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(
+                    LinearGradient(
+                        colors: [.pink, .purple],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(14)
+                .shadow(color: .pink.opacity(0.4), radius: 10, y: 5)
+            }
+        }
+        .padding(24)
+        .background(
+            RoundedRectangle(cornerRadius: 24)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.08), radius: 20, y: 10)
+        )
+    }
+
+    private var premiumFeaturesPreview: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Premium Benefits")
+                .font(.headline)
+                .foregroundColor(.primary)
+
+            VStack(spacing: 12) {
+                premiumFeatureRow(icon: "eye.fill", title: "See Who Likes You", description: "Match instantly with people interested in you", color: .pink)
+                premiumFeatureRow(icon: "infinity", title: "Unlimited Likes", description: "No daily limits, like as many as you want", color: .purple)
+                premiumFeatureRow(icon: "bolt.fill", title: "Profile Boost", description: "Get 10x more views with monthly boosts", color: .orange)
+                premiumFeatureRow(icon: "arrow.uturn.backward", title: "Rewind", description: "Undo accidental swipes", color: .blue)
+            }
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.secondarySystemBackground))
+        )
+    }
+
+    private func premiumFeatureRow(icon: String, title: String, description: String, color: Color) -> some View {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.15))
+                    .frame(width: 40, height: 40)
+
+                Image(systemName: icon)
+                    .font(.system(size: 16))
+                    .foregroundColor(color)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+
+                Text(description)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
         }
     }
 
@@ -582,6 +764,146 @@ struct LikeCardSkeleton: View {
         .opacity(isAnimating ? 0.5 : 1.0)
         .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isAnimating)
         .onAppear { isAnimating = true }
+    }
+}
+
+// MARK: - Blurred Like Card (Premium Locked)
+
+struct BlurredLikeCard: View {
+    let user: User
+    let index: Int
+
+    private let imageHeight: CGFloat = 180
+
+    // Gradient colors for variety
+    private var gradientColors: [Color] {
+        let colorSets: [[Color]] = [
+            [.pink, .purple],
+            [.purple, .blue],
+            [.orange, .pink],
+            [.cyan, .purple]
+        ]
+        return colorSets[index % colorSets.count]
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Blurred profile image with lock overlay
+            ZStack {
+                // Background image (blurred)
+                if let imageURL = URL(string: user.profileImageURL), !user.profileImageURL.isEmpty {
+                    CachedCardImage(url: imageURL)
+                        .frame(height: imageHeight)
+                        .blur(radius: 20)
+                        .clipped()
+                } else {
+                    // Gradient placeholder
+                    LinearGradient(
+                        colors: gradientColors.map { $0.opacity(0.7) },
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .frame(height: imageHeight)
+                    .blur(radius: 10)
+                }
+
+                // Gradient overlay for depth
+                LinearGradient(
+                    colors: [
+                        gradientColors[0].opacity(0.3),
+                        gradientColors[1].opacity(0.5)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+
+                // Lock icon
+                VStack(spacing: 8) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.white.opacity(0.2))
+                            .frame(width: 56, height: 56)
+
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(.white)
+                    }
+
+                    Text("Premium")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule()
+                                .fill(Color.white.opacity(0.2))
+                        )
+                }
+            }
+            .frame(height: imageHeight)
+            .clipped()
+            .cornerRadius(16, corners: [.topLeft, .topRight])
+
+            // Blurred user info
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    // Blurred name placeholder
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(
+                            LinearGradient(
+                                colors: gradientColors.map { $0.opacity(0.3) },
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: 100, height: 20)
+
+                    Spacer()
+
+                    // Heart indicator
+                    Image(systemName: "heart.fill")
+                        .foregroundColor(.pink)
+                        .font(.caption)
+                }
+
+                HStack(spacing: 4) {
+                    Image(systemName: "mappin.circle.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(.gray.opacity(0.5))
+
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(width: 60, height: 14)
+                }
+
+                // Tap to unlock hint
+                HStack {
+                    Spacer()
+                    Text("Tap to unlock")
+                        .font(.caption2)
+                        .foregroundColor(.pink)
+                    Spacer()
+                }
+                .padding(.top, 4)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: gradientColors[0].opacity(0.2), radius: 10, y: 5)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(
+                    LinearGradient(
+                        colors: gradientColors.map { $0.opacity(0.3) },
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
     }
 }
 
