@@ -62,7 +62,9 @@ struct ContentView: View {
 
     private func updateAuthenticationState() {
         isAuthenticated = (authService.userSession != nil)
-        needsEmailVerification = isAuthenticated && !authService.isEmailVerified
+        // TEMPORARY: Email verification disabled for testing
+        needsEmailVerification = false
+        // needsEmailVerification = isAuthenticated && !authService.isEmailVerified
         Logger.shared.debug("ContentView: isAuthenticated=\(isAuthenticated), needsEmailVerification=\(needsEmailVerification)", category: .general)
     }
 }
