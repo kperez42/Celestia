@@ -169,6 +169,7 @@ struct PremiumUpgradeView: View {
                 }
             }
         }
+        .preferredColorScheme(.light) // Force light mode for this view only
     }
 
     // MARK: - Animated Background
