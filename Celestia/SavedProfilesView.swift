@@ -18,12 +18,7 @@ struct SavedProfilesView: View {
     @State private var selectedTab = 0
     @State private var showPremiumUpgrade = false
 
-    // Tab data: (line1, line2, icon)
-    private let tabData: [(String, String, String)] = [
-        ("My", "Saves", "bookmark.fill"),
-        ("Viewed", "Me", "eye.fill"),
-        ("Saved", "Me", "heart.fill")
-    ]
+    private let tabs = ["My Saves", "Viewed", "Saved"]
 
     private var isPremium: Bool {
         authService.currentUser?.isPremium ?? false
@@ -97,57 +92,49 @@ struct SavedProfilesView: View {
 
     private var tabSelector: some View {
         HStack(spacing: 0) {
-            ForEach(0..<tabData.count, id: \.self) { index in
-                let tab = tabData[index]
-                let count = countForTab(index)
-                let isSelected = selectedTab == index
-                let color: Color = index == 0 ? .orange : (index == 1 ? .blue : .pink)
-
+            ForEach(Array(tabs.enumerated()), id: \.0) { index, title in
                 Button {
-                    HapticManager.shared.impact(.light)
+                    HapticManager.shared.selection()
                     withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
                         selectedTab = index
                     }
                 } label: {
-                    VStack(spacing: 6) {
-                        // Icon
-                        Image(systemName: tab.2)
-                            .font(.title3)
-                            .foregroundStyle(
-                                isSelected ?
-                                LinearGradient(colors: [color, color.opacity(0.7)], startPoint: .top, endPoint: .bottom) :
-                                LinearGradient(colors: [.gray.opacity(0.5)], startPoint: .top, endPoint: .bottom)
-                            )
+                    VStack(spacing: 8) {
+                        HStack(spacing: 4) {
+                            Text(title)
+                                .font(.subheadline)
+                                .fontWeight(selectedTab == index ? .semibold : .medium)
 
-                        // Count
-                        Text("\(count)")
-                            .font(.title3)
-                            .fontWeight(.bold)
-                            .foregroundColor(isSelected ? .primary : .secondary)
-
-                        // Two-line label
-                        VStack(spacing: 0) {
-                            Text(tab.0)
-                                .font(.caption)
-                                .fontWeight(.medium)
-                            Text(tab.1)
-                                .font(.caption)
-                                .fontWeight(.medium)
+                            // Badge count
+                            let count = countForTab(index)
+                            if count > 0 {
+                                Text("\(count)")
+                                    .font(.caption2)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(
+                                        selectedTab == index ?
+                                        Color.orange : Color.gray.opacity(0.5)
+                                    )
+                                    .clipShape(Capsule())
+                            }
                         }
-                        .foregroundColor(isSelected ? .secondary : .gray)
+                        .foregroundColor(selectedTab == index ? .orange : .gray)
+
+                        Rectangle()
+                            .fill(selectedTab == index ? Color.orange : Color.clear)
+                            .frame(height: 3)
+                            .cornerRadius(1.5)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(isSelected ? color.opacity(0.1) : Color.clear)
-                    )
                 }
+                .frame(maxWidth: .infinity)
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(Color(.systemBackground))
+        .padding(.top, 12)
+        .background(Color.white)
     }
 
     private func countForTab(_ index: Int) -> Int {

@@ -596,20 +596,15 @@ struct ProfileView: View {
 
     private func statsRow(user: User) -> some View {
         HStack(spacing: 0) {
-            // Liked Me
+            // Liked
             Button {
-                if user.isPremium {
-                    showingPremiumUpgrade = true // Could show likes list if implemented
-                } else {
-                    showingPremiumUpgrade = true
-                }
+                showingPremiumUpgrade = true
                 HapticManager.shared.impact(.light)
             } label: {
                 statCard(
                     icon: "heart.fill",
                     value: isLoadingStats ? "-" : "\(accurateLikesReceived)",
-                    line1: "Liked",
-                    line2: "Me",
+                    label: "Liked",
                     color: .pink
                 )
             }
@@ -617,7 +612,7 @@ struct ProfileView: View {
             Divider()
                 .frame(height: 50)
 
-            // Viewed Me
+            // Viewed
             Button {
                 if user.isPremium {
                     showingProfileViewers = true
@@ -629,8 +624,7 @@ struct ProfileView: View {
                 statCard(
                     icon: "eye.fill",
                     value: isLoadingStats ? "-" : "\(accurateProfileViews)",
-                    line1: "Viewed",
-                    line2: "Me",
+                    label: "Viewed",
                     color: .blue
                 )
             }
@@ -638,20 +632,15 @@ struct ProfileView: View {
             Divider()
                 .frame(height: 50)
 
-            // Saved Me
+            // Saved
             Button {
-                if user.isPremium {
-                    showingPremiumUpgrade = true // Could show saves list if implemented
-                } else {
-                    showingPremiumUpgrade = true
-                }
+                showingPremiumUpgrade = true
                 HapticManager.shared.impact(.light)
             } label: {
                 statCard(
                     icon: "bookmark.fill",
                     value: isLoadingStats ? "-" : "\(accurateMatchCount)",
-                    line1: "Saved",
-                    line2: "Me",
+                    label: "Saved",
                     color: .purple
                 )
             }
@@ -665,7 +654,7 @@ struct ProfileView: View {
         .opacity(animateStats ? 1 : 0)
     }
 
-    private func statCard(icon: String, value: String, line1: String, line2: String, color: Color) -> some View {
+    private func statCard(icon: String, value: String, label: String, color: Color) -> some View {
         VStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.title2)
@@ -682,16 +671,10 @@ struct ProfileView: View {
                 .fontWeight(.bold)
                 .foregroundColor(.primary)
 
-            VStack(spacing: 0) {
-                Text(line1)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(.secondary)
-                Text(line2)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(.secondary)
-            }
+            Text(label)
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity)
     }
