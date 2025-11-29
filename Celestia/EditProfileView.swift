@@ -73,6 +73,35 @@ struct EditProfileView: View {
     let petsOptions = ["Prefer not to say", "No Pets", "Dog", "Cat", "Both", "Other Pets", "Want Pets"]
     let exerciseOptions = ["Prefer not to say", "Never", "Rarely", "Sometimes", "Often", "Daily"]
     let dietOptions = ["Prefer not to say", "No Restrictions", "Vegan", "Vegetarian", "Pescatarian", "Kosher", "Halal"]
+    let availableCountries = [
+        "United States",
+        "Canada",
+        "Mexico",
+        "United Kingdom",
+        "Australia",
+        "Germany",
+        "France",
+        "Spain",
+        "Italy",
+        "Brazil",
+        "Argentina",
+        "Japan",
+        "South Korea",
+        "China",
+        "India",
+        "Philippines",
+        "Vietnam",
+        "Thailand",
+        "Netherlands",
+        "Sweden",
+        "Norway",
+        "Denmark",
+        "Switzerland",
+        "Ireland",
+        "New Zealand",
+        "Singapore",
+        "Other"
+    ]
     let predefinedLanguages = [
         "English", "Spanish", "French", "German", "Italian", "Portuguese",
         "Russian", "Chinese", "Japanese", "Korean", "Arabic", "Hindi"
@@ -1085,7 +1114,21 @@ struct EditProfileView: View {
                             .foregroundColor(.red)
                             .font(.subheadline)
                     }
-                    TextField("USA", text: $country)
+                    Menu {
+                        ForEach(availableCountries, id: \.self) { countryOption in
+                            Button(countryOption) {
+                                country = countryOption
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Text(country.isEmpty ? "Select Country" : country)
+                                .foregroundColor(country.isEmpty ? .gray : .primary)
+                            Spacer()
+                            Image(systemName: "chevron.down")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
                         .padding()
                         .background(Color(.systemGray6))
                         .cornerRadius(12)
@@ -1093,6 +1136,7 @@ struct EditProfileView: View {
                             RoundedRectangle(cornerRadius: 12)
                                 .stroke(country.isEmpty ? Color.red.opacity(0.3) : Color.clear, lineWidth: 1)
                         )
+                    }
                 }
             }
         }

@@ -27,23 +27,36 @@ struct PremiumUpgradeView: View {
     @State private var currentShowcaseIndex = 0
     @State private var showLimitedOffer = true
 
+    // Countdown timer state
+    @State private var timeRemaining: Int = 23 * 3600 + 47 * 60 + 32 // 23:47:32
+    let countdownTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
     // Timer for showcase rotation
     let showcaseTimer = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
 
-    // Dark background color used throughout
-    private let darkBackground = Color(red: 0.1, green: 0.05, blue: 0.2)
+    // Light background colors
+    private let lightBackground = Color(red: 0.98, green: 0.98, blue: 1.0)
+    private let cardBackground = Color.white
+    private let softPurple = Color(red: 0.95, green: 0.94, blue: 1.0)
 
     var body: some View {
         ZStack {
-            // Full screen dark background
-            darkBackground
-                .ignoresSafeArea(.all)
+            // Full screen light background with subtle gradient
+            LinearGradient(
+                colors: [
+                    Color(red: 0.95, green: 0.94, blue: 1.0),
+                    Color(red: 1.0, green: 0.98, blue: 0.98),
+                    Color.white
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea(.all)
 
             NavigationStack {
                 ZStack {
                     // Content background
-                    darkBackground
-                        .ignoresSafeArea(.all)
+                    Color.clear
 
                     ScrollView(.vertical, showsIndicators: false) {
                         VStack(spacing: 0) {
@@ -51,14 +64,20 @@ struct PremiumUpgradeView: View {
                             immersiveHero
 
                             // Content sections
-                            VStack(spacing: 28) {
+                            VStack(spacing: 24) {
                                 // Limited time banner
                                 if showLimitedOffer {
                                     limitedTimeBanner
                                 }
 
+                                // Who liked you preview (FOMO section)
+                                whoLikedYouPreview
+
                                 // Live feature showcase
                                 liveFeatureShowcase
+
+                                // Premium badge highlight
+                                premiumBadgeSection
 
                                 // Stats that matter
                                 impactStats
@@ -91,11 +110,10 @@ struct PremiumUpgradeView: View {
                         floatingCTA
                     }
                 }
-                .background(darkBackground.ignoresSafeArea(.all))
                 .navigationTitle("")
                 .navigationBarTitleDisplayMode(.inline)
-                .toolbarBackground(.hidden, for: .navigationBar)
-                .toolbarColorScheme(.dark, for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
+                .toolbarBackground(Material.ultraThinMaterial, for: .navigationBar)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarLeading) {
                         Button {
@@ -104,7 +122,7 @@ struct PremiumUpgradeView: View {
                             Image(systemName: "xmark.circle.fill")
                                 .font(.title2)
                                 .symbolRenderingMode(.hierarchical)
-                                .foregroundColor(.white.opacity(0.8))
+                                .foregroundColor(.gray)
                         }
                     }
 
@@ -113,7 +131,7 @@ struct PremiumUpgradeView: View {
                             restorePurchases()
                         }
                         .font(.subheadline.weight(.medium))
-                        .foregroundColor(.white.opacity(0.9))
+                        .foregroundColor(.purple)
                     }
                 }
                 .alert("Welcome to Premium!", isPresented: $showPurchaseSuccess) {
@@ -144,123 +162,157 @@ struct PremiumUpgradeView: View {
                         currentShowcaseIndex = (currentShowcaseIndex + 1) % 4
                     }
                 }
+                .onReceive(countdownTimer) { _ in
+                    if timeRemaining > 0 {
+                        timeRemaining -= 1
+                    }
+                }
             }
         }
+        .preferredColorScheme(.light) // Force light mode for this view only
     }
 
     // MARK: - Animated Background
 
     private var animatedBackground: some View {
-        darkBackground
+        lightBackground
             .ignoresSafeArea(.all)
     }
 
     // MARK: - Immersive Hero
 
     private var immersiveHero: some View {
-        VStack(spacing: 20) {
-            Spacer().frame(height: 20)
+        ZStack {
+            // Soft gradient background for hero
+            LinearGradient(
+                colors: [
+                    Color.purple.opacity(0.15),
+                    Color.pink.opacity(0.1),
+                    Color.clear
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
 
-            // Animated crown with glow
-            ZStack {
-                // Glow rings
-                ForEach(0..<3) { i in
+            VStack(spacing: 20) {
+                Spacer().frame(height: 20)
+
+                // Animated crown with glow
+                ZStack {
+                    // Soft glow rings
+                    ForEach(0..<3) { i in
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    colors: [.purple.opacity(0.15), .clear],
+                                    center: .center,
+                                    startRadius: 20,
+                                    endRadius: CGFloat(60 + i * 20)
+                                )
+                            )
+                            .frame(width: CGFloat(100 + i * 30), height: CGFloat(100 + i * 30))
+                            .scaleEffect(pulseGlow ? 1.1 : 0.9)
+                            .opacity(pulseGlow ? 0.5 : 0.8)
+                            .animation(
+                                .easeInOut(duration: 1.5)
+                                .repeatForever(autoreverses: true)
+                                .delay(Double(i) * 0.2),
+                                value: pulseGlow
+                            )
+                    }
+
+                    // Crown background circle
                     Circle()
-                        .stroke(
+                        .fill(
                             LinearGradient(
-                                colors: [.yellow.opacity(0.3), .orange.opacity(0.1)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            ),
-                            lineWidth: 2
+                                colors: [Color.purple.opacity(0.2), Color.pink.opacity(0.15)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
                         )
-                        .frame(width: CGFloat(100 + i * 30), height: CGFloat(100 + i * 30))
-                        .scaleEffect(pulseGlow ? 1.1 : 0.9)
-                        .opacity(pulseGlow ? 0.3 : 0.6)
-                        .animation(
-                            .easeInOut(duration: 1.5)
-                            .repeatForever(autoreverses: true)
-                            .delay(Double(i) * 0.2),
-                            value: pulseGlow
+                        .frame(width: 100, height: 100)
+
+                    // Crown icon
+                    Image(systemName: "crown.fill")
+                        .font(.system(size: 50))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.orange, .yellow, .orange],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
                         )
+                        .shadow(color: .orange.opacity(0.4), radius: 10)
+                        .scaleEffect(animateHero ? 1 : 0.5)
+                        .rotationEffect(.degrees(animateHero ? 0 : -20))
+                }
+                .frame(height: 140)
+
+                // Title
+                VStack(spacing: 12) {
+                    Text("Go Premium")
+                        .font(.system(size: 38, weight: .bold, design: .rounded))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .opacity(animateHero ? 1 : 0)
+                        .offset(y: animateHero ? 0 : 20)
+
+                    Text("Discover more people who match your vibe")
+                        .font(.body.weight(.medium))
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .opacity(animateHero ? 1 : 0)
+                        .offset(y: animateHero ? 0 : 15)
                 }
 
-                // Crown icon
-                Image(systemName: "crown.fill")
-                    .font(.system(size: 60))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.yellow, .orange, .yellow],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .shadow(color: .yellow.opacity(0.6), radius: 20)
-                    .shadow(color: .orange.opacity(0.4), radius: 40)
-                    .scaleEffect(animateHero ? 1 : 0.5)
-                    .rotationEffect(.degrees(animateHero ? 0 : -20))
+                // Mini preview cards (showing what premium unlocks)
+                miniPreviewCards
+                    .padding(.top, 10)
+
+                Spacer().frame(height: 10)
             }
-            .frame(height: 160)
-
-            // Title
-            VStack(spacing: 12) {
-                Text("Go Premium")
-                    .font(.system(size: 42, weight: .bold, design: .rounded))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.white, .white.opacity(0.9)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .opacity(animateHero ? 1 : 0)
-                    .offset(y: animateHero ? 0 : 20)
-
-                Text("Discover more people who match your vibe")
-                    .font(.title3.weight(.medium))
-                    .foregroundColor(.white.opacity(0.8))
-                    .multilineTextAlignment(.center)
-                    .opacity(animateHero ? 1 : 0)
-                    .offset(y: animateHero ? 0 : 15)
-            }
-
-            // Mini preview cards (showing what premium unlocks)
-            miniPreviewCards
-                .padding(.top, 10)
-
-            Spacer().frame(height: 10)
         }
-        .frame(height: 420)
+        .frame(height: 380)
     }
 
     // MARK: - Mini Preview Cards
 
     private var miniPreviewCards: some View {
-        HStack(spacing: -20) {
+        HStack(spacing: -15) {
             ForEach(0..<4) { index in
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(
-                        LinearGradient(
-                            colors: previewCardColors(for: index),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 70, height: 90)
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color.white)
+                    .frame(width: 72, height: 92)
                     .overlay(
-                        VStack {
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(
+                                LinearGradient(
+                                    colors: previewCardColors(for: index),
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .padding(3)
+                    )
+                    .overlay(
+                        VStack(spacing: 6) {
                             Image(systemName: previewCardIcon(for: index))
                                 .font(.title2)
                                 .foregroundColor(.white)
                             Text(previewCardLabel(for: index))
                                 .font(.system(size: 9, weight: .semibold))
-                                .foregroundColor(.white.opacity(0.9))
+                                .foregroundColor(.white.opacity(0.95))
                         }
                     )
-                    .shadow(color: previewCardColors(for: index)[0].opacity(0.4), radius: 8, y: 4)
-                    .rotationEffect(.degrees(Double(index - 2) * 8))
-                    .offset(y: index == currentShowcaseIndex ? -10 : 0)
-                    .scaleEffect(index == currentShowcaseIndex ? 1.1 : 1)
+                    .shadow(color: previewCardColors(for: index)[0].opacity(0.3), radius: 8, y: 4)
+                    .rotationEffect(.degrees(Double(index - 2) * 6))
+                    .offset(y: index == currentShowcaseIndex ? -8 : 0)
+                    .scaleEffect(index == currentShowcaseIndex ? 1.08 : 1)
                     .zIndex(index == currentShowcaseIndex ? 1 : 0)
                     .opacity(animateCards ? 1 : 0)
                     .offset(y: animateCards ? 0 : 30)
@@ -298,48 +350,298 @@ struct PremiumUpgradeView: View {
 
     // MARK: - Limited Time Banner
 
+    private var formattedTime: String {
+        let hours = timeRemaining / 3600
+        let minutes = (timeRemaining % 3600) / 60
+        let seconds = timeRemaining % 60
+        return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+    }
+
     private var limitedTimeBanner: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "clock.fill")
-                .font(.title3)
-                .foregroundColor(.orange)
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                // Fire icon for urgency
+                Image(systemName: "flame.fill")
+                    .font(.title3)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.orange, .red],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Limited Time: 50% Off Annual")
-                    .font(.subheadline.weight(.bold))
-                    .foregroundColor(.white)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Flash Sale: 50% Off")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundColor(.primary)
 
-                Text("Offer ends soon")
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.7))
-            }
-
-            Spacer()
-
-            Button {
-                withAnimation {
-                    showLimitedOffer = false
+                    Text("Limited spots available in California")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.6))
+
+                Spacer()
+
+                Button {
+                    withAnimation {
+                        showLimitedOffer = false
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
             }
+
+            // Countdown timer
+            HStack(spacing: 8) {
+                Image(systemName: "clock.fill")
+                    .font(.caption)
+                    .foregroundColor(.red)
+
+                Text("Offer expires in:")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                Text(formattedTime)
+                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                    .foregroundColor(.red)
+
+                Spacer()
+
+                // Urgency indicator
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 6, height: 6)
+                    Text("12 people viewing")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color.red.opacity(0.08))
+            .cornerRadius(8)
         }
         .padding(16)
         .background(
             LinearGradient(
-                colors: [Color.orange.opacity(0.3), Color.red.opacity(0.2)],
+                colors: [Color.orange.opacity(0.1), Color.red.opacity(0.06)],
                 startPoint: .leading,
                 endPoint: .trailing
             )
         )
-        .background(.ultraThinMaterial.opacity(0.5))
+        .background(Color.white)
         .cornerRadius(16)
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.orange.opacity(0.4), lineWidth: 1)
+                .stroke(Color.orange.opacity(0.25), lineWidth: 1)
         )
+        .shadow(color: .orange.opacity(0.1), radius: 8, y: 4)
+    }
+
+    // MARK: - Who Liked You Preview (FOMO Section)
+
+    private var whoLikedYouPreview: some View {
+        VStack(spacing: 16) {
+            // Header
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text("People Who Like You")
+                            .font(.title3.weight(.bold))
+                            .foregroundColor(.primary)
+
+                        // Notification badge
+                        Text("23")
+                            .font(.caption.weight(.bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.pink)
+                            .clipShape(Capsule())
+                    }
+
+                    Text("Unlock to see who's interested in you")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "lock.fill")
+                    .font(.title3)
+                    .foregroundColor(.gray.opacity(0.5))
+            }
+
+            // Blurred profile previews
+            HStack(spacing: -12) {
+                ForEach(0..<5) { index in
+                    ZStack {
+                        // Blurred avatar placeholder
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: blurredAvatarColors(for: index),
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 56, height: 56)
+                            .blur(radius: 6)
+
+                        // Overlay blur effect
+                        Circle()
+                            .fill(Color.white.opacity(0.3))
+                            .frame(width: 56, height: 56)
+
+                        // Lock icon on last one
+                        if index == 4 {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.black.opacity(0.4))
+                                    .frame(width: 56, height: 56)
+
+                                VStack(spacing: 2) {
+                                    Image(systemName: "lock.fill")
+                                        .font(.caption)
+                                        .foregroundColor(.white)
+                                    Text("+18")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(.white)
+                                }
+                            }
+                        }
+                    }
+                    .overlay(
+                        Circle()
+                            .stroke(Color.white, lineWidth: 3)
+                    )
+                    .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
+
+            // CTA Button
+            Button {
+                // Scroll to pricing
+            } label: {
+                HStack {
+                    Image(systemName: "eye.fill")
+                        .font(.subheadline)
+                    Text("See Who Likes You")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(
+                    LinearGradient(
+                        colors: [.pink, .purple],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(12)
+            }
+        }
+        .padding(20)
+        .background(Color.white)
+        .cornerRadius(20)
+        .shadow(color: .pink.opacity(0.15), radius: 15, y: 8)
+    }
+
+    private func blurredAvatarColors(for index: Int) -> [Color] {
+        let colorSets: [[Color]] = [
+            [.pink, .purple],
+            [.blue, .cyan],
+            [.orange, .yellow],
+            [.green, .mint],
+            [.purple, .indigo]
+        ]
+        return colorSets[index % colorSets.count]
+    }
+
+    // MARK: - Premium Badge Section
+
+    private var premiumBadgeSection: some View {
+        HStack(spacing: 16) {
+            // Badge preview
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.purple.opacity(0.2), .pink.opacity(0.15)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 70, height: 70)
+
+                // Premium badge icon
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 50, height: 50)
+
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.title2)
+                        .foregroundColor(.white)
+                }
+                .shadow(color: .purple.opacity(0.4), radius: 8, y: 4)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Get the Premium Badge")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundColor(.primary)
+
+                Text("Stand out with a verified premium badge on your profile. Members with badges get 2.5x more matches!")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(3)
+
+                // Social proof
+                HStack(spacing: 4) {
+                    Image(systemName: "person.2.fill")
+                        .font(.caption2)
+                        .foregroundColor(.purple)
+                    Text("1,247 members upgraded today")
+                        .font(.caption2)
+                        .foregroundColor(.purple)
+                }
+            }
+        }
+        .padding(18)
+        .background(
+            LinearGradient(
+                colors: [Color.purple.opacity(0.08), Color.pink.opacity(0.05)],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        )
+        .background(Color.white)
+        .cornerRadius(16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(
+                    LinearGradient(
+                        colors: [.purple.opacity(0.3), .pink.opacity(0.2)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
+        .shadow(color: .purple.opacity(0.1), radius: 10, y: 5)
     }
 
     // MARK: - Live Feature Showcase
@@ -348,8 +650,8 @@ struct PremiumUpgradeView: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text("What You're Missing")
-                    .font(.title2.weight(.bold))
-                    .foregroundColor(.white)
+                    .font(.title3.weight(.bold))
+                    .foregroundColor(.primary)
 
                 Spacer()
 
@@ -380,8 +682,8 @@ struct PremiumUpgradeView: View {
         let showcases = [
             ("23 people liked you today", "heart.circle.fill", Color.pink, "See who they are with Premium"),
             ("You're missing 15+ profiles", "eye.slash.fill", Color.purple, "Get unlimited browsing"),
-            ("5 Super Likes ready to use", "star.circle.fill", Color.yellow, "Stand out in their feed"),
-            ("Send unlimited messages", "message.circle.fill", Color.orange, "Connect with anyone you like")
+            ("5 Super Likes ready to use", "star.circle.fill", Color.orange, "Stand out in their feed"),
+            ("Send unlimited messages", "message.circle.fill", Color.blue, "Connect with anyone you like")
         ]
 
         let current = showcases[currentShowcaseIndex]
@@ -390,47 +692,38 @@ struct PremiumUpgradeView: View {
             // Icon
             ZStack {
                 Circle()
-                    .fill(current.2.opacity(0.2))
-                    .frame(width: 60, height: 60)
+                    .fill(current.2.opacity(0.12))
+                    .frame(width: 56, height: 56)
 
                 Image(systemName: current.1)
-                    .font(.title)
+                    .font(.title2)
                     .foregroundColor(current.2)
             }
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(current.0)
-                    .font(.headline)
-                    .foregroundColor(.white)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.primary)
 
                 Text(current.3)
-                    .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.7))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
             Spacer()
 
             Image(systemName: "chevron.right")
-                .font(.subheadline.weight(.semibold))
-                .foregroundColor(.white.opacity(0.5))
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.gray)
         }
-        .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(.ultraThinMaterial.opacity(0.3))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(
-                            LinearGradient(
-                                colors: [current.2.opacity(0.5), current.2.opacity(0.1)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 1
-                        )
-                )
+        .padding(18)
+        .background(Color.white)
+        .cornerRadius(16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(current.2.opacity(0.2), lineWidth: 1)
         )
-        .shadow(color: current.2.opacity(0.2), radius: 20, y: 10)
+        .shadow(color: current.2.opacity(0.12), radius: 12, y: 6)
     }
 
     // MARK: - Impact Stats
@@ -439,21 +732,22 @@ struct PremiumUpgradeView: View {
         HStack(spacing: 0) {
             impactStat(value: "3x", label: "More Matches", icon: "heart.fill", color: .pink)
 
-            Divider()
-                .frame(height: 50)
-                .background(Color.white.opacity(0.2))
+            Rectangle()
+                .fill(Color.gray.opacity(0.15))
+                .frame(width: 1, height: 45)
 
             impactStat(value: "10x", label: "More Views", icon: "eye.fill", color: .purple)
 
-            Divider()
-                .frame(height: 50)
-                .background(Color.white.opacity(0.2))
+            Rectangle()
+                .fill(Color.gray.opacity(0.15))
+                .frame(width: 1, height: 45)
 
             impactStat(value: "85%", label: "Success Rate", icon: "checkmark.seal.fill", color: .green)
         }
         .padding(.vertical, 20)
-        .background(.ultraThinMaterial.opacity(0.3))
-        .cornerRadius(20)
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.06), radius: 10, y: 4)
     }
 
     private func impactStat(value: String, label: String, icon: String, color: Color) -> some View {
@@ -465,12 +759,12 @@ struct PremiumUpgradeView: View {
 
                 Text(value)
                     .font(.title2.weight(.bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(.primary)
             }
 
             Text(label)
                 .font(.caption)
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity)
     }
@@ -478,24 +772,47 @@ struct PremiumUpgradeView: View {
     // MARK: - Feature Comparison
 
     private var featureComparisonSection: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 16) {
             Text("Premium vs Free")
-                .font(.title2.weight(.bold))
-                .foregroundColor(.white)
+                .font(.title3.weight(.bold))
+                .foregroundColor(.primary)
 
-            VStack(spacing: 12) {
-                comparisonRow(feature: "Send Messages", free: "Limited", premium: "Unlimited", icon: "message.fill")
-                comparisonRow(feature: "Daily Likes", free: "50/day", premium: "Unlimited", icon: "heart.fill")
-                comparisonRow(feature: "See Who Likes You", free: "Hidden", premium: "Full Access", icon: "eye.fill")
-                comparisonRow(feature: "Super Likes", free: "1/day", premium: "5/day", icon: "star.fill")
-                comparisonRow(feature: "Rewind Profiles", free: "No", premium: "Unlimited", icon: "arrow.uturn.backward")
-                comparisonRow(feature: "Advanced Filters", free: "Basic", premium: "All Filters", icon: "slider.horizontal.3")
-                comparisonRow(feature: "Read Receipts", free: "No", premium: "Yes", icon: "checkmark.message.fill")
-                comparisonRow(feature: "Priority in Feed", free: "Standard", premium: "Top Priority", icon: "arrow.up.circle.fill")
+            VStack(spacing: 0) {
+                // Header row
+                HStack(spacing: 8) {
+                    Text("Feature")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("Free")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.secondary)
+                        .frame(width: 60)
+                    Text("Premium")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.purple)
+                        .frame(width: 70)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(Color.gray.opacity(0.06))
+
+                VStack(spacing: 0) {
+                    comparisonRow(feature: "Send Messages", free: "Limited", premium: "Unlimited", icon: "message.fill")
+                    comparisonRow(feature: "Daily Likes", free: "50/day", premium: "Unlimited", icon: "heart.fill")
+                    comparisonRow(feature: "See Who Likes You", free: "Hidden", premium: "Full Access", icon: "eye.fill")
+                    comparisonRow(feature: "Super Likes", free: "1/day", premium: "5/day", icon: "star.fill")
+                    comparisonRow(feature: "Rewind Profiles", free: "No", premium: "Unlimited", icon: "arrow.uturn.backward")
+                    comparisonRow(feature: "Advanced Filters", free: "Basic", premium: "All Filters", icon: "slider.horizontal.3")
+                    comparisonRow(feature: "Read Receipts", free: "No", premium: "Yes", icon: "checkmark.message.fill")
+                    comparisonRow(feature: "Priority in Feed", free: "Standard", premium: "Top Priority", icon: "arrow.up.circle.fill")
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
             }
-            .padding(20)
-            .background(.ultraThinMaterial.opacity(0.3))
-            .cornerRadius(20)
+            .background(Color.white)
+            .cornerRadius(16)
+            .shadow(color: .black.opacity(0.06), radius: 10, y: 4)
         }
     }
 
@@ -508,34 +825,31 @@ struct PremiumUpgradeView: View {
 
             Text(feature)
                 .font(.caption)
-                .foregroundColor(.white)
+                .foregroundColor(.primary)
                 .lineLimit(1)
 
             Spacer(minLength: 4)
 
             Text(free)
                 .font(.caption2)
-                .foregroundColor(.white.opacity(0.4))
-                .frame(width: 55, alignment: .trailing)
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 8))
-                .foregroundColor(.white.opacity(0.3))
+                .foregroundColor(.secondary)
+                .frame(width: 60, alignment: .trailing)
 
             Text(premium)
                 .font(.caption2.weight(.semibold))
                 .foregroundColor(.green)
-                .frame(width: 60, alignment: .trailing)
+                .frame(width: 70, alignment: .trailing)
         }
+        .padding(.vertical, 10)
     }
 
     // MARK: - Pricing Section
 
     private var pricingSection: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 16) {
             Text("Choose Your Plan")
-                .font(.title2.weight(.bold))
-                .foregroundColor(.white)
+                .font(.title3.weight(.bold))
+                .foregroundColor(.primary)
 
             VStack(spacing: 12) {
                 ForEach(PremiumPlan.allCases, id: \.self) { plan in
@@ -560,8 +874,8 @@ struct PremiumUpgradeView: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text("Success Stories")
-                    .font(.title2.weight(.bold))
-                    .foregroundColor(.white)
+                    .font(.title3.weight(.bold))
+                    .foregroundColor(.primary)
 
                 Spacer()
 
@@ -570,7 +884,7 @@ struct PremiumUpgradeView: View {
                         .foregroundColor(.yellow)
                     Text("4.8")
                         .fontWeight(.bold)
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                 }
             }
 
@@ -604,12 +918,12 @@ struct PremiumUpgradeView: View {
             Circle()
                 .fill(
                     LinearGradient(
-                        colors: [color, color.opacity(0.6)],
+                        colors: [color, color.opacity(0.7)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
-                .frame(width: 40, height: 40)
+                .frame(width: 44, height: 44)
                 .overlay(
                     Text(initials)
                         .font(.subheadline.weight(.semibold))
@@ -620,14 +934,14 @@ struct PremiumUpgradeView: View {
                 HStack {
                     Text(name)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
 
                     Spacer()
 
                     HStack(spacing: 2) {
                         ForEach(0..<5) { _ in
                             Image(systemName: "star.fill")
-                                .font(.system(size: 8))
+                                .font(.system(size: 9))
                                 .foregroundColor(.yellow)
                         }
                     }
@@ -635,54 +949,61 @@ struct PremiumUpgradeView: View {
 
                 Text("\"\(story)\"")
                     .font(.caption)
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundColor(.secondary)
                     .lineLimit(2)
                     .italic()
             }
         }
         .padding(16)
-        .background(.ultraThinMaterial.opacity(0.3))
-        .cornerRadius(16)
+        .background(Color.white)
+        .cornerRadius(14)
+        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
     }
 
     // MARK: - Guarantee Section
 
     private var guaranteeSection: some View {
         HStack(spacing: 16) {
-            Image(systemName: "checkmark.shield.fill")
-                .font(.title)
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [.green, .mint],
-                        startPoint: .top,
-                        endPoint: .bottom
+            ZStack {
+                Circle()
+                    .fill(Color.green.opacity(0.12))
+                    .frame(width: 50, height: 50)
+                Image(systemName: "checkmark.shield.fill")
+                    .font(.title2)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.green, .mint],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
                     )
-                )
+            }
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("7-Day Free Trial")
-                    .font(.headline)
-                    .foregroundColor(.white)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.primary)
 
                 Text("Try Premium risk-free. Cancel anytime before your trial ends and pay nothing.")
                     .font(.caption)
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(.secondary)
             }
         }
-        .padding(20)
+        .padding(18)
         .background(
             LinearGradient(
-                colors: [Color.green.opacity(0.15), Color.green.opacity(0.05)],
+                colors: [Color.green.opacity(0.08), Color.mint.opacity(0.04)],
                 startPoint: .leading,
                 endPoint: .trailing
             )
         )
-        .background(.ultraThinMaterial.opacity(0.3))
-        .cornerRadius(20)
+        .background(Color.white)
+        .cornerRadius(16)
         .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.green.opacity(0.3), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.green.opacity(0.2), lineWidth: 1)
         )
+        .shadow(color: .green.opacity(0.08), radius: 8, y: 4)
     }
 
     // MARK: - FAQ Section
@@ -690,10 +1011,10 @@ struct PremiumUpgradeView: View {
     private var faqSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Common Questions")
-                .font(.title2.weight(.bold))
-                .foregroundColor(.white)
+                .font(.title3.weight(.bold))
+                .foregroundColor(.primary)
 
-            VStack(spacing: 8) {
+            VStack(spacing: 10) {
                 FAQItem(
                     question: "Can I cancel anytime?",
                     answer: "Yes! Cancel your subscription anytime from Settings. You'll keep premium access until your billing period ends."
@@ -715,7 +1036,7 @@ struct PremiumUpgradeView: View {
     // MARK: - Floating CTA
 
     private var floatingCTA: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 8) {
             // Main button
             Button {
                 purchasePremium()
@@ -723,6 +1044,7 @@ struct PremiumUpgradeView: View {
                 HStack(spacing: 10) {
                     Image(systemName: "crown.fill")
                         .font(.body)
+                        .foregroundColor(.yellow)
 
                     Text("Start 7-Day Free Trial")
                         .font(.subheadline.weight(.semibold))
@@ -747,37 +1069,50 @@ struct PremiumUpgradeView: View {
                     )
                 )
                 .cornerRadius(16)
-                .shadow(color: .purple.opacity(0.4), radius: 15, y: 8)
+                .shadow(color: .purple.opacity(0.3), radius: 12, y: 6)
             }
             .disabled(isProcessing)
 
             // Trust indicators
-            HStack(spacing: 12) {
+            HStack(spacing: 16) {
                 Label("Secure", systemImage: "lock.fill")
                 Label("Cancel Anytime", systemImage: "arrow.clockwise")
             }
             .font(.caption2)
-            .foregroundColor(.white.opacity(0.5))
+            .foregroundColor(.secondary)
         }
         .padding(.horizontal, 20)
         .padding(.top, 12)
-        .padding(.bottom, 8)
-        .background(darkBackground.ignoresSafeArea(edges: .bottom))
+        .padding(.bottom, 10)
+        .background(
+            LinearGradient(
+                colors: [Color.white.opacity(0.95), Color.white],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea(edges: .bottom)
+        )
+        .background(
+            Rectangle()
+                .fill(Color.white)
+                .shadow(color: .black.opacity(0.08), radius: 10, y: -5)
+                .ignoresSafeArea(edges: .bottom)
+        )
     }
 
     // MARK: - Processing Overlay
 
     private var processingOverlay: some View {
         ZStack {
-            Color.black.opacity(0.6)
+            Color.black.opacity(0.4)
                 .ignoresSafeArea()
 
             VStack(spacing: 24) {
                 // Animated loading
                 ZStack {
                     Circle()
-                        .stroke(Color.white.opacity(0.2), lineWidth: 4)
-                        .frame(width: 60, height: 60)
+                        .stroke(Color.gray.opacity(0.2), lineWidth: 4)
+                        .frame(width: 56, height: 56)
 
                     Circle()
                         .trim(from: 0, to: 0.7)
@@ -789,7 +1124,7 @@ struct PremiumUpgradeView: View {
                             ),
                             style: StrokeStyle(lineWidth: 4, lineCap: .round)
                         )
-                        .frame(width: 60, height: 60)
+                        .frame(width: 56, height: 56)
                         .rotationEffect(.degrees(isProcessing ? 360 : 0))
                         .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: isProcessing)
                 }
@@ -797,17 +1132,18 @@ struct PremiumUpgradeView: View {
                 VStack(spacing: 8) {
                     Text("Processing...")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
 
                     Text("Please wait while we set up your premium access")
                         .font(.caption)
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                 }
             }
-            .padding(40)
-            .background(.ultraThinMaterial)
-            .cornerRadius(24)
+            .padding(36)
+            .background(Color.white)
+            .cornerRadius(20)
+            .shadow(color: .black.opacity(0.15), radius: 20, y: 10)
         }
     }
 
@@ -914,7 +1250,7 @@ struct PremiumPlanCard: View {
                 // Selection indicator
                 ZStack {
                     Circle()
-                        .stroke(isSelected ? Color.purple : Color.white.opacity(0.3), lineWidth: 2)
+                        .stroke(isSelected ? Color.purple : Color.gray.opacity(0.3), lineWidth: 2)
                         .frame(width: 24, height: 24)
 
                     if isSelected {
@@ -926,7 +1262,7 @@ struct PremiumPlanCard: View {
                                     endPoint: .bottomTrailing
                                 )
                             )
-                            .frame(width: 16, height: 16)
+                            .frame(width: 14, height: 14)
                     }
                 }
 
@@ -934,12 +1270,12 @@ struct PremiumPlanCard: View {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 8) {
                         Text(plan.name)
-                            .font(.headline)
-                            .foregroundColor(.white)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.primary)
 
                         if plan == .annual {
                             Text("BEST VALUE")
-                                .font(.system(size: 10, weight: .bold))
+                                .font(.system(size: 9, weight: .bold))
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
@@ -955,7 +1291,7 @@ struct PremiumPlanCard: View {
 
                         if plan == .sixMonth {
                             Text("POPULAR")
-                                .font(.system(size: 10, weight: .bold))
+                                .font(.system(size: 9, weight: .bold))
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
@@ -966,7 +1302,7 @@ struct PremiumPlanCard: View {
 
                     Text(plan.totalPrice)
                         .font(.caption)
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(.secondary)
                 }
 
                 Spacer()
@@ -975,18 +1311,12 @@ struct PremiumPlanCard: View {
                 VStack(alignment: .trailing, spacing: 2) {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
                         Text(plan.price)
-                            .font(.title2.weight(.bold))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [.white, .white.opacity(0.9)],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
+                            .font(.title3.weight(.bold))
+                            .foregroundColor(.primary)
 
                         Text("/\(plan.period)")
                             .font(.caption)
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(.secondary)
                     }
 
                     if plan.savings > 0 {
@@ -996,24 +1326,24 @@ struct PremiumPlanCard: View {
                     }
                 }
             }
-            .padding(20)
+            .padding(18)
             .background(
-                RoundedRectangle(cornerRadius: 20)
+                RoundedRectangle(cornerRadius: 16)
                     .fill(isSelected ?
                         LinearGradient(
-                            colors: [Color.purple.opacity(0.3), Color.pink.opacity(0.2)],
+                            colors: [Color.purple.opacity(0.08), Color.pink.opacity(0.05)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ) :
                         LinearGradient(
-                            colors: [Color.white.opacity(0.1), Color.white.opacity(0.05)],
+                            colors: [Color.white, Color.white],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 20)
+                RoundedRectangle(cornerRadius: 16)
                     .stroke(
                         isSelected ?
                         LinearGradient(
@@ -1022,14 +1352,14 @@ struct PremiumPlanCard: View {
                             endPoint: .bottomTrailing
                         ) :
                         LinearGradient(
-                            colors: [Color.white.opacity(0.2), Color.white.opacity(0.1)],
+                            colors: [Color.gray.opacity(0.2), Color.gray.opacity(0.15)],
                             startPoint: .top,
                             endPoint: .bottom
                         ),
                         lineWidth: isSelected ? 2 : 1
                     )
             )
-            .shadow(color: isSelected ? .purple.opacity(0.3) : .clear, radius: 15, y: 8)
+            .shadow(color: isSelected ? .purple.opacity(0.15) : .black.opacity(0.04), radius: isSelected ? 12 : 6, y: isSelected ? 6 : 3)
         }
     }
 }
@@ -1052,14 +1382,14 @@ struct FAQItem: View {
                 HStack {
                     Text(question)
                         .font(.subheadline.weight(.medium))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                         .multilineTextAlignment(.leading)
 
                     Spacer()
 
                     Image(systemName: "chevron.down")
                         .font(.caption.weight(.semibold))
-                        .foregroundColor(.white.opacity(0.5))
+                        .foregroundColor(.gray)
                         .rotationEffect(.degrees(isExpanded ? 180 : 0))
                 }
                 .padding(16)
@@ -1068,13 +1398,14 @@ struct FAQItem: View {
             if isExpanded {
                 Text(answer)
                     .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(.secondary)
                     .padding(.horizontal, 16)
                     .padding(.bottom, 16)
             }
         }
-        .background(.ultraThinMaterial.opacity(0.2))
-        .cornerRadius(12)
+        .background(Color.white)
+        .cornerRadius(14)
+        .shadow(color: .black.opacity(0.04), radius: 6, y: 3)
     }
 }
 
