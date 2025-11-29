@@ -896,12 +896,12 @@ struct FeedDiscoverView: View {
     }
 
     private func handleMessage(user: User) {
-        // Premium check - messaging requires subscription
-        guard authService.currentUser?.isPremium == true else {
-            HapticManager.shared.impact(.medium)
-            showPremiumUpgrade = true
-            return
-        }
+        // TODO: Uncomment to enable premium-only messaging
+        // guard authService.currentUser?.isPremium == true else {
+        //     HapticManager.shared.impact(.medium)
+        //     showPremiumUpgrade = true
+        //     return
+        // }
 
         guard let currentUserId = authService.currentUser?.effectiveId,
               let userId = user.effectiveId else {
