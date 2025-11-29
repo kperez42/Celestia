@@ -592,274 +592,102 @@ struct ProfileView: View {
         }
     }
     
-    // MARK: - Stats Row (Enticing Clickable Cards)
+    // MARK: - Stats Row
 
     private func statsRow(user: User) -> some View {
-        VStack(spacing: 12) {
-            // Who Liked Me - Premium feature teaser
+        HStack(spacing: 0) {
+            // Likes - tappable, opens subscription
+            Button {
+                showingPremiumUpgrade = true
+                HapticManager.shared.impact(.light)
+            } label: {
+                statCard(
+                    icon: "heart.fill",
+                    value: isLoadingStats ? "-" : "\(accurateLikesReceived)",
+                    label: "Likes",
+                    color: .pink,
+                    locked: !user.isPremium
+                )
+            }
+
+            Divider()
+                .frame(height: 40)
+
+            // Views - tappable
             Button {
                 if user.isPremium {
-                    // Premium users could see a likes list (if implemented)
-                    showingPremiumUpgrade = true
+                    showingProfileViewers = true
                 } else {
                     showingPremiumUpgrade = true
                 }
-                HapticManager.shared.impact(.medium)
+                HapticManager.shared.impact(.light)
             } label: {
-                enticingStatCard(
-                    icon: "heart.fill",
-                    title: "Who Liked Me",
-                    count: isLoadingStats ? nil : accurateLikesReceived,
-                    subtitle: user.isPremium ? "See your admirers" : "Unlock to see who likes you",
-                    gradientColors: [.pink, .red],
-                    isPremium: user.isPremium
+                statCard(
+                    icon: "eye.fill",
+                    value: isLoadingStats ? "-" : "\(accurateProfileViews)",
+                    label: "Views",
+                    color: .blue,
+                    locked: !user.isPremium
                 )
             }
-            .accessibilityLabel("Who Liked Me")
-            .accessibilityHint(user.isPremium ? "See people who liked your profile" : "Upgrade to premium to see who liked you")
 
-            HStack(spacing: 12) {
-                // Who Viewed Me
-                Button {
-                    if user.isPremium {
-                        showingProfileViewers = true
-                    } else {
-                        showingPremiumUpgrade = true
-                    }
-                    HapticManager.shared.impact(.medium)
-                } label: {
-                    enticingStatCardCompact(
-                        icon: "eye.fill",
-                        title: "Who Viewed Me",
-                        count: isLoadingStats ? nil : accurateProfileViews,
-                        gradientColors: [.blue, .cyan],
-                        isPremium: user.isPremium
-                    )
-                }
-                .accessibilityLabel("Who Viewed Me")
-                .accessibilityHint(user.isPremium ? "See who viewed your profile" : "Upgrade to premium to see profile viewers")
+            Divider()
+                .frame(height: 40)
 
-                // Your Matches
-                Button {
-                    // Matches could navigate to matches tab or subscription
-                    if !user.isPremium && accurateMatchCount > 0 {
-                        showingPremiumUpgrade = true
-                    }
-                    HapticManager.shared.impact(.medium)
-                } label: {
-                    enticingStatCardCompact(
-                        icon: "heart.circle.fill",
-                        title: "Matches",
-                        count: isLoadingStats ? nil : accurateMatchCount,
-                        gradientColors: [.purple, .pink],
-                        isPremium: true // Always show count for matches
-                    )
-                }
-                .accessibilityLabel("Your Matches")
-                .accessibilityHint("View your matches")
+            // Matches - tappable
+            Button {
+                showingPremiumUpgrade = true
+                HapticManager.shared.impact(.light)
+            } label: {
+                statCard(
+                    icon: "heart.circle.fill",
+                    value: isLoadingStats ? "-" : "\(accurateMatchCount)",
+                    label: "Matches",
+                    color: .purple,
+                    locked: false
+                )
             }
         }
+        .padding(.vertical, 20)
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
         .padding(.horizontal, 20)
         .scaleEffect(animateStats ? 1 : 0.8)
         .opacity(animateStats ? 1 : 0)
     }
 
-    // Large enticing stat card (for "Who Liked Me")
-    private func enticingStatCard(icon: String, title: String, count: Int?, subtitle: String, gradientColors: [Color], isPremium: Bool) -> some View {
-        HStack(spacing: 16) {
-            // Icon with gradient background
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [gradientColors[0].opacity(0.2), gradientColors[1].opacity(0.15)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 56, height: 56)
-
-                Image(systemName: icon)
-                    .font(.title2)
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: gradientColors,
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Text(title)
-                        .font(.headline)
-                        .foregroundColor(.primary)
-
-                    if !isPremium {
-                        Image(systemName: "lock.fill")
-                            .font(.caption)
-                            .foregroundColor(.orange)
-                    }
-                }
-
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-            }
-
-            Spacer()
-
-            // Count or blurred count
-            ZStack {
-                if let count = count {
-                    if isPremium {
-                        Text("\(count)")
-                            .font(.title.weight(.bold))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: gradientColors,
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                    } else {
-                        // Show blurred/teaser count for non-premium
-                        ZStack {
-                            Text("\(count)")
-                                .font(.title.weight(.bold))
-                                .foregroundColor(.gray)
-                                .blur(radius: 6)
-
-                            // Sparkle overlay to entice
-                            Image(systemName: "sparkles")
-                                .font(.caption)
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: gradientColors,
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                        }
-                    }
-                } else {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                }
-            }
-            .frame(minWidth: 50)
-
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color(.systemBackground))
-                .shadow(color: gradientColors[0].opacity(0.15), radius: 12, y: 6)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(
+    private func statCard(icon: String, value: String, label: String, color: Color, locked: Bool = false) -> some View {
+        VStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundStyle(
                     LinearGradient(
-                        colors: [gradientColors[0].opacity(0.3), gradientColors[1].opacity(0.2)],
+                        colors: [color, color.opacity(0.7)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1.5
+                    )
                 )
-        )
-    }
 
-    // Compact enticing stat card (for "Who Viewed Me" and "Matches")
-    private func enticingStatCardCompact(icon: String, title: String, count: Int?, gradientColors: [Color], isPremium: Bool) -> some View {
-        VStack(spacing: 12) {
-            // Icon
             ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [gradientColors[0].opacity(0.15), gradientColors[1].opacity(0.1)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 44, height: 44)
+                Text(value)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+                    .blur(radius: locked ? 4 : 0)
 
-                Image(systemName: icon)
-                    .font(.title3)
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: gradientColors,
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            }
-
-            // Count
-            ZStack {
-                if let count = count {
-                    if isPremium {
-                        Text("\(count)")
-                            .font(.title2.weight(.bold))
-                            .foregroundColor(.primary)
-                    } else {
-                        ZStack {
-                            Text("\(count)")
-                                .font(.title2.weight(.bold))
-                                .foregroundColor(.gray)
-                                .blur(radius: 5)
-
-                            Image(systemName: "lock.fill")
-                                .font(.caption2)
-                                .foregroundColor(.orange)
-                        }
-                    }
-                } else {
-                    ProgressView()
-                        .scaleEffect(0.7)
-                }
-            }
-
-            // Title
-            HStack(spacing: 4) {
-                Text(title)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-
-                if !isPremium {
+                if locked {
                     Image(systemName: "lock.fill")
-                        .font(.system(size: 8))
+                        .font(.caption2)
                         .foregroundColor(.orange)
                 }
             }
+
+            Text(label)
+                .font(.caption)
+                .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
-        .padding(.horizontal, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(
-                    LinearGradient(
-                        colors: [gradientColors[0].opacity(0.2), gradientColors[1].opacity(0.15)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-        )
     }
     
     // MARK: - Referral Card
