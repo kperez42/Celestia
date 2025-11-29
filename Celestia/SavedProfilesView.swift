@@ -18,7 +18,12 @@ struct SavedProfilesView: View {
     @State private var selectedTab = 0
     @State private var showPremiumUpgrade = false
 
-    private let tabs = ["My Saves", "Viewed Me", "Saved Me"]
+    // Tab data: (line1, line2, icon)
+    private let tabData: [(String, String, String)] = [
+        ("My", "Saves", "bookmark.fill"),
+        ("Viewed", "Me", "eye.fill"),
+        ("Saved", "Me", "heart.fill")
+    ]
 
     private var isPremium: Bool {
         authService.currentUser?.isPremium ?? false
@@ -92,56 +97,56 @@ struct SavedProfilesView: View {
 
     private var tabSelector: some View {
         HStack(spacing: 0) {
-            ForEach(0..<tabs.count, id: \.self) { index in
+            ForEach(0..<tabData.count, id: \.self) { index in
+                let tab = tabData[index]
+                let count = countForTab(index)
+                let isSelected = selectedTab == index
+                let color: Color = index == 0 ? .orange : (index == 1 ? .blue : .pink)
+
                 Button {
                     HapticManager.shared.impact(.light)
                     withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
                         selectedTab = index
                     }
                 } label: {
-                    VStack(spacing: 8) {
-                        HStack(spacing: 6) {
-                            Text(tabs[index])
-                                .font(.subheadline)
-                                .fontWeight(selectedTab == index ? .bold : .medium)
-
-                            // Show count badge
-                            let count = countForTab(index)
-                            if count > 0 {
-                                Text("\(count)")
-                                    .font(.caption2)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(selectedTab == index ? .white : .orange)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(
-                                        Capsule()
-                                            .fill(selectedTab == index ? Color.orange : Color.orange.opacity(0.2))
-                                    )
-                            }
-                        }
-                        .foregroundColor(selectedTab == index ? .primary : .secondary)
-
-                        // Indicator line
-                        Rectangle()
-                            .fill(
-                                selectedTab == index ?
-                                LinearGradient(
-                                    colors: [.orange, .pink],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                ) :
-                                LinearGradient(colors: [Color.clear], startPoint: .leading, endPoint: .trailing)
+                    VStack(spacing: 6) {
+                        // Icon
+                        Image(systemName: tab.2)
+                            .font(.title3)
+                            .foregroundStyle(
+                                isSelected ?
+                                LinearGradient(colors: [color, color.opacity(0.7)], startPoint: .top, endPoint: .bottom) :
+                                LinearGradient(colors: [.gray.opacity(0.5)], startPoint: .top, endPoint: .bottom)
                             )
-                            .frame(height: 3)
-                            .cornerRadius(1.5)
+
+                        // Count
+                        Text("\(count)")
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .foregroundColor(isSelected ? .primary : .secondary)
+
+                        // Two-line label
+                        VStack(spacing: 0) {
+                            Text(tab.0)
+                                .font(.caption)
+                                .fontWeight(.medium)
+                            Text(tab.1)
+                                .font(.caption)
+                                .fontWeight(.medium)
+                        }
+                        .foregroundColor(isSelected ? .secondary : .gray)
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(isSelected ? color.opacity(0.1) : Color.clear)
+                    )
                 }
-                .frame(maxWidth: .infinity)
             }
         }
-        .padding(.horizontal)
-        .padding(.top, 8)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
         .background(Color(.systemBackground))
     }
 
