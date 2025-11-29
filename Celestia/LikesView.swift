@@ -106,6 +106,13 @@ struct LikesView: View {
     // MARK: - Message Handling
 
     private func handleMessage(user: User) {
+        // TODO: Uncomment to enable premium-only messaging
+        // guard authService.currentUser?.isPremium == true else {
+        //     HapticManager.shared.impact(.medium)
+        //     showPremiumUpgrade = true
+        //     return
+        // }
+
         guard let currentUserId = authService.currentUser?.effectiveId,
               let userId = user.effectiveId else {
             return
@@ -661,7 +668,7 @@ struct LikeProfileCard: View {
                 HStack(spacing: 4) {
                     Image(systemName: "mappin.circle.fill")
                         .font(.system(size: 12))
-                        .foregroundColor(.pink)
+                        .foregroundColor(.purple)
                     Text(user.location)
                         .font(.system(size: 13))
                         .foregroundColor(.secondary)
@@ -697,9 +704,9 @@ struct LikeProfileCard: View {
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(Color.white)
+        .background(Color(.systemBackground))
         .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
+        .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
         .onTapGesture {
             HapticManager.shared.impact(.light)
             onTap()
@@ -724,7 +731,7 @@ struct LikeProfileCard: View {
     private var placeholderImage: some View {
         ZStack {
             LinearGradient(
-                colors: [Color.pink.opacity(0.7), Color.purple.opacity(0.5)],
+                colors: [Color.purple.opacity(0.7), Color.pink.opacity(0.6)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
@@ -759,8 +766,9 @@ struct LikeCardSkeleton: View {
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(Color.white)
+        .background(Color(.systemBackground))
         .cornerRadius(16)
+        .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
         .opacity(isAnimating ? 0.5 : 1.0)
         .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isAnimating)
         .onAppear { isAnimating = true }
@@ -775,15 +783,9 @@ struct BlurredLikeCard: View {
 
     private let imageHeight: CGFloat = 180
 
-    // Gradient colors for variety
+    // Consistent purple/pink brand gradient
     private var gradientColors: [Color] {
-        let colorSets: [[Color]] = [
-            [.pink, .purple],
-            [.purple, .blue],
-            [.orange, .pink],
-            [.cyan, .purple]
-        ]
-        return colorSets[index % colorSets.count]
+        [.purple, .pink]
     }
 
     var body: some View {
@@ -890,14 +892,14 @@ struct BlurredLikeCard: View {
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(Color.white)
+        .background(Color(.systemBackground))
         .cornerRadius(16)
-        .shadow(color: gradientColors[0].opacity(0.2), radius: 10, y: 5)
+        .shadow(color: .purple.opacity(0.2), radius: 12, y: 4)
         .overlay(
             RoundedRectangle(cornerRadius: 16)
                 .stroke(
                     LinearGradient(
-                        colors: gradientColors.map { $0.opacity(0.3) },
+                        colors: [.purple.opacity(0.3), .pink.opacity(0.3)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),

@@ -19,8 +19,13 @@ struct SettingsView: View {
 
     // CODE QUALITY FIX: Define URL constants to avoid force unwrapping
     private static let supportEmailURL = URL(string: "mailto:support@celestia.app")!
-    private static let privacyPolicyURL = URL(string: "https://celestia.app/privacy")!
-    private static let termsOfServiceURL = URL(string: "https://celestia.app/terms")!
+
+    // Legal document states
+    @State private var showPrivacyPolicy = false
+    @State private var showTermsOfService = false
+    @State private var showCommunityGuidelines = false
+    @State private var showSafetyTips = false
+    @State private var showCookiePolicy = false
 
     var body: some View {
         NavigationStack {
@@ -193,20 +198,87 @@ struct SettingsView: View {
                         HStack {
                             Image(systemName: "envelope")
                             Text("Contact Support")
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.caption)
+                                .foregroundColor(.gray)
                         }
                     }
+                }
 
-                    Link(destination: Self.privacyPolicyURL) {
+                Section("Legal") {
+                    Button {
+                        showPrivacyPolicy = true
+                    } label: {
                         HStack {
                             Image(systemName: "lock.shield")
+                                .foregroundColor(.blue)
                             Text("Privacy Policy")
+                                .foregroundColor(.primary)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.gray)
                         }
                     }
 
-                    Link(destination: Self.termsOfServiceURL) {
+                    Button {
+                        showTermsOfService = true
+                    } label: {
                         HStack {
                             Image(systemName: "doc.text")
+                                .foregroundColor(.purple)
                             Text("Terms of Service")
+                                .foregroundColor(.primary)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                    }
+
+                    Button {
+                        showCommunityGuidelines = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "person.3.fill")
+                                .foregroundColor(.green)
+                            Text("Community Guidelines")
+                                .foregroundColor(.primary)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                    }
+
+                    Button {
+                        showSafetyTips = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "shield.checkered")
+                                .foregroundColor(.orange)
+                            Text("Dating Safety Tips")
+                                .foregroundColor(.primary)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                    }
+
+                    Button {
+                        showCookiePolicy = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "server.rack")
+                                .foregroundColor(.gray)
+                            Text("Cookie & Data Policy")
+                                .foregroundColor(.primary)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.gray)
                         }
                     }
                 }
@@ -279,6 +351,21 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showAdminDashboard) {
                 AdminModerationDashboard()
+            }
+            .sheet(isPresented: $showPrivacyPolicy) {
+                LegalDocumentView(documentType: .privacyPolicy)
+            }
+            .sheet(isPresented: $showTermsOfService) {
+                LegalDocumentView(documentType: .termsOfService)
+            }
+            .sheet(isPresented: $showCommunityGuidelines) {
+                LegalDocumentView(documentType: .communityGuidelines)
+            }
+            .sheet(isPresented: $showSafetyTips) {
+                LegalDocumentView(documentType: .safetyTips)
+            }
+            .sheet(isPresented: $showCookiePolicy) {
+                LegalDocumentView(documentType: .cookiePolicy)
             }
         }
     }

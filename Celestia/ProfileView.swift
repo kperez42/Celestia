@@ -78,9 +78,6 @@ struct ProfileView: View {
 
                                     // Primary action - Edit Profile
                                     editButton
-
-                                    // Secondary action - Profile Boost
-                                    ProfileBoostButton()
                                 }
                                 .padding(.top, 20)
 
@@ -905,10 +902,10 @@ struct ProfileView: View {
                             .foregroundColor(.yellow)
                     }
                     
-                    Text("Unlock unlimited likes & see who likes you")
+                    Text("Unlimited likes & see admirers")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                        .lineLimit(2)
+                        .lineLimit(1)
                 }
                 
                 Spacer()

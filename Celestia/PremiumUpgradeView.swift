@@ -146,7 +146,6 @@ struct PremiumUpgradeView: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
     }
 
     // MARK: - Animated Background
@@ -283,7 +282,7 @@ struct PremiumUpgradeView: View {
         switch index {
         case 0: return "infinity"
         case 1: return "eye.fill"
-        case 2: return "bolt.fill"
+        case 2: return "message.fill"
         default: return "star.fill"
         }
     }
@@ -292,7 +291,7 @@ struct PremiumUpgradeView: View {
         switch index {
         case 0: return "Unlimited"
         case 1: return "See Likes"
-        case 2: return "Boost"
+        case 2: return "Message"
         default: return "Super Like"
         }
     }
@@ -382,7 +381,7 @@ struct PremiumUpgradeView: View {
             ("23 people liked you today", "heart.circle.fill", Color.pink, "See who they are with Premium"),
             ("You're missing 15+ profiles", "eye.slash.fill", Color.purple, "Get unlimited browsing"),
             ("5 Super Likes ready to use", "star.circle.fill", Color.yellow, "Stand out in their feed"),
-            ("Boost available now", "bolt.circle.fill", Color.orange, "Be seen by 10x more people")
+            ("Send unlimited messages", "message.circle.fill", Color.orange, "Connect with anyone you like")
         ]
 
         let current = showcases[currentShowcaseIndex]
@@ -485,11 +484,11 @@ struct PremiumUpgradeView: View {
                 .foregroundColor(.white)
 
             VStack(spacing: 12) {
+                comparisonRow(feature: "Send Messages", free: "Limited", premium: "Unlimited", icon: "message.fill")
                 comparisonRow(feature: "Daily Likes", free: "50/day", premium: "Unlimited", icon: "heart.fill")
                 comparisonRow(feature: "See Who Likes You", free: "Hidden", premium: "Full Access", icon: "eye.fill")
                 comparisonRow(feature: "Super Likes", free: "1/day", premium: "5/day", icon: "star.fill")
                 comparisonRow(feature: "Rewind Profiles", free: "No", premium: "Unlimited", icon: "arrow.uturn.backward")
-                comparisonRow(feature: "Profile Boost", free: "No", premium: "Monthly", icon: "bolt.fill")
                 comparisonRow(feature: "Advanced Filters", free: "Basic", premium: "All Filters", icon: "slider.horizontal.3")
                 comparisonRow(feature: "Read Receipts", free: "No", premium: "Yes", icon: "checkmark.message.fill")
                 comparisonRow(feature: "Priority in Feed", free: "Standard", premium: "Top Priority", icon: "arrow.up.circle.fill")

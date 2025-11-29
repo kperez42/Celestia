@@ -550,7 +550,7 @@ struct SavedProfileCard: View {
                                 .frame(height: imageHeight)
                         } else {
                             LinearGradient(
-                                colors: [.purple.opacity(0.6), .pink.opacity(0.5)],
+                                colors: [.purple.opacity(0.7), .pink.opacity(0.6)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
@@ -610,7 +610,7 @@ struct SavedProfileCard: View {
                     HStack(spacing: 4) {
                         Image(systemName: "mappin.circle.fill")
                             .font(.system(size: 12))
-                            .foregroundColor(.pink)
+                            .foregroundColor(.purple)
                         Text(savedProfile.user.location)
                             .font(.system(size: 13))
                             .foregroundColor(.secondary)
@@ -619,12 +619,12 @@ struct SavedProfileCard: View {
                 }
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.white)
+                .background(Color(.systemBackground))
                 .opacity(isUnsaving ? 0.5 : 1.0)
             }
-            .background(Color.white)
+            .background(Color(.systemBackground))
             .cornerRadius(16)
-            .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
+            .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
         }
         .buttonStyle(ScaleButtonStyle())
         .disabled(isUnsaving)
@@ -665,9 +665,9 @@ struct SavedProfileCardSkeleton: View {
             }
             .padding(12)
         }
-        .background(Color.white)
+        .background(Color(.systemBackground))
         .cornerRadius(16)
-        .shadow(color: .black.opacity(0.1), radius: 5, y: 2)
+        .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
     }
 }
 
@@ -706,7 +706,7 @@ struct SavedYouCard: View {
                             .frame(height: imageHeight)
                     } else {
                         LinearGradient(
-                            colors: [.blue.opacity(0.6), .purple.opacity(0.5)],
+                            colors: [.purple.opacity(0.7), .pink.opacity(0.6)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -723,7 +723,7 @@ struct SavedYouCard: View {
                 .contentShape(Rectangle())
                 .cornerRadius(16, corners: [.topLeft, .topRight])
 
-                // User info section with white background - matching Likes page
+                // User info section
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text(profile.user.fullName)
@@ -746,7 +746,7 @@ struct SavedYouCard: View {
                     HStack(spacing: 4) {
                         Image(systemName: "mappin.circle.fill")
                             .font(.system(size: 12))
-                            .foregroundColor(.pink)
+                            .foregroundColor(.purple)
                         Text(profile.user.location)
                             .font(.system(size: 13))
                             .foregroundColor(.secondary)
@@ -755,11 +755,11 @@ struct SavedYouCard: View {
                 }
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.white)
+                .background(Color(.systemBackground))
             }
-            .background(Color.white)
+            .background(Color(.systemBackground))
             .cornerRadius(16)
-            .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
+            .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -784,7 +784,7 @@ struct ViewedProfileCard: View {
                             .frame(height: imageHeight)
                     } else {
                         LinearGradient(
-                            colors: [.green.opacity(0.6), .teal.opacity(0.5)],
+                            colors: [.purple.opacity(0.7), .pink.opacity(0.6)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -801,7 +801,7 @@ struct ViewedProfileCard: View {
                 .contentShape(Rectangle())
                 .cornerRadius(16, corners: [.topLeft, .topRight])
 
-                // User info section with white background
+                // User info section
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text(profile.user.fullName)
@@ -824,7 +824,7 @@ struct ViewedProfileCard: View {
                     HStack(spacing: 4) {
                         Image(systemName: "eye.fill")
                             .font(.system(size: 12))
-                            .foregroundColor(.green)
+                            .foregroundColor(.purple)
                         Text(profile.viewedAt.timeAgoDisplay())
                             .font(.system(size: 13))
                             .foregroundColor(.secondary)
@@ -833,11 +833,11 @@ struct ViewedProfileCard: View {
                 }
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.white)
+                .background(Color(.systemBackground))
             }
-            .background(Color.white)
+            .background(Color(.systemBackground))
             .cornerRadius(16)
-            .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
+            .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
         }
         .buttonStyle(ScaleButtonStyle())
     }
