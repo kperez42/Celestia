@@ -933,7 +933,12 @@ class ManualIDVerificationViewModel: ObservableObject {
         }
 
         let ref = storage.reference().child(path)
-        _ = try await ref.putDataAsync(imageData)
+
+        // Set metadata with content type - required for storage rules validation
+        let metadata = StorageMetadata()
+        metadata.contentType = "image/jpeg"
+
+        _ = try await ref.putDataAsync(imageData, metadata: metadata)
         let url = try await ref.downloadURL()
         return url.absoluteString
     }

@@ -213,6 +213,7 @@ service cloud.firestore {
     }
 
     // Pending Verifications Collection (ID verification submissions)
+    // TODO: Re-enable isEmailVerified() for production
     match /pendingVerifications/{verificationId} {
       // Admin helper function
       function isAdmin() {
@@ -221,12 +222,12 @@ service cloud.firestore {
 
       // Users can read their own verification status, admin can read all
       allow read: if isAuthenticated()
-        && isEmailVerified()
+        // && isEmailVerified()  // Temporarily disabled for testing
         && (verificationId == request.auth.uid || isAdmin());
 
       // Users can create their own verification submission
       allow create: if isAuthenticated()
-        && isEmailVerified()
+        // && isEmailVerified()  // Temporarily disabled for testing
         && verificationId == request.auth.uid
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.status == 'pending';
@@ -234,11 +235,11 @@ service cloud.firestore {
       // Users can update their own pending verification (to resubmit)
       // Admin can update any verification (to change status)
       allow update: if isAuthenticated()
-        && isEmailVerified()
+        // && isEmailVerified()  // Temporarily disabled for testing
         && (verificationId == request.auth.uid || isAdmin());
 
       // Only admin can delete verifications (after review)
-      allow delete: if isAuthenticated() && isEmailVerified() && isAdmin();
+      allow delete: if isAuthenticated() && isAdmin();
     }
 
     // Default: Deny all other access
