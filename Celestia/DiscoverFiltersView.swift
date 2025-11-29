@@ -53,25 +53,20 @@ struct DiscoverFiltersView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 0) {
-                    // Quick Filters Header
-                    quickFiltersHeader
-
-                    // Active Filters Summary
+                    // Active Filters Summary (no quick filters - cleaner UI)
                     if filters.hasActiveFilters {
                         activeFiltersSummary
                     }
 
                     // Filter Sections
                     VStack(spacing: 12) {
-                        // Basics Section
+                        // Basics Section (no distance - advertising in specific city)
                         filterSection(
                             section: .basics,
                             icon: "slider.horizontal.3",
                             content: {
                                 VStack(spacing: 20) {
                                     ageRangeSection
-                                    Divider().padding(.horizontal)
-                                    distanceSection
                                     Divider().padding(.horizontal)
                                     verificationSection
                                 }
@@ -171,78 +166,6 @@ struct DiscoverFiltersView: View {
                 }
             }
         }
-    }
-
-    // MARK: - Quick Filters Header
-
-    private var quickFiltersHeader: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Quick Filters")
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 20)
-                .padding(.top, 16)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    QuickFilterChip(
-                        title: "Verified Only",
-                        icon: "checkmark.seal.fill",
-                        isActive: filters.showVerifiedOnly,
-                        color: .blue
-                    ) {
-                        HapticManager.shared.impact(.light)
-                        filters.showVerifiedOnly.toggle()
-                    }
-
-                    QuickFilterChip(
-                        title: "Near Me",
-                        icon: "location.fill",
-                        isActive: filters.maxDistance <= 25,
-                        color: .green
-                    ) {
-                        HapticManager.shared.impact(.light)
-                        filters.maxDistance = filters.maxDistance <= 25 ? 50 : 25
-                    }
-
-                    QuickFilterChip(
-                        title: "Similar Age",
-                        icon: "person.2.fill",
-                        isActive: (filters.maxAge - filters.minAge) <= 10,
-                        color: .orange
-                    ) {
-                        HapticManager.shared.impact(.light)
-                        if (filters.maxAge - filters.minAge) <= 10 {
-                            filters.minAge = 18
-                            filters.maxAge = 65
-                        } else {
-                            filters.minAge = 25
-                            filters.maxAge = 35
-                        }
-                    }
-
-                    QuickFilterChip(
-                        title: "Looking for Love",
-                        icon: "heart.fill",
-                        isActive: filters.relationshipGoals.contains("Long-term Relationship") || filters.relationshipGoals.contains("Marriage"),
-                        color: .pink
-                    ) {
-                        HapticManager.shared.impact(.light)
-                        if filters.relationshipGoals.contains("Long-term Relationship") {
-                            filters.relationshipGoals.remove("Long-term Relationship")
-                            filters.relationshipGoals.remove("Marriage")
-                        } else {
-                            filters.relationshipGoals.insert("Long-term Relationship")
-                            filters.relationshipGoals.insert("Marriage")
-                        }
-                    }
-                }
-                .padding(.horizontal, 20)
-            }
-        }
-        .padding(.bottom, 8)
-        .background(Color(.systemBackground))
     }
 
     // MARK: - Active Filters Summary
@@ -403,42 +326,6 @@ struct DiscoverFiltersView: View {
                     ), in: Double(filters.minAge + 1)...65, step: 1)
                     .tint(.pink)
                 }
-            }
-        }
-    }
-
-    // MARK: - Distance Section
-
-    private var distanceSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("Maximum Distance")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-
-                Spacer()
-
-                Text("\(Int(filters.maxDistance)) mi")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.purple)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.purple.opacity(0.1))
-                    .cornerRadius(8)
-            }
-
-            Slider(value: $filters.maxDistance, in: 5...100, step: 5)
-                .tint(.purple)
-
-            HStack {
-                Text("5 mi")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Spacer()
-                Text("100 mi")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
             }
         }
     }
@@ -734,7 +621,7 @@ struct DiscoverFiltersView: View {
 
     private func countActiveFilters() -> Int {
         var count = 0
-        if filters.maxDistance < 50 { count += 1 }
+        // Removed distance filter - not needed for city-specific advertising
         if filters.minAge > 18 { count += 1 }
         if filters.maxAge < 65 { count += 1 }
         if filters.showVerifiedOnly { count += 1 }
@@ -756,7 +643,7 @@ struct DiscoverFiltersView: View {
         switch section {
         case .basics:
             var count = 0
-            if filters.maxDistance < 50 { count += 1 }
+            // Removed distance filter
             if filters.minAge > 18 || filters.maxAge < 65 { count += 1 }
             if filters.showVerifiedOnly { count += 1 }
             return count > 0 ? count : nil

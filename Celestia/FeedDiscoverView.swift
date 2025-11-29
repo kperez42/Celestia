@@ -62,7 +62,25 @@ struct FeedDiscoverView: View {
                 .navigationTitle("Discover")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    toolbarContent
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button {
+                            showFilters = true
+                        } label: {
+                            ZStack(alignment: .topTrailing) {
+                                Image(systemName: "slider.horizontal.3")
+                                    .font(.title3)
+                                    .foregroundColor(.purple)
+
+                                if filters.hasActiveFilters {
+                                    Circle()
+                                        .fill(Color.red)
+                                        .frame(width: 8, height: 8)
+                                        .offset(x: 2, y: -2)
+                                }
+                            }
+                        }
+                        .padding(.trailing, 4)
+                    }
                 }
                 .sheet(isPresented: $showFilters) {
                     DiscoverFiltersView()
@@ -319,29 +337,6 @@ struct FeedDiscoverView: View {
         .transition(.opacity)
     }
 
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .navigationBarTrailing) {
-            Button {
-                showFilters = true
-            } label: {
-                ZStack(alignment: .topTrailing) {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.title3)
-                        .foregroundColor(.purple)
-
-                    if filters.hasActiveFilters {
-                        Circle()
-                            .fill(Color.red)
-                            .frame(width: 8, height: 8)
-                            .offset(x: 2, y: -2)
-                    }
-                }
-            }
-            .padding(.trailing, 4)
-        }
-    }
-
     // MARK: - Helper Methods
 
     private func syncFavorites() {
@@ -395,21 +390,26 @@ struct FeedDiscoverView: View {
                 .font(.title2)
                 .fontWeight(.bold)
 
-            Text("Try adjusting your filters to see more people")
+            Text("Check back later for new people in your area")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
 
             Button {
-                showFilters = true
+                Task {
+                    await refreshFeed()
+                }
             } label: {
-                Text("Adjust Filters")
-                    .fontWeight(.semibold)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
-                    .background(buttonGradient)
-                    .cornerRadius(12)
+                HStack {
+                    Image(systemName: "arrow.clockwise")
+                    Text("Refresh")
+                }
+                .fontWeight(.semibold)
+                .foregroundColor(.white)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
+                .background(buttonGradient)
+                .cornerRadius(12)
             }
         }
         .padding(40)
