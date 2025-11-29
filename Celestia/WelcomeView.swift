@@ -20,9 +20,9 @@ struct WelcomeView: View {
     @State private var featureTimer: Timer?
 
     let features = [
-        Feature(icon: "globe.americas.fill", title: "Connect Globally", description: "Meet people from 195+ countries"),
+        Feature(icon: "heart.circle.fill", title: "Find Your Match", description: "Meet amazing people near you"),
         Feature(icon: "heart.text.square.fill", title: "Smart Matching", description: "AI-powered compatibility algorithm"),
-        Feature(icon: "message.fill", title: "Real-Time Chat", description: "Instant messaging with translation")
+        Feature(icon: "message.fill", title: "Real-Time Chat", description: "Instant messaging with your matches")
     ]
     
     var body: some View {
@@ -153,7 +153,7 @@ struct WelcomeView: View {
                     .foregroundColor(.white)
                     .shadow(color: .black.opacity(0.2), radius: 5)
                 
-                Text("Where hearts connect across the world")
+                Text("Find friends, dates, and meaningful connections")
                     .font(.headline)
                     .foregroundColor(.white.opacity(0.95))
                     .multilineTextAlignment(.center)
