@@ -240,9 +240,10 @@ struct FeedDiscoverView: View {
                             loadMoreUsers()
                         }
                     }
-                    // Instant card appearance - smooth as butter
+                    // Butter-smooth card appearance
                     .transition(.opacity)
-                    .animation(.quick, value: displayedUsers.count)
+                    .animation(.butterSmooth, value: displayedUsers.count)
+                    .smoothScrollOptimized()
                 }
 
                 // Loading indicator with instant appearance
@@ -331,7 +332,7 @@ struct FeedDiscoverView: View {
                 if toastIcon == "star.fill" && toastColor == .orange {
                     HapticManager.shared.impact(.medium)
                     selectedTab = 3
-                    withAnimation(.quick) {
+                    withAnimation(.butterSmooth) {
                         showActionToast = false
                     }
                 }
@@ -683,13 +684,13 @@ struct FeedDiscoverView: View {
         toastIcon = icon
         toastColor = color
 
-        withAnimation(.quick) {
+        withAnimation(.butterSmooth) {
             showActionToast = true
         }
 
         // Auto-hide after 2 seconds
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            withAnimation(.quick) {
+            withAnimation(.butterSmooth) {
                 showActionToast = false
             }
         }

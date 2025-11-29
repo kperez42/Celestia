@@ -51,6 +51,7 @@ struct LazyTabContent<Content: View>: View {
         Group {
             if hasBeenLoaded {
                 content()
+                    .transition(.opacity)
             } else {
                 // PERFORMANCE: Show background color matching system background
                 // instead of Color.clear to avoid blank flash
@@ -58,7 +59,9 @@ struct LazyTabContent<Content: View>: View {
                     .onAppear {
                         // Load immediately if this is the current tab or adjacent
                         if shouldPreRender {
-                            hasBeenLoaded = true
+                            withAnimation(.butterSmooth) {
+                                hasBeenLoaded = true
+                            }
                         }
                     }
                     .onChange(of: currentTab) { _, newTab in
@@ -66,11 +69,14 @@ struct LazyTabContent<Content: View>: View {
                         if !hasBeenLoaded {
                             let distance = abs(tabIndex - newTab)
                             if distance <= 1 {
-                                hasBeenLoaded = true
+                                withAnimation(.butterSmooth) {
+                                    hasBeenLoaded = true
+                                }
                             }
                         }
                     }
             }
         }
+        .animation(.tabSwitch, value: hasBeenLoaded)
     }
 }

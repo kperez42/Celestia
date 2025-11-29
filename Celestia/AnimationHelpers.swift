@@ -69,6 +69,43 @@ extension Animation {
     static var instant: Animation {
         .linear(duration: 0)
     }
+
+    // MARK: - Butter Smooth Animations
+
+    /// Butter smooth spring - natural iOS feel with perfect damping
+    static var butterSmooth: Animation {
+        .spring(response: 0.35, dampingFraction: 0.8, blendDuration: 0)
+    }
+
+    /// Snappy spring for interactions - quick response with slight bounce
+    static var snappy: Animation {
+        .spring(response: 0.25, dampingFraction: 0.75, blendDuration: 0)
+    }
+
+    /// Responsive spring for card swipes - physics-based feel
+    static var swipeSpring: Animation {
+        .interpolatingSpring(mass: 0.8, stiffness: 300, damping: 25, initialVelocity: 0)
+    }
+
+    /// Micro-interaction spring - subtle and fast
+    static var microSpring: Animation {
+        .spring(response: 0.2, dampingFraction: 0.85, blendDuration: 0)
+    }
+
+    /// Card dismiss animation - smooth exit
+    static var cardDismiss: Animation {
+        .interpolatingSpring(mass: 0.6, stiffness: 200, damping: 20, initialVelocity: 5)
+    }
+
+    /// Tab switch animation - instant but polished
+    static var tabSwitch: Animation {
+        .spring(response: 0.28, dampingFraction: 0.88, blendDuration: 0)
+    }
+
+    /// Scroll animation - for programmatic scrolling
+    static var smoothScroll: Animation {
+        .spring(response: 0.4, dampingFraction: 0.9, blendDuration: 0)
+    }
 }
 
 // MARK: - Shake Animation
@@ -414,6 +451,177 @@ struct SlideInModifier: ViewModifier {
 extension View {
     func slideIn(from edge: Edge, isPresented: Binding<Bool>) -> some View {
         modifier(SlideInModifier(edge: edge, isPresented: isPresented))
+    }
+}
+
+// MARK: - Butter Smooth View Modifiers
+
+/// View modifier for butter-smooth scale animations on press
+struct ButterSmoothPressEffect: ViewModifier {
+    let isPressed: Bool
+    let scale: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(isPressed ? scale : 1.0)
+            .animation(.snappy, value: isPressed)
+    }
+}
+
+/// View modifier for smooth spring opacity
+struct SmoothFadeModifier: ViewModifier {
+    let isVisible: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(isVisible ? 1.0 : 0.0)
+            .animation(.butterSmooth, value: isVisible)
+    }
+}
+
+/// Smooth card swipe gesture modifier
+struct SmoothSwipeModifier: ViewModifier {
+    @Binding var offset: CGSize
+    let onSwipeEnd: (CGSize) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .offset(offset)
+            .animation(.swipeSpring, value: offset)
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        offset = value.translation
+                    }
+                    .onEnded { value in
+                        onSwipeEnd(value.translation)
+                    }
+            )
+    }
+}
+
+extension View {
+    /// Apply butter-smooth press scale effect
+    func butterSmoothPress(isPressed: Bool, scale: CGFloat = 0.95) -> some View {
+        modifier(ButterSmoothPressEffect(isPressed: isPressed, scale: scale))
+    }
+
+    /// Apply smooth fade in/out
+    func smoothFade(isVisible: Bool) -> some View {
+        modifier(SmoothFadeModifier(isVisible: isVisible))
+    }
+
+    /// Apply smooth swipe gesture
+    func smoothSwipe(offset: Binding<CGSize>, onEnd: @escaping (CGSize) -> Void) -> some View {
+        modifier(SmoothSwipeModifier(offset: offset, onSwipeEnd: onEnd))
+    }
+
+    /// GPU-accelerated rendering for complex views
+    func gpuAccelerated() -> some View {
+        self
+            .drawingGroup(opaque: false)
+            .compositingGroup()
+    }
+
+    /// Optimize for smooth scrolling in lists
+    func smoothScrollOptimized() -> some View {
+        self
+            .drawingGroup(opaque: false)
+    }
+}
+
+// MARK: - Smooth Scale Button Style
+
+/// Button style with butter-smooth press animation
+struct SmoothScaleButtonStyle: ButtonStyle {
+    let scaleEffect: CGFloat
+
+    init(scaleEffect: CGFloat = 0.95) {
+        self.scaleEffect = scaleEffect
+    }
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? scaleEffect : 1.0)
+            .animation(.snappy, value: configuration.isPressed)
+    }
+}
+
+/// Button style with spring animation for interactive elements
+struct SpringButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.92 : 1.0)
+            .opacity(configuration.isPressed ? 0.9 : 1.0)
+            .animation(.microSpring, value: configuration.isPressed)
+    }
+}
+
+extension ButtonStyle where Self == SmoothScaleButtonStyle {
+    static var smoothScale: SmoothScaleButtonStyle {
+        SmoothScaleButtonStyle()
+    }
+
+    static func smoothScale(_ scale: CGFloat) -> SmoothScaleButtonStyle {
+        SmoothScaleButtonStyle(scaleEffect: scale)
+    }
+}
+
+extension ButtonStyle where Self == SpringButtonStyle {
+    static var springy: SpringButtonStyle {
+        SpringButtonStyle()
+    }
+}
+
+// MARK: - Smooth Scroll View Wrapper
+
+/// A scroll view that enables smooth, butter-like scrolling
+struct SmoothScrollView<Content: View>: View {
+    let axes: Axis.Set
+    let showsIndicators: Bool
+    let content: () -> Content
+
+    init(
+        _ axes: Axis.Set = .vertical,
+        showsIndicators: Bool = false,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        self.axes = axes
+        self.showsIndicators = showsIndicators
+        self.content = content
+    }
+
+    var body: some View {
+        ScrollView(axes, showsIndicators: showsIndicators) {
+            content()
+        }
+        .scrollDismissesKeyboard(.interactively)
+    }
+}
+
+// MARK: - Smooth List Row Appearance
+
+/// View modifier for smooth list row appearance animation
+struct SmoothRowAppearance: ViewModifier {
+    let delay: Double
+    @State private var hasAppeared = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(hasAppeared ? 1.0 : 0.0)
+            .offset(y: hasAppeared ? 0 : 10)
+            .onAppear {
+                withAnimation(.butterSmooth.delay(delay)) {
+                    hasAppeared = true
+                }
+            }
+    }
+}
+
+extension View {
+    /// Animate row appearance with staggered delay
+    func smoothRowAppearance(delay: Double = 0) -> some View {
+        modifier(SmoothRowAppearance(delay: delay))
     }
 }
 

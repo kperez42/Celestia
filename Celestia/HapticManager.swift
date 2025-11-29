@@ -105,7 +105,7 @@ class HapticManager {
     }
 
     func match() {
-        // Special pattern for matches
+        // Special pattern for matches - celebratory double tap
         notification(.success)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             self?.impact(.heavy)
@@ -133,5 +133,62 @@ class HapticManager {
 
     func cardFlip() {
         impact(.rigid)
+    }
+
+    // MARK: - Butter Smooth Haptics
+
+    /// Ultra-subtle haptic for micro-interactions (scrolling, hover states)
+    func microFeedback() {
+        impact(.soft)
+    }
+
+    /// Smooth card swipe feedback - progressive intensity based on distance
+    func swipeProgress(intensity: CGFloat) {
+        // Clamp intensity between 0 and 1
+        let clampedIntensity = max(0.0, min(1.0, intensity))
+
+        if clampedIntensity > 0.7 {
+            impact(.medium)
+        } else if clampedIntensity > 0.4 {
+            impact(.light)
+        }
+    }
+
+    /// Tab switch feedback - quick and subtle
+    func tabSwitch() {
+        selection()
+    }
+
+    /// Smooth dismiss gesture feedback
+    func dismissProgress(progress: CGFloat) {
+        if progress > 0.8 {
+            impact(.light)
+        }
+    }
+
+    /// Celebratory haptic sequence for special moments
+    func celebration() {
+        notification(.success)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            self?.impact(.medium)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.impact(.light)
+        }
+    }
+
+    /// Quick pulse for save/bookmark actions
+    func bookmarkPulse() {
+        impact(.rigid)
+    }
+
+    /// Smooth scroll snap feedback
+    func scrollSnap() {
+        impact(.soft)
+    }
+
+    /// Prepare all generators before intensive haptic usage
+    func prepareForIntensiveUse() {
+        prepareGenerators()
     }
 }

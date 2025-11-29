@@ -542,6 +542,7 @@ struct DiscoverView: View {
             .zIndex(Double(3 - cardIndex))
             .offset(cardIndex == 0 ? viewModel.dragOffset : .zero)
             .rotationEffect(.degrees(cardIndex == 0 ? (reduceMotion ? 0 : Double(viewModel.dragOffset.width / 20)) : 0))
+            .animation(.swipeSpring, value: viewModel.dragOffset)
             .contentShape(Rectangle()) // Define tappable area
             .accessibilityElement(
                 label: cardIndex == 0 ? "\(user.fullName), \(user.age) years old, from \(user.location)" : "",
@@ -799,6 +800,7 @@ struct UserCardView: View {
             }
         }
         .frame(maxHeight: .infinity) // Fill available space
+        .gpuAccelerated() // PERFORMANCE: GPU rendering for butter-smooth scrolling
     }
 }
 
@@ -845,8 +847,8 @@ struct SwipeActionButton: View {
             )
             .clipShape(Circle())
             .shadow(color: shadowColor, radius: isPressed ? 4 : 8, y: isPressed ? 2 : 4)
-            .scaleEffect(isPressed ? 0.85 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
+            .scaleEffect(isPressed ? 0.88 : 1.0)
+            .animation(.snappy, value: isPressed)
             .contentShape(Circle()) // Ensure full circle is tappable
         }
         .buttonStyle(PlainButtonStyle()) // Prevent default button styling
