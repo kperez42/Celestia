@@ -53,7 +53,8 @@ class MessageService: ObservableObject, MessageServiceProtocol, ListenerLifecycl
     private let db = Firestore.firestore()
     private var listener: ListenerRegistration?
     private var oldestMessageTimestamp: Date?
-    private let messagesPerPage = 50
+    // PERFORMANCE: Reduced initial load for faster display - load more on scroll
+    private let messagesPerPage = 20
 
     // Network monitor for offline detection
     private let networkMonitor = NetworkMonitor.shared
@@ -302,11 +303,8 @@ class MessageService: ObservableObject, MessageServiceProtocol, ListenerLifecycl
                         Logger.shared.info("📨 Message batch processed - Added: \(addedCount), Duplicates filtered: \(duplicateCount), Total messages: \(self.messages.count)", category: .messaging)
                     }
 
-                    // Only sort if we actually added messages
-                    if addedCount > 0 {
-                        // Keep messages sorted by timestamp
-                        self.messages.sort { $0.timestamp < $1.timestamp }
-                    }
+                    // PERFORMANCE: Messages arrive in order from Firestore, no sort needed
+                    // The listener query is already ordered by timestamp ascending
                 }
             }
     }
@@ -543,8 +541,9 @@ class MessageService: ObservableObject, MessageServiceProtocol, ListenerLifecycl
             // Add to message list if not already present
             if !messageIdSet.contains(localId) {
                 messageIdSet.insert(localId)
+                // PERFORMANCE: Insert at end since new messages are always newest
+                // This is O(1) instead of O(n log n) for sorting
                 messages.append(optimisticMessage)
-                messages.sort { $0.timestamp < $1.timestamp }
             }
         }
     }

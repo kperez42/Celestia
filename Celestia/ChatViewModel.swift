@@ -151,8 +151,8 @@ class ChatViewModel: ObservableObject {
         // Cancel previous task if any
         loadTask?.cancel()
 
-        // Find match between current user and other user
-        loadTask = Task {
+        // PERFORMANCE: Use high priority for faster message loading
+        loadTask = Task(priority: .userInitiated) {
             guard !Task.isCancelled else { return }
             // UX FIX: Properly handle match fetch errors instead of silent failure
             do {
@@ -216,7 +216,8 @@ class ChatViewModel: ObservableObject {
         // Track as pending immediately for UI feedback
         pendingMessageTexts.insert(text)
 
-        Task {
+        // PERFORMANCE: Use high priority for responsive message sending
+        Task(priority: .userInitiated) {
             do {
                 // Find or create match
                 // UX FIX: Properly handle match fetch errors instead of silent failure
