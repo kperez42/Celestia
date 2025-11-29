@@ -285,6 +285,18 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Attribution Touchpoints Collection (referral tracking)
+    match /attributionTouchpoints/{touchpointId} {
+      // Users can read their own touchpoints
+      allow read: if isAuthenticated();
+
+      // Users can create touchpoints
+      allow create: if isAuthenticated();
+
+      // No updates or deletes
+      allow update, delete: if false;
+    }
+
     // Likes Collection
     match /likes/{likeId} {
       // Users can read likes they sent or received
