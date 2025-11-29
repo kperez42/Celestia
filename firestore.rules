@@ -24,9 +24,10 @@ service cloud.firestore {
     }
 
     // Users Collection
+    // TODO: Re-enable isEmailVerified() for production
     match /users/{userId} {
       // Anyone can read public user profiles (for discovery)
-      allow read: if isAuthenticated() && isEmailVerified();
+      allow read: if isAuthenticated(); // && isEmailVerified() - Temporarily disabled for testing
 
       // Users can only create their own profile
       allow create: if isOwner(userId)
@@ -37,7 +38,7 @@ service cloud.firestore {
 
       // Users can only update their own profile
       allow update: if isOwner(userId)
-        && isEmailVerified()
+        // && isEmailVerified()  // Temporarily disabled for testing
         // Prevent changing critical fields
         && request.resource.data.id == resource.data.id
         && request.resource.data.email == resource.data.email;
