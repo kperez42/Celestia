@@ -13,13 +13,35 @@ struct ChatDetailView: View {
     @EnvironmentObject var authService: AuthService
     @State private var messageText = ""
     @State private var isSending = false  // BUGFIX: Track sending state to prevent double-send
+    @State private var showPremiumUpgrade = false
     @FocusState private var isInputFocused: Bool
+
+    // Message limit for free users
+    private let freeMessageLimit = 5
+
+    private var isPremium: Bool {
+        authService.currentUser?.isPremium ?? false
+    }
+
+    // Count messages sent by current user in this conversation
+    private var sentMessageCount: Int {
+        guard let currentUserId = authService.currentUser?.id else { return 0 }
+        return viewModel.messages.filter { $0.senderID == currentUserId }.count
+    }
+
+    private var hasReachedLimit: Bool {
+        !isPremium && sentMessageCount >= freeMessageLimit
+    }
+
+    private var remainingMessages: Int {
+        max(0, freeMessageLimit - sentMessageCount)
+    }
 
     init(otherUser: User) {
         self.otherUser = otherUser
         _viewModel = StateObject(wrappedValue: ChatViewModel(currentUserId: "", otherUserId: otherUser.id ?? ""))
     }
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // Messages List
@@ -45,35 +67,18 @@ struct ChatDetailView: View {
                     }
                 }
             }
-            
-            // Message Input
-            HStack(spacing: 12) {
-                TextField("Message...", text: $messageText, axis: .vertical)
-                    .padding(12)
-                    .background(Color(.systemGray6))
-                    .cornerRadius(20)
-                    .focused($isInputFocused)
-                    .lineLimit(1...5)
-                    .onChange(of: messageText) { _, newValue in
-                        // SAFETY: Enforce message character limit to prevent data overflow
-                        if newValue.count > AppConstants.Limits.maxMessageLength {
-                            messageText = String(newValue.prefix(AppConstants.Limits.maxMessageLength))
-                        }
-                    }
 
-                Button(action: sendMessage) {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 32))
-                        .foregroundStyle(
-                            (messageText.isEmpty || isSending) ?
-                            LinearGradient(colors: [.gray, .gray], startPoint: .leading, endPoint: .trailing) :
-                            LinearGradient.brandPrimary
-                        )
-                }
-                .disabled(messageText.isEmpty || isSending)
+            // Message limit banner for free users
+            if !isPremium && sentMessageCount > 0 {
+                messageLimitBanner
             }
-            .padding()
-            .background(Color(.systemBackground))
+
+            // Message Input or Upgrade Prompt
+            if hasReachedLimit {
+                upgradeToContinueView
+            } else {
+                messageInputView
+            }
         }
         .navigationTitle(otherUser.fullName)
         .navigationBarTitleDisplayMode(.inline)
@@ -83,13 +88,127 @@ struct ChatDetailView: View {
                 viewModel.loadMessages()
             }
         }
+        .sheet(isPresented: $showPremiumUpgrade) {
+            PremiumUpgradeView()
+                .environmentObject(authService)
+        }
     }
-    
+
+    // MARK: - Message Limit Banner
+
+    private var messageLimitBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "bubble.left.and.bubble.right")
+                .font(.caption)
+                .foregroundColor(.orange)
+
+            if remainingMessages > 0 {
+                Text("\(remainingMessages) free message\(remainingMessages == 1 ? "" : "s") left")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            } else {
+                Text("Message limit reached")
+                    .font(.caption)
+                    .foregroundColor(.orange)
+            }
+
+            Spacer()
+
+            Button {
+                showPremiumUpgrade = true
+                HapticManager.shared.impact(.light)
+            } label: {
+                Text("Upgrade")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        LinearGradient(colors: [.orange, .pink], startPoint: .leading, endPoint: .trailing)
+                    )
+                    .cornerRadius(12)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(Color.orange.opacity(0.1))
+    }
+
+    // MARK: - Upgrade to Continue View
+
+    private var upgradeToContinueView: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "lock.fill")
+                    .foregroundColor(.orange)
+                Text("Unlock unlimited messaging")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+            }
+
+            Button {
+                showPremiumUpgrade = true
+                HapticManager.shared.impact(.medium)
+            } label: {
+                Text("Upgrade to Premium")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(
+                        LinearGradient(colors: [.orange, .pink], startPoint: .leading, endPoint: .trailing)
+                    )
+                    .cornerRadius(16)
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+    }
+
+    // MARK: - Message Input View
+
+    private var messageInputView: some View {
+        HStack(spacing: 12) {
+            TextField("Message...", text: $messageText, axis: .vertical)
+                .padding(12)
+                .background(Color(.systemGray6))
+                .cornerRadius(20)
+                .focused($isInputFocused)
+                .lineLimit(1...5)
+                .onChange(of: messageText) { _, newValue in
+                    // SAFETY: Enforce message character limit to prevent data overflow
+                    if newValue.count > AppConstants.Limits.maxMessageLength {
+                        messageText = String(newValue.prefix(AppConstants.Limits.maxMessageLength))
+                    }
+                }
+
+            Button(action: sendMessage) {
+                Image(systemName: "arrow.up.circle.fill")
+                    .font(.system(size: 32))
+                    .foregroundStyle(
+                        (messageText.isEmpty || isSending) ?
+                        LinearGradient(colors: [.gray, .gray], startPoint: .leading, endPoint: .trailing) :
+                        LinearGradient.brandPrimary
+                    )
+            }
+            .disabled(messageText.isEmpty || isSending)
+        }
+        .padding()
+        .background(Color(.systemBackground))
+    }
+
     private func sendMessage() {
         guard !messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
 
         // BUGFIX: Prevent double-send from rapid taps
         guard !isSending else { return }
+
+        // Check message limit for free users
+        if hasReachedLimit {
+            showPremiumUpgrade = true
+            return
+        }
 
         isSending = true
         let textToSend = messageText
