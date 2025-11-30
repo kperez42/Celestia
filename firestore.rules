@@ -639,6 +639,187 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Emergency Contacts Collection
+    match /emergency_contacts/{contactId} {
+      // Users can read their own emergency contacts
+      allow read: if isAuthenticated()
+        && resource.data.userId == request.auth.uid;
+
+      // Users can create contacts for themselves
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid;
+
+      // Users can update/delete their own contacts
+      allow update, delete: if isAuthenticated()
+        && resource.data.userId == request.auth.uid;
+    }
+
+    // Blocked Users Collection (SafetyCenter variant with underscore)
+    match /blocked_users/{blockId} {
+      allow read: if isAuthenticated()
+        && (resource.data.blockerId == request.auth.uid || resource.data.blockedUserId == request.auth.uid);
+
+      allow create: if isAuthenticated()
+        && request.resource.data.blockerId == request.auth.uid;
+
+      allow delete: if isAuthenticated()
+        && (resource.data.blockerId == request.auth.uid || resource.data.blockedUserId == request.auth.uid);
+
+      allow update: if false;
+    }
+
+    // Consent Records Collection (GDPR compliance)
+    match /consentRecords/{recordId} {
+      // Users can read their own consent records
+      allow read: if isAuthenticated()
+        && resource.data.userId == request.auth.uid;
+
+      // System creates consent records
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid;
+
+      // No updates or deletes (audit trail)
+      allow update, delete: if false;
+    }
+
+    // Data Subject Requests Collection (GDPR)
+    match /dataSubjectRequests/{requestId} {
+      function isModerator() {
+        return request.auth.token.email in ['perezkevin640@gmail.com', 'admin@celestia.app'];
+      }
+
+      // Users can read their own requests, admin can read all
+      allow read: if isAuthenticated()
+        && (resource.data.userId == request.auth.uid || isModerator());
+
+      // Users can create requests for themselves
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid;
+
+      // Admin can update request status
+      allow update: if isAuthenticated() && isModerator();
+
+      // No deletes
+      allow delete: if false;
+    }
+
+    // Device Fingerprints Collection (fraud detection)
+    match /deviceFingerprints/{fingerprintId} {
+      // Only system/admin can read
+      allow read: if isAdmin();
+
+      // System creates fingerprints
+      allow create: if isAuthenticated();
+
+      // No updates or deletes
+      allow update, delete: if false;
+    }
+
+    // Fraud Assessments Collection
+    match /fraudAssessments/{assessmentId} {
+      // Admin can read all, users can read their own
+      allow read: if isAdmin() ||
+        (isAuthenticated() && resource.data.userId == request.auth.uid);
+
+      // System creates assessments
+      allow create: if isAuthenticated();
+
+      // Admin can update (mark as resolved)
+      allow update: if isAdmin();
+
+      // No deletes
+      allow delete: if false;
+    }
+
+    // User Segment Assignments Collection
+    match /userSegmentAssignments/{assignmentId} {
+      // Users can read their own assignments
+      allow read: if isAuthenticated()
+        && assignmentId == request.auth.uid;
+
+      // System creates assignments
+      allow create: if isAuthenticated();
+
+      // Allow delete for account cleanup
+      allow delete: if isAuthenticated()
+        && assignmentId == request.auth.uid;
+
+      // No updates
+      allow update: if false;
+    }
+
+    // Compliance Audit Logs Collection
+    match /complianceAuditLogs/{logId} {
+      // Only admin can read
+      allow read: if isAdmin();
+
+      // System creates logs
+      allow create: if isAuthenticated();
+
+      // No updates or deletes (immutable audit trail)
+      allow update, delete: if false;
+    }
+
+    // AB Testing - Experiment Assignments (underscore variant)
+    match /experiment_assignments/{assignmentId} {
+      // Users can read their own assignments
+      allow read: if isAuthenticated();
+
+      // System creates assignments
+      allow create: if isAuthenticated();
+
+      // No updates or deletes
+      allow update, delete: if false;
+    }
+
+    // AB Testing - Experiment Conversions
+    match /experiment_conversions/{conversionId} {
+      // Admin can read for analytics
+      allow read: if isAdmin();
+
+      // System creates conversions
+      allow create: if isAuthenticated();
+
+      // No updates or deletes
+      allow update, delete: if false;
+    }
+
+    // AB Testing - Experiment Metrics
+    match /experiment_metrics/{metricId} {
+      // Admin can read for analytics
+      allow read: if isAdmin();
+
+      // System creates metrics
+      allow create: if isAuthenticated();
+
+      // No updates or deletes
+      allow update, delete: if false;
+    }
+
+    // Referral Signups Collection (tracking)
+    match /referralSignups/{signupId} {
+      // Admin can read all
+      allow read: if isAdmin();
+
+      // System creates signups
+      allow create: if isAuthenticated();
+
+      // No updates or deletes
+      allow update, delete: if false;
+    }
+
+    // Experiment Events Collection
+    match /experimentEvents/{eventId} {
+      // Admin can read for analytics
+      allow read: if isAdmin();
+
+      // System creates events
+      allow create: if isAuthenticated();
+
+      // No updates or deletes
+      allow update, delete: if false;
+    }
+
     // Default: Deny all other access
     match /{document=**} {
       allow read, write: if false;

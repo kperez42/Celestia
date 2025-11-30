@@ -173,7 +173,21 @@ class AuthService: ObservableObject, AuthServiceProtocol {
         do {
             let result = try await Auth.auth().signIn(withEmail: sanitizedEmail, password: sanitizedPassword)
             self.userSession = result.user
-            self.isEmailVerified = result.user.isEmailVerified
+
+            // CRITICAL: Force token refresh to get latest email_verified status
+            // This fixes issues when user deletes account and re-creates with same email
+            // The cached token may have stale email_verified=false
+            do {
+                _ = try await result.user.getIDTokenResult(forcingRefresh: true)
+                try await result.user.reload()
+                self.isEmailVerified = result.user.isEmailVerified
+                Logger.shared.auth("Token refreshed - Email verified: \(isEmailVerified)", level: .info)
+            } catch {
+                // Fall back to current state if refresh fails
+                self.isEmailVerified = result.user.isEmailVerified
+                Logger.shared.auth("Token refresh failed, using cached state", level: .warning)
+            }
+
             // SECURITY FIX: Never log UIDs
             Logger.shared.auth("Sign in successful", level: .info)
             Logger.shared.auth("Email verified: \(isEmailVerified)", level: .info)
@@ -550,11 +564,14 @@ class AuthService: ObservableObject, AuthServiceProtocol {
             async let referralCodesDeleted: () = deleteUserReferralCodes(uid: uid, db: db)
             async let profileViewsDeleted: () = deleteUserProfileViews(uid: uid, db: db)
             async let passesDeleted: () = deleteUserPasses(uid: uid, db: db)
+            async let emergencyContactsDeleted: () = deleteUserEmergencyContacts(uid: uid, db: db)
+            async let segmentAssignmentsDeleted: () = deleteUserSegmentAssignments(uid: uid, db: db)
 
             // Wait for all deletions to complete
             _ = try await (messagesDeleted, matchesDeleted, interestsDeleted, likesDeleted,
                           savedProfilesDeleted, notificationsDeleted, blocksDeleted,
-                          referralCodesDeleted, profileViewsDeleted, passesDeleted)
+                          referralCodesDeleted, profileViewsDeleted, passesDeleted,
+                          emergencyContactsDeleted, segmentAssignmentsDeleted)
 
             Logger.shared.auth("All related user data deleted", level: .info)
 
@@ -797,6 +814,36 @@ class AuthService: ObservableObject, AuthServiceProtocol {
         }
 
         Logger.shared.auth("Deleted \(passes.count) passes", level: .debug)
+    }
+
+    /// Delete emergency contacts for the user
+    private func deleteUserEmergencyContacts(uid: String, db: Firestore) async throws {
+        let contacts = try await db.collection("emergency_contacts")
+            .whereField("userId", isEqualTo: uid)
+            .getDocuments()
+
+        for doc in contacts.documents {
+            try await doc.reference.delete()
+        }
+
+        Logger.shared.auth("Deleted \(contacts.count) emergency contacts", level: .debug)
+    }
+
+    /// Delete user segment assignments
+    private func deleteUserSegmentAssignments(uid: String, db: Firestore) async throws {
+        // Try to delete document with userId as document ID
+        try? await db.collection("userSegmentAssignments").document(uid).delete()
+
+        // Also try to find any documents with userId field
+        let assignments = try await db.collection("userSegmentAssignments")
+            .whereField("userId", isEqualTo: uid)
+            .getDocuments()
+
+        for doc in assignments.documents {
+            try await doc.reference.delete()
+        }
+
+        Logger.shared.auth("Deleted user segment assignments", level: .debug)
     }
 
     // MARK: - Re-authentication
