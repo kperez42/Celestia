@@ -321,17 +321,13 @@ struct ActionButton: View {
                         .frame(width: 56, height: 56)
                         .scaleEffect(isAnimating ? 1.2 : (isPressed ? 0.95 : 1.0))
 
-                    if isProcessing {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: color))
-                            .scaleEffect(0.9)
-                    } else {
-                        Image(systemName: icon)
-                            .font(.title3)
-                            .fontWeight(label == "Saved" ? .bold : .medium)
-                            .foregroundColor(color)
-                            .scaleEffect(isAnimating ? 1.3 : 1.0)
-                    }
+                    // Show icon always (no loading spinner to avoid UIKit rendering issues)
+                    Image(systemName: icon)
+                        .font(.title3)
+                        .fontWeight(label == "Saved" ? .bold : .medium)
+                        .foregroundColor(color)
+                        .scaleEffect(isAnimating ? 1.3 : 1.0)
+                        .opacity(isProcessing ? 0.5 : 1.0)
                 }
 
                 Text(label)

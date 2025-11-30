@@ -270,10 +270,14 @@ class DiscoverViewModel: ObservableObject {
             dragOffset = .zero
         }
 
+        // Reset processing state immediately after card moves
+        // This prevents the loading indicator from showing during the network call
+        isProcessingAction = false
+
         // Preload images for next users
         await preloadUpcomingImages()
 
-        // Send like to backend
+        // Send like to backend (in background, card already moved)
         do {
             // ARCHITECTURE FIX: Use injected swipeService
             let isMatch = try await swipeService.likeUser(
@@ -310,8 +314,6 @@ class DiscoverViewModel: ObservableObject {
                 showActionError = false
             }
         }
-
-        isProcessingAction = false
     }
 
     /// Check if user has daily likes remaining (delegates to UserService)
@@ -354,10 +356,13 @@ class DiscoverViewModel: ObservableObject {
             dragOffset = .zero
         }
 
+        // Reset processing state immediately after card moves
+        isProcessingAction = false
+
         // Preload images for next users
         await preloadUpcomingImages()
 
-        // Record pass in backend
+        // Record pass in backend (in background, card already moved)
         do {
             // ARCHITECTURE FIX: Use injected swipeService
             try await swipeService.passUser(
@@ -377,8 +382,6 @@ class DiscoverViewModel: ObservableObject {
                 showActionError = false
             }
         }
-
-        isProcessingAction = false
     }
 
     /// Handle super like action
@@ -408,10 +411,13 @@ class DiscoverViewModel: ObservableObject {
             dragOffset = .zero
         }
 
+        // Reset processing state immediately after card moves
+        isProcessingAction = false
+
         // Preload images for next users
         await preloadUpcomingImages()
 
-        // Send super like to backend
+        // Send super like to backend (in background, card already moved)
         do {
             // ARCHITECTURE FIX: Use injected swipeService
             let isMatch = try await swipeService.likeUser(
@@ -446,8 +452,6 @@ class DiscoverViewModel: ObservableObject {
                 showActionError = false
             }
         }
-
-        isProcessingAction = false
     }
 
     /// Decrement super like count (delegates to UserService)
