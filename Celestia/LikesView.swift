@@ -18,6 +18,9 @@ struct LikesView: View {
     @State private var showChatWithUser: User?
     @State private var showPremiumUpgrade = false
 
+    // PERFORMANCE: Track if initial load completed to prevent loading flash on tab switches
+    @State private var hasCompletedInitialLoad = false
+
     // Direct messaging state - using dedicated struct for item-based presentation
     @State private var chatPresentation: ChatPresentation?
 
@@ -48,7 +51,10 @@ struct LikesView: View {
                     tabSelector
 
                     // Content based on selected tab
-                    if viewModel.isLoading {
+                    // PERFORMANCE: Only show loading on first load when we have no data
+                    // After initial load, show cached data instantly (no skeleton flash)
+                    let hasAnyData = !viewModel.usersWhoLikedMe.isEmpty || !viewModel.usersILiked.isEmpty || !viewModel.mutualLikes.isEmpty
+                    if viewModel.isLoading && !hasCompletedInitialLoad && !hasAnyData {
                         loadingView
                     } else {
                         TabView(selection: $selectedTab) {
@@ -65,6 +71,7 @@ struct LikesView: View {
             .task {
                 // PERFORMANCE: Initial load with cache check
                 await viewModel.loadAllLikes()
+                hasCompletedInitialLoad = true
             }
             .onAppear {
                 // PERFORMANCE: Skip reload if cache is still fresh (within 2 minutes)
@@ -452,7 +459,6 @@ struct LikesView: View {
                 premiumFeatureRow(icon: "eye.fill", title: "See Who Likes You", description: "Match instantly with people interested in you", color: .pink)
                 premiumFeatureRow(icon: "infinity", title: "Unlimited Likes", description: "No daily limits, like as many as you want", color: .purple)
                 premiumFeatureRow(icon: "bolt.fill", title: "Profile Boost", description: "Get 10x more views with monthly boosts", color: .orange)
-                premiumFeatureRow(icon: "arrow.uturn.backward", title: "Rewind", description: "Undo accidental swipes", color: .blue)
             }
         }
         .padding(20)
