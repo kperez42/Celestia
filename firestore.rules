@@ -733,16 +733,16 @@ service cloud.firestore {
 
     // User Segment Assignments Collection
     match /userSegmentAssignments/{assignmentId} {
-      // Users can read their own assignments
+      // Users can read their own assignments (by doc ID or userId field)
       allow read: if isAuthenticated()
-        && assignmentId == request.auth.uid;
+        && (assignmentId == request.auth.uid || resource.data.userId == request.auth.uid);
 
       // System creates assignments
       allow create: if isAuthenticated();
 
-      // Allow delete for account cleanup
+      // Allow delete for account cleanup (by doc ID or userId field)
       allow delete: if isAuthenticated()
-        && assignmentId == request.auth.uid;
+        && (assignmentId == request.auth.uid || resource.data.userId == request.auth.uid);
 
       // No updates
       allow update: if false;
