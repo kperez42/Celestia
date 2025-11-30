@@ -224,30 +224,6 @@ struct DiscoverView: View {
                     )
                     .disabled(viewModel.isProcessingAction)
 
-                    // Rewind button
-                    SwipeActionButton(
-                        icon: "arrow.uturn.backward",
-                        iconSize: .title2,
-                        iconWeight: .semibold,
-                        size: 56,
-                        colors: [Color.yellow.opacity(0.9), Color.orange],
-                        shadowColor: .yellow.opacity(0.4),
-                        isProcessing: viewModel.isProcessingAction
-                    ) {
-                        Task {
-                            await viewModel.handleRewind()
-                            VoiceOverAnnouncement.announce("Last swipe undone")
-                        }
-                    }
-                    .accessibilityElement(
-                        label: "Rewind",
-                        hint: "Undo your last swipe and see the previous profile again",
-                        traits: .isButton,
-                        identifier: "rewindButton"
-                    )
-                    .disabled(!viewModel.canRewind || viewModel.isProcessingAction)
-                    .opacity(viewModel.canRewind ? 1.0 : 0.5)
-
                     // Super Like button
                     SwipeActionButton(
                         icon: "star.fill",
@@ -560,10 +536,6 @@ struct DiscoverView: View {
                 },
                 AccessibilityCustomAction(name: "Super Like") {
                     Task { await viewModel.handleSuperLike() }
-                },
-                AccessibilityCustomAction(name: "Rewind") {
-                    guard viewModel.canRewind else { return }
-                    Task { await viewModel.handleRewind() }
                 },
                 AccessibilityCustomAction(name: "View Profile") {
                     viewModel.showUserDetail(user)

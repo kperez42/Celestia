@@ -9,21 +9,6 @@ import Foundation
 import SwiftUI
 import FirebaseFirestore
 
-// MARK: - Swipe History
-
-struct SwipeHistory {
-    let user: User
-    let index: Int
-    let action: SwipeAction
-    let timestamp: Date
-
-    enum SwipeAction {
-        case like
-        case pass
-        case superLike
-    }
-}
-
 @MainActor
 class DiscoverViewModel: ObservableObject {
     @Published var users: [User] = []
@@ -39,17 +24,6 @@ class DiscoverViewModel: ObservableObject {
     @Published var isProcessingAction = false
     @Published var showingUpgradeSheet = false
     @Published var connectionQuality: PerformanceMonitor.ConnectionQuality = .excellent
-
-    // Rewind history - stores last 10 swipes for undo functionality
-    private var swipeHistory: [SwipeHistory] = []
-    private let maxHistorySize = 10
-
-    // Computed property to check if rewind is available
-    var canRewind: Bool {
-        return !swipeHistory.isEmpty &&
-               (authService.currentUser?.rewindsRemaining ?? 0) > 0 &&
-               currentIndex > 0
-    }
 
     // Computed property that syncs with DiscoveryFilters.shared
     var hasActiveFilters: Bool {
@@ -286,9 +260,6 @@ class DiscoverViewModel: ObservableObject {
             }
         }
 
-        // Record in history for potential rewind
-        recordSwipeInHistory(user: likedUser, action: .like)
-
         // Move to next card with animation
         withAnimation {
             currentIndex += 1
@@ -365,9 +336,6 @@ class DiscoverViewModel: ObservableObject {
             return
         }
 
-        // Record in history for potential rewind
-        recordSwipeInHistory(user: passedUser, action: .pass)
-
         // Move to next card with animation
         withAnimation {
             currentIndex += 1
@@ -413,9 +381,6 @@ class DiscoverViewModel: ObservableObject {
             Logger.shared.warning("No Super Likes remaining. User needs to purchase more", category: .payment)
             return
         }
-
-        // Record in history for potential rewind
-        recordSwipeInHistory(user: superLikedUser, action: .superLike)
 
         // Move to next card with animation
         withAnimation {
@@ -464,94 +429,6 @@ class DiscoverViewModel: ObservableObject {
         await userService.decrementSuperLikes(userId: userId)
         await authService.fetchUser()
         Logger.shared.info("Super Like used. Remaining: \(authService.currentUser?.superLikesRemaining ?? 0)", category: .matching)
-    }
-
-    // MARK: - Rewind Functionality
-
-    /// Handle rewind/undo action - reverts last swipe
-    func handleRewind() async {
-        guard canRewind, !swipeHistory.isEmpty, !isProcessingAction else {
-            Logger.shared.warning("Cannot rewind: No history or no rewinds remaining", category: .matching)
-            return
-        }
-
-        guard let currentUser = authService.currentUser else {
-            Logger.shared.error("Cannot rewind: No current user", category: .matching)
-            return
-        }
-
-        // Check if user has rewinds remaining
-        if currentUser.rewindsRemaining <= 0 {
-            showingUpgradeSheet = true
-            Logger.shared.warning("No Rewinds remaining. User needs premium", category: .payment)
-            return
-        }
-
-        isProcessingAction = true
-
-        // Get last swipe from history
-        let lastSwipe = swipeHistory.removeLast()
-
-        // Restore previous state
-        await MainActor.run {
-            currentIndex = lastSwipe.index
-            dragOffset = .zero
-        }
-
-        // Re-insert the user at current index if needed
-        if currentIndex < users.count && users[currentIndex].id != lastSwipe.user.id {
-            users.insert(lastSwipe.user, at: currentIndex)
-        }
-
-        // Deduct rewind from balance
-        guard let currentUserId = currentUser.id,
-              let targetUserId = lastSwipe.user.id else {
-            isProcessingAction = false
-            return
-        }
-
-        // TODO: Implement deleteSwipe in SwipeServiceProtocol when backend support is added
-        // For now, the rewind works by resetting UI state and decrementing rewind count
-        await decrementRewinds()
-
-        HapticManager.shared.notification(.success)
-        Logger.shared.info("Rewind successful. Previous action on \(lastSwipe.user.fullName) reverted", category: .matching)
-
-        isProcessingAction = false
-    }
-
-    /// Record swipe in history for potential undo
-    private func recordSwipeInHistory(user: User, action: SwipeHistory.SwipeAction) {
-        let history = SwipeHistory(
-            user: user,
-            index: currentIndex,
-            action: action,
-            timestamp: Date()
-        )
-
-        swipeHistory.append(history)
-
-        // Keep only last 10 swipes
-        if swipeHistory.count > maxHistorySize {
-            swipeHistory.removeFirst()
-        }
-
-        Logger.shared.info("Swipe recorded in history. Total history: \(swipeHistory.count)", category: .matching)
-    }
-
-    /// Decrement rewind count
-    private func decrementRewinds() async {
-        guard let userId = authService.currentUser?.id,
-              let currentRewinds = authService.currentUser?.rewindsRemaining else { return }
-
-        do {
-            let newCount = max(0, currentRewinds - 1)
-            try await userService.updateUserFields(userId: userId, fields: ["rewindsRemaining": newCount])
-            await authService.fetchUser()
-            Logger.shared.info("Rewind used. Remaining: \(authService.currentUser?.rewindsRemaining ?? 0)", category: .matching)
-        } catch {
-            Logger.shared.error("Error decrementing rewinds", category: .matching, error: error)
-        }
     }
 
     /// Apply filters
