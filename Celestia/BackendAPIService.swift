@@ -8,6 +8,7 @@
 
 import Foundation
 import StoreKit
+import FirebaseFirestore
 
 // MARK: - Response Cache
 
