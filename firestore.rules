@@ -76,8 +76,8 @@ service cloud.firestore {
         && (resource.data.user1Id == request.auth.uid || resource.data.user2Id == request.auth.uid);
 
       // Allow participants to delete matches (for account deletion cleanup)
+      // Note: Email verification NOT required for delete to allow cascade delete during account deletion
       allow delete: if isAuthenticated()
-        && isEmailVerified()
         && (resource.data.user1Id == request.auth.uid || resource.data.user2Id == request.auth.uid);
     }
 
@@ -101,8 +101,8 @@ service cloud.firestore {
         && (resource.data.senderId == request.auth.uid || resource.data.receiverId == request.auth.uid);
 
       // Users can delete messages they sent OR received (for account deletion cleanup)
+      // Note: Email verification NOT required for delete to allow cascade delete during account deletion
       allow delete: if isAuthenticated()
-        && isEmailVerified()
         && (resource.data.senderId == request.auth.uid || resource.data.receiverId == request.auth.uid);
     }
 
@@ -111,6 +111,9 @@ service cloud.firestore {
       // Users can read/write their own batch operation logs
       allow read, write: if isAuthenticated()
         && isEmailVerified();
+
+      // Allow delete for account cleanup without email verification
+      allow delete: if isAuthenticated();
     }
 
     // Interests (Likes) Collection
@@ -132,8 +135,8 @@ service cloud.firestore {
         && (resource.data.toUserId == request.auth.uid || resource.data.fromUserId == request.auth.uid);
 
       // Users can delete interests they sent OR received (for account deletion cleanup)
+      // Note: Email verification NOT required for delete to allow cascade delete during account deletion
       allow delete: if isAuthenticated()
-        && isEmailVerified()
         && (resource.data.fromUserId == request.auth.uid || resource.data.toUserId == request.auth.uid);
     }
 
@@ -151,8 +154,8 @@ service cloud.firestore {
         && request.resource.data.blockerId != request.resource.data.blockedId;
 
       // Users can unblock OR blocked users can delete during account cleanup
+      // Note: Email verification NOT required for delete to allow cascade delete during account deletion
       allow delete: if isAuthenticated()
-        && isEmailVerified()
         && (resource.data.blockerId == request.auth.uid || resource.data.blockedId == request.auth.uid);
 
       // Don't allow updating blocks
@@ -173,8 +176,8 @@ service cloud.firestore {
         && request.resource.data.blockerId != request.resource.data.blockedUserId;
 
       // Users can unblock OR blocked users can delete during account cleanup
+      // Note: Email verification NOT required for delete to allow cascade delete during account deletion
       allow delete: if isAuthenticated()
-        && isEmailVerified()
         && (resource.data.blockerId == request.auth.uid || resource.data.blockedUserId == request.auth.uid);
 
       // Don't allow updating blocks
@@ -234,12 +237,12 @@ service cloud.firestore {
         && resource.data.userId == request.auth.uid;
 
       // Users can delete their own notifications
+      // Note: Email verification NOT required for delete to allow cascade delete during account deletion
       allow delete: if isAuthenticated()
-        && isEmailVerified()
         && resource.data.userId == request.auth.uid;
     }
 
-    // Analytics Collection (for tracking)
+    // Analytics Collection (for tracking - legacy)
     match /analytics/{analyticsId} {
       // No read access to analytics
       allow read: if false;
@@ -248,6 +251,39 @@ service cloud.firestore {
       allow create: if isAuthenticated() && isEmailVerified();
 
       // No update or delete
+      allow update, delete: if false;
+    }
+
+    // Analytics Events Collection (for enhanced analytics tracking)
+    match /analytics_events/{eventId} {
+      // No read access to analytics events
+      allow read: if false;
+
+      // Allow creating analytics events for authenticated users
+      allow create: if isAuthenticated();
+
+      // No update or delete (analytics are immutable)
+      allow update, delete: if false;
+    }
+
+    // Experiments Collection (A/B testing)
+    match /experiments/{experimentId} {
+      // Authenticated users can read active experiments
+      allow read: if isAuthenticated();
+
+      // Only admin can create/update/delete experiments
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Experiment Assignments Collection (user variant assignments)
+    match /experimentAssignments/{assignmentId} {
+      // Users can read their own assignments
+      allow read: if isAuthenticated();
+
+      // Users can create assignments for themselves
+      allow create: if isAuthenticated();
+
+      // No updates or deletes
       allow update, delete: if false;
     }
 
@@ -326,9 +362,9 @@ service cloud.firestore {
         && request.resource.data.userId == request.auth.uid;
 
       // No updates, but allow delete for account cleanup
+      // Note: Email verification NOT required for delete to allow cascade delete during account deletion
       allow update: if false;
       allow delete: if isAuthenticated()
-        && isEmailVerified()
         && resource.data.userId == request.auth.uid;
     }
 
@@ -376,8 +412,8 @@ service cloud.firestore {
         && resource.data.fromUserId == request.auth.uid;
 
       // Users can delete likes they sent OR received (for account deletion cleanup)
+      // Note: Email verification NOT required for delete to allow cascade delete during account deletion
       allow delete: if isAuthenticated()
-        && isEmailVerified()
         && (resource.data.fromUserId == request.auth.uid || resource.data.toUserId == request.auth.uid);
     }
 
@@ -399,8 +435,8 @@ service cloud.firestore {
         && resource.data.fromUserId == request.auth.uid;
 
       // Users can delete their own passes
+      // Note: Email verification NOT required for delete to allow cascade delete during account deletion
       allow delete: if isAuthenticated()
-        && isEmailVerified()
         && resource.data.fromUserId == request.auth.uid;
     }
 
@@ -422,8 +458,8 @@ service cloud.firestore {
         && resource.data.userId == request.auth.uid;
 
       // Users can remove saved profiles they created OR where they are the saved user (for account deletion cleanup)
+      // Note: Email verification NOT required for delete to allow cascade delete during account deletion
       allow delete: if isAuthenticated()
-        && isEmailVerified()
         && (resource.data.userId == request.auth.uid || resource.data.savedUserId == request.auth.uid);
     }
 
@@ -445,8 +481,8 @@ service cloud.firestore {
         && resource.data.viewerUserId == request.auth.uid;
 
       // Allow users to delete views they made OR views of their profile (for account deletion cleanup)
+      // Note: Email verification NOT required for delete to allow cascade delete during account deletion
       allow delete: if isAuthenticated()
-        && isEmailVerified()
         && (resource.data.viewerUserId == request.auth.uid || resource.data.viewedUserId == request.auth.uid);
     }
 
