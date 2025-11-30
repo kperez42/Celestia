@@ -1557,6 +1557,7 @@ exports.onReportCreated = functions.firestore
  * Trigger: Auto-set isAdmin for whitelisted email addresses
  * When a user document is created, check if their email is in the admin whitelist
  * and set isAdmin: true if so
+ * Also notifies admins when new accounts need approval
  */
 exports.onUserCreated = functions.firestore
   .document('users/{userId}')
@@ -1567,7 +1568,10 @@ exports.onUserCreated = functions.firestore
     // Admin email whitelist - must match SettingsView.swift whitelist
     const adminEmails = ['perezkevin640@gmail.com', 'admin@celestia.app'];
 
-    if (userData.email && adminEmails.includes(userData.email.toLowerCase())) {
+    // Check if this is an admin user
+    const isAdminUser = userData.email && adminEmails.includes(userData.email.toLowerCase());
+
+    if (isAdminUser) {
       try {
         await snap.ref.update({
           isAdmin: true
@@ -1581,6 +1585,29 @@ exports.onUserCreated = functions.firestore
         functions.logger.error('Failed to set admin access', {
           userId,
           email: userData.email,
+          error: error.message
+        });
+      }
+    }
+
+    // Send push notification to admins when new account needs approval
+    // Only for non-admin users with pending status
+    if (!isAdminUser && userData.profileStatus === 'pending') {
+      try {
+        await notifications.sendNewAccountNotification({
+          userId: userId,
+          firstName: userData.firstName,
+          fullName: userData.fullName,
+          email: userData.email
+        });
+
+        functions.logger.info('Admin notified of new pending account', {
+          userId,
+          userName: userData.firstName || userData.fullName
+        });
+      } catch (error) {
+        functions.logger.error('Failed to notify admins of new account', {
+          userId,
           error: error.message
         });
       }
@@ -1599,7 +1626,50 @@ exports.onUserUpdated = functions.firestore
     const previousData = change.before.data();
     const userId = context.params.userId;
 
-    // Skip if isAdmin is already true
+    // Handle profile status changes (approval/rejection notifications)
+    if (previousData.profileStatus !== userData.profileStatus) {
+      functions.logger.info('Profile status changed', {
+        userId,
+        from: previousData.profileStatus,
+        to: userData.profileStatus
+      });
+
+      try {
+        // Send notification for approved or rejected profiles
+        if (userData.profileStatus === 'active' && previousData.profileStatus === 'pending') {
+          await notifications.sendProfileStatusNotification(userId, {
+            status: 'approved'
+          });
+        } else if (userData.profileStatus === 'rejected') {
+          await notifications.sendProfileStatusNotification(userId, {
+            status: 'rejected',
+            reason: userData.profileStatusReason,
+            reasonCode: userData.profileStatusReasonCode
+          });
+        }
+        // Notify admins when user resubmits profile for review
+        else if (userData.profileStatus === 'pending' && previousData.profileStatus === 'rejected') {
+          await notifications.sendAdminNotification({
+            title: '🔄 Profile Resubmitted',
+            body: `${userData.firstName || userData.fullName || 'A user'} has updated their profile and resubmitted for review`,
+            alertType: 'profile_resubmitted',
+            badge: 1,
+            data: {
+              userId: userId,
+              userName: userData.firstName || userData.fullName || '',
+              userEmail: userData.email || ''
+            }
+          });
+        }
+      } catch (error) {
+        functions.logger.error('Failed to send profile status notification', {
+          userId,
+          error: error.message
+        });
+      }
+    }
+
+    // Skip admin check if isAdmin is already true
     if (userData.isAdmin === true) {
       return;
     }

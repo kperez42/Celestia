@@ -484,9 +484,9 @@ service cloud.firestore {
       }
 
       // Users can read their own verification status, admin can read all
+      // Note: Email verification NOT required for reads to allow cascade delete queries
       allow read: if isAuthenticated()
-        && isEmailVerified()
-        && (verificationId == request.auth.uid || isAdmin());
+        && (verificationId == request.auth.uid || resource.data.userId == request.auth.uid || isAdmin());
 
       // Users can create their own verification submission
       allow create: if isAuthenticated()
@@ -501,8 +501,10 @@ service cloud.firestore {
         && isEmailVerified()
         && (verificationId == request.auth.uid || isAdmin());
 
-      // Only admin can delete verifications (after review)
-      allow delete: if isAuthenticated() && isAdmin();
+      // Users can delete their own verification (GDPR right to erasure)
+      // Admin can also delete after review
+      allow delete: if isAuthenticated()
+        && (verificationId == request.auth.uid || resource.data.userId == request.auth.uid || isAdmin());
     }
 
     // Moderation Queue Collection (admin dashboard)
@@ -817,6 +819,33 @@ service cloud.firestore {
       allow create: if isAuthenticated();
 
       // No updates or deletes
+      allow update, delete: if false;
+    }
+
+    // Admin Alerts Collection (push notifications to admins)
+    match /admin_alerts/{alertId} {
+      // Only admins can read alerts
+      allow read: if isAdmin();
+
+      // System creates alerts (via Cloud Functions)
+      allow create: if isAuthenticated();
+
+      // Admins can mark alerts as read/dismissed
+      allow update: if isAdmin();
+
+      // No deletes
+      allow delete: if false;
+    }
+
+    // Notification Logs Collection (tracking sent notifications)
+    match /notification_logs/{logId} {
+      // Only admins can read logs
+      allow read: if isAdmin();
+
+      // System creates logs
+      allow create: if isAuthenticated();
+
+      // No updates or deletes (audit trail)
       allow update, delete: if false;
     }
 

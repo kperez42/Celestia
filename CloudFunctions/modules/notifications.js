@@ -346,10 +346,190 @@ async function getPersonalizedStats(userId) {
   };
 }
 
+/**
+ * Sends a profile status notification (approved/rejected)
+ * @param {string} userId - User to notify
+ * @param {object} statusData - Status information
+ */
+async function sendProfileStatusNotification(userId, statusData) {
+  const userDoc = await admin.firestore().collection('users').doc(userId).get();
+
+  if (!userDoc.exists) {
+    functions.logger.error('User not found for status notification', { userId });
+    return;
+  }
+
+  const user = userDoc.data();
+  const fcmToken = user.fcmToken;
+
+  if (!fcmToken) {
+    functions.logger.info('No FCM token for user', { userId });
+    return;
+  }
+
+  // Check if notifications are enabled
+  if (!user.notificationsEnabled) {
+    functions.logger.info('Notifications disabled for user', { userId });
+    return;
+  }
+
+  let notification;
+
+  if (statusData.status === 'approved' || statusData.status === 'active') {
+    notification = {
+      title: "Profile Approved! 🎉",
+      body: "Your profile is now live. Start discovering people!",
+      sound: 'default',
+      badge: 1,
+      category: 'PROFILE_STATUS',
+      data: {
+        type: 'profile_approved',
+        status: 'approved'
+      }
+    };
+  } else if (statusData.status === 'rejected') {
+    notification = {
+      title: "Profile Needs Updates",
+      body: statusData.reason || "Please review your profile and make some changes.",
+      sound: 'default',
+      badge: 1,
+      category: 'PROFILE_STATUS',
+      data: {
+        type: 'profile_rejected',
+        status: 'rejected',
+        reasonCode: statusData.reasonCode || 'unknown',
+        reason: statusData.reason || ''
+      }
+    };
+  } else {
+    functions.logger.info('Unknown profile status, skipping notification', { status: statusData.status });
+    return;
+  }
+
+  await sendPushNotification(fcmToken, notification);
+
+  // Log the notification
+  await admin.firestore().collection('notification_logs').add({
+    userId,
+    type: 'profile_status',
+    status: statusData.status,
+    sentAt: admin.firestore.FieldValue.serverTimestamp(),
+    delivered: true
+  });
+
+  functions.logger.info('Profile status notification sent', { userId, status: statusData.status });
+}
+
+/**
+ * Sends a push notification to all admin users
+ * @param {object} notificationData - Notification information
+ */
+async function sendAdminNotification(notificationData) {
+  // Admin email whitelist - must match the one in index.js
+  const adminEmails = ['perezkevin640@gmail.com', 'admin@celestia.app'];
+
+  try {
+    // Get all admin users
+    const adminUsers = await admin.firestore()
+      .collection('users')
+      .where('email', 'in', adminEmails)
+      .get();
+
+    if (adminUsers.empty) {
+      functions.logger.info('No admin users found for notification');
+      return;
+    }
+
+    const promises = [];
+
+    for (const adminDoc of adminUsers.docs) {
+      const adminData = adminDoc.data();
+      const fcmToken = adminData.fcmToken;
+
+      if (!fcmToken) {
+        functions.logger.info('No FCM token for admin', { adminId: adminDoc.id });
+        continue;
+      }
+
+      // Check if notifications are enabled
+      if (adminData.notificationsEnabled === false) {
+        functions.logger.info('Notifications disabled for admin', { adminId: adminDoc.id });
+        continue;
+      }
+
+      const notification = {
+        title: notificationData.title,
+        body: notificationData.body,
+        sound: 'default',
+        badge: notificationData.badge || 1,
+        category: 'ADMIN',
+        data: {
+          type: 'admin_alert',
+          alertType: notificationData.alertType || 'general',
+          ...notificationData.data
+        }
+      };
+
+      promises.push(
+        sendPushNotification(fcmToken, notification)
+          .then(() => {
+            functions.logger.info('Admin notification sent', { adminId: adminDoc.id });
+          })
+          .catch((error) => {
+            functions.logger.error('Failed to send admin notification', {
+              adminId: adminDoc.id,
+              error: error.message
+            });
+          })
+      );
+    }
+
+    await Promise.allSettled(promises);
+
+    // Log the admin notification
+    await admin.firestore().collection('admin_alerts').add({
+      type: notificationData.alertType || 'general',
+      title: notificationData.title,
+      body: notificationData.body,
+      data: notificationData.data || {},
+      sentAt: admin.firestore.FieldValue.serverTimestamp(),
+      recipientCount: promises.length
+    });
+
+    functions.logger.info('Admin notifications sent', { count: promises.length });
+
+  } catch (error) {
+    functions.logger.error('Error sending admin notifications', { error: error.message });
+  }
+}
+
+/**
+ * Sends notification to admins when a new account needs approval
+ * @param {object} userData - New user's data
+ */
+async function sendNewAccountNotification(userData) {
+  const userName = userData.firstName || userData.fullName || 'New user';
+
+  await sendAdminNotification({
+    title: '👤 New Account Pending',
+    body: `${userName} just signed up and needs approval`,
+    alertType: 'new_account_pending',
+    badge: 1,
+    data: {
+      userId: userData.userId || '',
+      userName: userName,
+      userEmail: userData.email || ''
+    }
+  });
+}
+
 module.exports = {
   sendPushNotification,
   sendMatchNotification,
   sendMessageNotification,
   sendLikeNotification,
-  sendDailyEngagementReminders
+  sendDailyEngagementReminders,
+  sendProfileStatusNotification,
+  sendAdminNotification,
+  sendNewAccountNotification
 };

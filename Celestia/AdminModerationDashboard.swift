@@ -164,18 +164,40 @@ struct AdminModerationDashboard: View {
     private var pendingProfilesView: some View {
         Group {
             if viewModel.isLoading {
-                ProgressView("Loading new accounts...")
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .scaleEffect(1.2)
+                    Text("Loading new accounts...")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if viewModel.pendingProfiles.isEmpty {
                 emptyState(
                     icon: "person.crop.circle.badge.checkmark",
-                    title: "No Pending Accounts",
-                    message: "All new accounts have been reviewed"
+                    title: "All Caught Up!",
+                    message: "No new accounts waiting for review"
                 )
             } else {
-                List(viewModel.pendingProfiles) { profile in
-                    PendingProfileRow(profile: profile, viewModel: viewModel)
+                ScrollView {
+                    LazyVStack(spacing: 16) {
+                        // Header with count
+                        HStack {
+                            Text("\(viewModel.pendingProfiles.count) accounts pending")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                        }
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+
+                        ForEach(viewModel.pendingProfiles) { profile in
+                            PendingProfileCard(profile: profile, viewModel: viewModel)
+                                .padding(.horizontal)
+                        }
+                    }
+                    .padding(.bottom, 20)
                 }
-                .listStyle(.plain)
             }
         }
     }
@@ -943,18 +965,20 @@ class ModerationViewModel: ObservableObject {
         Logger.shared.info("Profile approved: \(userId)", category: .moderation)
     }
 
-    /// Reject a pending profile
-    func rejectProfile(userId: String, reason: String) async throws {
+    /// Reject a pending profile with detailed reason and fix instructions
+    func rejectProfile(userId: String, reasonCode: String, reasonMessage: String, fixInstructions: String) async throws {
         try await db.collection("users").document(userId).updateData([
             "profileStatus": "rejected",
-            "profileStatusReason": reason,
+            "profileStatusReason": reasonMessage,
+            "profileStatusReasonCode": reasonCode,
+            "profileStatusFixInstructions": fixInstructions,
             "profileStatusUpdatedAt": FieldValue.serverTimestamp(),
             "showMeInSearch": false
         ])
 
         // Refresh to update list
         await loadQueue()
-        Logger.shared.info("Profile rejected: \(userId)", category: .moderation)
+        Logger.shared.info("Profile rejected: \(userId) - Reason: \(reasonCode)", category: .moderation)
     }
 
     /// Load reports from Firestore
@@ -1482,174 +1506,300 @@ struct AdminAlert: Identifiable {
     }
 }
 
-// MARK: - Pending Profile Row View
+// MARK: - Pending Profile Card View (Redesigned)
 
-struct PendingProfileRow: View {
+struct PendingProfileCard: View {
     let profile: PendingProfile
     @ObservedObject var viewModel: ModerationViewModel
     @State private var isApproving = false
     @State private var isRejecting = false
     @State private var showRejectAlert = false
-    @State private var showApproveConfirmation = false
+    @State private var currentPhotoIndex = 0
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                // Profile photo
-                if let photoURL = profile.photoURL, let url = URL(string: photoURL) {
-                    AsyncImage(url: url) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        Color.gray.opacity(0.3)
+        VStack(spacing: 0) {
+            // Photo Gallery
+            ZStack(alignment: .bottom) {
+                TabView(selection: $currentPhotoIndex) {
+                    ForEach(Array(profile.photos.enumerated()), id: \.offset) { index, photoURL in
+                        if let url = URL(string: photoURL) {
+                            AsyncImage(url: url) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                case .failure:
+                                    Rectangle()
+                                        .fill(Color.gray.opacity(0.2))
+                                        .overlay(
+                                            Image(systemName: "photo")
+                                                .font(.largeTitle)
+                                                .foregroundColor(.gray)
+                                        )
+                                case .empty:
+                                    Rectangle()
+                                        .fill(Color.gray.opacity(0.1))
+                                        .overlay(ProgressView())
+                                @unknown default:
+                                    EmptyView()
+                                }
+                            }
+                            .frame(height: 280)
+                            .clipped()
+                            .tag(index)
+                        }
                     }
-                    .frame(width: 60, height: 60)
-                    .clipShape(Circle())
-                } else {
-                    Circle()
-                        .fill(Color.gray.opacity(0.3))
-                        .frame(width: 60, height: 60)
-                        .overlay(
-                            Image(systemName: "person.fill")
-                                .foregroundColor(.gray)
-                        )
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .frame(height: 280)
+
+                // Photo indicators
+                if profile.photos.count > 1 {
+                    HStack(spacing: 6) {
+                        ForEach(0..<profile.photos.count, id: \.self) { index in
+                            Circle()
+                                .fill(index == currentPhotoIndex ? Color.white : Color.white.opacity(0.5))
+                                .frame(width: 8, height: 8)
+                        }
+                    }
+                    .padding(.bottom, 12)
                 }
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(profile.name)
-                        .font(.headline)
+                // Photo count badge
+                HStack {
+                    Spacer()
+                    Label("\(profile.photos.count)", systemImage: "photo.stack")
+                        .font(.caption.bold())
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(.ultraThinMaterial)
+                        .cornerRadius(20)
+                        .padding(12)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            }
 
-                    Text("\(profile.age) • \(profile.gender) • \(profile.location)")
+            // Profile Info
+            VStack(alignment: .leading, spacing: 12) {
+                // Name and Age
+                HStack(alignment: .firstTextBaseline) {
+                    Text(profile.name)
+                        .font(.title2.bold())
+                    Text("\(profile.age)")
+                        .font(.title3)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    // Time badge
+                    Text(profile.createdAt)
+                        .font(.caption)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Color.orange)
+                        .cornerRadius(12)
+                }
+
+                // Location and Gender
+                HStack(spacing: 16) {
+                    Label(profile.location, systemImage: "mappin.circle.fill")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
 
-                    Text(profile.email)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    Text("Joined \(profile.createdAt)")
-                        .font(.caption2)
+                    Label(profile.gender, systemImage: "person.fill")
+                        .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
 
-                Spacer()
-            }
-
-            // Bio preview
-            if !profile.bio.isEmpty {
-                Text(profile.bio)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .lineLimit(2)
-            }
-
-            // Photo count
-            if profile.photos.count > 1 {
-                Text("\(profile.photos.count) photos")
+                // Email
+                Label(profile.email, systemImage: "envelope.fill")
                     .font(.caption)
                     .foregroundColor(.blue)
-            }
 
-            // Action buttons
-            HStack(spacing: 12) {
-                Button(action: {
-                    showApproveConfirmation = true
-                }) {
-                    HStack {
-                        if isApproving {
-                            ProgressView()
-                                .scaleEffect(0.7)
-                        } else {
-                            Image(systemName: "checkmark.circle.fill")
-                        }
-                        Text("Approve")
-                    }
-                    .font(.subheadline.weight(.medium))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 16)
+                // Bio
+                if !profile.bio.isEmpty {
+                    Text(profile.bio)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .lineLimit(3)
+                        .padding(.top, 4)
+                }
+
+                Divider()
                     .padding(.vertical, 8)
-                    .background(Color.green)
-                    .cornerRadius(8)
-                }
-                .disabled(isApproving || isRejecting)
 
-                Button(action: {
-                    showRejectAlert = true
-                }) {
-                    HStack {
-                        if isRejecting {
-                            ProgressView()
-                                .scaleEffect(0.7)
-                        } else {
-                            Image(systemName: "xmark.circle.fill")
+                // Action Buttons
+                HStack(spacing: 16) {
+                    // Reject Button
+                    Button(action: { showRejectAlert = true }) {
+                        HStack(spacing: 8) {
+                            if isRejecting {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                    .tint(.white)
+                            } else {
+                                Image(systemName: "xmark")
+                                    .font(.title3.bold())
+                            }
+                            Text("Reject")
+                                .fontWeight(.semibold)
                         }
-                        Text("Reject")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(
+                            LinearGradient(
+                                colors: [Color.red.opacity(0.8), Color.red],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
                     }
-                    .font(.subheadline.weight(.medium))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(Color.red)
-                    .cornerRadius(8)
-                }
-                .disabled(isApproving || isRejecting)
+                    .disabled(isApproving || isRejecting)
 
-                Spacer()
-            }
-        }
-        .padding(.vertical, 8)
-        .confirmationDialog("Approve Profile", isPresented: $showApproveConfirmation, titleVisibility: .visible) {
-            Button("Approve \(profile.name)") {
-                Task {
-                    isApproving = true
-                    try? await viewModel.approveProfile(userId: profile.id)
-                    isApproving = false
+                    // Approve Button
+                    Button(action: {
+                        Task {
+                            isApproving = true
+                            try? await viewModel.approveProfile(userId: profile.id)
+                            isApproving = false
+                        }
+                    }) {
+                        HStack(spacing: 8) {
+                            if isApproving {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                    .tint(.white)
+                            } else {
+                                Image(systemName: "checkmark")
+                                    .font(.title3.bold())
+                            }
+                            Text("Approve")
+                                .fontWeight(.semibold)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(
+                            LinearGradient(
+                                colors: [Color.green, Color.green.opacity(0.8)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                    }
+                    .disabled(isApproving || isRejecting)
                 }
             }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("This will allow \(profile.name) to appear in Discover and interact with other users.")
+            .padding(16)
         }
+        .background(Color(.systemBackground))
+        .cornerRadius(20)
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
         .confirmationDialog("Reject Profile", isPresented: $showRejectAlert, titleVisibility: .visible) {
-            Button("Inappropriate Photos", role: .destructive) {
-                Task {
-                    isRejecting = true
-                    try? await viewModel.rejectProfile(userId: profile.id, reason: "Inappropriate photos")
-                    isRejecting = false
-                }
+            Button("No Clear Face Photo", role: .destructive) {
+                rejectWithReason(ProfileRejectionReason.noFacePhoto)
             }
-            Button("Fake/Spam Profile", role: .destructive) {
-                Task {
-                    isRejecting = true
-                    try? await viewModel.rejectProfile(userId: profile.id, reason: "Fake or spam profile")
-                    isRejecting = false
-                }
+            Button("Inappropriate/Adult Content", role: .destructive) {
+                rejectWithReason(ProfileRejectionReason.inappropriatePhotos)
             }
-            Button("Incomplete Profile", role: .destructive) {
-                Task {
-                    isRejecting = true
-                    try? await viewModel.rejectProfile(userId: profile.id, reason: "Incomplete profile information")
-                    isRejecting = false
-                }
+            Button("Fake/Stock Photos", role: .destructive) {
+                rejectWithReason(ProfileRejectionReason.fakePhotos)
             }
-            Button("Underage Suspected", role: .destructive) {
-                Task {
-                    isRejecting = true
-                    try? await viewModel.rejectProfile(userId: profile.id, reason: "Underage user suspected")
-                    isRejecting = false
-                }
+            Button("Empty/Incomplete Bio", role: .destructive) {
+                rejectWithReason(ProfileRejectionReason.incompleteBio)
             }
-            Button("Other Violation", role: .destructive) {
-                Task {
-                    isRejecting = true
-                    try? await viewModel.rejectProfile(userId: profile.id, reason: "Violates community guidelines")
-                    isRejecting = false
-                }
+            Button("Suspected Underage", role: .destructive) {
+                rejectWithReason(ProfileRejectionReason.underage)
+            }
+            Button("Spam/Promotional", role: .destructive) {
+                rejectWithReason(ProfileRejectionReason.spam)
+            }
+            Button("Offensive Content", role: .destructive) {
+                rejectWithReason(ProfileRejectionReason.offensiveContent)
             }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Select a reason for rejecting this profile")
+            Text("Select a reason for rejecting \(profile.name)'s profile")
+        }
+    }
+
+    private func rejectWithReason(_ reason: ProfileRejectionReason) {
+        Task {
+            isRejecting = true
+            try? await viewModel.rejectProfile(
+                userId: profile.id,
+                reasonCode: reason.code,
+                reasonMessage: reason.userMessage,
+                fixInstructions: reason.fixInstructions
+            )
+            isRejecting = false
+        }
+    }
+}
+
+// MARK: - Profile Rejection Reasons
+
+/// Structured rejection reasons with user-friendly messages and fix instructions
+enum ProfileRejectionReason {
+    case noFacePhoto
+    case inappropriatePhotos
+    case fakePhotos
+    case incompleteBio
+    case underage
+    case spam
+    case offensiveContent
+
+    var code: String {
+        switch self {
+        case .noFacePhoto: return "no_face_photo"
+        case .inappropriatePhotos: return "inappropriate_photos"
+        case .fakePhotos: return "fake_photos"
+        case .incompleteBio: return "incomplete_bio"
+        case .underage: return "underage"
+        case .spam: return "spam"
+        case .offensiveContent: return "offensive_content"
+        }
+    }
+
+    var userMessage: String {
+        switch self {
+        case .noFacePhoto:
+            return "Your profile needs a clear photo showing your face"
+        case .inappropriatePhotos:
+            return "One or more of your photos contains inappropriate content"
+        case .fakePhotos:
+            return "Your photos appear to be stock images or from another person"
+        case .incompleteBio:
+            return "Your profile bio is empty or too short"
+        case .underage:
+            return "We couldn't verify that you meet our minimum age requirement"
+        case .spam:
+            return "Your profile appears to be promotional or spam"
+        case .offensiveContent:
+            return "Your profile contains offensive or hateful content"
+        }
+    }
+
+    var fixInstructions: String {
+        switch self {
+        case .noFacePhoto:
+            return "Please upload at least one photo that clearly shows your face. Group photos, photos with sunglasses, or photos taken from far away won't be accepted."
+        case .inappropriatePhotos:
+            return "Please remove any photos containing nudity, explicit content, or suggestive material. Your photos should be appropriate for all audiences."
+        case .fakePhotos:
+            return "Please upload real photos of yourself. Using someone else's photos or stock images violates our community guidelines."
+        case .incompleteBio:
+            return "Please write a bio that's at least 20 characters long. Tell others about your interests, hobbies, or what you're looking for."
+        case .underage:
+            return "If you believe this is a mistake, please contact support with a valid ID to verify your age. Users must be 18 or older."
+        case .spam:
+            return "Please remove any promotional content, links, or business advertisements from your profile. This platform is for genuine connections only."
+        case .offensiveContent:
+            return "Please remove any content that could be considered hateful, discriminatory, or offensive. Our community is built on respect."
         }
     }
 }
