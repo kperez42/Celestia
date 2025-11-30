@@ -91,11 +91,12 @@ struct MessagesView: View {
                     }
 
                     // Content - single unified list of all conversations
-                    // PERFORMANCE: Only show loading on first load when we have no data
-                    // After initial load, show cached data instantly (no skeleton flash)
-                    if matchService.isLoading && !hasCompletedInitialLoad && conversations.isEmpty {
+                    // PERFORMANCE: Only show loading skeleton on very first app launch
+                    // when we have absolutely no data. Otherwise show content instantly.
+                    // Check matchService.matches directly to avoid flash from local cache init
+                    if matchService.isLoading && !hasCompletedInitialLoad && matchService.matches.isEmpty && conversations.isEmpty {
                         loadingView
-                    } else if conversations.isEmpty {
+                    } else if conversations.isEmpty && matchService.matches.isEmpty {
                         emptyStateView
                     } else if filteredConversations.isEmpty && !searchDebouncer.debouncedText.isEmpty {
                         // No search results
@@ -107,6 +108,14 @@ struct MessagesView: View {
             }
             .navigationTitle("")
             .navigationBarHidden(true)
+            .onAppear {
+                // PERFORMANCE: Immediately populate cache from existing matchService data
+                // This runs synchronously before any async tasks, preventing flash
+                if cachedConversations.isEmpty && !matchService.matches.isEmpty {
+                    updateCachedConversations()
+                    Logger.shared.debug("MessagesView instant cache populate from matchService", category: .performance)
+                }
+            }
             .task {
                 // PERFORMANCE: Show cached data immediately, fetch in background if stale
                 if hasCompletedInitialLoad && !cachedConversations.isEmpty {

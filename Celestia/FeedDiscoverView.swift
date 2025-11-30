@@ -723,15 +723,17 @@ struct FeedDiscoverView: View {
             return
         }
 
-        // Check rate limit
-        guard RateLimiter.shared.canSendLike() else {
-            let remaining = RateLimiter.shared.getRemainingLikes()
-            showToast(
-                message: "Daily like limit reached. Try again tomorrow.",
-                icon: "exclamationmark.triangle.fill",
-                color: .orange
-            )
-            return
+        // Check daily like limit for free users (premium gets unlimited)
+        let isPremium = authService.currentUser?.isPremium ?? false
+        if !isPremium {
+            guard RateLimiter.shared.canSendLike() else {
+                showToast(
+                    message: "Daily like limit reached (\(AppConstants.RateLimit.maxLikesPerDay) likes). Upgrade for unlimited!",
+                    icon: "exclamationmark.triangle.fill",
+                    color: .orange
+                )
+                return
+            }
         }
 
         // Optimistic update - add to liked users

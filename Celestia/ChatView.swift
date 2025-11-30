@@ -54,6 +54,10 @@ struct ChatView: View {
     // Track initial load to prevent scroll animation on first load
     @State private var isInitialLoad = true
 
+    // PERFORMANCE: Track if THIS chat has loaded messages to prevent conversation starters flash
+    // This fixes a race condition where view renders before onAppear sets loading state
+    @State private var hasLoadedMessagesForThisChat = false
+
     // PERFORMANCE: Debounce message count changes to prevent excessive updates
     @State private var pendingScrollTask: Task<Void, Never>?
 
@@ -154,6 +158,10 @@ struct ChatView: View {
                 .environmentObject(authService)
         }
         .onChange(of: messageService.messages.count) { oldCount, newCount in
+            // BUGFIX: Mark as loaded when messages are populated
+            if newCount > 0 && !hasLoadedMessagesForThisChat {
+                hasLoadedMessagesForThisChat = true
+            }
             // SWIFTUI FIX: Defer safety check with longer delay to avoid modifying state during view update
             // Only check if message count actually increased (not on initial load or deletions)
             guard newCount > oldCount else { return }
@@ -161,6 +169,13 @@ struct ChatView: View {
                 // Longer delay ensures view update cycle completes
                 try? await Task.sleep(nanoseconds: 100_000_000) // 100ms delay
                 checkConversationSafety()
+            }
+        }
+        .onChange(of: messageService.isLoading) { _, isLoading in
+            // BUGFIX: Mark as loaded once service finishes loading
+            // This ensures we only show conversation starters AFTER we confirm no messages exist
+            if !isLoading && !hasLoadedMessagesForThisChat {
+                hasLoadedMessagesForThisChat = true
             }
         }
         .task {
@@ -348,9 +363,12 @@ struct ChatView: View {
                     }
 
                     // Show conversation starters if no messages
+                    // BUGFIX: Use hasLoadedMessagesForThisChat to prevent flash of conversation starters
+                    // before messages are loaded. This fixes a race condition where the view renders
+                    // before onAppear sets the loading state.
                     if messageService.messages.isEmpty, let currentUser = authService.currentUser {
-                        if messageService.isLoading {
-                            // Show loading state
+                        if messageService.isLoading || !hasLoadedMessagesForThisChat {
+                            // Show loading state - either service is loading OR we haven't confirmed load for this chat
                             VStack(spacing: 16) {
                                 ProgressView()
                                     .progressViewStyle(.circular)
@@ -765,6 +783,12 @@ struct ChatView: View {
     
     private func setupChat() {
         guard let matchId = match.id else { return }
+
+        // BUGFIX: If messages are already cached for this match, mark as loaded immediately
+        // This prevents showing loading state when messages are already available
+        if !messageService.messages.isEmpty {
+            hasLoadedMessagesForThisChat = true
+        }
 
         messageService.listenToMessages(matchId: matchId)
 

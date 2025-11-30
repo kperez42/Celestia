@@ -22,9 +22,9 @@ struct LazyView<Content: View>: View {
     }
 }
 
-/// Tab content wrapper with true lazy loading - only renders when tab is visited
-/// PERFORMANCE FIX: Defers content creation until tab is first selected
-/// Once rendered, content stays in memory to preserve state and enable instant switching
+/// Tab content wrapper with smart preloading - renders adjacent tabs for instant switching
+/// PERFORMANCE FIX: Pre-renders tabs within 1 position of current tab
+/// This ensures smooth, instant tab switching without any flash or loading state
 struct LazyTabContent<Content: View>: View {
     let tabIndex: Int
     let currentTab: Int
@@ -39,14 +39,21 @@ struct LazyTabContent<Content: View>: View {
         self.content = content
     }
 
+    // PERFORMANCE: Determine if this tab should be rendered
+    // Render if: currently selected, adjacent to current, or previously visited
+    private var shouldRender: Bool {
+        // Always render if visited before (preserves state)
+        if hasBeenVisited { return true }
+        // Render current tab
+        if tabIndex == currentTab { return true }
+        // PRELOAD: Render adjacent tabs (within 1 position) for instant switching
+        if abs(tabIndex - currentTab) <= 1 { return true }
+        return false
+    }
+
     var body: some View {
         Group {
-            // Render content if: currently selected OR has been visited before
-            // This ensures:
-            // 1. First visit: content loads when user navigates to tab
-            // 2. Subsequent visits: content is already rendered (instant switch)
-            // 3. No double-render: content only builds once
-            if hasBeenVisited || tabIndex == currentTab {
+            if shouldRender {
                 content()
                     .onAppear {
                         // Mark as visited on first appearance - content will stay rendered
@@ -55,7 +62,7 @@ struct LazyTabContent<Content: View>: View {
                         }
                     }
             } else {
-                // Placeholder for unvisited tabs - matches background color
+                // Placeholder for distant unvisited tabs - matches background color
                 Color(.systemGroupedBackground)
             }
         }
