@@ -16,25 +16,17 @@ struct ChatDetailView: View {
     @State private var showPremiumUpgrade = false
     @FocusState private var isInputFocused: Bool
 
-    // Message limit for free users
-    private let freeMessageLimit = 5
-
     private var isPremium: Bool {
         authService.currentUser?.isPremium ?? false
     }
 
-    // Count messages sent by current user in this conversation
-    private var sentMessageCount: Int {
-        guard let currentUserId = authService.currentUser?.id else { return 0 }
-        return viewModel.messages.filter { $0.senderID == currentUserId }.count
-    }
-
+    // Daily message limit for free users (across ALL conversations)
     private var hasReachedLimit: Bool {
-        !isPremium && sentMessageCount >= freeMessageLimit
+        !isPremium && RateLimiter.shared.hasReachedDailyMessageLimit()
     }
 
     private var remainingMessages: Int {
-        max(0, freeMessageLimit - sentMessageCount)
+        RateLimiter.shared.getRemainingDailyMessages()
     }
 
     init(otherUser: User) {
@@ -68,8 +60,8 @@ struct ChatDetailView: View {
                 }
             }
 
-            // Message limit banner for free users
-            if !isPremium && sentMessageCount > 0 {
+            // Daily message limit banner for free users
+            if !isPremium && remainingMessages < AppConstants.RateLimit.maxDailyMessagesForFreeUsers {
                 messageLimitBanner
             }
 
@@ -103,11 +95,11 @@ struct ChatDetailView: View {
                 .foregroundColor(.orange)
 
             if remainingMessages > 0 {
-                Text("\(remainingMessages) free message\(remainingMessages == 1 ? "" : "s") left")
+                Text("\(remainingMessages) daily message\(remainingMessages == 1 ? "" : "s") left")
                     .font(.caption)
                     .foregroundColor(.secondary)
             } else {
-                Text("Message limit reached")
+                Text("Daily limit reached")
                     .font(.caption)
                     .foregroundColor(.orange)
             }

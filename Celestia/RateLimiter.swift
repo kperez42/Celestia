@@ -26,15 +26,21 @@ class RateLimiter: ObservableObject {
         didSet { saveToDisk(searchTimes, key: "rate_limit_searches") }
     }
 
+    // Daily message tracking for free users (across all conversations)
+    private var dailyMessageTimes: [Date] = [] {
+        didSet { saveToDisk(dailyMessageTimes, key: "rate_limit_daily_messages") }
+    }
+
     private init() {
         // Load persisted timestamps
         messageTimes = loadFromDisk(key: "rate_limit_messages")
         likeTimes = loadFromDisk(key: "rate_limit_likes")
         reportTimes = loadFromDisk(key: "rate_limit_reports")
         searchTimes = loadFromDisk(key: "rate_limit_searches")
+        dailyMessageTimes = loadFromDisk(key: "rate_limit_daily_messages")
 
         Logger.shared.debug(
-            "RateLimiter initialized - Loaded \(messageTimes.count) messages, \(likeTimes.count) likes, \(reportTimes.count) reports, \(searchTimes.count) searches",
+            "RateLimiter initialized - Loaded \(messageTimes.count) messages, \(likeTimes.count) likes, \(reportTimes.count) reports, \(searchTimes.count) searches, \(dailyMessageTimes.count) daily messages",
             category: .general
         )
     }
@@ -54,6 +60,49 @@ class RateLimiter: ObservableObject {
 
     func recordMessage() {
         messageTimes.append(Date())
+    }
+
+    // MARK: - Daily Message Limit (for free users)
+
+    /// Check if free user can send a message (daily limit across all conversations)
+    /// Premium users should bypass this check entirely
+    func canSendDailyMessage() -> Bool {
+        cleanupOldTimestamps(&dailyMessageTimes, window: 86400) // 24 hour window
+
+        guard dailyMessageTimes.count < AppConstants.RateLimit.maxDailyMessagesForFreeUsers else {
+            return false
+        }
+
+        return true
+    }
+
+    /// Record a daily message (call after successfully sending for free users)
+    func recordDailyMessage() {
+        dailyMessageTimes.append(Date())
+    }
+
+    /// Get remaining daily messages for free users
+    func getRemainingDailyMessages() -> Int {
+        cleanupOldTimestamps(&dailyMessageTimes, window: 86400)
+        return max(0, AppConstants.RateLimit.maxDailyMessagesForFreeUsers - dailyMessageTimes.count)
+    }
+
+    /// Check if free user has reached daily message limit
+    func hasReachedDailyMessageLimit() -> Bool {
+        cleanupOldTimestamps(&dailyMessageTimes, window: 86400)
+        return dailyMessageTimes.count >= AppConstants.RateLimit.maxDailyMessagesForFreeUsers
+    }
+
+    /// Get time until daily message limit resets
+    func timeUntilDailyMessageReset() -> TimeInterval? {
+        guard let oldestTime = dailyMessageTimes.first else {
+            return nil
+        }
+
+        let resetTime = oldestTime.addingTimeInterval(86400) // 24 hours
+        let now = Date()
+
+        return resetTime > now ? resetTime.timeIntervalSince(now) : nil
     }
 
     // MARK: - Like/Interest Rate Limiting
@@ -119,6 +168,7 @@ class RateLimiter: ObservableObject {
         likeTimes = []
         reportTimes = []
         searchTimes = []
+        dailyMessageTimes = []
 
         Logger.shared.info("All rate limits reset", category: .general)
     }

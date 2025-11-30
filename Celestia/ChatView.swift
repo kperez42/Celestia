@@ -30,6 +30,7 @@ struct ChatView: View {
     @State private var showingUnmatchConfirmation = false
     @State private var showingUserProfile = false
     @State private var showingReportSheet = false
+    @State private var showingPremiumUpgrade = false
     @State private var isSending = false
     @State private var sendingMessagePreview: String?
     @State private var sendingImagePreview: UIImage?
@@ -89,6 +90,11 @@ struct ChatView: View {
             // Messages
             messagesScrollView
 
+            // Daily message limit banner for free users
+            if let isPremium = authService.currentUser?.isPremium, !isPremium {
+                dailyMessageLimitBanner
+            }
+
             // Input bar
             messageInputBar
         }
@@ -142,6 +148,10 @@ struct ChatView: View {
         }
         .sheet(isPresented: $showingReportSheet) {
             ReportUserView(user: otherUser)
+        }
+        .sheet(isPresented: $showingPremiumUpgrade) {
+            PremiumUpgradeView()
+                .environmentObject(authService)
         }
         .onChange(of: messageService.messages.count) { oldCount, newCount in
             // SWIFTUI FIX: Defer safety check with longer delay to avoid modifying state during view update
@@ -580,6 +590,54 @@ struct ChatView: View {
         }
     }
     
+    // MARK: - Daily Message Limit Banner
+
+    @ViewBuilder
+    private var dailyMessageLimitBanner: some View {
+        let remaining = RateLimiter.shared.getRemainingDailyMessages()
+        let maxDaily = AppConstants.RateLimit.maxDailyMessagesForFreeUsers
+
+        // Only show if they've used some messages
+        if remaining < maxDaily {
+            HStack(spacing: 8) {
+                Image(systemName: remaining > 0 ? "bubble.left.and.bubble.right" : "lock.fill")
+                    .font(.caption)
+                    .foregroundColor(remaining > 0 ? .orange : .red)
+
+                if remaining > 0 {
+                    Text("\(remaining) daily message\(remaining == 1 ? "" : "s") left")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("Daily limit reached")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                }
+
+                Spacer()
+
+                Button {
+                    showingPremiumUpgrade = true
+                    HapticManager.shared.impact(.light)
+                } label: {
+                    Text("Unlimited")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            LinearGradient(colors: [.purple, .pink], startPoint: .leading, endPoint: .trailing)
+                        )
+                        .cornerRadius(12)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(remaining > 0 ? Color.orange.opacity(0.1) : Color.red.opacity(0.1))
+        }
+    }
+
     // MARK: - Input Bar
 
     private var messageInputBar: some View {
@@ -758,7 +816,20 @@ struct ChatView: View {
         guard let currentUserId = authService.currentUser?.id else { return }
         guard let receiverId = otherUser.id else { return }
 
-        // Check rate limit locally for immediate feedback
+        // Check daily message limit for free users (10 messages/day total across ALL conversations)
+        let isPremium = authService.currentUser?.isPremium ?? false
+        if !isPremium {
+            guard RateLimiter.shared.canSendDailyMessage() else {
+                errorToastMessage = "Daily message limit reached (\(AppConstants.RateLimit.maxDailyMessagesForFreeUsers) messages). Upgrade to Premium for unlimited messaging!"
+                showErrorToast = true
+                HapticManager.shared.notification(.warning)
+                return
+            }
+            // Record this message towards daily limit immediately (optimistic)
+            RateLimiter.shared.recordDailyMessage()
+        }
+
+        // Check rate limit locally for immediate feedback (prevents spam)
         guard RateLimiter.shared.canSendMessage() else {
             errorToastMessage = "Slow down! You're sending messages too quickly."
             showErrorToast = true
