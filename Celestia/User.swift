@@ -162,6 +162,9 @@ struct User: Identifiable, Codable, Equatable {
         try container.encode(isAdmin, forKey: .isAdmin)
         try container.encodeIfPresent(premiumTier, forKey: .premiumTier)
         try container.encodeIfPresent(subscriptionExpiryDate, forKey: .subscriptionExpiryDate)
+        try container.encode(profileStatus, forKey: .profileStatus)
+        try container.encodeIfPresent(profileStatusReason, forKey: .profileStatusReason)
+        try container.encodeIfPresent(profileStatusUpdatedAt, forKey: .profileStatusUpdatedAt)
         try container.encode(ageRangeMin, forKey: .ageRangeMin)
         try container.encode(ageRangeMax, forKey: .ageRangeMax)
         try container.encode(maxDistance, forKey: .maxDistance)
@@ -198,6 +201,7 @@ struct User: Identifiable, Codable, Equatable {
         case languages, interests, photos, profileImageURL
         case timestamp, lastActive, isOnline
         case isPremium, isVerified, isAdmin, premiumTier, subscriptionExpiryDate
+        case profileStatus, profileStatusReason, profileStatusUpdatedAt
         case ageRangeMin, ageRangeMax, maxDistance, showMeInSearch
         case likesGiven, likesReceived, matchCount, profileViews
         case fcmToken, notificationsEnabled
@@ -246,11 +250,18 @@ struct User: Identifiable, Codable, Equatable {
         self.isVerified = dictionary["isVerified"] as? Bool ?? false
         self.isAdmin = dictionary["isAdmin"] as? Bool ?? false
         self.premiumTier = dictionary["premiumTier"] as? String
-        
+
         if let expiryDate = dictionary["subscriptionExpiryDate"] as? Timestamp {
             self.subscriptionExpiryDate = expiryDate.dateValue()
         }
-        
+
+        // Profile Status (for moderation quarantine)
+        self.profileStatus = dictionary["profileStatus"] as? String ?? "pending"
+        self.profileStatusReason = dictionary["profileStatusReason"] as? String
+        if let statusUpdatedAt = dictionary["profileStatusUpdatedAt"] as? Timestamp {
+            self.profileStatusUpdatedAt = statusUpdatedAt.dateValue()
+        }
+
         self.ageRangeMin = dictionary["ageRangeMin"] as? Int ?? 18
         self.ageRangeMax = dictionary["ageRangeMax"] as? Int ?? 99
         self.maxDistance = dictionary["maxDistance"] as? Int ?? 100
