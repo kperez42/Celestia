@@ -483,12 +483,8 @@ class StoreManager: ObservableObject {
         }
 
         // Consumables
-        else if productID.contains("superlikes") {
-            return .consumable(.superLikes)
-        } else if productID.contains("boost") {
+        else if productID.contains("boost") {
             return .consumable(.boost)
-        } else if productID.contains("rewinds") {
-            return .consumable(.rewind)
         } else if productID.contains("spotlight") {
             return .consumable(.spotlight)
         }
@@ -498,20 +494,12 @@ class StoreManager: ObservableObject {
 
     /// Get consumable amount from product ID
     private func getConsumableAmount(for productID: String) -> Int {
-        if productID == ProductIdentifiers.superLikes5 {
-            return 5
-        } else if productID == ProductIdentifiers.superLikes10 {
-            return 10
-        } else if productID == ProductIdentifiers.superLikes25 {
-            return 25
-        } else if productID == ProductIdentifiers.boost1Hour {
+        if productID == ProductIdentifiers.boost1Hour {
             return 1
         } else if productID == ProductIdentifiers.boost3Hours {
             return 1
         } else if productID == ProductIdentifiers.boost24Hours {
             return 1
-        } else if productID == ProductIdentifiers.rewinds5 {
-            return 5
         } else if productID == ProductIdentifiers.spotlightWeekend {
             return 1
         }
