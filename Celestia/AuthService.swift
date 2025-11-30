@@ -566,12 +566,14 @@ class AuthService: ObservableObject, AuthServiceProtocol {
             async let passesDeleted: () = deleteUserPasses(uid: uid, db: db)
             async let emergencyContactsDeleted: () = deleteUserEmergencyContacts(uid: uid, db: db)
             async let segmentAssignmentsDeleted: () = deleteUserSegmentAssignments(uid: uid, db: db)
+            async let pendingVerificationsDeleted: () = deleteUserPendingVerifications(uid: uid, db: db)
 
             // Wait for all deletions to complete
             _ = try await (messagesDeleted, matchesDeleted, interestsDeleted, likesDeleted,
                           savedProfilesDeleted, notificationsDeleted, blocksDeleted,
                           referralCodesDeleted, profileViewsDeleted, passesDeleted,
-                          emergencyContactsDeleted, segmentAssignmentsDeleted)
+                          emergencyContactsDeleted, segmentAssignmentsDeleted,
+                          pendingVerificationsDeleted)
 
             Logger.shared.auth("All related user data deleted", level: .info)
 
@@ -844,6 +846,23 @@ class AuthService: ObservableObject, AuthServiceProtocol {
         }
 
         Logger.shared.auth("Deleted user segment assignments", level: .debug)
+    }
+
+    /// Delete pending ID verifications (GDPR: contains sensitive ID documents)
+    private func deleteUserPendingVerifications(uid: String, db: Firestore) async throws {
+        // Document ID is the user ID for pendingVerifications
+        try? await db.collection("pendingVerifications").document(uid).delete()
+
+        // Also query by userId field in case of different document structure
+        let verifications = try await db.collection("pendingVerifications")
+            .whereField("userId", isEqualTo: uid)
+            .getDocuments()
+
+        for doc in verifications.documents {
+            try await doc.reference.delete()
+        }
+
+        Logger.shared.auth("Deleted pending verifications (ID documents)", level: .debug)
     }
 
     // MARK: - Re-authentication
