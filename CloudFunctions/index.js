@@ -2168,6 +2168,5 @@ function getContentRejectionMessage(result) {
   return 'This photo does not meet our community guidelines. Please choose a different photo.';
 }
 
-// Export admin object for use in modules
-exports.admin = admin;
-exports.db = db;
+// NOTE: Do NOT export admin or db here - it causes stack overflow in firebase-functions loader
+// Modules should initialize firebase-admin themselves if needed
