@@ -1553,6 +1553,83 @@ exports.onReportCreated = functions.firestore
     ));
   });
 
+/**
+ * Trigger: Auto-set isAdmin for whitelisted email addresses
+ * When a user document is created, check if their email is in the admin whitelist
+ * and set isAdmin: true if so
+ */
+exports.onUserCreated = functions.firestore
+  .document('users/{userId}')
+  .onCreate(async (snap, context) => {
+    const userData = snap.data();
+    const userId = context.params.userId;
+
+    // Admin email whitelist - must match SettingsView.swift whitelist
+    const adminEmails = ['perezkevin640@gmail.com', 'admin@celestia.app'];
+
+    if (userData.email && adminEmails.includes(userData.email.toLowerCase())) {
+      try {
+        await snap.ref.update({
+          isAdmin: true
+        });
+
+        functions.logger.info('Admin access granted to user', {
+          userId,
+          email: userData.email
+        });
+      } catch (error) {
+        functions.logger.error('Failed to set admin access', {
+          userId,
+          email: userData.email,
+          error: error.message
+        });
+      }
+    }
+  });
+
+/**
+ * Trigger: Check for admin access on user update (for existing users)
+ * If an existing user updates their document and their email is in the admin whitelist
+ * but isAdmin is not set, set it automatically
+ */
+exports.onUserUpdated = functions.firestore
+  .document('users/{userId}')
+  .onUpdate(async (change, context) => {
+    const userData = change.after.data();
+    const previousData = change.before.data();
+    const userId = context.params.userId;
+
+    // Skip if isAdmin is already true
+    if (userData.isAdmin === true) {
+      return;
+    }
+
+    // Admin email whitelist
+    const adminEmails = ['perezkevin640@gmail.com', 'admin@celestia.app'];
+
+    // If email is in whitelist and isAdmin is not set, set it
+    if (userData.email && adminEmails.includes(userData.email.toLowerCase())) {
+      // Only update if isAdmin field is missing or false
+      if (previousData.isAdmin !== true) {
+        try {
+          await change.after.ref.update({
+            isAdmin: true
+          });
+
+          functions.logger.info('Admin access granted to existing user', {
+            userId,
+            email: userData.email
+          });
+        } catch (error) {
+          functions.logger.error('Failed to set admin access on update', {
+            userId,
+            error: error.message
+          });
+        }
+      }
+    }
+  });
+
 // ============================================================================
 // FIRESTORE TRIGGERS - AUTOMATIC PUSH NOTIFICATIONS
 // ============================================================================
@@ -2057,6 +2134,30 @@ exports.onPhotoUploaded = functions.storage.object().onFinalize(async (object) =
 
     // Content approved
     functions.logger.info('Image passed moderation', { filePath });
+
+    // QUARANTINE SYSTEM: Activate profile when first photo passes moderation
+    // This ensures new accounts are only visible after their photos are verified
+    if (userId && (photoType === 'profile_images' || photoType === 'profile-photos' || photoType === 'photos')) {
+      try {
+        const userDoc = await db.collection('users').doc(userId).get();
+        if (userDoc.exists) {
+          const userData = userDoc.data();
+          // Only activate if currently pending (don't reactivate suspended accounts)
+          if (userData.profileStatus === 'pending' || !userData.profileStatus) {
+            await db.collection('users').doc(userId).update({
+              profileStatus: 'active',
+              profileStatusReason: 'Photo passed content moderation',
+              profileStatusUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            functions.logger.info('Profile activated after photo moderation passed', { userId, photoType });
+          }
+        }
+      } catch (activationError) {
+        functions.logger.error('Error activating profile', { userId, error: activationError.message });
+        // Don't fail the whole operation - photo is still approved
+      }
+    }
+
     return { approved: true };
 
   } catch (error) {

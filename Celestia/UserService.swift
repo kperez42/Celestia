@@ -61,6 +61,7 @@ class UserService: ObservableObject, UserServiceProtocol {
 
         var query = db.collection("users")
             .whereField("showMeInSearch", isEqualTo: true)
+            .whereField("profileStatus", isEqualTo: "active") // SAFETY: Only show approved profiles
             .order(by: "lastActive", descending: true)
             .limit(to: limit)
 

@@ -409,9 +409,16 @@ struct SettingsView: View {
     }
 
     // Check if current user is an admin
+    // Uses both Firestore isAdmin field AND email whitelist (for bootstrapping)
     private var isAdminUser: Bool {
+        // First check if user has isAdmin flag in Firestore (authoritative)
+        if authService.currentUser?.isAdmin == true {
+            return true
+        }
+
+        // Fallback to email whitelist for bootstrapping new admin accounts
+        // Once isAdmin is set in Firestore, this is just a secondary check
         guard let email = authService.currentUser?.email else { return false }
-        // Add your admin email(s) here
         let adminEmails = ["perezkevin640@gmail.com", "admin@celestia.app"]
         return adminEmails.contains(email.lowercased())
     }

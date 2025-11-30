@@ -116,6 +116,7 @@ enum ValidationHelper {
 
     /// Validate bio text length and content
     /// Max length: 500 characters (AppConstants.Limits.maxBioLength)
+    /// Also checks for inappropriate content (profanity, spam, contact info)
     static func validateBio(_ bio: String) -> ValidationResult {
         let sanitizedBio = InputSanitizer.standard(bio)
 
@@ -127,6 +128,15 @@ enum ValidationHelper {
         let maxLength = AppConstants.Limits.maxBioLength
         guard sanitizedBio.count <= maxLength else {
             return .invalid("Bio must be \(maxLength) characters or less. Currently: \(sanitizedBio.count)")
+        }
+
+        // CONTENT MODERATION: Check for inappropriate content
+        if !ContentModerator.shared.isAppropriate(sanitizedBio) {
+            let violations = ContentModerator.shared.getViolations(sanitizedBio)
+            if !violations.isEmpty {
+                return .invalid(violations.first ?? "Bio contains inappropriate content.")
+            }
+            return .invalid("Bio contains inappropriate content.")
         }
 
         return .valid
@@ -144,6 +154,7 @@ enum ValidationHelper {
     /// - Not empty
     /// - 2-50 characters
     /// - Only letters, spaces, hyphens, apostrophes
+    /// - No inappropriate/sexual/profane content
     static func validateName(_ name: String) -> ValidationResult {
         let sanitizedName = InputSanitizer.strict(name)
 
@@ -164,6 +175,12 @@ enum ValidationHelper {
         let namePredicate = NSPredicate(format: "SELF MATCHES %@", nameRegex)
         guard namePredicate.evaluate(with: sanitizedName) else {
             return .invalid("Name can only contain letters, spaces, hyphens, and apostrophes.")
+        }
+
+        // CONTENT MODERATION: Check for inappropriate/sexual/profane names
+        let nameValidation = ContentModerator.shared.validateName(sanitizedName)
+        guard nameValidation.isValid else {
+            return .invalid(nameValidation.reason ?? "Name contains inappropriate content.")
         }
 
         return .valid
