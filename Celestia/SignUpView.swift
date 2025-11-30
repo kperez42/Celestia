@@ -6,11 +6,14 @@
 //
 
 import SwiftUI
+import PhotosUI
 
 struct SignUpView: View {
     @EnvironmentObject var authService: AuthService
     @EnvironmentObject var deepLinkManager: DeepLinkManager
     @Environment(\.dismiss) var dismiss
+
+    private let imageUploadService = ImageUploadService.shared
 
     @State private var currentStep = 1
 
@@ -28,6 +31,11 @@ struct SignUpView: View {
     // Step 3: Location
     @State private var location = ""
     @State private var country = ""
+
+    // Step 4: Photos
+    @State private var selectedPhotos: [PhotosPickerItem] = []
+    @State private var photoImages: [UIImage] = []
+    @State private var isLoadingPhotos = false
 
     // Referral code (optional)
     @State private var referralCode = ""
@@ -64,7 +72,7 @@ struct SignUpView: View {
                     VStack(spacing: 25) {
                         // Progress indicator
                         HStack(spacing: 10) {
-                            ForEach(1...3, id: \.self) { step in
+                            ForEach(1...4, id: \.self) { step in
                                 Circle()
                                     .fill(currentStep >= step ? Color.purple : Color.gray.opacity(0.3))
                                     .frame(width: 12, height: 12)
@@ -74,7 +82,7 @@ struct SignUpView: View {
                         }
                         .accessibilityElement(children: .ignore)
                         .accessibilityLabel("Sign up progress")
-                        .accessibilityValue("Step \(currentStep) of 3")
+                        .accessibilityValue("Step \(currentStep) of 4")
                         .padding(.top, 20)
                         
                         // Header
@@ -110,6 +118,12 @@ struct SignUpView: View {
                                     ))
                             case 3:
                                 step3Content
+                                    .transition(.asymmetric(
+                                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                                        removal: .move(edge: .leading).combined(with: .opacity)
+                                    ))
+                            case 4:
+                                step4Content
                                     .transition(.asymmetric(
                                         insertion: .move(edge: .trailing).combined(with: .opacity),
                                         removal: .move(edge: .leading).combined(with: .opacity)
@@ -154,11 +168,11 @@ struct SignUpView: View {
                             Button {
                                 handleNext()
                             } label: {
-                                if authService.isLoading {
+                                if authService.isLoading || isLoadingPhotos {
                                     ProgressView()
                                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                 } else {
-                                    Text(currentStep == 3 ? "Create Account" : "Next")
+                                    Text(currentStep == 4 ? "Create Account" : "Next")
                                         .font(.headline)
                                         .foregroundColor(.white)
                                 }
@@ -173,10 +187,10 @@ struct SignUpView: View {
                                 )
                             )
                             .cornerRadius(15)
-                            .disabled(!canProceed || authService.isLoading)
-                            .accessibilityLabel(currentStep == 3 ? "Create Account" : "Next")
-                            .accessibilityHint(currentStep == 3 ? "Create your account and sign up" : "Continue to next step")
-                            .accessibilityIdentifier(currentStep == 3 ? AccessibilityIdentifier.createAccountButton : AccessibilityIdentifier.nextButton)
+                            .disabled(!canProceed || authService.isLoading || isLoadingPhotos)
+                            .accessibilityLabel(currentStep == 4 ? "Create Account" : "Next")
+                            .accessibilityHint(currentStep == 4 ? "Create your account and sign up" : "Continue to next step")
+                            .accessibilityIdentifier(currentStep == 4 ? AccessibilityIdentifier.createAccountButton : AccessibilityIdentifier.nextButton)
                             .scaleButton()
                         }
                         .padding(.horizontal, 30)
@@ -513,26 +527,235 @@ struct SignUpView: View {
                 .padding(.top, 10)
         }
     }
-    
+
+    // MARK: - Step 4: Photos
+    var step4Content: some View {
+        VStack(spacing: 20) {
+            // Photo Tips
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 6) {
+                    Image(systemName: "lightbulb.fill")
+                        .foregroundColor(.yellow)
+                    Text("Photo Tips")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    photoTipRow(icon: "face.smiling", text: "Use a clear face photo as your first picture")
+                    photoTipRow(icon: "person.fill", text: "Show your full body in at least one photo")
+                    photoTipRow(icon: "xmark.circle", text: "Avoid group photos or sunglasses")
+                }
+            }
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.yellow.opacity(0.08))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.yellow.opacity(0.3), lineWidth: 1)
+                    )
+            )
+
+            // Main profile photo (larger)
+            if !photoImages.isEmpty {
+                ZStack(alignment: .topTrailing) {
+                    Image(uiImage: photoImages[0])
+                        .resizable()
+                        .scaledToFill()
+                        .frame(height: 200)
+                        .frame(maxWidth: .infinity)
+                        .clipped()
+                        .cornerRadius(16)
+                        .overlay(
+                            VStack {
+                                Spacer()
+                                HStack {
+                                    Image(systemName: "star.fill")
+                                        .font(.caption)
+                                    Text("Profile Picture")
+                                        .font(.caption)
+                                        .fontWeight(.semibold)
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(Capsule().fill(Color.black.opacity(0.6)))
+                                .padding(10)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        )
+
+                    Button {
+                        withAnimation {
+                            photoImages.remove(at: 0)
+                        }
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                            .background(Circle().fill(Color.black.opacity(0.5)).padding(4))
+                            .padding(10)
+                    }
+                }
+            } else {
+                // Empty main photo placeholder
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(LinearGradient(colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.05)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .frame(height: 200)
+                    .overlay(
+                        VStack(spacing: 10) {
+                            Image(systemName: "person.crop.circle.badge.plus")
+                                .font(.system(size: 40))
+                                .foregroundStyle(LinearGradient(colors: [.purple, .pink], startPoint: .topLeading, endPoint: .bottomTrailing))
+
+                            Text("Profile Picture")
+                                .font(.headline)
+
+                            Text("This will be your main photo")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(LinearGradient(colors: [.purple.opacity(0.5), .pink.opacity(0.3)], startPoint: .topLeading, endPoint: .bottomTrailing), style: StrokeStyle(lineWidth: 2, dash: [8]))
+                    )
+            }
+
+            // Additional photos grid
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                ForEach(1..<6, id: \.self) { index in
+                    if index < photoImages.count {
+                        ZStack(alignment: .topTrailing) {
+                            Image(uiImage: photoImages[index])
+                                .resizable()
+                                .scaledToFill()
+                                .frame(height: 100)
+                                .clipped()
+                                .cornerRadius(12)
+
+                            Button {
+                                withAnimation {
+                                    photoImages.remove(at: index)
+                                }
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.body)
+                                    .foregroundColor(.white)
+                                    .background(Circle().fill(Color.black.opacity(0.5)).padding(2))
+                                    .padding(6)
+                            }
+                        }
+                    } else {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color(.systemBackground))
+                            .frame(height: 100)
+                            .overlay(
+                                Image(systemName: "plus")
+                                    .foregroundColor(.gray.opacity(0.5))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(style: StrokeStyle(lineWidth: 1, dash: [5]))
+                                    .foregroundColor(.gray.opacity(0.3))
+                            )
+                    }
+                }
+            }
+
+            // Photo picker button
+            PhotosPicker(
+                selection: $selectedPhotos,
+                maxSelectionCount: 6 - photoImages.count,
+                matching: .images
+            ) {
+                HStack(spacing: 8) {
+                    Image(systemName: "photo.badge.plus")
+                    Text(photoImages.isEmpty ? "Add Photos" : "Add More Photos")
+                        .fontWeight(.semibold)
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(
+                    LinearGradient(colors: [Color.purple, Color.pink], startPoint: .leading, endPoint: .trailing)
+                )
+                .cornerRadius(12)
+            }
+            .disabled(photoImages.count >= 6 || isLoadingPhotos)
+            .onChange(of: selectedPhotos) { _, newValue in
+                Task {
+                    await loadSelectedPhotos(newValue)
+                }
+            }
+
+            // Photo count
+            HStack(spacing: 4) {
+                ForEach(0..<6, id: \.self) { index in
+                    Circle()
+                        .fill(index < photoImages.count ? Color.purple : Color.gray.opacity(0.3))
+                        .frame(width: 8, height: 8)
+                }
+            }
+
+            Text("\(photoImages.count)/6 photos • Minimum 2 required")
+                .font(.caption)
+                .foregroundColor(photoImages.count >= 2 ? .secondary : .orange)
+        }
+    }
+
+    private func photoTipRow(icon: String, text: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundColor(.purple)
+                .frame(width: 16)
+            Text(text)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+    }
+
+    private func loadSelectedPhotos(_ items: [PhotosPickerItem]) async {
+        isLoadingPhotos = true
+        for item in items {
+            if let data = try? await item.loadTransferable(type: Data.self),
+               let image = UIImage(data: data) {
+                await MainActor.run {
+                    if photoImages.count < 6 {
+                        photoImages.append(image)
+                    }
+                }
+            }
+        }
+        await MainActor.run {
+            selectedPhotos = []
+            isLoadingPhotos = false
+        }
+    }
+
     // MARK: - Computed Properties
     var stepTitle: String {
         switch currentStep {
         case 1: return "Create Account"
         case 2: return "Tell us about yourself"
         case 3: return "Where are you from?"
+        case 4: return "Add Your Photos"
         default: return ""
         }
     }
-    
+
     var stepSubtitle: String {
         switch currentStep {
         case 1: return "Let's get started with your account"
         case 2: return "This helps us find your perfect match"
         case 3: return "Connect with people near and far"
+        case 4: return "Show off your best self"
         default: return ""
         }
     }
-    
+
     var canProceed: Bool {
         switch currentStep {
         case 1:
@@ -542,19 +765,21 @@ struct SignUpView: View {
             return !name.isEmpty && ageInt >= 18
         case 3:
             return !location.isEmpty && !country.isEmpty
+        case 4:
+            return photoImages.count >= 2
         default:
             return false
         }
     }
-    
+
     // MARK: - Actions
     func handleNext() {
-        if currentStep < 3 {
+        if currentStep < 4 {
             withAnimation {
                 currentStep += 1
             }
         } else {
-            // Final step - create account
+            // Final step - create account with photos
             guard let ageInt = Int(age) else { return }
             Task {
                 do {
@@ -567,7 +792,8 @@ struct SignUpView: View {
                         lookingFor: lookingFor,
                         location: InputSanitizer.standard(location),
                         country: InputSanitizer.basic(country),
-                        referralCode: InputSanitizer.referralCode(referralCode)
+                        referralCode: InputSanitizer.referralCode(referralCode),
+                        photos: photoImages
                     )
                 } catch {
                     Logger.shared.error("Error creating account", category: .authentication, error: error)

@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import UIKit
 import Firebase
 import FirebaseAuth
 import FirebaseFirestore
@@ -239,7 +240,7 @@ class AuthService: ObservableObject, AuthServiceProtocol {
     }
 
     @MainActor
-    func createUser(withEmail email: String, password: String, fullName: String, age: Int, gender: String, lookingFor: String, location: String, country: String, referralCode: String = "") async throws {
+    func createUser(withEmail email: String, password: String, fullName: String, age: Int, gender: String, lookingFor: String, location: String, country: String, referralCode: String = "", photos: [UIImage] = []) async throws {
         isLoading = true
         errorMessage = nil
 
@@ -331,6 +332,29 @@ class AuthService: ObservableObject, AuthServiceProtocol {
             try await Firestore.firestore().collection("users").document(userId).setData(encodedUser)
 
             Logger.shared.auth("User saved to Firestore successfully", level: .info)
+
+            // Step 3.5: Upload photos if provided
+            if !photos.isEmpty {
+                Logger.shared.auth("Uploading \(photos.count) photos", level: .info)
+                do {
+                    var photoURLs: [String] = []
+                    for (index, image) in photos.enumerated() {
+                        let url = try await ImageUploadService.shared.uploadImage(image, userId: userId, index: index)
+                        photoURLs.append(url)
+                    }
+
+                    // Update user document with photo URLs
+                    let updateData: [String: Any] = [
+                        "photos": photoURLs,
+                        "profileImageURL": photoURLs.first ?? ""
+                    ]
+                    try await Firestore.firestore().collection("users").document(userId).updateData(updateData)
+                    Logger.shared.auth("Photos uploaded and saved successfully", level: .info)
+                } catch {
+                    Logger.shared.error("Failed to upload photos during signup", category: .authentication, error: error)
+                    // Don't fail account creation if photo upload fails - user can add later
+                }
+            }
 
             // Step 4: Send email verification with action code settings
             let actionCodeSettings = ActionCodeSettings()
