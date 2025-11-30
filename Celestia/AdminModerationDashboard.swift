@@ -12,6 +12,7 @@ import FirebaseFirestore
 struct AdminModerationDashboard: View {
     @StateObject private var viewModel = ModerationViewModel()
     @State private var selectedTab = 0
+    @State private var showingAlerts = false
 
     var body: some View {
         NavigationView {
@@ -68,6 +69,24 @@ struct AdminModerationDashboard: View {
             }
             .navigationTitle("Moderation")
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    // Alerts bell button
+                    Button(action: { showingAlerts = true }) {
+                        ZStack(alignment: .topTrailing) {
+                            Image(systemName: "bell.fill")
+                                .font(.title3)
+                            if viewModel.unreadAlertCount > 0 {
+                                Text("\(viewModel.unreadAlertCount)")
+                                    .font(.caption2.bold())
+                                    .foregroundColor(.white)
+                                    .padding(4)
+                                    .background(Color.red)
+                                    .clipShape(Circle())
+                                    .offset(x: 8, y: -8)
+                            }
+                        }
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
                         Task {
@@ -80,6 +99,15 @@ struct AdminModerationDashboard: View {
             }
             .task {
                 await viewModel.loadQueue()
+            }
+            .onAppear {
+                viewModel.startListeningToAlerts()
+            }
+            .onDisappear {
+                viewModel.stopListeningToAlerts()
+            }
+            .sheet(isPresented: $showingAlerts) {
+                AdminAlertsSheet(viewModel: viewModel)
             }
         }
     }
@@ -761,12 +789,76 @@ class ModerationViewModel: ObservableObject {
     @Published var reports: [ModerationReport] = []
     @Published var suspiciousProfiles: [SuspiciousProfileItem] = []
     @Published var pendingProfiles: [PendingProfile] = []
+    @Published var adminAlerts: [AdminAlert] = []
+    @Published var unreadAlertCount: Int = 0
     @Published var stats: ModerationStats = ModerationStats()
     @Published var isLoading = false
     @Published var errorMessage: String? = nil
 
     private let db = Firestore.firestore()
     private let functions = Functions.functions()
+    private var alertsListener: ListenerRegistration?
+
+    /// Start listening to admin alerts in real-time
+    func startListeningToAlerts() {
+        alertsListener?.remove()
+
+        alertsListener = db.collection("admin_alerts")
+            .order(by: "createdAt", descending: true)
+            .limit(to: 20)
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self, let documents = snapshot?.documents else { return }
+
+                self.adminAlerts = documents.compactMap { doc -> AdminAlert? in
+                    let data = doc.data()
+                    var createdAtStr = "Just now"
+                    if let timestamp = data["createdAt"] as? Timestamp {
+                        let formatter = RelativeDateTimeFormatter()
+                        formatter.unitsStyle = .abbreviated
+                        createdAtStr = formatter.localizedString(for: timestamp.dateValue(), relativeTo: Date())
+                    }
+
+                    return AdminAlert(
+                        id: doc.documentID,
+                        type: data["type"] as? String ?? "",
+                        userId: data["userId"] as? String ?? "",
+                        userName: data["userName"] as? String ?? "Unknown",
+                        userEmail: data["userEmail"] as? String ?? "",
+                        userPhoto: data["userPhoto"] as? String,
+                        createdAt: createdAtStr,
+                        read: data["read"] as? Bool ?? false
+                    )
+                }
+
+                self.unreadAlertCount = self.adminAlerts.filter { !$0.read }.count
+            }
+    }
+
+    /// Stop listening to alerts
+    func stopListeningToAlerts() {
+        alertsListener?.remove()
+        alertsListener = nil
+    }
+
+    /// Mark an alert as read
+    func markAlertAsRead(alertId: String) async {
+        do {
+            try await db.collection("admin_alerts").document(alertId).updateData([
+                "read": true
+            ])
+        } catch {
+            Logger.shared.error("Failed to mark alert as read", category: .moderation, error: error)
+        }
+    }
+
+    /// Mark all alerts as read
+    func markAllAlertsAsRead() async {
+        for alert in adminAlerts where !alert.read {
+            try? await db.collection("admin_alerts").document(alert.id).updateData([
+                "read": true
+            ])
+        }
+    }
 
     /// Load moderation queue directly from Firestore (no Cloud Function required)
     func loadQueue() async {
@@ -1338,6 +1430,58 @@ struct PendingProfile: Identifiable {
     let createdAt: String
 }
 
+// MARK: - Admin Alert Model
+
+struct AdminAlert: Identifiable {
+    let id: String
+    let type: String
+    let userId: String
+    let userName: String
+    let userEmail: String
+    let userPhoto: String?
+    let createdAt: String
+    let read: Bool
+
+    var title: String {
+        switch type {
+        case "new_pending_account":
+            return "New Account Pending"
+        case "profile_reported":
+            return "Profile Reported"
+        case "suspicious_activity":
+            return "Suspicious Activity"
+        default:
+            return "Alert"
+        }
+    }
+
+    var icon: String {
+        switch type {
+        case "new_pending_account":
+            return "person.badge.plus"
+        case "profile_reported":
+            return "exclamationmark.triangle"
+        case "suspicious_activity":
+            return "eye.trianglebadge.exclamationmark"
+        default:
+            return "bell"
+        }
+    }
+
+    var iconColor: Color {
+        switch type {
+        case "new_pending_account":
+            return .blue
+        case "profile_reported":
+            return .orange
+        case "suspicious_activity":
+            return .red
+        default:
+            return .gray
+        }
+    }
+}
+
 // MARK: - Pending Profile Row View
 
 struct PendingProfileRow: View {
@@ -1471,6 +1615,127 @@ struct PendingProfileRow: View {
             }
         } message: {
             Text("Are you sure you want to reject this profile?")
+        }
+    }
+}
+
+// MARK: - Admin Alerts Sheet
+
+struct AdminAlertsSheet: View {
+    @ObservedObject var viewModel: ModerationViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationView {
+            Group {
+                if viewModel.adminAlerts.isEmpty {
+                    VStack(spacing: 16) {
+                        Image(systemName: "bell.slash")
+                            .font(.system(size: 60))
+                            .foregroundColor(.gray)
+                        Text("No Alerts")
+                            .font(.title2.bold())
+                        Text("You'll see notifications here when new accounts need approval")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
+                    }
+                } else {
+                    List {
+                        ForEach(viewModel.adminAlerts) { alert in
+                            AdminAlertRow(alert: alert, viewModel: viewModel)
+                        }
+                    }
+                    .listStyle(.plain)
+                }
+            }
+            .navigationTitle("Notifications")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    if !viewModel.adminAlerts.isEmpty {
+                        Button("Mark All Read") {
+                            Task {
+                                await viewModel.markAllAlertsAsRead()
+                            }
+                        }
+                        .font(.caption)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Admin Alert Row
+
+struct AdminAlertRow: View {
+    let alert: AdminAlert
+    @ObservedObject var viewModel: ModerationViewModel
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // Icon
+            Image(systemName: alert.icon)
+                .font(.title2)
+                .foregroundColor(alert.iconColor)
+                .frame(width: 40, height: 40)
+                .background(alert.iconColor.opacity(0.1))
+                .cornerRadius(8)
+
+            // Content
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(alert.title)
+                        .font(.subheadline.weight(.semibold))
+                    if !alert.read {
+                        Circle()
+                            .fill(Color.blue)
+                            .frame(width: 8, height: 8)
+                    }
+                }
+
+                Text(alert.userName)
+                    .font(.subheadline)
+
+                Text(alert.userEmail)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                Text(alert.createdAt)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+
+            // User photo
+            if let photoURL = alert.userPhoto, let url = URL(string: photoURL) {
+                AsyncImage(url: url) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Color.gray.opacity(0.3)
+                }
+                .frame(width: 44, height: 44)
+                .clipShape(Circle())
+            }
+        }
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if !alert.read {
+                Task {
+                    await viewModel.markAlertAsRead(alertId: alert.id)
+                }
+            }
         }
     }
 }

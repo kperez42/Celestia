@@ -191,6 +191,21 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Admin Alerts Collection (for in-app admin notifications)
+    match /admin_alerts/{alertId} {
+      // Only admins can read alerts
+      allow read: if isAdmin();
+
+      // Only Cloud Functions can create alerts (no client creates)
+      allow create: if false;
+
+      // Admins can update (mark as read)
+      allow update: if isAdmin();
+
+      // Admins can delete old alerts
+      allow delete: if isAdmin();
+    }
+
     // Notifications Collection
     match /notifications/{notificationId} {
       // Users can read their own notifications
