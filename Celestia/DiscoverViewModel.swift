@@ -137,14 +137,26 @@ class DiscoverViewModel: ObservableObject {
 
                 // SAFETY: Filter out suspicious/fake profiles
                 let filteredUsers = await filterSuspiciousProfiles(fetchedUsers)
-                let removedCount = fetchedUsers.count - filteredUsers.count
+                let suspiciousRemovedCount = fetchedUsers.count - filteredUsers.count
 
-                if removedCount > 0 {
-                    Logger.shared.info("Filtered out \(removedCount) suspicious profiles", category: .matching)
+                if suspiciousRemovedCount > 0 {
+                    Logger.shared.info("Filtered out \(suspiciousRemovedCount) suspicious profiles", category: .matching)
+                }
+
+                // SAFETY: Filter out blocked users
+                let blockedUserIds = BlockReportService.shared.blockedUserIds
+                let nonBlockedUsers = filteredUsers.filter { user in
+                    guard let userId = user.id else { return true }
+                    return !blockedUserIds.contains(userId)
+                }
+                let blockedRemovedCount = filteredUsers.count - nonBlockedUsers.count
+
+                if blockedRemovedCount > 0 {
+                    Logger.shared.info("Filtered out \(blockedRemovedCount) blocked users", category: .matching)
                 }
 
                 // BOOST: Prioritize boosted profiles (show them first)
-                let prioritizedUsers = prioritizeBoostedProfiles(filteredUsers)
+                let prioritizedUsers = prioritizeBoostedProfiles(nonBlockedUsers)
 
                 users = prioritizedUsers
                 isLoading = false
@@ -152,7 +164,7 @@ class DiscoverViewModel: ObservableObject {
                 // Preload images for next 2 users
                 await self.preloadUpcomingImages()
 
-                Logger.shared.info("Loaded \(users.count) users in \(String(format: "%.0f", queryDuration))ms (\(removedCount) filtered)", category: .matching)
+                Logger.shared.info("Loaded \(users.count) users in \(String(format: "%.0f", queryDuration))ms (\(suspiciousRemovedCount) suspicious, \(blockedRemovedCount) blocked filtered)", category: .matching)
             } catch {
                 guard !Task.isCancelled else {
                     isLoading = false

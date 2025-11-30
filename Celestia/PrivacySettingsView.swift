@@ -401,7 +401,7 @@ struct PrivacySettingsView: View {
 
             VStack(spacing: 12) {
                 NavigationLink {
-                    // Blocked users list
+                    BlockedUsersView()
                 } label: {
                     DataPrivacyRow(
                         icon: "hand.raised.fill",

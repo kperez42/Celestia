@@ -118,7 +118,7 @@ service cloud.firestore {
         && resource.data.fromUserId == request.auth.uid;
     }
 
-    // Blocks Collection
+    // Blocks Collection (legacy - keeping for backwards compatibility)
     match /blocks/{blockId} {
       // Users can read blocks they created
       allow read: if isAuthenticated()
@@ -130,6 +130,28 @@ service cloud.firestore {
         && isEmailVerified()
         && request.resource.data.blockerId == request.auth.uid
         && request.resource.data.blockerId != request.resource.data.blockedId;
+
+      // Users can unblock (delete)
+      allow delete: if isAuthenticated()
+        && isEmailVerified()
+        && resource.data.blockerId == request.auth.uid;
+
+      // Don't allow updating blocks
+      allow update: if false;
+    }
+
+    // Blocked Users Collection (active - used by BlockReportService)
+    match /blockedUsers/{blockId} {
+      // Users can read blocks they created
+      allow read: if isAuthenticated()
+        && isEmailVerified()
+        && resource.data.blockerId == request.auth.uid;
+
+      // Users can create blocks
+      allow create: if isAuthenticated()
+        && isEmailVerified()
+        && request.resource.data.blockerId == request.auth.uid
+        && request.resource.data.blockerId != request.resource.data.blockedUserId;
 
       // Users can unblock (delete)
       allow delete: if isAuthenticated()
