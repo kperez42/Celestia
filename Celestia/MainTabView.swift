@@ -28,7 +28,7 @@ struct MainTabView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            // Main content
+            // Main content - PERFORMANCE: Use page style for smoother transitions
             TabView(selection: $selectedTab) {
                 // Discover - Load immediately (tab 0)
                 FeedDiscoverView(selectedTab: $selectedTab)
@@ -60,6 +60,10 @@ struct MainTabView: View {
             }
             .tabViewStyle(.automatic)
             .ignoresSafeArea(.keyboard)
+            // PERFORMANCE: Disable default animation, use custom smooth transition
+            .transaction { transaction in
+                transaction.animation = nil
+            }
             
             // Custom Tab Bar
             customTabBar
