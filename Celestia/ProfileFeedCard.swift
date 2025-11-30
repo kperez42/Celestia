@@ -69,6 +69,8 @@ struct ProfileFeedCard: View {
         .background(Color(.systemBackground))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
+        // PERFORMANCE: GPU acceleration for smooth scrolling
+        .compositingGroup()
         .onAppear {
             isFavorited = initialIsFavorited
             isLiked = initialIsLiked

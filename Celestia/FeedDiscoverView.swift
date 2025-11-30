@@ -201,8 +201,8 @@ struct FeedDiscoverView: View {
     }
 
     private var scrollContent: some View {
-        ScrollView {
-            LazyVStack(spacing: 16) {
+        ScrollView(showsIndicators: false) {
+            LazyVStack(spacing: 16, pinnedViews: []) {
                 // Current user's profile card
                 if let currentUser = authService.currentUser {
                     CurrentUserProfileCard(user: currentUser) {
@@ -289,6 +289,8 @@ struct FeedDiscoverView: View {
             .padding(.top, 8)
             .padding(.bottom)
         }
+        .scrollDismissesKeyboard(.interactively)
+        .scrollIndicators(.hidden)
         .refreshable {
             HapticManager.shared.impact(.light)
             await refreshFeed()
