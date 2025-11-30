@@ -33,8 +33,10 @@ service cloud.firestore {
 
     // Users Collection
     match /users/{userId} {
-      // Anyone can read public user profiles (for discovery)
-      allow read: if isAuthenticated() && isEmailVerified();
+      // Users can always read their own profile (even without email verification)
+      // Other users require email verification to read profiles (for discovery)
+      allow read: if isAuthenticated()
+        && (request.auth.uid == userId || isEmailVerified());
 
       // Users can only create their own profile
       allow create: if isOwner(userId)
@@ -45,8 +47,8 @@ service cloud.firestore {
 
       // Users can only update their own profile
       // Admin can update any profile (for ban/suspend/warn actions)
+      // Note: Users can update their own profile even without email verification
       allow update: if (isOwner(userId)
-        && isEmailVerified()
         // Prevent changing critical fields
         && request.resource.data.id == resource.data.id
         && request.resource.data.email == resource.data.email)
@@ -346,16 +348,14 @@ service cloud.firestore {
 
     // Referral Codes Collection
     match /referralCodes/{codeId} {
-      // Users can read their own codes
-      allow read: if isAuthenticated()
-        && resource.data.userId == request.auth.uid;
+      // Users can read referral codes (needed for code validation and uniqueness checking)
+      allow read: if isAuthenticated();
 
       // Users can create codes for themselves
       allow create: if isAuthenticated()
         && request.resource.data.userId == request.auth.uid;
 
       // No updates, but allow delete for account cleanup
-      // Note: Email verification NOT required for delete to allow cascade delete during account deletion
       allow update: if false;
       allow delete: if isAuthenticated()
         && resource.data.userId == request.auth.uid;
