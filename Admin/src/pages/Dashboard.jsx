@@ -34,15 +34,16 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    loadStats();
-
-    // Refresh every 5 minutes (matches cache TTL)
-    const interval = setInterval(loadStats, 5 * 60 * 1000);
-    return () => clearInterval(interval);
+  // PERFORMANCE: Memoized logout handler - must be before any conditional returns
+  const handleLogout = useCallback(async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   }, []);
 
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       setError(null);
       const data = await getStats();
@@ -52,7 +53,15 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadStats();
+
+    // Refresh every 5 minutes (matches cache TTL)
+    const interval = setInterval(loadStats, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [loadStats]);
 
   // PERFORMANCE: Show skeleton loaders instead of spinner for better perceived performance
   if (loading) {
@@ -86,15 +95,6 @@ export default function Dashboard() {
   if (error) {
     return <Alert severity="error">{error}</Alert>;
   }
-
-  // PERFORMANCE: Memoized logout handler
-  const handleLogout = useCallback(async () => {
-    try {
-      await signOut(auth);
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-  }, []);
 
   return (
     <Fade in timeout={300}>
