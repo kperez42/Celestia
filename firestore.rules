@@ -34,8 +34,7 @@ service cloud.firestore {
     // Users Collection
     match /users/{userId} {
       // Anyone can read public user profiles (for discovery)
-      // NOTE: Temporarily removed isEmailVerified() for testing
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && isEmailVerified();
 
       // Users can only create their own profile
       allow create: if isOwner(userId)
