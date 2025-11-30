@@ -15,6 +15,11 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    // Global admin check - used across multiple collections
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email in ['perezkevin640@gmail.com', 'admin@celestia.app'];
+    }
+
     function isValidString(text, minLength, maxLength) {
       return text is string && text.size() >= minLength && text.size() <= maxLength;
     }
@@ -36,11 +41,13 @@ service cloud.firestore {
         && request.resource.data.email == request.auth.token.email;
 
       // Users can only update their own profile
-      allow update: if isOwner(userId)
+      // Admin can update any profile (for ban/suspend/warn actions)
+      allow update: if (isOwner(userId)
         && isEmailVerified()
         // Prevent changing critical fields
         && request.resource.data.id == resource.data.id
-        && request.resource.data.email == resource.data.email;
+        && request.resource.data.email == resource.data.email)
+        || isAdmin();
 
       // Users can delete their own profile
       allow delete: if isOwner(userId);
@@ -164,19 +171,22 @@ service cloud.firestore {
 
     // Reports Collection
     match /reports/{reportId} {
-      // Only the reporter can read their reports
+      // Reporter can read their own reports, admin can read all reports
       allow read: if isAuthenticated()
         && isEmailVerified()
-        && resource.data.reporterId == request.auth.uid;
+        && (resource.data.reporterId == request.auth.uid || isAdmin());
 
       // Users can create reports
       allow create: if isAuthenticated()
         && isEmailVerified()
         && request.resource.data.reporterId == request.auth.uid
-        && isValidString(request.resource.data.reason, 5, 500);
+        && isValidString(request.resource.data.reason, 1, 500);
 
-      // Don't allow updating or deleting reports
-      allow update, delete: if false;
+      // Admin can update reports (to resolve them)
+      allow update: if isAuthenticated() && isAdmin();
+
+      // Don't allow deleting reports
+      allow delete: if false;
     }
 
     // Notifications Collection
