@@ -35,7 +35,7 @@ struct SavedProfilesView: View {
             // Tab selector
             tabSelector
 
-            // Main content
+            // Main content - use ZStack with explicit identity to prevent re-creation
             ZStack {
                 // Background
                 Color(.systemGroupedBackground)
@@ -49,22 +49,35 @@ struct SavedProfilesView: View {
                 } else if !viewModel.errorMessage.isEmpty {
                     errorStateView
                 } else {
-                    TabView(selection: $selectedTab) {
-                        allSavedTab.tag(0)
-                        viewedTab.tag(1)
-                        savedYouTab.tag(2)
+                    // PERFORMANCE FIX: Use ZStack with opacity instead of TabView
+                    // TabView with .page style causes animation/jitter on tab switches
+                    // This approach shows content instantly without page-swiping animation
+                    ZStack {
+                        allSavedTab
+                            .opacity(selectedTab == 0 ? 1 : 0)
+                            .zIndex(selectedTab == 0 ? 1 : 0)
+                        viewedTab
+                            .opacity(selectedTab == 1 ? 1 : 0)
+                            .zIndex(selectedTab == 1 ? 1 : 0)
+                        savedYouTab
+                            .opacity(selectedTab == 2 ? 1 : 0)
+                            .zIndex(selectedTab == 2 ? 1 : 0)
                     }
-                    .tabViewStyle(.page(indexDisplayMode: .never))
                 }
             }
         }
         .navigationBarHidden(true)
-        .task {
-            // Load data once when view first appears
-            // Silent refresh (no skeleton) if we already have cached data
-            await viewModel.loadSavedProfiles()
-            await viewModel.loadViewedProfiles()
-            await viewModel.loadSavedYouProfiles()
+        .task(id: hasCompletedInitialLoad) {
+            // PERFORMANCE: Only load data once on first appearance
+            // Skip if already loaded to prevent re-fetching on tab switches
+            guard !hasCompletedInitialLoad else { return }
+
+            // Load data in parallel for faster initial load
+            async let savedTask: () = viewModel.loadSavedProfiles()
+            async let viewedTask: () = viewModel.loadViewedProfiles()
+            async let savedYouTask: () = viewModel.loadSavedYouProfiles()
+
+            _ = await (savedTask, viewedTask, savedYouTask)
             hasCompletedInitialLoad = true
         }
         .sheet(item: $selectedUser) { user in

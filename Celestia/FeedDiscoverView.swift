@@ -135,8 +135,14 @@ struct FeedDiscoverView: View {
                         await reloadWithFilters()
                     }
                 }
-                .onChange(of: savedProfilesViewModel.savedProfiles) { _ in
-                    syncFavorites()
+                .onChange(of: savedProfilesViewModel.savedProfiles) { oldProfiles, newProfiles in
+                    // PERFORMANCE: Only sync if the actual user IDs changed
+                    // This prevents unnecessary re-renders when only metadata changes
+                    let oldIds = Set(oldProfiles.compactMap { $0.user.effectiveId })
+                    let newIds = Set(newProfiles.compactMap { $0.user.effectiveId })
+                    if oldIds != newIds {
+                        syncFavorites()
+                    }
                 }
                 .sheet(isPresented: $showOwnProfileDetail) {
                     if let currentUser = authService.currentUser {
@@ -821,29 +827,10 @@ struct FeedDiscoverView: View {
                 color: .orange
             )
 
-            // Save to SavedProfilesViewModel
+            // Save to SavedProfilesViewModel - fire and forget with optimistic UI
+            // The saveProfile function handles errors internally and updates local state immediately
             Task {
                 await savedProfilesViewModel.saveProfile(user: user)
-
-                // Small delay to ensure state update has propagated
-                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
-
-                // Check if save succeeded (will be in savedProfiles array)
-                await MainActor.run {
-                    let saveSucceeded = savedProfilesViewModel.savedProfiles.contains(where: { $0.user.effectiveId == userId })
-                    if !saveSucceeded {
-                        // Revert optimistic update on failure
-                        favorites.remove(userId)
-                        showToast(
-                            message: "Failed to save. Try again.",
-                            icon: "exclamationmark.triangle.fill",
-                            color: .red
-                        )
-                        Logger.shared.warning("Save validation failed for user \(userId)", category: .general)
-                    } else {
-                        Logger.shared.debug("Save validated successfully for user \(userId)", category: .general)
-                    }
-                }
             }
         }
 

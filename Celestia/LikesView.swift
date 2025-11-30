@@ -57,19 +57,29 @@ struct LikesView: View {
                     if viewModel.isLoading && !hasCompletedInitialLoad && !hasAnyData {
                         loadingView
                     } else {
-                        TabView(selection: $selectedTab) {
-                            likedMeTab.tag(0)
-                            myLikesTab.tag(1)
-                            mutualLikesTab.tag(2)
+                        // PERFORMANCE FIX: Use ZStack with opacity instead of TabView
+                        // TabView with .page style causes animation/jitter on tab switches
+                        // This approach shows content instantly without page-swiping animation
+                        ZStack {
+                            likedMeTab
+                                .opacity(selectedTab == 0 ? 1 : 0)
+                                .zIndex(selectedTab == 0 ? 1 : 0)
+                            myLikesTab
+                                .opacity(selectedTab == 1 ? 1 : 0)
+                                .zIndex(selectedTab == 1 ? 1 : 0)
+                            mutualLikesTab
+                                .opacity(selectedTab == 2 ? 1 : 0)
+                                .zIndex(selectedTab == 2 ? 1 : 0)
                         }
-                        .tabViewStyle(.page(indexDisplayMode: .never))
                     }
                 }
             }
             .navigationTitle("")
             .navigationBarHidden(true)
-            .task {
-                // PERFORMANCE: Initial load with cache check
+            .task(id: hasCompletedInitialLoad) {
+                // PERFORMANCE: Only load data once on first appearance
+                // Skip if already loaded to prevent re-fetching on tab switches
+                guard !hasCompletedInitialLoad else { return }
                 await viewModel.loadAllLikes()
                 hasCompletedInitialLoad = true
             }
