@@ -101,7 +101,12 @@ struct ChatView: View {
             VoiceOverAnnouncement.screenChanged(to: "Chat with \(otherUser.fullName)")
         }
         .onDisappear {
-            messageService.stopListening()
+            // Only clean up user-specific listener (typing indicators, online status)
+            // Don't call stopListening() here - it clears all messages which breaks
+            // the experience when user just switches tabs and comes back
+            // The message listener will be cleaned up when:
+            // - A new chat is opened (listenToMessages handles cleanup)
+            // - App goes to background (ListenerLifecycleManager handles it)
             cleanupUserListener()
         }
         .confirmationDialog("Unmatch with \(otherUser.fullName)?", isPresented: $showingUnmatchConfirmation, titleVisibility: .visible) {
