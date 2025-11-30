@@ -55,6 +55,15 @@ struct User: Identifiable, Codable, Equatable {
     var isVerified: Bool = false
     var premiumTier: String?
     var subscriptionExpiryDate: Date?
+
+    // Profile Status (for content moderation quarantine)
+    // "pending" = new account, not shown in Discover until photo approved
+    // "active" = approved, visible to other users
+    // "suspended" = temporarily or permanently blocked
+    // "flagged" = under review by moderators
+    var profileStatus: String = "pending"
+    var profileStatusReason: String?
+    var profileStatusUpdatedAt: Date?
     
     // Preferences
     var ageRangeMin: Int

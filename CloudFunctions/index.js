@@ -2057,6 +2057,30 @@ exports.onPhotoUploaded = functions.storage.object().onFinalize(async (object) =
 
     // Content approved
     functions.logger.info('Image passed moderation', { filePath });
+
+    // QUARANTINE SYSTEM: Activate profile when first photo passes moderation
+    // This ensures new accounts are only visible after their photos are verified
+    if (userId && (photoType === 'profile_images' || photoType === 'profile-photos' || photoType === 'photos')) {
+      try {
+        const userDoc = await db.collection('users').doc(userId).get();
+        if (userDoc.exists) {
+          const userData = userDoc.data();
+          // Only activate if currently pending (don't reactivate suspended accounts)
+          if (userData.profileStatus === 'pending' || !userData.profileStatus) {
+            await db.collection('users').doc(userId).update({
+              profileStatus: 'active',
+              profileStatusReason: 'Photo passed content moderation',
+              profileStatusUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            functions.logger.info('Profile activated after photo moderation passed', { userId, photoType });
+          }
+        }
+      } catch (activationError) {
+        functions.logger.error('Error activating profile', { userId, error: activationError.message });
+        // Don't fail the whole operation - photo is still approved
+      }
+    }
+
     return { approved: true };
 
   } catch (error) {

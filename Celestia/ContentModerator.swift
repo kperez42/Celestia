@@ -30,7 +30,35 @@ class ContentModerator: ContentModerating {
         // Common profanity (lowercase)
         "damn", "hell", "crap", "shit", "fuck", "bitch", "ass", "bastard",
         "dick", "cock", "pussy", "slut", "whore", "fag", "nigger", "cunt",
-        // Add more as needed
+        "asshole", "bullshit", "motherfucker", "fucker", "dumbass", "jackass",
+        "prick", "douche", "twat", "wanker", "tosser", "bollocks"
+    ]
+
+    // MARK: - Sexual/Inappropriate Name Terms (for username/name validation)
+
+    private let inappropriateNameTerms: Set<String> = [
+        // Sexual terms
+        "sexy", "sexyy", "sexxy", "sexii", "horny", "hornyy", "hornii",
+        "nude", "nudes", "naked", "xxx", "porn", "porno", "pornstar",
+        "onlyfans", "escort", "hooker", "stripper", "camgirl", "camboy",
+        "hotgirl", "hotboy", "hotbabe", "sexygirl", "sexyboy", "sexybabe",
+        "bigdick", "bigcock", "bigboobs", "bigtits", "bigass", "thicc",
+        "dtf", "hookup", "fuckbuddy", "fwb", "nsa", "ons",
+        "blowjob", "handjob", "deepthroat", "anal", "oral", "cumshot",
+        "milf", "dilf", "gilf", "daddy", "mommy", "sugar",
+        "booty", "boobies", "titties", "nipples", "vagina", "penis",
+        "erotic", "kinky", "fetish", "bdsm", "bondage", "dominatrix",
+        "mistress", "master", "slave", "submissive", "dominant",
+        // Scam-related
+        "bitcoin", "crypto", "investment", "forex", "trading",
+        "rich", "wealthy", "millionaire", "billionaire",
+        "cashapp", "venmo", "paypal", "zelle", "moneygram",
+        // Fake identity signals
+        "realme", "notfake", "notabot", "realaccount", "verified100",
+        "model", "supermodel", "influencer", "celebrity",
+        // Drugs
+        "weed", "marijuana", "cocaine", "heroin", "meth", "drugs",
+        "dealer", "plug", "420", "blaze"
     ]
 
     // MARK: - Spam Patterns
@@ -194,6 +222,66 @@ class ContentModerator: ContentModerating {
         // Check for repeated characters (e.g., "hiiiiiii", "hahahahahaha")
         let pattern = #"(.)\1{4,}"# // 5 or more of the same character
         return text.range(of: pattern, options: .regularExpression) != nil
+    }
+
+    // MARK: - Name Validation
+
+    /// Validates a user's display name for inappropriate content
+    /// Returns (isValid, reason) tuple
+    func validateName(_ name: String) -> (isValid: Bool, reason: String?) {
+        let lowerName = name.lowercased().replacingOccurrences(of: " ", with: "")
+
+        // Check for profanity in name
+        if containsProfanity(name) {
+            return (false, "Name contains inappropriate language")
+        }
+
+        // Check for inappropriate terms (sexual, scam, etc.)
+        for term in inappropriateNameTerms {
+            if lowerName.contains(term) {
+                return (false, "Name contains inappropriate content")
+            }
+        }
+
+        // Check for profanity list in concatenated name
+        for word in profanityList {
+            if lowerName.contains(word) {
+                return (false, "Name contains inappropriate language")
+            }
+        }
+
+        // Check for numbers that look like phone/contact info
+        let numbersOnly = name.filter { $0.isNumber }
+        if numbersOnly.count >= 7 {
+            return (false, "Name cannot contain phone numbers or long number sequences")
+        }
+
+        // Check for email patterns in name
+        if name.contains("@") || name.contains(".com") || name.contains(".net") {
+            return (false, "Name cannot contain email addresses or URLs")
+        }
+
+        // Check for excessive special characters
+        let specialChars = name.filter { !$0.isLetter && !$0.isWhitespace }
+        if Double(specialChars.count) / Double(max(name.count, 1)) > 0.3 {
+            return (false, "Name contains too many special characters")
+        }
+
+        // Check name length
+        if name.trimmingCharacters(in: .whitespaces).count < 2 {
+            return (false, "Name must be at least 2 characters")
+        }
+
+        if name.count > 50 {
+            return (false, "Name must be 50 characters or less")
+        }
+
+        return (true, nil)
+    }
+
+    /// Quick check if name is appropriate (convenience method)
+    func isNameAppropriate(_ name: String) -> Bool {
+        return validateName(name).isValid
     }
 
     // MARK: - Content Score
