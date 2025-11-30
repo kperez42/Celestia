@@ -64,7 +64,8 @@ struct User: Identifiable, Codable, Equatable {
     // "active" = approved, visible to other users
     // "suspended" = temporarily or permanently blocked
     // "flagged" = under review by moderators
-    var profileStatus: String = "pending"
+    // Default to "active" so new users appear in Discover immediately
+    var profileStatus: String = "active"
     var profileStatusReason: String?
     var profileStatusUpdatedAt: Date?
     
