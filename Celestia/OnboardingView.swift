@@ -478,14 +478,18 @@ struct OnboardingView: View {
                                 .font(.subheadline)
                                 .fontWeight(.medium)
                                 .foregroundColor(.secondary)
-                            
+
+                            Text("*")
+                                .foregroundColor(.red)
+                                .font(.subheadline)
+
                             Spacer()
-                            
+
                             Text("\(bio.count)/500")
                                 .font(.caption)
                                 .foregroundColor(bio.count > 500 ? .red : .secondary)
                         }
-                        
+
                         TextEditor(text: $bio)
                             .frame(height: 140)
                             .padding(12)
@@ -493,7 +497,7 @@ struct OnboardingView: View {
                             .cornerRadius(12)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.purple.opacity(0.2), lineWidth: 1)
+                                    .stroke(bio.isEmpty ? Color.red.opacity(0.5) : Color.purple.opacity(0.2), lineWidth: 1)
                             )
                             .overlay(alignment: .topLeading) {
                                 if bio.isEmpty {
@@ -515,33 +519,45 @@ struct OnboardingView: View {
                             .accessibilityValue("\(bio.count) of 500 characters")
                             .accessibilityIdentifier(AccessibilityIdentifier.bioField)
                     }
-                    
+
                     // Location
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("City")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundColor(.secondary)
-                        
+                        HStack {
+                            Text("City")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundColor(.secondary)
+
+                            Text("*")
+                                .foregroundColor(.red)
+                                .font(.subheadline)
+                        }
+
                         TextField("e.g. Los Angeles", text: $location)
                             .padding()
                             .background(Color.white)
                             .cornerRadius(12)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.purple.opacity(0.2), lineWidth: 1)
+                                    .stroke(location.isEmpty ? Color.red.opacity(0.5) : Color.purple.opacity(0.2), lineWidth: 1)
                             )
                             .accessibilityLabel("City")
                             .accessibilityHint("Enter your city")
                             .accessibilityIdentifier(AccessibilityIdentifier.locationField)
                     }
-                    
+
                     // Country
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Country")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundColor(.secondary)
+                        HStack {
+                            Text("Country")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundColor(.secondary)
+
+                            Text("*")
+                                .foregroundColor(.red)
+                                .font(.subheadline)
+                        }
 
                         Menu {
                             ForEach(availableCountries, id: \.self) { countryOption in
@@ -563,13 +579,26 @@ struct OnboardingView: View {
                             .cornerRadius(12)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.purple.opacity(0.2), lineWidth: 1)
+                                    .stroke(country.isEmpty ? Color.red.opacity(0.5) : Color.purple.opacity(0.2), lineWidth: 1)
                             )
                         }
                         .accessibilityLabel("Country")
                         .accessibilityHint("Select your country from the list")
                         .accessibilityValue(country.isEmpty ? "No country selected" : country)
                         .accessibilityIdentifier(AccessibilityIdentifier.countryField)
+                    }
+
+                    // Helper text showing what's needed
+                    if bio.isEmpty || location.isEmpty || country.isEmpty {
+                        HStack(spacing: 6) {
+                            Image(systemName: "info.circle.fill")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                            Text("Fill in all required fields (*) to continue")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.top, 4)
                     }
                 }
             }

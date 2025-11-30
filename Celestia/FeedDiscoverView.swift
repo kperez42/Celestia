@@ -604,34 +604,99 @@ struct FeedDiscoverView: View {
 
     private var regularEmptyStateView: some View {
         VStack(spacing: 20) {
-            Image(systemName: "person.2.slash")
-                .font(.system(size: 60))
-                .foregroundColor(.gray.opacity(0.5))
+            // Check if user is pending approval
+            if authService.currentUser?.profileStatus == "pending" {
+                // Friendly pending message
+                Image(systemName: "sparkles")
+                    .font(.system(size: 60))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
 
-            Text("No Profiles Found")
-                .font(.title2)
-                .fontWeight(.bold)
+                Text("Welcome to Celestia!")
+                    .font(.title2)
+                    .fontWeight(.bold)
 
-            Text("Check back later for new people in your area")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
+                Text("Your profile is being reviewed by our team. This usually takes just a few hours. Once approved, you'll be visible to others and can start making connections!")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
 
-            Button {
-                Task {
-                    await refreshFeed()
+                // Status indicator
+                VStack(spacing: 10) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                        Text("Account created")
+                            .font(.subheadline)
+                        Spacer()
+                    }
+
+                    HStack(spacing: 10) {
+                        Image(systemName: "clock.fill")
+                            .foregroundColor(.orange)
+                        Text("Profile under review")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                        Spacer()
+                    }
+
+                    HStack(spacing: 10) {
+                        Image(systemName: "heart.circle")
+                            .foregroundColor(.gray.opacity(0.4))
+                        Text("Start matching")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                        Spacer()
+                    }
                 }
-            } label: {
-                HStack {
-                    Image(systemName: "arrow.clockwise")
-                    Text("Refresh")
-                }
-                .fontWeight(.semibold)
-                .foregroundColor(.white)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 12)
-                .background(buttonGradient)
+                .padding()
+                .background(Color(.systemBackground))
                 .cornerRadius(12)
+                .shadow(color: .black.opacity(0.05), radius: 5)
+                .padding(.horizontal)
+
+                Text("We'll notify you when your profile is approved")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .padding(.top, 8)
+
+            } else {
+                // Regular empty state for approved users
+                Image(systemName: "person.2.slash")
+                    .font(.system(size: 60))
+                    .foregroundColor(.gray.opacity(0.5))
+
+                Text("No Profiles Found")
+                    .font(.title2)
+                    .fontWeight(.bold)
+
+                Text("Check back later for new people in your area")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+
+                Button {
+                    Task {
+                        await refreshFeed()
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: "arrow.clockwise")
+                        Text("Refresh")
+                    }
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+                    .background(buttonGradient)
+                    .cornerRadius(12)
+                }
             }
         }
     }
@@ -640,44 +705,78 @@ struct FeedDiscoverView: View {
 
     private var errorStateView: some View {
         VStack(spacing: 24) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 70))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [.red.opacity(0.7), .orange.opacity(0.5)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+            // Check if user is pending - show friendly message instead of error
+            if authService.currentUser?.profileStatus == "pending" {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 70))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     )
-                )
 
-            VStack(spacing: 12) {
-                Text("Oops! Something Went Wrong")
-                    .font(.title2)
-                    .fontWeight(.bold)
+                VStack(spacing: 12) {
+                    Text("Welcome to Celestia!")
+                        .font(.title2)
+                        .fontWeight(.bold)
 
-                Text(errorMessage)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-            }
+                    Text("Your profile is being reviewed. Once approved, you'll see other profiles here and can start connecting!")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
 
-            Button {
-                errorMessage = ""  // Clear error
-                Task {
-                    await loadUsers()
+                    HStack(spacing: 8) {
+                        Image(systemName: "clock.fill")
+                            .foregroundColor(.orange)
+                        Text("Usually takes a few hours")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.top, 8)
                 }
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "arrow.clockwise")
-                    Text("Try Again")
+            } else {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 70))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.red.opacity(0.7), .orange.opacity(0.5)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+
+                VStack(spacing: 12) {
+                    Text("Oops! Something Went Wrong")
+                        .font(.title2)
+                        .fontWeight(.bold)
+
+                    Text(errorMessage)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
                 }
-                .fontWeight(.semibold)
-                .foregroundColor(.white)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 14)
-                .background(buttonGradient)
-                .cornerRadius(12)
+
+                Button {
+                    errorMessage = ""  // Clear error
+                    Task {
+                        await loadUsers()
+                    }
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "arrow.clockwise")
+                        Text("Try Again")
+                    }
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 14)
+                    .background(buttonGradient)
+                    .cornerRadius(12)
+                }
             }
         }
         .padding(40)
