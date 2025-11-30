@@ -3,9 +3,17 @@
  * Prevents abuse by limiting actions per user
  */
 
-const { RateLimiterMemory, RateLimiterFirestore } = require('rate-limiter-flexible');
+const { RateLimiterMemory } = require('rate-limiter-flexible');
 const admin = require('firebase-admin');
 const functions = require('firebase-functions');
+
+// Try to load RateLimiterFirestore (may not be available in all versions)
+let RateLimiterFirestore = null;
+try {
+  RateLimiterFirestore = require('rate-limiter-flexible').RateLimiterFirestore;
+} catch (e) {
+  console.log('RateLimiterFirestore not available, using memory-only rate limiting');
+}
 
 // Rate limit configurations for different actions
 const RATE_LIMITS = {
@@ -79,16 +87,22 @@ function initializeLimiters() {
       blockDuration: config.blockDuration
     });
 
-    // Firestore limiter (persists, works across instances)
-    firestoreLimiters[actionType] = new RateLimiterFirestore({
-      storeClient: db,
-      storeType: 'firestore',
-      dbName: 'rate_limits',
-      tableName: actionType,
-      points: config.points,
-      duration: config.duration,
-      blockDuration: config.blockDuration
-    });
+    // Firestore limiter (persists, works across instances) - only if available
+    if (RateLimiterFirestore) {
+      try {
+        firestoreLimiters[actionType] = new RateLimiterFirestore({
+          storeClient: db,
+          storeType: 'firestore',
+          dbName: 'rate_limits',
+          tableName: actionType,
+          points: config.points,
+          duration: config.duration,
+          blockDuration: config.blockDuration
+        });
+      } catch (err) {
+        console.log(`Failed to create Firestore limiter for ${actionType}, using memory only`);
+      }
+    }
   }
 }
 

@@ -37,6 +37,9 @@ const stripeIdentity = require('./modules/stripeIdentity');
 // Express app for HTTP endpoints
 const app = express();
 
+// CORS must come first to handle preflight OPTIONS requests
+app.use(cors({ origin: true }));
+
 // Security middleware - Helmet adds various HTTP headers for security
 app.use(helmet({
   contentSecurityPolicy: {
@@ -53,9 +56,9 @@ app.use(helmet({
     },
   },
   crossOriginEmbedderPolicy: false, // Allow embedding for Firebase
+  crossOriginResourcePolicy: { policy: "cross-origin" }, // Allow cross-origin requests
 }));
 
-app.use(cors({ origin: true }));
 app.use(express.json());
 
 // ============================================================================
@@ -2168,6 +2171,5 @@ function getContentRejectionMessage(result) {
   return 'This photo does not meet our community guidelines. Please choose a different photo.';
 }
 
-// Export admin object for use in modules
-exports.admin = admin;
-exports.db = db;
+// NOTE: Do NOT export admin or db here - it causes stack overflow in firebase-functions loader
+// Modules should initialize firebase-admin themselves if needed

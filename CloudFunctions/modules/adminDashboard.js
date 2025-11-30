@@ -245,7 +245,7 @@ async function getStats() {
         pendingWarnings,
         suspendedUsers
       },
-      timestamp: admin.firestore.FieldValue.serverTimestamp()
+      timestamp: new Date().toISOString()
     };
 
     } catch (error) {

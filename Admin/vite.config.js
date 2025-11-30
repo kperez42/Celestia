@@ -14,7 +14,7 @@ const securityHeadersPlugin = () => ({
         "style-src 'self' 'unsafe-inline'; " +
         "img-src 'self' data: https: blob:; " +
         "font-src 'self' data:; " +
-        "connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://identitytoolkit.googleapis.com wss://*.firebaseio.com; " +
+        "connect-src 'self' http://127.0.0.1:* http://localhost:* https://*.firebaseio.com https://*.googleapis.com https://identitytoolkit.googleapis.com wss://*.firebaseio.com; " +
         "frame-src 'none'; " +
         "object-src 'none'; " +
         "base-uri 'self';"
