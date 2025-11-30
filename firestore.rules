@@ -17,7 +17,10 @@ service cloud.firestore {
 
     // Global admin check - used across multiple collections
     function isAdmin() {
-      return request.auth != null && request.auth.token.email in ['perezkevin640@gmail.com', 'admin@celestia.app'];
+      return request.auth != null &&
+        (request.auth.token.email == 'perezkevin640@gmail.com' ||
+         request.auth.token.email == 'Perezkevin640@gmail.com' ||
+         request.auth.token.email == 'admin@celestia.app');
     }
 
     function isValidString(text, minLength, maxLength) {
@@ -171,10 +174,9 @@ service cloud.firestore {
 
     // Reports Collection
     match /reports/{reportId} {
-      // Reporter can read their own reports, admin can read all reports
-      allow read: if isAuthenticated()
-        && isEmailVerified()
-        && (resource.data.reporterId == request.auth.uid || isAdmin());
+      // Admin can read all reports, regular users can read their own
+      allow read: if isAdmin() ||
+        (isAuthenticated() && isEmailVerified() && resource.data.reporterId == request.auth.uid);
 
       // Users can create reports
       allow create: if isAuthenticated()
@@ -183,7 +185,7 @@ service cloud.firestore {
         && isValidString(request.resource.data.reason, 1, 500);
 
       // Admin can update reports (to resolve them)
-      allow update: if isAuthenticated() && isAdmin();
+      allow update: if isAdmin();
 
       // Don't allow deleting reports
       allow delete: if false;
