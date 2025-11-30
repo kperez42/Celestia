@@ -179,9 +179,10 @@ struct WelcomeView: View {
             // Pagination dots
             HStack(spacing: 10) {
                 ForEach(0..<features.count, id: \.self) { index in
-                    Capsule()
+                    Circle()
                         .fill(index == currentFeature ? Color.white : Color.white.opacity(0.4))
-                        .frame(width: index == currentFeature ? 30 : 8, height: 8)
+                        .frame(width: index == currentFeature ? 12 : 8, height: index == currentFeature ? 12 : 8)
+                        .scaleEffect(index == currentFeature ? 1.0 : 0.85)
                         .accessibleAnimation(.spring(response: 0.3), value: currentFeature)
                 }
             }
