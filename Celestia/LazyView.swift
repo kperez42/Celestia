@@ -55,8 +55,6 @@ struct LazyTabContent<Content: View>: View {
         Group {
             if shouldRender {
                 content()
-                    // PERFORMANCE: GPU acceleration for smooth tab switching
-                    .drawingGroup(opaque: false, colorMode: .linear)
                     .onAppear {
                         // Mark as visited on first appearance - content will stay rendered
                         if !hasBeenVisited {
