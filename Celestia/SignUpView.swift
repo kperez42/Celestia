@@ -588,7 +588,7 @@ struct SignUpView: View {
 
                     Button {
                         withAnimation {
-                            photoImages.remove(at: 0)
+                            _ = photoImages.remove(at: 0)
                         }
                     } label: {
                         Image(systemName: "xmark.circle.fill")
@@ -637,7 +637,7 @@ struct SignUpView: View {
 
                             Button {
                                 withAnimation {
-                                    photoImages.remove(at: index)
+                                    _ = photoImages.remove(at: index)
                                 }
                             } label: {
                                 Image(systemName: "xmark.circle.fill")
