@@ -579,16 +579,16 @@ struct OnboardingView: View {
     }
     
     // MARK: - Step 3: Photos
-    
+
     private var step3View: some View {
         ScrollView(showsIndicators: false) {
-            VStack(spacing: 30) {
+            VStack(spacing: 24) {
                 // Icon
                 ZStack {
                     Circle()
                         .fill(Color.purple.opacity(0.15))
                         .frame(width: 100, height: 100)
-                    
+
                     Image(systemName: "photo.on.rectangle.fill")
                         .font(.system(size: 50))
                         .foregroundStyle(
@@ -599,68 +599,194 @@ struct OnboardingView: View {
                             )
                         )
                 }
-                
+
                 VStack(spacing: 8) {
                     Text("Add Your Photos")
                         .font(.title)
                         .fontWeight(.bold)
-                    
+
                     Text("Add at least 2 photos to continue")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
-                
-                // Photo grid
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                    ForEach(0..<6, id: \.self) { index in
-                        if index < photoImages.count {
-                            ZStack(alignment: .topTrailing) {
-                                Image(uiImage: photoImages[index])
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(height: 180)
-                                    .clipped()
-                                    .cornerRadius(16)
-                                
-                                Button {
-                                    withAnimation {
-                                        photoImages.remove(at: index)
-                                        HapticManager.shared.impact(.light)
-                                    }
-                                } label: {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .font(.title2)
-                                        .foregroundColor(.white)
-                                        .background(Circle().fill(Color.black.opacity(0.5)).padding(4))
-                                        .padding(8)
-                                }
-                            }
-                        } else {
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(Color.white)
-                                .frame(height: 180)
+
+                // Photo Tips Card
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "lightbulb.fill")
+                            .foregroundColor(.yellow)
+                        Text("Photo Tips")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        photoTipRow(icon: "face.smiling", text: "Use a clear photo of your face as your first photo")
+                        photoTipRow(icon: "person.fill", text: "Show your full body in at least one photo")
+                        photoTipRow(icon: "sun.max.fill", text: "Good lighting makes a big difference")
+                        photoTipRow(icon: "xmark.circle", text: "Avoid group photos or photos with sunglasses")
+                    }
+                }
+                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.yellow.opacity(0.08))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.yellow.opacity(0.3), lineWidth: 1)
+                        )
+                )
+
+                // Photo grid - Main photo is larger and more prominent
+                VStack(spacing: 12) {
+                    // Main Profile Photo - Full width, taller
+                    if photoImages.count > 0 {
+                        ZStack(alignment: .topTrailing) {
+                            Image(uiImage: photoImages[0])
+                                .resizable()
+                                .scaledToFill()
+                                .frame(height: 240)
+                                .frame(maxWidth: .infinity)
+                                .clipped()
+                                .cornerRadius(20)
                                 .overlay(
-                                    VStack(spacing: 8) {
-                                        Image(systemName: index == 0 ? "person.crop.circle.badge.plus" : "plus")
-                                            .font(.title)
-                                            .foregroundColor(.purple.opacity(0.5))
-                                        
-                                        if index == 0 {
-                                            Text("Main Photo")
+                                    VStack {
+                                        Spacer()
+                                        HStack {
+                                            Image(systemName: "star.fill")
                                                 .font(.caption)
+                                            Text("Profile Picture")
+                                                .font(.caption)
+                                                .fontWeight(.semibold)
+                                        }
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(
+                                            Capsule()
+                                                .fill(Color.black.opacity(0.6))
+                                        )
+                                        .padding(12)
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                )
+
+                            Button {
+                                withAnimation {
+                                    photoImages.remove(at: 0)
+                                    HapticManager.shared.impact(.light)
+                                }
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.title2)
+                                    .foregroundColor(.white)
+                                    .background(Circle().fill(Color.black.opacity(0.5)).padding(4))
+                                    .padding(12)
+                            }
+                        }
+                    } else {
+                        // Empty main photo slot
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.05)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(height: 240)
+                            .overlay(
+                                VStack(spacing: 12) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(Color.purple.opacity(0.15))
+                                            .frame(width: 70, height: 70)
+
+                                        Image(systemName: "person.crop.circle.badge.plus")
+                                            .font(.system(size: 36))
+                                            .foregroundStyle(
+                                                LinearGradient(
+                                                    colors: [.purple, .pink],
+                                                    startPoint: .topLeading,
+                                                    endPoint: .bottomTrailing
+                                                )
+                                            )
+                                    }
+
+                                    VStack(spacing: 4) {
+                                        Text("Profile Picture")
+                                            .font(.headline)
+                                            .foregroundColor(.primary)
+
+                                        Text("This will be your main photo")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .stroke(
+                                        LinearGradient(
+                                            colors: [.purple.opacity(0.5), .pink.opacity(0.3)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        style: StrokeStyle(lineWidth: 2, dash: [8])
+                                    )
+                            )
+                    }
+
+                    // Additional photos grid (2 columns)
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                        ForEach(1..<6, id: \.self) { index in
+                            if index < photoImages.count {
+                                ZStack(alignment: .topTrailing) {
+                                    Image(uiImage: photoImages[index])
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(height: 150)
+                                        .clipped()
+                                        .cornerRadius(16)
+
+                                    Button {
+                                        withAnimation {
+                                            photoImages.remove(at: index)
+                                            HapticManager.shared.impact(.light)
+                                        }
+                                    } label: {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .font(.title3)
+                                            .foregroundColor(.white)
+                                            .background(Circle().fill(Color.black.opacity(0.5)).padding(4))
+                                            .padding(8)
+                                    }
+                                }
+                            } else {
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color.white)
+                                    .frame(height: 150)
+                                    .overlay(
+                                        VStack(spacing: 6) {
+                                            Image(systemName: "plus")
+                                                .font(.title2)
+                                                .foregroundColor(.purple.opacity(0.4))
+
+                                            Text("Photo \(index + 1)")
+                                                .font(.caption2)
                                                 .foregroundColor(.secondary)
                                         }
-                                    }
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .stroke(style: StrokeStyle(lineWidth: 2, dash: [5]))
-                                        .foregroundColor(.purple.opacity(0.3))
-                                )
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .stroke(style: StrokeStyle(lineWidth: 1.5, dash: [5]))
+                                            .foregroundColor(.gray.opacity(0.3))
+                                    )
+                            }
                         }
                     }
                 }
-                
+
                 // Add photos button
                 PhotosPicker(
                     selection: $selectedPhotos,
@@ -673,7 +799,7 @@ struct OnboardingView: View {
                                 .tint(.white)
                         } else {
                             Image(systemName: "photo.badge.plus")
-                            Text("Add Photos")
+                            Text(photoImages.isEmpty ? "Add Photos" : "Add More Photos")
                                 .fontWeight(.semibold)
                         }
                     }
@@ -698,9 +824,36 @@ struct OnboardingView: View {
                         isUploadingPhotos = false
                     }
                 }
+
+                // Photo count indicator
+                HStack(spacing: 4) {
+                    ForEach(0..<6, id: \.self) { index in
+                        Circle()
+                            .fill(index < photoImages.count ? Color.purple : Color.gray.opacity(0.3))
+                            .frame(width: 8, height: 8)
+                    }
+                }
+                .padding(.top, 4)
+
+                Text("\(photoImages.count)/6 photos added")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
             .padding(20)
             .padding(.top, 20)
+        }
+    }
+
+    private func photoTipRow(icon: String, text: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundColor(.purple)
+                .frame(width: 16)
+
+            Text(text)
+                .font(.caption)
+                .foregroundColor(.secondary)
         }
     }
     
