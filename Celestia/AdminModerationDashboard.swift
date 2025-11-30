@@ -953,11 +953,12 @@ class ModerationViewModel: ObservableObject {
         }
     }
 
-    /// Approve a pending profile
+    /// Approve a pending profile - makes user visible to others
     func approveProfile(userId: String) async throws {
         try await db.collection("users").document(userId).updateData([
             "profileStatus": "active",
-            "profileStatusUpdatedAt": FieldValue.serverTimestamp()
+            "profileStatusUpdatedAt": FieldValue.serverTimestamp(),
+            "showMeInSearch": true  // Make user visible to others
         ])
 
         // Refresh to update list

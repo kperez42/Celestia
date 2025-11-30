@@ -206,44 +206,48 @@ struct OnboardingView: View {
     }
     
     // MARK: - Progress Bar
-    
+
     private var progressBar: some View {
         VStack(spacing: 16) {
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    // Background
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.gray.opacity(0.15))
-                        .frame(height: 8)
-                    
-                    // Progress
-                    RoundedRectangle(cornerRadius: 6)
+            // Step indicator dots
+            HStack(spacing: 12) {
+                ForEach(0..<totalSteps, id: \.self) { step in
+                    Circle()
                         .fill(
+                            currentStep >= step ?
                             LinearGradient(
                                 colors: [Color.purple, Color.pink],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ) :
+                            LinearGradient(
+                                colors: [Color.gray.opacity(0.3)],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
                         )
-                        .frame(width: geo.size.width * CGFloat(currentStep + 1) / CGFloat(totalSteps), height: 8)
-                        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentStep)
+                        .frame(width: currentStep == step ? 14 : 10, height: currentStep == step ? 14 : 10)
+                        .scaleEffect(currentStep == step ? 1.0 : 0.85)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentStep)
                 }
             }
-            .frame(height: 8)
-            
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Step indicator")
+            .accessibilityValue("Step \(currentStep + 1) of \(totalSteps)")
+
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(stepTitle)
                         .font(.headline)
                         .foregroundColor(.primary)
-                    
+
                     Text(stepSubtitle)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                
+
                 Spacer()
-                
+
                 // Percentage
                 Text("\(Int(CGFloat(currentStep + 1) / CGFloat(totalSteps) * 100))%")
                     .font(.subheadline)

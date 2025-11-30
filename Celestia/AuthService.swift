@@ -316,6 +316,10 @@ class AuthService: ObservableObject, AuthServiceProtocol {
                 user.referredByCode = sanitizedReferralCode
             }
 
+            // New users are invisible to others until admin approves
+            // They can still see and interact with other profiles
+            user.showMeInSearch = false
+
             Logger.shared.auth("Attempting to save user to Firestore", level: .info)
 
             // Step 3: Save to Firestore

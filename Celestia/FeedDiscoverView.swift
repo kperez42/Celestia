@@ -397,10 +397,9 @@ struct FeedDiscoverView: View {
 
     private var emptyStateView: some View {
         VStack(spacing: 20) {
-            // Check if user's profile is pending approval or rejected
-            if authService.currentUser?.profileStatus == "pending" {
-                pendingApprovalView
-            } else if authService.currentUser?.profileStatus == "rejected" {
+            // Only show rejected view if profile was rejected
+            // Pending users can still browse - they're just invisible to others
+            if authService.currentUser?.profileStatus == "rejected" {
                 rejectedProfileView
             } else {
                 regularEmptyStateView
