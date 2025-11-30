@@ -242,12 +242,30 @@ class BackendAPIService: BackendAPIServiceProtocol {
     func updatePushTokens(userId: String, apnsToken: String?, fcmToken: String?) async throws {
         Logger.shared.info("Updating push tokens for user: \(userId)", category: .general)
 
+        // Save directly to Firestore (required for Cloud Function notifications)
+        var firestoreData: [String: Any] = [
+            "fcmTokenUpdatedAt": FieldValue.serverTimestamp()
+        ]
+        if let fcmToken = fcmToken {
+            firestoreData["fcmToken"] = fcmToken
+        }
+        if let apnsToken = apnsToken {
+            firestoreData["apnsToken"] = apnsToken
+        }
+
+        do {
+            try await Firestore.firestore().collection("users").document(userId).updateData(firestoreData)
+            Logger.shared.info("FCM token saved to Firestore", category: .general)
+        } catch {
+            Logger.shared.error("Failed to save FCM token to Firestore", category: .general, error: error)
+        }
+
+        // Also send to backend API (for other purposes)
         var payload: [String: Any] = [
             "user_id": userId,
             "updated_at": ISO8601DateFormatter().string(from: Date())
         ]
 
-        // Add tokens if available
         if let apnsToken = apnsToken {
             payload["apns_token"] = apnsToken
         }
@@ -256,10 +274,14 @@ class BackendAPIService: BackendAPIServiceProtocol {
             payload["fcm_token"] = fcmToken
         }
 
-        let endpoint = "/v1/users/push-tokens"
-        let _: EmptyResponse = try await post(endpoint: endpoint, body: payload)
-
-        Logger.shared.debug("Push tokens updated successfully", category: .general)
+        do {
+            let endpoint = "/v1/users/push-tokens"
+            let _: EmptyResponse = try await post(endpoint: endpoint, body: payload)
+            Logger.shared.debug("Push tokens updated successfully", category: .general)
+        } catch {
+            // Backend API might not be available - that's OK, we saved to Firestore
+            Logger.shared.warning("Backend API for push tokens failed (Firestore save succeeded)", category: .general)
+        }
     }
 
     // MARK: - Generic HTTP Methods

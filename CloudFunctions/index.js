@@ -2272,5 +2272,186 @@ function getContentRejectionMessage(result) {
   return 'This photo does not meet our community guidelines. Please choose a different photo.';
 }
 
+// ============================================================================
+// ADMIN NOTIFICATIONS FOR NEW ACCOUNTS
+// ============================================================================
+
+/**
+ * Admin emails that should receive notifications for new pending accounts
+ */
+const ADMIN_EMAILS = ['perezkevin640@gmail.com', 'admin@celestia.app'];
+
+/**
+ * Firestore trigger: Notify admin when a new user account is created
+ * Sends push notification to admin devices
+ */
+exports.onNewUserCreated = functions.firestore
+  .document('users/{userId}')
+  .onCreate(async (snapshot, context) => {
+    const userData = snapshot.data();
+    const userId = context.params.userId;
+
+    functions.logger.info('New user created', {
+      userId,
+      email: userData.email,
+      profileStatus: userData.profileStatus
+    });
+
+    // Only notify for pending accounts
+    if (userData.profileStatus !== 'pending') {
+      return null;
+    }
+
+    try {
+      // Find admin users and their FCM tokens
+      const adminSnapshot = await db.collection('users')
+        .where('email', 'in', ADMIN_EMAILS)
+        .get();
+
+      if (adminSnapshot.empty) {
+        functions.logger.warn('No admin users found to notify');
+        return null;
+      }
+
+      const notificationPromises = [];
+
+      for (const adminDoc of adminSnapshot.docs) {
+        const adminData = adminDoc.data();
+        const fcmToken = adminData.fcmToken;
+
+        if (!fcmToken) {
+          functions.logger.info('Admin has no FCM token', { adminEmail: adminData.email });
+          continue;
+        }
+
+        // Send push notification
+        const message = {
+          token: fcmToken,
+          notification: {
+            title: '🆕 New Account Pending',
+            body: `${userData.fullName || 'New user'} (${userData.email}) needs approval`
+          },
+          data: {
+            type: 'admin_pending_account',
+            userId: userId,
+            userName: userData.fullName || '',
+            userEmail: userData.email || ''
+          },
+          apns: {
+            payload: {
+              aps: {
+                sound: 'default',
+                badge: 1,
+                'content-available': 1
+              }
+            }
+          }
+        };
+
+        notificationPromises.push(
+          admin.messaging().send(message)
+            .then(() => {
+              functions.logger.info('Admin notified of new pending account', {
+                adminEmail: adminData.email,
+                newUserId: userId
+              });
+            })
+            .catch(err => {
+              functions.logger.error('Failed to notify admin', {
+                error: err.message,
+                adminEmail: adminData.email
+              });
+            })
+        );
+      }
+
+      await Promise.all(notificationPromises);
+
+      // Also store in admin_alerts collection for dashboard
+      await db.collection('admin_alerts').add({
+        type: 'new_pending_account',
+        userId: userId,
+        userName: userData.fullName || 'Unknown',
+        userEmail: userData.email || '',
+        userPhoto: userData.profileImageURL || null,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        read: false
+      });
+
+      return null;
+    } catch (error) {
+      functions.logger.error('Error notifying admin of new user', { error: error.message });
+      return null;
+    }
+  });
+
+/**
+ * Firestore trigger: Notify admin when a user updates to pending status
+ * (e.g., after editing profile that requires re-approval)
+ */
+exports.onUserStatusChangedToPending = functions.firestore
+  .document('users/{userId}')
+  .onUpdate(async (change, context) => {
+    const beforeData = change.before.data();
+    const afterData = change.after.data();
+    const userId = context.params.userId;
+
+    // Only trigger if profileStatus changed TO pending
+    if (beforeData.profileStatus === afterData.profileStatus ||
+        afterData.profileStatus !== 'pending') {
+      return null;
+    }
+
+    functions.logger.info('User profile changed to pending', {
+      userId,
+      previousStatus: beforeData.profileStatus
+    });
+
+    try {
+      // Find admin users and their FCM tokens
+      const adminSnapshot = await db.collection('users')
+        .where('email', 'in', ADMIN_EMAILS)
+        .get();
+
+      if (adminSnapshot.empty) {
+        return null;
+      }
+
+      for (const adminDoc of adminSnapshot.docs) {
+        const adminData = adminDoc.data();
+        const fcmToken = adminData.fcmToken;
+
+        if (!fcmToken) continue;
+
+        const message = {
+          token: fcmToken,
+          notification: {
+            title: '👤 Profile Needs Re-approval',
+            body: `${afterData.fullName || 'User'} updated their profile`
+          },
+          data: {
+            type: 'admin_pending_account',
+            userId: userId
+          },
+          apns: {
+            payload: {
+              aps: {
+                sound: 'default',
+                badge: 1
+              }
+            }
+          }
+        };
+
+        await admin.messaging().send(message).catch(() => {});
+      }
+
+      return null;
+    } catch (error) {
+      functions.logger.error('Error notifying admin of status change', { error: error.message });
+      return null;
+    }
+  });
+
 // NOTE: Do NOT export admin or db here - it causes stack overflow in firebase-functions loader
 // Modules should initialize firebase-admin themselves if needed
