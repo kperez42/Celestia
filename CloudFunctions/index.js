@@ -2453,5 +2453,80 @@ exports.onUserStatusChangedToPending = functions.firestore
     }
   });
 
+// ============================================================================
+// ONE-TIME MIGRATION: Set existing users to active
+// ============================================================================
+
+/**
+ * Migration function to set all existing users without profileStatus to "active"
+ * This is for users created before the approval workflow was implemented
+ * Call via: firebase functions:shell then migrateExistingUsersToActive()
+ */
+exports.migrateExistingUsersToActive = functions.https.onRequest(async (req, res) => {
+  // Only allow POST
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    // Verify admin
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const token = authHeader.split('Bearer ')[1];
+    const decodedToken = await admin.auth().verifyIdToken(token);
+
+    if (!ADMIN_EMAILS.includes(decodedToken.email?.toLowerCase())) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    // Get all users without profileStatus = 'active'
+    const usersSnapshot = await db.collection('users').get();
+
+    let updatedCount = 0;
+    let skippedCount = 0;
+    const batch = db.batch();
+
+    for (const doc of usersSnapshot.docs) {
+      const data = doc.data();
+      const currentStatus = data.profileStatus;
+
+      // Skip if already active or explicitly set to something else that should be preserved
+      if (currentStatus === 'active') {
+        skippedCount++;
+        continue;
+      }
+
+      // Only migrate users that have no status or have 'pending' (legacy)
+      // Skip suspended/banned/rejected users
+      if (currentStatus && ['suspended', 'banned', 'rejected'].includes(currentStatus)) {
+        skippedCount++;
+        continue;
+      }
+
+      batch.update(doc.ref, {
+        profileStatus: 'active',
+        profileStatusUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      updatedCount++;
+    }
+
+    if (updatedCount > 0) {
+      await batch.commit();
+    }
+
+    functions.logger.info('Migration completed', { updatedCount, skippedCount });
+    res.json({
+      success: true,
+      message: `Migration complete. Updated ${updatedCount} users, skipped ${skippedCount} users.`
+    });
+  } catch (error) {
+    functions.logger.error('Migration error', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // NOTE: Do NOT export admin or db here - it causes stack overflow in firebase-functions loader
 // Modules should initialize firebase-admin themselves if needed
