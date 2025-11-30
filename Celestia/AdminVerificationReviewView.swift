@@ -630,8 +630,11 @@ class AdminVerificationReviewViewModel: ObservableObject {
 
     func loadPendingVerifications() async {
         isLoading = true
+        errorMessage = ""
 
         do {
+            Logger.shared.info("Admin loading pending verifications...", category: .general)
+
             let snapshot = try await db.collection("pendingVerifications")
                 .whereField("status", isEqualTo: "pending")
                 .order(by: "submittedAt", descending: false)
@@ -643,9 +646,14 @@ class AdminVerificationReviewViewModel: ObservableObject {
 
             Logger.shared.info("Loaded \(pendingVerifications.count) pending verifications", category: .general)
 
+            // If no results, provide more context
+            if pendingVerifications.isEmpty {
+                Logger.shared.info("No pending verifications found in Firestore", category: .general)
+            }
+
         } catch {
             Logger.shared.error("Failed to load pending verifications", category: .general, error: error)
-            errorMessage = "Failed to load verifications: \(error.localizedDescription)"
+            errorMessage = "Failed to load: \(error.localizedDescription)"
             showingError = true
         }
 
@@ -763,6 +771,14 @@ struct IDVerificationReviewEmbeddedView: View {
                     Text("No pending ID verifications to review")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
+
+                    if !viewModel.errorMessage.isEmpty {
+                        Text("Error: \(viewModel.errorMessage)")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
 
                     Button(action: {
                         Task { await viewModel.loadPendingVerifications() }

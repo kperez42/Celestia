@@ -96,8 +96,52 @@ struct DiscoverView: View {
             }
         }
         .networkStatusBanner() // UX: Show offline status
+        .overlay(alignment: .top) {
+            // Error toast for action failures
+            if viewModel.showActionError {
+                actionErrorToast
+                    .padding(.top, 100)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .zIndex(999)
+            }
+        }
+        .animation(.spring(response: 0.3), value: viewModel.showActionError)
     }
-    
+
+    // MARK: - Action Error Toast
+
+    private var actionErrorToast: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "exclamationmark.circle.fill")
+                .font(.title3)
+                .foregroundColor(.white)
+
+            Text(viewModel.actionErrorMessage)
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundColor(.white)
+
+            Spacer()
+
+            Button {
+                viewModel.showActionError = false
+                HapticManager.shared.impact(.light)
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.8))
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.red.opacity(0.9))
+                .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
+        )
+        .padding(.horizontal, 20)
+    }
+
     // MARK: - Header
     
     private var headerView: some View {
@@ -223,30 +267,6 @@ struct DiscoverView: View {
                         identifier: AccessibilityIdentifier.passButton
                     )
                     .disabled(viewModel.isProcessingAction)
-
-                    // Rewind button
-                    SwipeActionButton(
-                        icon: "arrow.uturn.backward",
-                        iconSize: .title2,
-                        iconWeight: .semibold,
-                        size: 56,
-                        colors: [Color.yellow.opacity(0.9), Color.orange],
-                        shadowColor: .yellow.opacity(0.4),
-                        isProcessing: viewModel.isProcessingAction
-                    ) {
-                        Task {
-                            await viewModel.handleRewind()
-                            VoiceOverAnnouncement.announce("Last swipe undone")
-                        }
-                    }
-                    .accessibilityElement(
-                        label: "Rewind",
-                        hint: "Undo your last swipe and see the previous profile again",
-                        traits: .isButton,
-                        identifier: "rewindButton"
-                    )
-                    .disabled(!viewModel.canRewind || viewModel.isProcessingAction)
-                    .opacity(viewModel.canRewind ? 1.0 : 0.5)
 
                     // Super Like button
                     SwipeActionButton(
@@ -560,10 +580,6 @@ struct DiscoverView: View {
                 },
                 AccessibilityCustomAction(name: "Super Like") {
                     Task { await viewModel.handleSuperLike() }
-                },
-                AccessibilityCustomAction(name: "Rewind") {
-                    guard viewModel.canRewind else { return }
-                    Task { await viewModel.handleRewind() }
                 },
                 AccessibilityCustomAction(name: "View Profile") {
                     viewModel.showUserDetail(user)
