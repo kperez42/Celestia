@@ -22,13 +22,16 @@ struct LazyView<Content: View>: View {
     }
 }
 
-/// Tab content wrapper that renders all tabs immediately for instant switching
-/// PERFORMANCE FIX: Renders content immediately without any animation or transition
-/// to eliminate flickering/jittering when switching between tabs
+/// Tab content wrapper with true lazy loading - only renders when tab is visited
+/// PERFORMANCE FIX: Defers content creation until tab is first selected
+/// Once rendered, content stays in memory to preserve state and enable instant switching
 struct LazyTabContent<Content: View>: View {
     let tabIndex: Int
     let currentTab: Int
     let content: () -> Content
+
+    // Track if this tab has ever been visited - once true, content stays rendered
+    @State private var hasBeenVisited = false
 
     init(tabIndex: Int, currentTab: Int, @ViewBuilder content: @escaping () -> Content) {
         self.tabIndex = tabIndex
@@ -37,8 +40,24 @@ struct LazyTabContent<Content: View>: View {
     }
 
     var body: some View {
-        // PERFORMANCE: Render content immediately - no lazy loading, no transitions
-        // This eliminates the flash/jitter caused by showing placeholder then animating to content
-        content()
+        Group {
+            // Render content if: currently selected OR has been visited before
+            // This ensures:
+            // 1. First visit: content loads when user navigates to tab
+            // 2. Subsequent visits: content is already rendered (instant switch)
+            // 3. No double-render: content only builds once
+            if hasBeenVisited || tabIndex == currentTab {
+                content()
+                    .onAppear {
+                        // Mark as visited on first appearance - content will stay rendered
+                        if !hasBeenVisited {
+                            hasBeenVisited = true
+                        }
+                    }
+            } else {
+                // Placeholder for unvisited tabs - matches background color
+                Color(.systemGroupedBackground)
+            }
+        }
     }
 }
