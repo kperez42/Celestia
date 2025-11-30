@@ -365,11 +365,19 @@ extension NotificationService {
         return await manager.requestAuthorization()
     }
 
-    /// Save FCM token (protocol method)
+    /// Save FCM token to Firestore (for push notifications)
     func saveFCMToken(userId: String, token: String) async {
-        // Implementation for saving FCM token to backend
         Logger.shared.info("Saving FCM token for user: \(userId)", category: .general)
-        // In production, save to Firestore or your backend
+
+        do {
+            try await Firestore.firestore().collection("users").document(userId).updateData([
+                "fcmToken": token,
+                "fcmTokenUpdatedAt": FieldValue.serverTimestamp()
+            ])
+            Logger.shared.info("FCM token saved successfully", category: .general)
+        } catch {
+            Logger.shared.error("Failed to save FCM token", category: .general, error: error)
+        }
     }
 
     /// Send new match notification (protocol method)
