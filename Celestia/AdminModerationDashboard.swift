@@ -16,29 +16,53 @@ struct AdminModerationDashboard: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Tab selector
-                Picker("View", selection: $selectedTab) {
-                    Text("Reports").tag(0)
-                    Text("Suspicious").tag(1)
-                    Text("ID Review").tag(2)
-                    Text("Stats").tag(3)
+                // Tab selector - scrollable for more tabs
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(["New", "Reports", "Suspicious", "ID Review", "Stats"], id: \.self) { tab in
+                            let index = ["New", "Reports", "Suspicious", "ID Review", "Stats"].firstIndex(of: tab) ?? 0
+                            Button(action: { selectedTab = index }) {
+                                Text(tab)
+                                    .font(.subheadline.weight(.medium))
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(selectedTab == index ? Color.blue : Color(.systemGray5))
+                                    .foregroundColor(selectedTab == index ? .white : .primary)
+                                    .cornerRadius(8)
+                            }
+                            // Show badge for pending accounts
+                            .overlay(alignment: .topTrailing) {
+                                if tab == "New" && viewModel.pendingProfiles.count > 0 {
+                                    Text("\(viewModel.pendingProfiles.count)")
+                                        .font(.caption2.bold())
+                                        .foregroundColor(.white)
+                                        .padding(4)
+                                        .background(Color.red)
+                                        .clipShape(Circle())
+                                        .offset(x: 6, y: -6)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
                 }
-                .pickerStyle(.segmented)
-                .padding()
+                .padding(.vertical, 8)
 
                 // Content
                 Group {
                     switch selectedTab {
                     case 0:
-                        reportsListView
+                        pendingProfilesView
                     case 1:
-                        suspiciousProfilesView
+                        reportsListView
                     case 2:
-                        idVerificationReviewView
+                        suspiciousProfilesView
                     case 3:
+                        idVerificationReviewView
+                    case 4:
                         statsView
                     default:
-                        reportsListView
+                        pendingProfilesView
                     }
                 }
             }
@@ -101,6 +125,27 @@ struct AdminModerationDashboard: View {
                     } label: {
                         ReportRowView(report: report)
                     }
+                }
+                .listStyle(.plain)
+            }
+        }
+    }
+
+    // MARK: - Pending Profiles (New Accounts)
+
+    private var pendingProfilesView: some View {
+        Group {
+            if viewModel.isLoading {
+                ProgressView("Loading new accounts...")
+            } else if viewModel.pendingProfiles.isEmpty {
+                emptyState(
+                    icon: "person.crop.circle.badge.checkmark",
+                    title: "No Pending Accounts",
+                    message: "All new accounts have been reviewed"
+                )
+            } else {
+                List(viewModel.pendingProfiles) { profile in
+                    PendingProfileRow(profile: profile, viewModel: viewModel)
                 }
                 .listStyle(.plain)
             }
@@ -715,6 +760,7 @@ struct SuspiciousProfileDetailView: View {
 class ModerationViewModel: ObservableObject {
     @Published var reports: [ModerationReport] = []
     @Published var suspiciousProfiles: [SuspiciousProfileItem] = []
+    @Published var pendingProfiles: [PendingProfile] = []
     @Published var stats: ModerationStats = ModerationStats()
     @Published var isLoading = false
     @Published var errorMessage: String? = nil
@@ -730,21 +776,93 @@ class ModerationViewModel: ObservableObject {
         do {
             Logger.shared.info("Admin: Loading moderation data from Firestore...", category: .moderation)
 
-            // Load reports, suspicious profiles, and stats in parallel
+            // Load all data in parallel
             async let reportsTask = loadReports()
             async let suspiciousTask = loadSuspiciousProfiles()
+            async let pendingTask = loadPendingProfiles()
             async let statsTask = loadStats()
 
-            let (loadedReports, loadedSuspicious, loadedStats) = await (reportsTask, suspiciousTask, statsTask)
+            let (loadedReports, loadedSuspicious, loadedPending, loadedStats) = await (reportsTask, suspiciousTask, pendingTask, statsTask)
 
             reports = loadedReports
             suspiciousProfiles = loadedSuspicious
+            pendingProfiles = loadedPending
             stats = loadedStats
 
-            Logger.shared.info("Admin: Loaded \(reports.count) reports, \(suspiciousProfiles.count) suspicious profiles", category: .moderation)
+            Logger.shared.info("Admin: Loaded \(reports.count) reports, \(suspiciousProfiles.count) suspicious, \(pendingProfiles.count) pending profiles", category: .moderation)
 
             isLoading = false
         }
+    }
+
+    /// Load pending profiles (new accounts waiting for approval)
+    private func loadPendingProfiles() async -> [PendingProfile] {
+        do {
+            let snapshot = try await db.collection("users")
+                .whereField("profileStatus", isEqualTo: "pending")
+                .order(by: "timestamp", descending: true)
+                .limit(to: 50)
+                .getDocuments()
+
+            var profiles: [PendingProfile] = []
+
+            for doc in snapshot.documents {
+                let data = doc.data()
+
+                // Format timestamp
+                var createdAt = "Unknown"
+                if let timestamp = data["timestamp"] as? Timestamp {
+                    let formatter = RelativeDateTimeFormatter()
+                    formatter.unitsStyle = .abbreviated
+                    createdAt = formatter.localizedString(for: timestamp.dateValue(), relativeTo: Date())
+                }
+
+                let profile = PendingProfile(
+                    id: doc.documentID,
+                    name: data["fullName"] as? String ?? "Unknown",
+                    email: data["email"] as? String ?? "",
+                    age: data["age"] as? Int ?? 0,
+                    gender: data["gender"] as? String ?? "",
+                    location: data["location"] as? String ?? "",
+                    photoURL: data["profileImageURL"] as? String,
+                    photos: data["photos"] as? [String] ?? [],
+                    bio: data["bio"] as? String ?? "",
+                    createdAt: createdAt
+                )
+                profiles.append(profile)
+            }
+
+            return profiles
+        } catch {
+            Logger.shared.error("Admin: Failed to load pending profiles", category: .moderation, error: error)
+            return []
+        }
+    }
+
+    /// Approve a pending profile
+    func approveProfile(userId: String) async throws {
+        try await db.collection("users").document(userId).updateData([
+            "profileStatus": "active",
+            "profileStatusUpdatedAt": FieldValue.serverTimestamp()
+        ])
+
+        // Refresh to update list
+        await loadQueue()
+        Logger.shared.info("Profile approved: \(userId)", category: .moderation)
+    }
+
+    /// Reject a pending profile
+    func rejectProfile(userId: String, reason: String) async throws {
+        try await db.collection("users").document(userId).updateData([
+            "profileStatus": "rejected",
+            "profileStatusReason": reason,
+            "profileStatusUpdatedAt": FieldValue.serverTimestamp(),
+            "showMeInSearch": false
+        ])
+
+        // Refresh to update list
+        await loadQueue()
+        Logger.shared.info("Profile rejected: \(userId)", category: .moderation)
     }
 
     /// Load reports from Firestore
@@ -1201,6 +1319,158 @@ enum ModerationAction: String {
         case .warn: return .orange
         case .suspend: return .purple
         case .ban: return .red
+        }
+    }
+}
+
+// MARK: - Pending Profile Model
+
+struct PendingProfile: Identifiable {
+    let id: String
+    let name: String
+    let email: String
+    let age: Int
+    let gender: String
+    let location: String
+    let photoURL: String?
+    let photos: [String]
+    let bio: String
+    let createdAt: String
+}
+
+// MARK: - Pending Profile Row View
+
+struct PendingProfileRow: View {
+    let profile: PendingProfile
+    @ObservedObject var viewModel: ModerationViewModel
+    @State private var isApproving = false
+    @State private var isRejecting = false
+    @State private var showRejectAlert = false
+    @State private var rejectReason = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                // Profile photo
+                if let photoURL = profile.photoURL, let url = URL(string: photoURL) {
+                    AsyncImage(url: url) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Color.gray.opacity(0.3)
+                    }
+                    .frame(width: 60, height: 60)
+                    .clipShape(Circle())
+                } else {
+                    Circle()
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(width: 60, height: 60)
+                        .overlay(
+                            Image(systemName: "person.fill")
+                                .foregroundColor(.gray)
+                        )
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(profile.name)
+                        .font(.headline)
+
+                    Text("\(profile.age) • \(profile.gender) • \(profile.location)")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+
+                    Text(profile.email)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    Text("Joined \(profile.createdAt)")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+            }
+
+            // Bio preview
+            if !profile.bio.isEmpty {
+                Text(profile.bio)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+            }
+
+            // Photo count
+            if profile.photos.count > 1 {
+                Text("\(profile.photos.count) photos")
+                    .font(.caption)
+                    .foregroundColor(.blue)
+            }
+
+            // Action buttons
+            HStack(spacing: 12) {
+                Button(action: {
+                    Task {
+                        isApproving = true
+                        try? await viewModel.approveProfile(userId: profile.id)
+                        isApproving = false
+                    }
+                }) {
+                    HStack {
+                        if isApproving {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                        } else {
+                            Image(systemName: "checkmark.circle.fill")
+                        }
+                        Text("Approve")
+                    }
+                    .font(.subheadline.weight(.medium))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(Color.green)
+                    .cornerRadius(8)
+                }
+                .disabled(isApproving || isRejecting)
+
+                Button(action: {
+                    showRejectAlert = true
+                }) {
+                    HStack {
+                        if isRejecting {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                        } else {
+                            Image(systemName: "xmark.circle.fill")
+                        }
+                        Text("Reject")
+                    }
+                    .font(.subheadline.weight(.medium))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(Color.red)
+                    .cornerRadius(8)
+                }
+                .disabled(isApproving || isRejecting)
+
+                Spacer()
+            }
+        }
+        .padding(.vertical, 8)
+        .alert("Reject Profile", isPresented: $showRejectAlert) {
+            TextField("Reason (optional)", text: $rejectReason)
+            Button("Cancel", role: .cancel) { }
+            Button("Reject", role: .destructive) {
+                Task {
+                    isRejecting = true
+                    try? await viewModel.rejectProfile(userId: profile.id, reason: rejectReason)
+                    isRejecting = false
+                }
+            }
+        } message: {
+            Text("Are you sure you want to reject this profile?")
         }
     }
 }
