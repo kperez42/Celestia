@@ -36,6 +36,13 @@ struct SignUpView: View {
 
     let genderOptions = ["Male", "Female", "Non-binary", "Other"]
     let lookingForOptions = ["Men", "Women", "Everyone"]
+    let availableCountries = [
+        "United States", "Canada", "Mexico", "United Kingdom", "Australia",
+        "Germany", "France", "Spain", "Italy", "Brazil", "Argentina",
+        "Japan", "South Korea", "China", "India", "Philippines", "Vietnam",
+        "Thailand", "Netherlands", "Sweden", "Norway", "Denmark", "Switzerland",
+        "Ireland", "New Zealand", "Singapore", "Other"
+    ]
 
     // Computed properties for validation
     private var passwordsMatch: Bool {
@@ -399,13 +406,29 @@ struct SignUpView: View {
                     .font(.subheadline)
                     .foregroundColor(.secondary)
 
-                TextField("e.g. United States", text: $country)
+                Menu {
+                    ForEach(availableCountries, id: \.self) { countryOption in
+                        Button(countryOption) {
+                            country = countryOption
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Text(country.isEmpty ? "Select Country" : country)
+                            .foregroundColor(country.isEmpty ? .gray : .primary)
+                        Spacer()
+                        Image(systemName: "chevron.down")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
                     .padding()
                     .background(Color(.systemBackground))
                     .cornerRadius(10)
-                    .accessibilityLabel("Country")
-                    .accessibilityHint("Enter your country")
-                    .accessibilityIdentifier(AccessibilityIdentifier.countryField)
+                }
+                .accessibilityLabel("Country")
+                .accessibilityHint("Select your country from the list")
+                .accessibilityValue(country.isEmpty ? "No country selected" : country)
+                .accessibilityIdentifier(AccessibilityIdentifier.countryField)
             }
 
             // Referral Code (Optional)

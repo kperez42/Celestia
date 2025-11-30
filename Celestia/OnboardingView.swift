@@ -64,6 +64,14 @@ struct OnboardingView: View {
         "English", "Spanish", "French", "German", "Italian",
         "Portuguese", "Chinese", "Japanese", "Korean", "Arabic"
     ]
+
+    let availableCountries = [
+        "United States", "Canada", "Mexico", "United Kingdom", "Australia",
+        "Germany", "France", "Spain", "Italy", "Brazil", "Argentina",
+        "Japan", "South Korea", "China", "India", "Philippines", "Vietnam",
+        "Thailand", "Netherlands", "Sweden", "Norway", "Denmark", "Switzerland",
+        "Ireland", "New Zealand", "Singapore", "Other"
+    ]
     
     var body: some View {
         NavigationStack {
@@ -530,8 +538,22 @@ struct OnboardingView: View {
                             .font(.subheadline)
                             .fontWeight(.medium)
                             .foregroundColor(.secondary)
-                        
-                        TextField("e.g. United States", text: $country)
+
+                        Menu {
+                            ForEach(availableCountries, id: \.self) { countryOption in
+                                Button(countryOption) {
+                                    country = countryOption
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text(country.isEmpty ? "Select Country" : country)
+                                    .foregroundColor(country.isEmpty ? .gray : .primary)
+                                Spacer()
+                                Image(systemName: "chevron.down")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
                             .padding()
                             .background(Color.white)
                             .cornerRadius(12)
@@ -539,9 +561,11 @@ struct OnboardingView: View {
                                 RoundedRectangle(cornerRadius: 12)
                                     .stroke(Color.purple.opacity(0.2), lineWidth: 1)
                             )
-                            .accessibilityLabel("Country")
-                            .accessibilityHint("Enter your country")
-                            .accessibilityIdentifier(AccessibilityIdentifier.countryField)
+                        }
+                        .accessibilityLabel("Country")
+                        .accessibilityHint("Select your country from the list")
+                        .accessibilityValue(country.isEmpty ? "No country selected" : country)
+                        .accessibilityIdentifier(AccessibilityIdentifier.countryField)
                     }
                 }
             }
