@@ -7,6 +7,7 @@
 
 import SwiftUI
 import FirebaseFunctions
+import FirebaseFirestore
 
 struct AdminModerationDashboard: View {
     @StateObject private var viewModel = ModerationViewModel()
@@ -65,6 +66,28 @@ struct AdminModerationDashboard: View {
         Group {
             if viewModel.isLoading {
                 ProgressView("Loading reports...")
+            } else if let error = viewModel.errorMessage {
+                // Show error state with admin access hint
+                VStack(spacing: 20) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 60))
+                        .foregroundColor(.orange)
+
+                    Text("Could Not Load Reports")
+                        .font(.title2.bold())
+
+                    Text(error)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+
+                    Button("Retry") {
+                        Task { await viewModel.refresh() }
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if viewModel.reports.isEmpty {
                 emptyState(
                     icon: "checkmark.shield.fill",
@@ -694,39 +717,193 @@ class ModerationViewModel: ObservableObject {
     @Published var suspiciousProfiles: [SuspiciousProfileItem] = []
     @Published var stats: ModerationStats = ModerationStats()
     @Published var isLoading = false
+    @Published var errorMessage: String? = nil
 
+    private let db = Firestore.firestore()
     private let functions = Functions.functions()
 
+    /// Load moderation queue directly from Firestore (no Cloud Function required)
     func loadQueue() async {
         isLoading = true
+        errorMessage = nil
 
         do {
-            let callable = functions.httpsCallable("getModerationQueue")
-            let result = try await callable.call(["status": "pending", "limit": 50])
+            Logger.shared.info("Admin: Loading moderation data from Firestore...", category: .moderation)
 
-            guard let data = result.data as? [String: Any] else {
-                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
-            }
+            // Load reports, suspicious profiles, and stats in parallel
+            async let reportsTask = loadReports()
+            async let suspiciousTask = loadSuspiciousProfiles()
+            async let statsTask = loadStats()
 
-            // Parse reports
-            if let reportsData = data["reports"] as? [[String: Any]] {
-                reports = reportsData.compactMap { ModerationReport(dict: $0) }
-            }
+            let (loadedReports, loadedSuspicious, loadedStats) = await (reportsTask, suspiciousTask, statsTask)
 
-            // Parse moderation queue
-            if let queueData = data["moderationQueue"] as? [[String: Any]] {
-                suspiciousProfiles = queueData.compactMap { SuspiciousProfileItem(dict: $0) }
-            }
+            reports = loadedReports
+            suspiciousProfiles = loadedSuspicious
+            stats = loadedStats
 
-            // Parse stats
-            if let statsData = data["stats"] as? [String: Any] {
-                stats = ModerationStats(dict: statsData)
-            }
+            Logger.shared.info("Admin: Loaded \(reports.count) reports, \(suspiciousProfiles.count) suspicious profiles", category: .moderation)
 
             isLoading = false
+        }
+    }
+
+    /// Load reports from Firestore
+    private func loadReports() async -> [ModerationReport] {
+        do {
+            let snapshot = try await db.collection("reports")
+                .whereField("status", isEqualTo: "pending")
+                .order(by: "timestamp", descending: true)
+                .limit(to: 50)
+                .getDocuments()
+
+            var loadedReports: [ModerationReport] = []
+
+            for doc in snapshot.documents {
+                let data = doc.data()
+                let reporterId = data["reporterId"] as? String ?? ""
+                let reportedUserId = data["reportedUserId"] as? String ?? ""
+
+                // Fetch user details for reporter and reported user
+                var reporterInfo: ModerationReport.UserInfo? = nil
+                var reportedUserInfo: ModerationReport.UserInfo? = nil
+
+                if !reporterId.isEmpty {
+                    if let reporterDoc = try? await db.collection("users").document(reporterId).getDocument(),
+                       reporterDoc.exists,
+                       let reporterData = reporterDoc.data() {
+                        reporterInfo = ModerationReport.UserInfo(
+                            id: reporterId,
+                            name: reporterData["fullName"] as? String ?? "Unknown",
+                            email: reporterData["email"] as? String ?? "",
+                            photoURL: reporterData["profileImageURL"] as? String
+                        )
+                    }
+                }
+
+                if !reportedUserId.isEmpty {
+                    if let reportedDoc = try? await db.collection("users").document(reportedUserId).getDocument(),
+                       reportedDoc.exists,
+                       let reportedData = reportedDoc.data() {
+                        reportedUserInfo = ModerationReport.UserInfo(
+                            id: reportedUserId,
+                            name: reportedData["fullName"] as? String ?? "Unknown",
+                            email: reportedData["email"] as? String ?? "",
+                            photoURL: reportedData["profileImageURL"] as? String
+                        )
+                    }
+                }
+
+                // Format timestamp
+                var timestampStr = "Unknown"
+                if let timestamp = data["timestamp"] as? Timestamp {
+                    let formatter = RelativeDateTimeFormatter()
+                    formatter.unitsStyle = .abbreviated
+                    timestampStr = formatter.localizedString(for: timestamp.dateValue(), relativeTo: Date())
+                }
+
+                let report = ModerationReport(
+                    id: doc.documentID,
+                    reason: data["reason"] as? String ?? "Unknown",
+                    timestamp: timestampStr,
+                    status: data["status"] as? String ?? "pending",
+                    additionalDetails: data["additionalDetails"] as? String,
+                    reporter: reporterInfo,
+                    reportedUser: reportedUserInfo
+                )
+                loadedReports.append(report)
+            }
+
+            return loadedReports
         } catch {
-            isLoading = false
-            Logger.shared.error("Failed to load moderation queue", category: .general, error: error)
+            Logger.shared.error("Admin: Failed to load reports", category: .moderation, error: error)
+            await MainActor.run { errorMessage = "Failed to load reports: \(error.localizedDescription)" }
+            return []
+        }
+    }
+
+    /// Load suspicious profiles from moderation queue
+    private func loadSuspiciousProfiles() async -> [SuspiciousProfileItem] {
+        do {
+            let snapshot = try await db.collection("moderation_queue")
+                .order(by: "timestamp", descending: true)
+                .limit(to: 50)
+                .getDocuments()
+
+            var loadedProfiles: [SuspiciousProfileItem] = []
+
+            for doc in snapshot.documents {
+                let data = doc.data()
+                let userId = data["reportedUserId"] as? String ?? data["userId"] as? String ?? ""
+
+                // Fetch user details
+                var userInfo: SuspiciousProfileItem.UserInfo? = nil
+                if !userId.isEmpty {
+                    if let userDoc = try? await db.collection("users").document(userId).getDocument(),
+                       userDoc.exists,
+                       let userData = userDoc.data() {
+                        userInfo = SuspiciousProfileItem.UserInfo(
+                            id: userId,
+                            name: userData["fullName"] as? String ?? "Unknown",
+                            photoURL: userData["profileImageURL"] as? String
+                        )
+                    }
+                }
+
+                // Format timestamp
+                var timestampStr = "Unknown"
+                if let timestamp = data["timestamp"] as? Timestamp {
+                    let formatter = RelativeDateTimeFormatter()
+                    formatter.unitsStyle = .abbreviated
+                    timestampStr = formatter.localizedString(for: timestamp.dateValue(), relativeTo: Date())
+                }
+
+                let item = SuspiciousProfileItem(
+                    id: doc.documentID,
+                    suspicionScore: data["suspicionScore"] as? Double ?? 0.5,
+                    indicators: data["indicators"] as? [String] ?? [],
+                    autoDetected: data["autoDetected"] as? Bool ?? true,
+                    timestamp: timestampStr,
+                    user: userInfo
+                )
+                loadedProfiles.append(item)
+            }
+
+            return loadedProfiles
+        } catch {
+            Logger.shared.error("Admin: Failed to load suspicious profiles", category: .moderation, error: error)
+            return []
+        }
+    }
+
+    /// Load stats from Firestore
+    private func loadStats() async -> ModerationStats {
+        do {
+            // Count total reports
+            let totalSnapshot = try await db.collection("reports").getDocuments()
+            let totalReports = totalSnapshot.documents.count
+
+            // Count pending reports
+            let pendingSnapshot = try await db.collection("reports")
+                .whereField("status", isEqualTo: "pending")
+                .getDocuments()
+            let pendingReports = pendingSnapshot.documents.count
+
+            // Count resolved reports
+            let resolvedReports = totalReports - pendingReports
+
+            // Count suspicious profiles
+            let suspiciousSnapshot = try await db.collection("moderation_queue").getDocuments()
+            let suspiciousCount = suspiciousSnapshot.documents.count
+
+            return ModerationStats(
+                totalReports: totalReports,
+                pendingReports: pendingReports,
+                resolvedReports: resolvedReports,
+                suspiciousProfiles: suspiciousCount
+            )
+        } catch {
+            Logger.shared.error("Admin: Failed to load stats", category: .moderation, error: error)
+            return ModerationStats()
         }
     }
 
@@ -734,21 +911,32 @@ class ModerationViewModel: ObservableObject {
         await loadQueue()
     }
 
+    /// Moderate a report - update status in Firestore
     func moderateReport(reportId: String, action: ModerationAction, reason: String?) async throws {
-        let callable = functions.httpsCallable("moderateReport")
+        let reportRef = db.collection("reports").document(reportId)
+        let reportDoc = try await reportRef.getDocument()
 
-        var params: [String: Any] = [
-            "reportId": reportId,
-            "action": action.rawValue,
-            "reason": reason ?? ""
-        ]
-
-        // Only include duration for suspend action
-        if action == .suspend {
-            params["duration"] = 7
+        guard let data = reportDoc.data(),
+              let reportedUserId = data["reportedUserId"] as? String else {
+            throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Report not found"])
         }
 
-        _ = try await callable.call(params)
+        // Update report status
+        try await reportRef.updateData([
+            "status": "resolved",
+            "resolvedAt": FieldValue.serverTimestamp(),
+            "resolution": action.rawValue,
+            "resolutionReason": reason ?? ""
+        ])
+
+        // Take action on user based on moderation decision
+        if action == .ban {
+            try await banUserInFirestore(userId: reportedUserId, reason: reason ?? "Banned due to report")
+        } else if action == .suspend {
+            try await suspendUserInFirestore(userId: reportedUserId, days: 7, reason: reason ?? "Suspended due to report")
+        } else if action == .warn {
+            try await warnUserInFirestore(userId: reportedUserId, reason: reason ?? "Warning issued")
+        }
 
         // Refresh queue
         await loadQueue()
@@ -756,19 +944,65 @@ class ModerationViewModel: ObservableObject {
 
     /// Ban user directly (without needing a report)
     func banUserDirectly(userId: String, reason: String) async throws {
-        let callable = functions.httpsCallable("banUserDirectly")
+        try await banUserInFirestore(userId: userId, reason: reason)
 
-        let params: [String: Any] = [
-            "userId": userId,
-            "reason": reason
-        ]
+        // Remove from moderation queue if present
+        let queueSnapshot = try await db.collection("moderation_queue")
+            .whereField("reportedUserId", isEqualTo: userId)
+            .getDocuments()
 
-        _ = try await callable.call(params)
+        for doc in queueSnapshot.documents {
+            try await doc.reference.delete()
+        }
 
-        // Refresh queue to update suspicious profiles list
+        // Refresh queue
         await loadQueue()
 
         Logger.shared.info("User banned directly from admin panel: \(userId)", category: .moderation)
+    }
+
+    /// Ban user in Firestore
+    private func banUserInFirestore(userId: String, reason: String) async throws {
+        try await db.collection("users").document(userId).updateData([
+            "isBanned": true,
+            "bannedAt": FieldValue.serverTimestamp(),
+            "banReason": reason,
+            "profileStatus": "banned",
+            "showMeInSearch": false
+        ])
+
+        Logger.shared.info("User banned: \(userId)", category: .moderation)
+    }
+
+    /// Suspend user in Firestore
+    private func suspendUserInFirestore(userId: String, days: Int, reason: String) async throws {
+        let suspendedUntil = Calendar.current.date(byAdding: .day, value: days, to: Date()) ?? Date()
+
+        try await db.collection("users").document(userId).updateData([
+            "isSuspended": true,
+            "suspendedAt": FieldValue.serverTimestamp(),
+            "suspendedUntil": Timestamp(date: suspendedUntil),
+            "suspendReason": reason,
+            "profileStatus": "suspended",
+            "showMeInSearch": false
+        ])
+
+        Logger.shared.info("User suspended for \(days) days: \(userId)", category: .moderation)
+    }
+
+    /// Warn user in Firestore
+    private func warnUserInFirestore(userId: String, reason: String) async throws {
+        try await db.collection("users").document(userId).updateData([
+            "warnings": FieldValue.arrayUnion([
+                [
+                    "reason": reason,
+                    "timestamp": Timestamp(date: Date())
+                ]
+            ]),
+            "warningCount": FieldValue.increment(Int64(1))
+        ])
+
+        Logger.shared.info("Warning issued to user: \(userId)", category: .moderation)
     }
 }
 
@@ -788,6 +1022,17 @@ struct ModerationReport: Identifiable {
         let name: String
         let email: String
         let photoURL: String?
+    }
+
+    // Direct initializer for Firestore data
+    init(id: String, reason: String, timestamp: String, status: String, additionalDetails: String?, reporter: UserInfo?, reportedUser: UserInfo?) {
+        self.id = id
+        self.reason = reason
+        self.timestamp = timestamp
+        self.status = status
+        self.additionalDetails = additionalDetails
+        self.reporter = reporter
+        self.reportedUser = reportedUser
     }
 
     init?(dict: [String: Any]) {
@@ -842,6 +1087,16 @@ struct SuspiciousProfileItem: Identifiable {
         let photoURL: String?
     }
 
+    // Direct initializer for Firestore data
+    init(id: String, suspicionScore: Double, indicators: [String], autoDetected: Bool, timestamp: String, user: UserInfo?) {
+        self.id = id
+        self.suspicionScore = suspicionScore
+        self.indicators = indicators
+        self.autoDetected = autoDetected
+        self.timestamp = timestamp
+        self.user = user
+    }
+
     init?(dict: [String: Any]) {
         guard let id = dict["id"] as? String,
               let suspicionScore = dict["suspicionScore"] as? Double,
@@ -880,6 +1135,14 @@ struct ModerationStats {
         self.pendingReports = 0
         self.resolvedReports = 0
         self.suspiciousProfiles = 0
+    }
+
+    // Direct initializer for Firestore data
+    init(totalReports: Int, pendingReports: Int, resolvedReports: Int, suspiciousProfiles: Int) {
+        self.totalReports = totalReports
+        self.pendingReports = pendingReports
+        self.resolvedReports = resolvedReports
+        self.suspiciousProfiles = suspiciousProfiles
     }
 
     init(dict: [String: Any]) {
