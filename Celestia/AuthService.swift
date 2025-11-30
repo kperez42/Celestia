@@ -534,11 +534,33 @@ class AuthService: ObservableObject, AuthServiceProtocol {
         let uid = user.uid
 
         // SECURITY FIX: Never log UIDs
-        Logger.shared.auth("Deleting user account", level: .info)
+        Logger.shared.auth("Deleting user account and all related data", level: .info)
 
         do {
-            // Delete user data from Firestore first
-            try await Firestore.firestore().collection("users").document(uid).delete()
+            let db = Firestore.firestore()
+
+            // Delete all related data in parallel for better performance
+            async let messagesDeleted: () = deleteUserMessages(uid: uid, db: db)
+            async let matchesDeleted: () = deleteUserMatches(uid: uid, db: db)
+            async let interestsDeleted: () = deleteUserInterests(uid: uid, db: db)
+            async let likesDeleted: () = deleteUserLikes(uid: uid, db: db)
+            async let savedProfilesDeleted: () = deleteUserSavedProfiles(uid: uid, db: db)
+            async let notificationsDeleted: () = deleteUserNotifications(uid: uid, db: db)
+            async let blocksDeleted: () = deleteUserBlocks(uid: uid, db: db)
+            async let referralCodesDeleted: () = deleteUserReferralCodes(uid: uid, db: db)
+            async let profileViewsDeleted: () = deleteUserProfileViews(uid: uid, db: db)
+            async let passesDeleted: () = deleteUserPasses(uid: uid, db: db)
+
+            // Wait for all deletions to complete
+            _ = try await (messagesDeleted, matchesDeleted, interestsDeleted, likesDeleted,
+                          savedProfilesDeleted, notificationsDeleted, blocksDeleted,
+                          referralCodesDeleted, profileViewsDeleted, passesDeleted)
+
+            Logger.shared.auth("All related user data deleted", level: .info)
+
+            // Delete user document from Firestore
+            try await db.collection("users").document(uid).delete()
+            Logger.shared.auth("User document deleted", level: .info)
 
             // Delete auth account (may require recent authentication)
             try await user.delete()
@@ -557,6 +579,224 @@ class AuthService: ObservableObject, AuthServiceProtocol {
             }
             throw error
         }
+    }
+
+    // MARK: - Cascade Delete Helpers
+
+    /// Delete all messages sent by or received by the user
+    private func deleteUserMessages(uid: String, db: Firestore) async throws {
+        // Delete messages where user is sender
+        let sentMessages = try await db.collection("messages")
+            .whereField("senderId", isEqualTo: uid)
+            .getDocuments()
+
+        for doc in sentMessages.documents {
+            try await doc.reference.delete()
+        }
+
+        // Delete messages where user is receiver
+        let receivedMessages = try await db.collection("messages")
+            .whereField("receiverId", isEqualTo: uid)
+            .getDocuments()
+
+        for doc in receivedMessages.documents {
+            try await doc.reference.delete()
+        }
+
+        Logger.shared.auth("Deleted \(sentMessages.count + receivedMessages.count) messages", level: .debug)
+    }
+
+    /// Delete all matches involving the user
+    private func deleteUserMatches(uid: String, db: Firestore) async throws {
+        // Delete matches where user is user1
+        let matchesAsUser1 = try await db.collection("matches")
+            .whereField("user1Id", isEqualTo: uid)
+            .getDocuments()
+
+        for doc in matchesAsUser1.documents {
+            try await doc.reference.delete()
+        }
+
+        // Delete matches where user is user2
+        let matchesAsUser2 = try await db.collection("matches")
+            .whereField("user2Id", isEqualTo: uid)
+            .getDocuments()
+
+        for doc in matchesAsUser2.documents {
+            try await doc.reference.delete()
+        }
+
+        Logger.shared.auth("Deleted \(matchesAsUser1.count + matchesAsUser2.count) matches", level: .debug)
+    }
+
+    /// Delete all interests (likes) sent by or received by the user
+    private func deleteUserInterests(uid: String, db: Firestore) async throws {
+        // Delete interests sent by user
+        let sentInterests = try await db.collection("interests")
+            .whereField("fromUserId", isEqualTo: uid)
+            .getDocuments()
+
+        for doc in sentInterests.documents {
+            try await doc.reference.delete()
+        }
+
+        // Delete interests received by user
+        let receivedInterests = try await db.collection("interests")
+            .whereField("toUserId", isEqualTo: uid)
+            .getDocuments()
+
+        for doc in receivedInterests.documents {
+            try await doc.reference.delete()
+        }
+
+        Logger.shared.auth("Deleted \(sentInterests.count + receivedInterests.count) interests", level: .debug)
+    }
+
+    /// Delete all likes sent by or received by the user
+    private func deleteUserLikes(uid: String, db: Firestore) async throws {
+        // Delete likes sent by user
+        let sentLikes = try await db.collection("likes")
+            .whereField("fromUserId", isEqualTo: uid)
+            .getDocuments()
+
+        for doc in sentLikes.documents {
+            try await doc.reference.delete()
+        }
+
+        // Delete likes received by user
+        let receivedLikes = try await db.collection("likes")
+            .whereField("toUserId", isEqualTo: uid)
+            .getDocuments()
+
+        for doc in receivedLikes.documents {
+            try await doc.reference.delete()
+        }
+
+        Logger.shared.auth("Deleted \(sentLikes.count + receivedLikes.count) likes", level: .debug)
+    }
+
+    /// Delete all saved profiles by or of the user
+    private func deleteUserSavedProfiles(uid: String, db: Firestore) async throws {
+        // Delete saved profiles created by user
+        let savedByUser = try await db.collection("saved_profiles")
+            .whereField("userId", isEqualTo: uid)
+            .getDocuments()
+
+        for doc in savedByUser.documents {
+            try await doc.reference.delete()
+        }
+
+        // Delete saved profiles where user was saved
+        let savedOfUser = try await db.collection("saved_profiles")
+            .whereField("savedUserId", isEqualTo: uid)
+            .getDocuments()
+
+        for doc in savedOfUser.documents {
+            try await doc.reference.delete()
+        }
+
+        Logger.shared.auth("Deleted \(savedByUser.count + savedOfUser.count) saved profiles", level: .debug)
+    }
+
+    /// Delete all notifications for the user
+    private func deleteUserNotifications(uid: String, db: Firestore) async throws {
+        let notifications = try await db.collection("notifications")
+            .whereField("userId", isEqualTo: uid)
+            .getDocuments()
+
+        for doc in notifications.documents {
+            try await doc.reference.delete()
+        }
+
+        Logger.shared.auth("Deleted \(notifications.count) notifications", level: .debug)
+    }
+
+    /// Delete all blocks created by or against the user
+    private func deleteUserBlocks(uid: String, db: Firestore) async throws {
+        // Delete from blocks collection
+        let blockerBlocks = try await db.collection("blocks")
+            .whereField("blockerId", isEqualTo: uid)
+            .getDocuments()
+
+        for doc in blockerBlocks.documents {
+            try await doc.reference.delete()
+        }
+
+        let blockedBlocks = try await db.collection("blocks")
+            .whereField("blockedId", isEqualTo: uid)
+            .getDocuments()
+
+        for doc in blockedBlocks.documents {
+            try await doc.reference.delete()
+        }
+
+        // Delete from blockedUsers collection
+        let blockerUsers = try await db.collection("blockedUsers")
+            .whereField("blockerId", isEqualTo: uid)
+            .getDocuments()
+
+        for doc in blockerUsers.documents {
+            try await doc.reference.delete()
+        }
+
+        let blockedUsers = try await db.collection("blockedUsers")
+            .whereField("blockedUserId", isEqualTo: uid)
+            .getDocuments()
+
+        for doc in blockedUsers.documents {
+            try await doc.reference.delete()
+        }
+
+        Logger.shared.auth("Deleted blocks data", level: .debug)
+    }
+
+    /// Delete referral codes for the user
+    private func deleteUserReferralCodes(uid: String, db: Firestore) async throws {
+        let referralCodes = try await db.collection("referralCodes")
+            .whereField("userId", isEqualTo: uid)
+            .getDocuments()
+
+        for doc in referralCodes.documents {
+            try await doc.reference.delete()
+        }
+
+        Logger.shared.auth("Deleted \(referralCodes.count) referral codes", level: .debug)
+    }
+
+    /// Delete profile views by or of the user
+    private func deleteUserProfileViews(uid: String, db: Firestore) async throws {
+        // Delete views made by user
+        let viewsMade = try await db.collection("profileViews")
+            .whereField("viewerUserId", isEqualTo: uid)
+            .getDocuments()
+
+        for doc in viewsMade.documents {
+            try await doc.reference.delete()
+        }
+
+        // Delete views of user's profile
+        let viewsReceived = try await db.collection("profileViews")
+            .whereField("viewedUserId", isEqualTo: uid)
+            .getDocuments()
+
+        for doc in viewsReceived.documents {
+            try await doc.reference.delete()
+        }
+
+        Logger.shared.auth("Deleted \(viewsMade.count + viewsReceived.count) profile views", level: .debug)
+    }
+
+    /// Delete passes made by the user
+    private func deleteUserPasses(uid: String, db: Firestore) async throws {
+        let passes = try await db.collection("passes")
+            .whereField("fromUserId", isEqualTo: uid)
+            .getDocuments()
+
+        for doc in passes.documents {
+            try await doc.reference.delete()
+        }
+
+        Logger.shared.auth("Deleted \(passes.count) passes", level: .debug)
     }
 
     // MARK: - Re-authentication

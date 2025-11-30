@@ -34,8 +34,7 @@ service cloud.firestore {
     // Users Collection
     match /users/{userId} {
       // Anyone can read public user profiles (for discovery)
-      // NOTE: Temporarily removed isEmailVerified() for testing
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && isEmailVerified();
 
       // Users can only create their own profile
       allow create: if isOwner(userId)
@@ -76,8 +75,10 @@ service cloud.firestore {
         && isEmailVerified()
         && (resource.data.user1Id == request.auth.uid || resource.data.user2Id == request.auth.uid);
 
-      // Don't allow deleting matches (soft delete via isActive field instead)
-      allow delete: if false;
+      // Allow participants to delete matches (for account deletion cleanup)
+      allow delete: if isAuthenticated()
+        && isEmailVerified()
+        && (resource.data.user1Id == request.auth.uid || resource.data.user2Id == request.auth.uid);
     }
 
     // Messages Collection
@@ -99,10 +100,10 @@ service cloud.firestore {
         && isEmailVerified()
         && (resource.data.senderId == request.auth.uid || resource.data.receiverId == request.auth.uid);
 
-      // Users can delete their own messages
+      // Users can delete messages they sent OR received (for account deletion cleanup)
       allow delete: if isAuthenticated()
         && isEmailVerified()
-        && resource.data.senderId == request.auth.uid;
+        && (resource.data.senderId == request.auth.uid || resource.data.receiverId == request.auth.uid);
     }
 
     // Batch Operation Logs Collection (for message read tracking)
@@ -130,10 +131,10 @@ service cloud.firestore {
         && isEmailVerified()
         && (resource.data.toUserId == request.auth.uid || resource.data.fromUserId == request.auth.uid);
 
-      // Users can delete interests they sent
+      // Users can delete interests they sent OR received (for account deletion cleanup)
       allow delete: if isAuthenticated()
         && isEmailVerified()
-        && resource.data.fromUserId == request.auth.uid;
+        && (resource.data.fromUserId == request.auth.uid || resource.data.toUserId == request.auth.uid);
     }
 
     // Blocks Collection (legacy - keeping for backwards compatibility)
@@ -149,10 +150,10 @@ service cloud.firestore {
         && request.resource.data.blockerId == request.auth.uid
         && request.resource.data.blockerId != request.resource.data.blockedId;
 
-      // Users can unblock (delete)
+      // Users can unblock OR blocked users can delete during account cleanup
       allow delete: if isAuthenticated()
         && isEmailVerified()
-        && resource.data.blockerId == request.auth.uid;
+        && (resource.data.blockerId == request.auth.uid || resource.data.blockedId == request.auth.uid);
 
       // Don't allow updating blocks
       allow update: if false;
@@ -171,10 +172,10 @@ service cloud.firestore {
         && request.resource.data.blockerId == request.auth.uid
         && request.resource.data.blockerId != request.resource.data.blockedUserId;
 
-      // Users can unblock (delete)
+      // Users can unblock OR blocked users can delete during account cleanup
       allow delete: if isAuthenticated()
         && isEmailVerified()
-        && resource.data.blockerId == request.auth.uid;
+        && (resource.data.blockerId == request.auth.uid || resource.data.blockedUserId == request.auth.uid);
 
       // Don't allow updating blocks
       allow update: if false;
@@ -324,8 +325,11 @@ service cloud.firestore {
       allow create: if isAuthenticated()
         && request.resource.data.userId == request.auth.uid;
 
-      // No updates or deletes
-      allow update, delete: if false;
+      // No updates, but allow delete for account cleanup
+      allow update: if false;
+      allow delete: if isAuthenticated()
+        && isEmailVerified()
+        && resource.data.userId == request.auth.uid;
     }
 
     // Referral Rewards Collection
@@ -371,10 +375,10 @@ service cloud.firestore {
         && isEmailVerified()
         && resource.data.fromUserId == request.auth.uid;
 
-      // Users can delete likes they sent
+      // Users can delete likes they sent OR received (for account deletion cleanup)
       allow delete: if isAuthenticated()
         && isEmailVerified()
-        && resource.data.fromUserId == request.auth.uid;
+        && (resource.data.fromUserId == request.auth.uid || resource.data.toUserId == request.auth.uid);
     }
 
     // Passes Collection
@@ -417,10 +421,10 @@ service cloud.firestore {
         && isEmailVerified()
         && resource.data.userId == request.auth.uid;
 
-      // Users can remove saved profiles
+      // Users can remove saved profiles they created OR where they are the saved user (for account deletion cleanup)
       allow delete: if isAuthenticated()
         && isEmailVerified()
-        && resource.data.userId == request.auth.uid;
+        && (resource.data.userId == request.auth.uid || resource.data.savedUserId == request.auth.uid);
     }
 
     // Profile Views Collection
@@ -440,8 +444,10 @@ service cloud.firestore {
         && isEmailVerified()
         && resource.data.viewerUserId == request.auth.uid;
 
-      // Don't allow deletes
-      allow delete: if false;
+      // Allow users to delete views they made OR views of their profile (for account deletion cleanup)
+      allow delete: if isAuthenticated()
+        && isEmailVerified()
+        && (resource.data.viewerUserId == request.auth.uid || resource.data.viewedUserId == request.auth.uid);
     }
 
     // Pending Verifications Collection (ID verification submissions)
