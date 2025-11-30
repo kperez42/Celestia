@@ -344,7 +344,7 @@ struct PremiumUpgradeView: View {
         case 0: return "Unlimited"
         case 1: return "See Likes"
         case 2: return "Message"
-        default: return "Super Like"
+        default: return "Premium"
         }
     }
 
@@ -682,7 +682,7 @@ struct PremiumUpgradeView: View {
         let showcases = [
             ("23 people liked you today", "heart.circle.fill", Color.pink, "See who they are with Premium"),
             ("You're missing 15+ profiles", "eye.slash.fill", Color.purple, "Get unlimited browsing"),
-            ("5 Super Likes ready to use", "star.circle.fill", Color.orange, "Stand out in their feed"),
+            ("Unlimited likes available", "heart.fill", Color.red, "Like as many profiles as you want"),
             ("Send unlimited messages", "message.circle.fill", Color.blue, "Connect with anyone you like")
         ]
 
@@ -798,10 +798,9 @@ struct PremiumUpgradeView: View {
                 .background(Color.gray.opacity(0.06))
 
                 VStack(spacing: 0) {
-                    comparisonRow(feature: "Send Messages", free: "Limited", premium: "Unlimited", icon: "message.fill")
-                    comparisonRow(feature: "Daily Likes", free: "50/day", premium: "Unlimited", icon: "heart.fill")
+                    comparisonRow(feature: "Send Messages", free: "10/day", premium: "Unlimited", icon: "message.fill")
+                    comparisonRow(feature: "Daily Likes", free: "10/day", premium: "Unlimited", icon: "heart.fill")
                     comparisonRow(feature: "See Who Likes You", free: "Hidden", premium: "Full Access", icon: "eye.fill")
-                    comparisonRow(feature: "Super Likes", free: "1/day", premium: "5/day", icon: "star.fill")
                     comparisonRow(feature: "Advanced Filters", free: "Basic", premium: "All Filters", icon: "slider.horizontal.3")
                     comparisonRow(feature: "Read Receipts", free: "No", premium: "Yes", icon: "checkmark.message.fill")
                     comparisonRow(feature: "Priority in Feed", free: "Standard", premium: "Top Priority", icon: "arrow.up.circle.fill")

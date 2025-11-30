@@ -25,15 +25,10 @@ struct ProductIdentifiers {
 
     // MARK: - Consumables
 
-    static let superLikes5 = "com.celestia.consumable.superlikes.5"
-    static let superLikes10 = "com.celestia.consumable.superlikes.10"
-    static let superLikes25 = "com.celestia.consumable.superlikes.25"
-
     static let boost1Hour = "com.celestia.consumable.boost.1hour"
     static let boost3Hours = "com.celestia.consumable.boost.3hours"
     static let boost24Hours = "com.celestia.consumable.boost.24hours"
 
-    static let rewinds5 = "com.celestia.consumable.rewinds.5"
     static let spotlightWeekend = "com.celestia.consumable.spotlight.weekend"
 
     // MARK: - All Products
@@ -51,13 +46,9 @@ struct ProductIdentifiers {
 
     static var allConsumables: [String] {
         return [
-            superLikes5,
-            superLikes10,
-            superLikes25,
             boost1Hour,
             boost3Hours,
             boost24Hours,
-            rewinds5,
             spotlightWeekend
         ]
     }
@@ -119,8 +110,7 @@ enum SubscriptionTier: String, Codable, CaseIterable {
         case .none:
             return [
                 .unlimitedMatches(false),
-                .superLikesPerDay(5),
-                .rewinds(false),
+                .unlimitedLikes(false),
                 .seeWhoLikesYou(false),
                 .boosts(0),
                 .advancedFilters(false),
@@ -132,8 +122,7 @@ enum SubscriptionTier: String, Codable, CaseIterable {
         case .basic:
             return [
                 .unlimitedMatches(true),
-                .superLikesPerDay(10),
-                .rewinds(true),
+                .unlimitedLikes(true),
                 .seeWhoLikesYou(false),
                 .boosts(1),
                 .advancedFilters(true),
@@ -145,8 +134,7 @@ enum SubscriptionTier: String, Codable, CaseIterable {
         case .plus:
             return [
                 .unlimitedMatches(true),
-                .superLikesPerDay(25),
-                .rewinds(true),
+                .unlimitedLikes(true),
                 .seeWhoLikesYou(true),
                 .boosts(5),
                 .advancedFilters(true),
@@ -158,8 +146,7 @@ enum SubscriptionTier: String, Codable, CaseIterable {
         case .premium:
             return [
                 .unlimitedMatches(true),
-                .superLikesPerDay(100),
-                .rewinds(true),
+                .unlimitedLikes(true),
                 .seeWhoLikesYou(true),
                 .boosts(10),
                 .advancedFilters(true),
@@ -202,8 +189,7 @@ enum SubscriptionTier: String, Codable, CaseIterable {
 
 enum SubscriptionFeature: Equatable {
     case unlimitedMatches(Bool)
-    case superLikesPerDay(Int)
-    case rewinds(Bool)
+    case unlimitedLikes(Bool)
     case seeWhoLikesYou(Bool)
     case boosts(Int)
     case advancedFilters(Bool)
@@ -216,10 +202,8 @@ enum SubscriptionFeature: Equatable {
         switch self {
         case .unlimitedMatches(let enabled):
             return enabled ? "Unlimited Matches" : "Limited Matches"
-        case .superLikesPerDay(let count):
-            return "\(count) Super Likes per day"
-        case .rewinds(let enabled):
-            return enabled ? "Unlimited Rewinds" : "No Rewinds"
+        case .unlimitedLikes(let enabled):
+            return enabled ? "Unlimited Likes" : "10 Likes per day"
         case .seeWhoLikesYou(let enabled):
             return enabled ? "See Who Likes You" : "Hidden Likes"
         case .boosts(let count):
@@ -241,10 +225,8 @@ enum SubscriptionFeature: Equatable {
         switch self {
         case .unlimitedMatches:
             return "infinity"
-        case .superLikesPerDay:
-            return "star.fill"
-        case .rewinds:
-            return "arrow.uturn.backward"
+        case .unlimitedLikes:
+            return "heart.fill"
         case .seeWhoLikesYou:
             return "heart.circle.fill"
         case .boosts:
@@ -265,7 +247,7 @@ enum SubscriptionFeature: Equatable {
     var isEnabled: Bool {
         switch self {
         case .unlimitedMatches(let enabled),
-             .rewinds(let enabled),
+             .unlimitedLikes(let enabled),
              .seeWhoLikesYou(let enabled),
              .advancedFilters(let enabled),
              .readReceipts(let enabled),
@@ -273,8 +255,7 @@ enum SubscriptionFeature: Equatable {
              .noAds(let enabled),
              .profileBoost(let enabled):
             return enabled
-        case .superLikesPerDay(let count),
-             .boosts(let count):
+        case .boosts(let count):
             return count > 0
         }
     }
@@ -324,19 +305,13 @@ enum ProductType {
 // MARK: - Consumable Type
 
 enum ConsumableType: String, Codable {
-    case superLikes = "super_likes"
     case boost = "boost"
-    case rewind = "rewind"
     case spotlight = "spotlight"
 
     var displayName: String {
         switch self {
-        case .superLikes:
-            return "Super Likes"
         case .boost:
             return "Profile Boost"
-        case .rewind:
-            return "Rewinds"
         case .spotlight:
             return "Spotlight"
         }
@@ -344,12 +319,8 @@ enum ConsumableType: String, Codable {
 
     var icon: String {
         switch self {
-        case .superLikes:
-            return "star.fill"
         case .boost:
             return "flame.fill"
-        case .rewind:
-            return "arrow.uturn.backward"
         case .spotlight:
             return "sparkles"
         }
@@ -412,19 +383,13 @@ struct SubscriptionStatus: Codable {
 // MARK: - Consumable Balance
 
 struct ConsumableBalance: Codable {
-    var superLikes: Int = 0
     var boosts: Int = 0
-    var rewinds: Int = 0
     var spotlights: Int = 0
 
     mutating func add(_ type: ConsumableType, amount: Int) {
         switch type {
-        case .superLikes:
-            superLikes += amount
         case .boost:
             boosts += amount
-        case .rewind:
-            rewinds += amount
         case .spotlight:
             spotlights += amount
         }
@@ -432,17 +397,9 @@ struct ConsumableBalance: Codable {
 
     mutating func use(_ type: ConsumableType, amount: Int = 1) -> Bool {
         switch type {
-        case .superLikes:
-            guard superLikes >= amount else { return false }
-            superLikes -= amount
-            return true
         case .boost:
             guard boosts >= amount else { return false }
             boosts -= amount
-            return true
-        case .rewind:
-            guard rewinds >= amount else { return false }
-            rewinds -= amount
             return true
         case .spotlight:
             guard spotlights >= amount else { return false }
@@ -453,12 +410,8 @@ struct ConsumableBalance: Codable {
 
     func balance(for type: ConsumableType) -> Int {
         switch type {
-        case .superLikes:
-            return superLikes
         case .boost:
             return boosts
-        case .rewind:
-            return rewinds
         case .spotlight:
             return spotlights
         }
