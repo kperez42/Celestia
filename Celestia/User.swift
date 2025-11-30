@@ -60,12 +60,11 @@ struct User: Identifiable, Codable, Equatable {
     var isAdmin: Bool = false
 
     // Profile Status (for content moderation quarantine)
-    // "pending" = new account, not shown in Discover until photo approved
+    // "pending" = new account, not shown in Discover until approved by admin
     // "active" = approved, visible to other users
     // "suspended" = temporarily or permanently blocked
     // "flagged" = under review by moderators
-    // Default to "active" so new users appear in Discover immediately
-    var profileStatus: String = "active"
+    var profileStatus: String = "pending"
     var profileStatusReason: String?
     var profileStatusUpdatedAt: Date?
     
