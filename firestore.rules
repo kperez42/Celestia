@@ -822,6 +822,33 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Admin Alerts Collection (push notifications to admins)
+    match /admin_alerts/{alertId} {
+      // Only admins can read alerts
+      allow read: if isAdmin();
+
+      // System creates alerts (via Cloud Functions)
+      allow create: if isAuthenticated();
+
+      // Admins can mark alerts as read/dismissed
+      allow update: if isAdmin();
+
+      // No deletes
+      allow delete: if false;
+    }
+
+    // Notification Logs Collection (tracking sent notifications)
+    match /notification_logs/{logId} {
+      // Only admins can read logs
+      allow read: if isAdmin();
+
+      // System creates logs
+      allow create: if isAuthenticated();
+
+      // No updates or deletes (audit trail)
+      allow update, delete: if false;
+    }
+
     // Default: Deny all other access
     match /{document=**} {
       allow read, write: if false;
