@@ -25,6 +25,10 @@ class DiscoverViewModel: ObservableObject {
     @Published var showingUpgradeSheet = false
     @Published var connectionQuality: PerformanceMonitor.ConnectionQuality = .excellent
 
+    // Action error feedback
+    @Published var showActionError = false
+    @Published var actionErrorMessage = ""
+
     // Computed property that syncs with DiscoveryFilters.shared
     var hasActiveFilters: Bool {
         return DiscoveryFilters.shared.hasActiveFilters
@@ -296,7 +300,15 @@ class DiscoverViewModel: ObservableObject {
             }
         } catch {
             Logger.shared.error("Error sending like", category: .matching, error: error)
-            // Still move forward even if like fails
+            // Show error feedback to user
+            actionErrorMessage = "Failed to send like. Please try again."
+            showActionError = true
+            HapticManager.shared.notification(.error)
+            // Auto-hide after 3 seconds
+            Task {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                showActionError = false
+            }
         }
 
         isProcessingAction = false
@@ -355,7 +367,15 @@ class DiscoverViewModel: ObservableObject {
             Logger.shared.info("Pass recorded for \(passedUser.fullName)", category: .matching)
         } catch {
             Logger.shared.error("Error recording pass", category: .matching, error: error)
-            // Still move forward even if pass fails
+            // Show error feedback to user
+            actionErrorMessage = "Failed to record pass. Please try again."
+            showActionError = true
+            HapticManager.shared.notification(.error)
+            // Auto-hide after 3 seconds
+            Task {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                showActionError = false
+            }
         }
 
         isProcessingAction = false
@@ -416,7 +436,15 @@ class DiscoverViewModel: ObservableObject {
             }
         } catch {
             Logger.shared.error("Error sending super like", category: .matching, error: error)
-            // Still move forward even if super like fails
+            // Show error feedback to user
+            actionErrorMessage = "Failed to send super like. Please try again."
+            showActionError = true
+            HapticManager.shared.notification(.error)
+            // Auto-hide after 3 seconds
+            Task {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                showActionError = false
+            }
         }
 
         isProcessingAction = false
