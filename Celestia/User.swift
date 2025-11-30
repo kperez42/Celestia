@@ -62,10 +62,13 @@ struct User: Identifiable, Codable, Equatable {
     // Profile Status (for content moderation quarantine)
     // "pending" = new account, not shown in Discover until approved by admin
     // "active" = approved, visible to other users
+    // "rejected" = rejected, user must fix issues
     // "suspended" = temporarily or permanently blocked
     // "flagged" = under review by moderators
     var profileStatus: String = "pending"
-    var profileStatusReason: String?
+    var profileStatusReason: String?           // User-friendly message
+    var profileStatusReasonCode: String?       // Machine-readable code (e.g., "no_face_photo")
+    var profileStatusFixInstructions: String?  // Detailed fix instructions for user
     var profileStatusUpdatedAt: Date?
     
     // Preferences
@@ -164,6 +167,8 @@ struct User: Identifiable, Codable, Equatable {
         try container.encodeIfPresent(subscriptionExpiryDate, forKey: .subscriptionExpiryDate)
         try container.encode(profileStatus, forKey: .profileStatus)
         try container.encodeIfPresent(profileStatusReason, forKey: .profileStatusReason)
+        try container.encodeIfPresent(profileStatusReasonCode, forKey: .profileStatusReasonCode)
+        try container.encodeIfPresent(profileStatusFixInstructions, forKey: .profileStatusFixInstructions)
         try container.encodeIfPresent(profileStatusUpdatedAt, forKey: .profileStatusUpdatedAt)
         try container.encode(ageRangeMin, forKey: .ageRangeMin)
         try container.encode(ageRangeMax, forKey: .ageRangeMax)
@@ -201,7 +206,7 @@ struct User: Identifiable, Codable, Equatable {
         case languages, interests, photos, profileImageURL
         case timestamp, lastActive, isOnline
         case isPremium, isVerified, isAdmin, premiumTier, subscriptionExpiryDate
-        case profileStatus, profileStatusReason, profileStatusUpdatedAt
+        case profileStatus, profileStatusReason, profileStatusReasonCode, profileStatusFixInstructions, profileStatusUpdatedAt
         case ageRangeMin, ageRangeMax, maxDistance, showMeInSearch
         case likesGiven, likesReceived, matchCount, profileViews
         case fcmToken, notificationsEnabled

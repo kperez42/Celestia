@@ -1599,7 +1599,36 @@ exports.onUserUpdated = functions.firestore
     const previousData = change.before.data();
     const userId = context.params.userId;
 
-    // Skip if isAdmin is already true
+    // Handle profile status changes (approval/rejection notifications)
+    if (previousData.profileStatus !== userData.profileStatus) {
+      functions.logger.info('Profile status changed', {
+        userId,
+        from: previousData.profileStatus,
+        to: userData.profileStatus
+      });
+
+      try {
+        // Send notification for approved or rejected profiles
+        if (userData.profileStatus === 'active' && previousData.profileStatus === 'pending') {
+          await notifications.sendProfileStatusNotification(userId, {
+            status: 'approved'
+          });
+        } else if (userData.profileStatus === 'rejected') {
+          await notifications.sendProfileStatusNotification(userId, {
+            status: 'rejected',
+            reason: userData.profileStatusReason,
+            reasonCode: userData.profileStatusReasonCode
+          });
+        }
+      } catch (error) {
+        functions.logger.error('Failed to send profile status notification', {
+          userId,
+          error: error.message
+        });
+      }
+    }
+
+    // Skip admin check if isAdmin is already true
     if (userData.isAdmin === true) {
       return;
     }

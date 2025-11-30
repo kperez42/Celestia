@@ -346,10 +346,85 @@ async function getPersonalizedStats(userId) {
   };
 }
 
+/**
+ * Sends a profile status notification (approved/rejected)
+ * @param {string} userId - User to notify
+ * @param {object} statusData - Status information
+ */
+async function sendProfileStatusNotification(userId, statusData) {
+  const userDoc = await admin.firestore().collection('users').doc(userId).get();
+
+  if (!userDoc.exists) {
+    functions.logger.error('User not found for status notification', { userId });
+    return;
+  }
+
+  const user = userDoc.data();
+  const fcmToken = user.fcmToken;
+
+  if (!fcmToken) {
+    functions.logger.info('No FCM token for user', { userId });
+    return;
+  }
+
+  // Check if notifications are enabled
+  if (!user.notificationsEnabled) {
+    functions.logger.info('Notifications disabled for user', { userId });
+    return;
+  }
+
+  let notification;
+
+  if (statusData.status === 'approved' || statusData.status === 'active') {
+    notification = {
+      title: "Profile Approved! 🎉",
+      body: "Your profile is now live. Start discovering people!",
+      sound: 'default',
+      badge: 1,
+      category: 'PROFILE_STATUS',
+      data: {
+        type: 'profile_approved',
+        status: 'approved'
+      }
+    };
+  } else if (statusData.status === 'rejected') {
+    notification = {
+      title: "Profile Needs Updates",
+      body: statusData.reason || "Please review your profile and make some changes.",
+      sound: 'default',
+      badge: 1,
+      category: 'PROFILE_STATUS',
+      data: {
+        type: 'profile_rejected',
+        status: 'rejected',
+        reasonCode: statusData.reasonCode || 'unknown',
+        reason: statusData.reason || ''
+      }
+    };
+  } else {
+    functions.logger.info('Unknown profile status, skipping notification', { status: statusData.status });
+    return;
+  }
+
+  await sendPushNotification(fcmToken, notification);
+
+  // Log the notification
+  await admin.firestore().collection('notification_logs').add({
+    userId,
+    type: 'profile_status',
+    status: statusData.status,
+    sentAt: admin.firestore.FieldValue.serverTimestamp(),
+    delivered: true
+  });
+
+  functions.logger.info('Profile status notification sent', { userId, status: statusData.status });
+}
+
 module.exports = {
   sendPushNotification,
   sendMatchNotification,
   sendMessageNotification,
   sendLikeNotification,
-  sendDailyEngagementReminders
+  sendDailyEngagementReminders,
+  sendProfileStatusNotification
 };

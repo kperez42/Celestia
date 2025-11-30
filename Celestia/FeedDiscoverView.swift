@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import FirebaseFirestore
 
 struct FeedDiscoverView: View {
     @EnvironmentObject var authService: AuthService
@@ -396,9 +397,11 @@ struct FeedDiscoverView: View {
 
     private var emptyStateView: some View {
         VStack(spacing: 20) {
-            // Check if user's profile is pending approval
+            // Check if user's profile is pending approval or rejected
             if authService.currentUser?.profileStatus == "pending" {
                 pendingApprovalView
+            } else if authService.currentUser?.profileStatus == "rejected" {
+                rejectedProfileView
             } else {
                 regularEmptyStateView
             }
@@ -479,6 +482,124 @@ struct FeedDiscoverView: View {
                 )
                 .cornerRadius(12)
             }
+        }
+    }
+
+    private var rejectedProfileView: some View {
+        VStack(spacing: 20) {
+            // Rejection icon
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 60))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.red, .orange],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            Text("Profile Needs Updates")
+                .font(.title2)
+                .fontWeight(.bold)
+
+            // Show the reason
+            if let reason = authService.currentUser?.profileStatusReason {
+                Text(reason)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
+
+            // Fix instructions card
+            if let instructions = authService.currentUser?.profileStatusFixInstructions {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Image(systemName: "wrench.and.screwdriver.fill")
+                            .foregroundColor(.blue)
+                        Text("How to Fix")
+                            .font(.headline)
+                    }
+
+                    Text(instructions)
+                        .font(.subheadline)
+                        .foregroundColor(.primary)
+                        .multilineTextAlignment(.leading)
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.blue.opacity(0.1))
+                .cornerRadius(12)
+            }
+
+            // Action buttons
+            VStack(spacing: 12) {
+                Button {
+                    showEditProfile = true
+                } label: {
+                    HStack {
+                        Image(systemName: "pencil")
+                        Text("Edit Profile")
+                    }
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(12)
+                }
+
+                Button {
+                    Task {
+                        // Re-submit profile for review
+                        await resubmitForReview()
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: "paperplane.fill")
+                        Text("Submit for Review")
+                    }
+                    .fontWeight(.semibold)
+                    .foregroundColor(.purple)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color.purple.opacity(0.1))
+                    .cornerRadius(12)
+                }
+            }
+
+            Text("After making changes, submit your profile for review. Our team typically responds within 24 hours.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+        }
+    }
+
+    private func resubmitForReview() async {
+        guard let userId = authService.currentUser?.effectiveId else { return }
+
+        do {
+            try await Firestore.firestore().collection("users").document(userId).updateData([
+                "profileStatus": "pending",
+                "profileStatusReason": FieldValue.delete(),
+                "profileStatusReasonCode": FieldValue.delete(),
+                "profileStatusFixInstructions": FieldValue.delete(),
+                "profileStatusUpdatedAt": FieldValue.serverTimestamp()
+            ])
+
+            // Refresh user data
+            await authService.fetchUser()
+
+            HapticManager.shared.notification(.success)
+        } catch {
+            Logger.shared.error("Failed to resubmit profile", category: .general, error: error)
+            HapticManager.shared.notification(.error)
         }
     }
 

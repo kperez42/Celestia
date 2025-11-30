@@ -965,18 +965,20 @@ class ModerationViewModel: ObservableObject {
         Logger.shared.info("Profile approved: \(userId)", category: .moderation)
     }
 
-    /// Reject a pending profile
-    func rejectProfile(userId: String, reason: String) async throws {
+    /// Reject a pending profile with detailed reason and fix instructions
+    func rejectProfile(userId: String, reasonCode: String, reasonMessage: String, fixInstructions: String) async throws {
         try await db.collection("users").document(userId).updateData([
             "profileStatus": "rejected",
-            "profileStatusReason": reason,
+            "profileStatusReason": reasonMessage,
+            "profileStatusReasonCode": reasonCode,
+            "profileStatusFixInstructions": fixInstructions,
             "profileStatusUpdatedAt": FieldValue.serverTimestamp(),
             "showMeInSearch": false
         ])
 
         // Refresh to update list
         await loadQueue()
-        Logger.shared.info("Profile rejected: \(userId)", category: .moderation)
+        Logger.shared.info("Profile rejected: \(userId) - Reason: \(reasonCode)", category: .moderation)
     }
 
     /// Load reports from Firestore
@@ -1698,20 +1700,26 @@ struct PendingProfileCard: View {
         .cornerRadius(20)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
         .confirmationDialog("Reject Profile", isPresented: $showRejectAlert, titleVisibility: .visible) {
-            Button("Inappropriate Photos", role: .destructive) {
-                rejectWithReason("Inappropriate photos")
+            Button("No Clear Face Photo", role: .destructive) {
+                rejectWithReason(ProfileRejectionReason.noFacePhoto)
             }
-            Button("Fake/Spam Profile", role: .destructive) {
-                rejectWithReason("Fake or spam profile")
+            Button("Inappropriate/Adult Content", role: .destructive) {
+                rejectWithReason(ProfileRejectionReason.inappropriatePhotos)
             }
-            Button("Incomplete Profile", role: .destructive) {
-                rejectWithReason("Incomplete profile information")
+            Button("Fake/Stock Photos", role: .destructive) {
+                rejectWithReason(ProfileRejectionReason.fakePhotos)
             }
-            Button("Underage Suspected", role: .destructive) {
-                rejectWithReason("Underage user suspected")
+            Button("Empty/Incomplete Bio", role: .destructive) {
+                rejectWithReason(ProfileRejectionReason.incompleteBio)
             }
-            Button("Other Violation", role: .destructive) {
-                rejectWithReason("Violates community guidelines")
+            Button("Suspected Underage", role: .destructive) {
+                rejectWithReason(ProfileRejectionReason.underage)
+            }
+            Button("Spam/Promotional", role: .destructive) {
+                rejectWithReason(ProfileRejectionReason.spam)
+            }
+            Button("Offensive Content", role: .destructive) {
+                rejectWithReason(ProfileRejectionReason.offensiveContent)
             }
             Button("Cancel", role: .cancel) { }
         } message: {
@@ -1719,11 +1727,79 @@ struct PendingProfileCard: View {
         }
     }
 
-    private func rejectWithReason(_ reason: String) {
+    private func rejectWithReason(_ reason: ProfileRejectionReason) {
         Task {
             isRejecting = true
-            try? await viewModel.rejectProfile(userId: profile.id, reason: reason)
+            try? await viewModel.rejectProfile(
+                userId: profile.id,
+                reasonCode: reason.code,
+                reasonMessage: reason.userMessage,
+                fixInstructions: reason.fixInstructions
+            )
             isRejecting = false
+        }
+    }
+}
+
+// MARK: - Profile Rejection Reasons
+
+/// Structured rejection reasons with user-friendly messages and fix instructions
+enum ProfileRejectionReason {
+    case noFacePhoto
+    case inappropriatePhotos
+    case fakePhotos
+    case incompleteBio
+    case underage
+    case spam
+    case offensiveContent
+
+    var code: String {
+        switch self {
+        case .noFacePhoto: return "no_face_photo"
+        case .inappropriatePhotos: return "inappropriate_photos"
+        case .fakePhotos: return "fake_photos"
+        case .incompleteBio: return "incomplete_bio"
+        case .underage: return "underage"
+        case .spam: return "spam"
+        case .offensiveContent: return "offensive_content"
+        }
+    }
+
+    var userMessage: String {
+        switch self {
+        case .noFacePhoto:
+            return "Your profile needs a clear photo showing your face"
+        case .inappropriatePhotos:
+            return "One or more of your photos contains inappropriate content"
+        case .fakePhotos:
+            return "Your photos appear to be stock images or from another person"
+        case .incompleteBio:
+            return "Your profile bio is empty or too short"
+        case .underage:
+            return "We couldn't verify that you meet our minimum age requirement"
+        case .spam:
+            return "Your profile appears to be promotional or spam"
+        case .offensiveContent:
+            return "Your profile contains offensive or hateful content"
+        }
+    }
+
+    var fixInstructions: String {
+        switch self {
+        case .noFacePhoto:
+            return "Please upload at least one photo that clearly shows your face. Group photos, photos with sunglasses, or photos taken from far away won't be accepted."
+        case .inappropriatePhotos:
+            return "Please remove any photos containing nudity, explicit content, or suggestive material. Your photos should be appropriate for all audiences."
+        case .fakePhotos:
+            return "Please upload real photos of yourself. Using someone else's photos or stock images violates our community guidelines."
+        case .incompleteBio:
+            return "Please write a bio that's at least 20 characters long. Tell others about your interests, hobbies, or what you're looking for."
+        case .underage:
+            return "If you believe this is a mistake, please contact support with a valid ID to verify your age. Users must be 18 or older."
+        case .spam:
+            return "Please remove any promotional content, links, or business advertisements from your profile. This platform is for genuine connections only."
+        case .offensiveContent:
+            return "Please remove any content that could be considered hateful, discriminatory, or offensive. Our community is built on respect."
         }
     }
 }
