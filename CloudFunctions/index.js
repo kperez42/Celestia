@@ -1553,6 +1553,83 @@ exports.onReportCreated = functions.firestore
     ));
   });
 
+/**
+ * Trigger: Auto-set isAdmin for whitelisted email addresses
+ * When a user document is created, check if their email is in the admin whitelist
+ * and set isAdmin: true if so
+ */
+exports.onUserCreated = functions.firestore
+  .document('users/{userId}')
+  .onCreate(async (snap, context) => {
+    const userData = snap.data();
+    const userId = context.params.userId;
+
+    // Admin email whitelist - must match SettingsView.swift whitelist
+    const adminEmails = ['perezkevin640@gmail.com', 'admin@celestia.app'];
+
+    if (userData.email && adminEmails.includes(userData.email.toLowerCase())) {
+      try {
+        await snap.ref.update({
+          isAdmin: true
+        });
+
+        functions.logger.info('Admin access granted to user', {
+          userId,
+          email: userData.email
+        });
+      } catch (error) {
+        functions.logger.error('Failed to set admin access', {
+          userId,
+          email: userData.email,
+          error: error.message
+        });
+      }
+    }
+  });
+
+/**
+ * Trigger: Check for admin access on user update (for existing users)
+ * If an existing user updates their document and their email is in the admin whitelist
+ * but isAdmin is not set, set it automatically
+ */
+exports.onUserUpdated = functions.firestore
+  .document('users/{userId}')
+  .onUpdate(async (change, context) => {
+    const userData = change.after.data();
+    const previousData = change.before.data();
+    const userId = context.params.userId;
+
+    // Skip if isAdmin is already true
+    if (userData.isAdmin === true) {
+      return;
+    }
+
+    // Admin email whitelist
+    const adminEmails = ['perezkevin640@gmail.com', 'admin@celestia.app'];
+
+    // If email is in whitelist and isAdmin is not set, set it
+    if (userData.email && adminEmails.includes(userData.email.toLowerCase())) {
+      // Only update if isAdmin field is missing or false
+      if (previousData.isAdmin !== true) {
+        try {
+          await change.after.ref.update({
+            isAdmin: true
+          });
+
+          functions.logger.info('Admin access granted to existing user', {
+            userId,
+            email: userData.email
+          });
+        } catch (error) {
+          functions.logger.error('Failed to set admin access on update', {
+            userId,
+            error: error.message
+          });
+        }
+      }
+    }
+  });
+
 // ============================================================================
 // FIRESTORE TRIGGERS - AUTOMATIC PUSH NOTIFICATIONS
 // ============================================================================

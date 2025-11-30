@@ -56,6 +56,9 @@ struct User: Identifiable, Codable, Equatable {
     var premiumTier: String?
     var subscriptionExpiryDate: Date?
 
+    // Admin Access (for moderation dashboard)
+    var isAdmin: Bool = false
+
     // Profile Status (for content moderation quarantine)
     // "pending" = new account, not shown in Discover until photo approved
     // "active" = approved, visible to other users
@@ -156,6 +159,7 @@ struct User: Identifiable, Codable, Equatable {
         try container.encode(isOnline, forKey: .isOnline)
         try container.encode(isPremium, forKey: .isPremium)
         try container.encode(isVerified, forKey: .isVerified)
+        try container.encode(isAdmin, forKey: .isAdmin)
         try container.encodeIfPresent(premiumTier, forKey: .premiumTier)
         try container.encodeIfPresent(subscriptionExpiryDate, forKey: .subscriptionExpiryDate)
         try container.encode(ageRangeMin, forKey: .ageRangeMin)
@@ -193,7 +197,7 @@ struct User: Identifiable, Codable, Equatable {
         case location, country, latitude, longitude
         case languages, interests, photos, profileImageURL
         case timestamp, lastActive, isOnline
-        case isPremium, isVerified, premiumTier, subscriptionExpiryDate
+        case isPremium, isVerified, isAdmin, premiumTier, subscriptionExpiryDate
         case ageRangeMin, ageRangeMax, maxDistance, showMeInSearch
         case likesGiven, likesReceived, matchCount, profileViews
         case fcmToken, notificationsEnabled
@@ -240,6 +244,7 @@ struct User: Identifiable, Codable, Equatable {
         self.isOnline = dictionary["isOnline"] as? Bool ?? false
         self.isPremium = dictionary["isPremium"] as? Bool ?? false
         self.isVerified = dictionary["isVerified"] as? Bool ?? false
+        self.isAdmin = dictionary["isAdmin"] as? Bool ?? false
         self.premiumTier = dictionary["premiumTier"] as? String
         
         if let expiryDate = dictionary["subscriptionExpiryDate"] as? Timestamp {
