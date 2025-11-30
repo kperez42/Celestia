@@ -16,6 +16,9 @@ struct SettingsView: View {
     @State private var showPremiumUpgrade = false
     @State private var showSeeWhoLikesYou = false
     @State private var showAdminDashboard = false
+    @State private var showDeleteError = false
+    @State private var deleteErrorMessage = ""
+    @State private var isDeleting = false
 
     // CODE QUALITY FIX: Define URL constants to avoid force unwrapping
     private static let supportEmailURL = URL(string: "mailto:support@celestia.app")!
@@ -342,8 +345,14 @@ struct SettingsView: View {
                         HStack {
                             Image(systemName: "trash")
                             Text("Delete Account")
+                            if isDeleting {
+                                Spacer()
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle())
+                            }
                         }
                     }
+                    .disabled(isDeleting)
                 }
             }
             .navigationTitle("Settings")
@@ -359,15 +368,42 @@ struct SettingsView: View {
                 Button("Cancel", role: .cancel) { }
                 Button("Delete", role: .destructive) {
                     Task {
+                        isDeleting = true
                         do {
                             try await authService.deleteAccount()
-                        } catch {
+                        } catch let error as CelestiaError {
+                            isDeleting = false
+                            switch error {
+                            case .requiresRecentLogin:
+                                deleteErrorMessage = "For security, please sign out and sign back in before deleting your account."
+                            case .notAuthenticated:
+                                deleteErrorMessage = "You must be signed in to delete your account."
+                            default:
+                                deleteErrorMessage = "Failed to delete account. Please try again later."
+                            }
+                            showDeleteError = true
+                            Logger.shared.error("Error deleting account", category: .general, error: error)
+                        } catch let error as NSError {
+                            isDeleting = false
+                            if error.domain == "FIRFirestoreErrorDomain" && error.code == 7 {
+                                deleteErrorMessage = "Permission denied. Please sign out and sign back in, then try again."
+                            } else if error.domain == "FIRAuthErrorDomain" && error.code == 17014 {
+                                deleteErrorMessage = "For security, please sign out and sign back in before deleting your account."
+                            } else {
+                                deleteErrorMessage = "Failed to delete account: \(error.localizedDescription)"
+                            }
+                            showDeleteError = true
                             Logger.shared.error("Error deleting account", category: .general, error: error)
                         }
                     }
                 }
             } message: {
                 Text("Are you sure you want to delete your account? This action cannot be undone.")
+            }
+            .alert("Delete Failed", isPresented: $showDeleteError) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(deleteErrorMessage)
             }
             .sheet(isPresented: $showReferralDashboard) {
                 ReferralDashboardView()
