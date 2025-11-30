@@ -1490,7 +1490,7 @@ struct PendingProfileRow: View {
     @State private var isApproving = false
     @State private var isRejecting = false
     @State private var showRejectAlert = false
-    @State private var rejectReason = ""
+    @State private var showApproveConfirmation = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -1554,11 +1554,7 @@ struct PendingProfileRow: View {
             // Action buttons
             HStack(spacing: 12) {
                 Button(action: {
-                    Task {
-                        isApproving = true
-                        try? await viewModel.approveProfile(userId: profile.id)
-                        isApproving = false
-                    }
+                    showApproveConfirmation = true
                 }) {
                     HStack {
                         if isApproving {
@@ -1603,18 +1599,57 @@ struct PendingProfileRow: View {
             }
         }
         .padding(.vertical, 8)
-        .alert("Reject Profile", isPresented: $showRejectAlert) {
-            TextField("Reason (optional)", text: $rejectReason)
+        .confirmationDialog("Approve Profile", isPresented: $showApproveConfirmation, titleVisibility: .visible) {
+            Button("Approve \(profile.name)") {
+                Task {
+                    isApproving = true
+                    try? await viewModel.approveProfile(userId: profile.id)
+                    isApproving = false
+                }
+            }
             Button("Cancel", role: .cancel) { }
-            Button("Reject", role: .destructive) {
+        } message: {
+            Text("This will allow \(profile.name) to appear in Discover and interact with other users.")
+        }
+        .confirmationDialog("Reject Profile", isPresented: $showRejectAlert, titleVisibility: .visible) {
+            Button("Inappropriate Photos", role: .destructive) {
                 Task {
                     isRejecting = true
-                    try? await viewModel.rejectProfile(userId: profile.id, reason: rejectReason)
+                    try? await viewModel.rejectProfile(userId: profile.id, reason: "Inappropriate photos")
                     isRejecting = false
                 }
             }
+            Button("Fake/Spam Profile", role: .destructive) {
+                Task {
+                    isRejecting = true
+                    try? await viewModel.rejectProfile(userId: profile.id, reason: "Fake or spam profile")
+                    isRejecting = false
+                }
+            }
+            Button("Incomplete Profile", role: .destructive) {
+                Task {
+                    isRejecting = true
+                    try? await viewModel.rejectProfile(userId: profile.id, reason: "Incomplete profile information")
+                    isRejecting = false
+                }
+            }
+            Button("Underage Suspected", role: .destructive) {
+                Task {
+                    isRejecting = true
+                    try? await viewModel.rejectProfile(userId: profile.id, reason: "Underage user suspected")
+                    isRejecting = false
+                }
+            }
+            Button("Other Violation", role: .destructive) {
+                Task {
+                    isRejecting = true
+                    try? await viewModel.rejectProfile(userId: profile.id, reason: "Violates community guidelines")
+                    isRejecting = false
+                }
+            }
+            Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Are you sure you want to reject this profile?")
+            Text("Select a reason for rejecting this profile")
         }
     }
 }
