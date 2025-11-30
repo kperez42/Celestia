@@ -65,6 +65,28 @@ struct AdminModerationDashboard: View {
         Group {
             if viewModel.isLoading {
                 ProgressView("Loading reports...")
+            } else if let error = viewModel.errorMessage {
+                // Show error state with admin access hint
+                VStack(spacing: 20) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 60))
+                        .foregroundColor(.orange)
+
+                    Text("Could Not Load Reports")
+                        .font(.title2.bold())
+
+                    Text(error)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+
+                    Button("Retry") {
+                        Task { await viewModel.refresh() }
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if viewModel.reports.isEmpty {
                 emptyState(
                     icon: "checkmark.shield.fill",
@@ -694,13 +716,17 @@ class ModerationViewModel: ObservableObject {
     @Published var suspiciousProfiles: [SuspiciousProfileItem] = []
     @Published var stats: ModerationStats = ModerationStats()
     @Published var isLoading = false
+    @Published var errorMessage: String? = nil
 
     private let functions = Functions.functions()
 
     func loadQueue() async {
         isLoading = true
+        errorMessage = nil
 
         do {
+            Logger.shared.info("Admin: Loading moderation queue...", category: .moderation)
+
             let callable = functions.httpsCallable("getModerationQueue")
             let result = try await callable.call(["status": "pending", "limit": 50])
 
@@ -708,14 +734,18 @@ class ModerationViewModel: ObservableObject {
                 throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
             }
 
+            Logger.shared.info("Admin: Moderation queue loaded successfully", category: .moderation)
+
             // Parse reports
             if let reportsData = data["reports"] as? [[String: Any]] {
                 reports = reportsData.compactMap { ModerationReport(dict: $0) }
+                Logger.shared.info("Admin: Found \(reports.count) reports", category: .moderation)
             }
 
             // Parse moderation queue
             if let queueData = data["moderationQueue"] as? [[String: Any]] {
                 suspiciousProfiles = queueData.compactMap { SuspiciousProfileItem(dict: $0) }
+                Logger.shared.info("Admin: Found \(suspiciousProfiles.count) suspicious profiles", category: .moderation)
             }
 
             // Parse stats
@@ -726,7 +756,14 @@ class ModerationViewModel: ObservableObject {
             isLoading = false
         } catch {
             isLoading = false
-            Logger.shared.error("Failed to load moderation queue", category: .general, error: error)
+            let errorDesc = (error as NSError).localizedDescription
+            errorMessage = errorDesc
+            Logger.shared.error("Admin: Failed to load moderation queue - \(errorDesc)", category: .moderation, error: error)
+
+            // Check if it's a permission error
+            if errorDesc.contains("permission") || errorDesc.contains("Admin") {
+                errorMessage = "Admin access required. Please ensure isAdmin is set to true in your Firestore user document."
+            }
         }
     }
 
