@@ -138,23 +138,11 @@ class SubscriptionManager: ObservableObject {
 
         do {
             switch type {
-            case .superLikes:
-                try await userRef.updateData([
-                    "superLikesRemaining": FieldValue.increment(Int64(amount))
-                ])
-                Logger.shared.info("✅ Added \(amount) Super Likes", category: .general)
-
             case .boost:
                 try await userRef.updateData([
                     "boostsRemaining": FieldValue.increment(Int64(amount))
                 ])
                 Logger.shared.info("✅ Added \(amount) Boosts", category: .general)
-
-            case .rewind:
-                try await userRef.updateData([
-                    "rewindsRemaining": FieldValue.increment(Int64(amount))
-                ])
-                Logger.shared.info("✅ Added \(amount) Rewinds", category: .general)
 
             case .spotlight:
                 try await userRef.updateData([
