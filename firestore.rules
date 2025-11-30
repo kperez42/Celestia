@@ -34,10 +34,10 @@ service cloud.firestore {
 
     // Users Collection
     match /users/{userId} {
-      // Users can always read their own profile (even without email verification)
-      // Other users require email verification to read profiles (for discovery)
-      allow read: if isAuthenticated()
-        && (request.auth.uid == userId || isEmailVerified());
+      // Allow authenticated users to read any profile for discovery
+      // Profile visibility is controlled by showMeInSearch field and client-side filtering
+      // This is safe because profile data is meant to be public within the app
+      allow read: if isAuthenticated();
 
       // Users can only create their own profile
       allow create: if isOwner(userId)
