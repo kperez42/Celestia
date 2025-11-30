@@ -82,7 +82,32 @@ class MessageService: ObservableObject, MessageServiceProtocol, ListenerLifecycl
             return
         }
         Logger.shared.info("MessageService: Reconnecting listeners for match: \(matchId)", category: .messaging)
-        listenToMessages(matchId: matchId)
+        // PERFORMANCE FIX: Don't clear messages on reconnect - just re-establish listener
+        // This preserves existing message history and prevents conversation starters flash
+        reconnectWithoutReset(matchId: matchId)
+    }
+
+    /// Reconnect listener without clearing existing messages
+    /// Used when app returns from background to preserve chat history
+    private func reconnectWithoutReset(matchId: String) {
+        // Cancel any existing loading task
+        loadingTask?.cancel()
+        loadingTask = nil
+
+        // Remove existing listener before setting up new one
+        listener?.remove()
+        listener = nil
+
+        // If we have messages, just re-establish the real-time listener
+        // without clearing state or showing loading
+        if !messages.isEmpty {
+            let cutoffTimestamp = messages.last?.timestamp ?? Date()
+            setupNewMessageListener(matchId: matchId, after: cutoffTimestamp)
+            Logger.shared.info("Reconnected listener without reset - preserving \(messages.count) messages", category: .messaging)
+        } else {
+            // No messages cached, do a full load
+            listenToMessages(matchId: matchId)
+        }
     }
 
     func pauseListeners() {
@@ -112,10 +137,22 @@ class MessageService: ObservableObject, MessageServiceProtocol, ListenerLifecycl
         listener?.remove()
         listener = nil
 
+        // PERFORMANCE FIX: Only clear messages if switching to a DIFFERENT match
+        // This prevents conversation starters from flashing when reopening same chat
+        let isSameMatch = currentMatchId == matchId && !messages.isEmpty
+
         // AUDIT FIX: Track current matchId to validate listener callbacks
         currentMatchId = matchId
 
-        // Reset state
+        // If same match and we have messages, just reconnect without reset
+        if isSameMatch {
+            let cutoffTimestamp = messages.last?.timestamp ?? Date()
+            setupNewMessageListener(matchId: matchId, after: cutoffTimestamp)
+            Logger.shared.info("Same match - reconnecting without clearing \(messages.count) messages", category: .messaging)
+            return
+        }
+
+        // Reset state only when switching to different match
         messages = []
         messageIdSet = []  // AUDIT FIX: Reset duplicate tracking set
         oldestMessageTimestamp = nil
