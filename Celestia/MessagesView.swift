@@ -91,7 +91,9 @@ struct MessagesView: View {
                     }
 
                     // Content - single unified list of all conversations
-                    if matchService.isLoading && conversations.isEmpty {
+                    // PERFORMANCE: Only show loading on first load when we have no data
+                    // After initial load, show cached data instantly (no skeleton flash)
+                    if matchService.isLoading && !hasCompletedInitialLoad && conversations.isEmpty {
                         loadingView
                     } else if conversations.isEmpty {
                         emptyStateView

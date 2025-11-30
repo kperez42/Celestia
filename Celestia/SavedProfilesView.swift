@@ -18,6 +18,9 @@ struct SavedProfilesView: View {
     @State private var selectedTab = 0
     @State private var showPremiumUpgrade = false
 
+    // PERFORMANCE: Track if initial load completed to prevent loading flash on tab switches
+    @State private var hasCompletedInitialLoad = false
+
     private let tabs = ["My Saves", "Viewed", "Saved"]
 
     private var isPremium: Bool {
@@ -39,9 +42,9 @@ struct SavedProfilesView: View {
                     .ignoresSafeArea()
 
                 // PERFORMANCE: Only show loading skeleton on first load when we have no cached data
-                // If cached data exists, show it instantly while refresh happens in background
+                // After initial load, show cached data instantly (no skeleton flash)
                 let hasAnyData = !viewModel.savedProfiles.isEmpty || !viewModel.viewedProfiles.isEmpty || !viewModel.savedYouProfiles.isEmpty
-                if viewModel.isLoading && !hasAnyData {
+                if viewModel.isLoading && !hasCompletedInitialLoad && !hasAnyData {
                     loadingView
                 } else if !viewModel.errorMessage.isEmpty {
                     errorStateView
@@ -62,6 +65,7 @@ struct SavedProfilesView: View {
             await viewModel.loadSavedProfiles()
             await viewModel.loadViewedProfiles()
             await viewModel.loadSavedYouProfiles()
+            hasCompletedInitialLoad = true
         }
         .sheet(item: $selectedUser) { user in
             UserDetailView(user: user)
