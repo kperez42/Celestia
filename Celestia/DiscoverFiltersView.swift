@@ -11,8 +11,8 @@ struct DiscoverFiltersView: View {
     @ObservedObject var filters = DiscoveryFilters.shared
     @Environment(\.dismiss) var dismiss
 
-    // Section expansion state
-    @State private var expandedSections: Set<FilterSection> = [.basics, .interests]
+    // Section expansion state - basics, interests, and background open by default
+    @State private var expandedSections: Set<FilterSection> = [.basics, .interests, .background]
 
     enum FilterSection: String, CaseIterable {
         case basics = "Basics"
