@@ -91,11 +91,12 @@ class Logger {
     // MARK: - Properties
 
     /// Minimum log level to display (can be changed at runtime)
+    /// NOTE: Set to .warning in DEBUG to improve performance - change to .debug only when debugging
     var minimumLogLevel: LogLevel = {
         #if DEBUG
-        return .debug
+        return .warning  // Changed from .debug to reduce console spam and improve performance
         #else
-        return .info
+        return .warning
         #endif
     }()
 
@@ -105,14 +106,8 @@ class Logger {
     /// Enable console logging
     var consoleLoggingEnabled = true
 
-    /// Enable persistent logging to file
-    var fileLoggingEnabled: Bool = {
-        #if DEBUG
-        return true
-        #else
-        return false
-        #endif
-    }()
+    /// Enable persistent logging to file (disabled for performance)
+    var fileLoggingEnabled: Bool = false
 
     /// Maximum log file size (10 MB)
     private let maxLogFileSize: Int = 10 * 1024 * 1024
