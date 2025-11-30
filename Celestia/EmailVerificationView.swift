@@ -56,6 +56,27 @@ struct EmailVerificationView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
 
+            // Spam folder warning
+            HStack(spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundColor(.orange)
+                    .font(.title3)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Can't find the email?")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                    Text("Check your spam or junk folder. The email may have been filtered there.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.orange.opacity(0.1))
+            .cornerRadius(12)
+            .padding(.horizontal, 32)
+
             Spacer()
 
             // Error message
@@ -165,7 +186,7 @@ struct EmailVerificationView: View {
                 } else {
                     await MainActor.run {
                         isChecking = false
-                        errorMessage = "Email not verified yet. Please check your inbox and click the verification link."
+                        errorMessage = "Email not verified yet. Please check your inbox (and spam/junk folder) and click the verification link."
                     }
                 }
             } catch {
