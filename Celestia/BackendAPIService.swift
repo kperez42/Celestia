@@ -73,7 +73,7 @@ class ResponseCache {
 // MARK: - Backend API Service Protocol
 
 protocol BackendAPIServiceProtocol {
-    func validateReceipt(_ transaction: Transaction, userId: String) async throws -> ReceiptValidationResponse
+    func validateReceipt(_ transaction: StoreKit.Transaction, userId: String) async throws -> ReceiptValidationResponse
     func validateContent(_ content: String, type: ContentType) async throws -> ContentValidationResponse
     func checkRateLimit(userId: String, action: RateLimitAction) async throws -> RateLimitResponse
     func reportContent(reporterId: String, reportedId: String, reason: String, details: String?) async throws
@@ -133,7 +133,7 @@ class BackendAPIService: BackendAPIServiceProtocol {
 
     /// Validate StoreKit transaction with backend server
     /// CRITICAL: This prevents fraud by verifying purchases server-side
-    func validateReceipt(_ transaction: Transaction, userId: String) async throws -> ReceiptValidationResponse {
+    func validateReceipt(_ transaction: StoreKit.Transaction, userId: String) async throws -> ReceiptValidationResponse {
         Logger.shared.info("Validating receipt server-side for transaction: \(transaction.id)", category: .payment)
 
         // Prepare request payload
