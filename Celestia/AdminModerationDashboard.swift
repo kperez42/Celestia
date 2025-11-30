@@ -824,7 +824,7 @@ class ModerationViewModel: ObservableObject {
     /// Load suspicious profiles from moderation queue
     private func loadSuspiciousProfiles() async -> [SuspiciousProfileItem] {
         do {
-            let snapshot = try await db.collection("moderationQueue")
+            let snapshot = try await db.collection("moderation_queue")
                 .order(by: "timestamp", descending: true)
                 .limit(to: 50)
                 .getDocuments()
@@ -892,7 +892,7 @@ class ModerationViewModel: ObservableObject {
             let resolvedReports = totalReports - pendingReports
 
             // Count suspicious profiles
-            let suspiciousSnapshot = try await db.collection("moderationQueue").getDocuments()
+            let suspiciousSnapshot = try await db.collection("moderation_queue").getDocuments()
             let suspiciousCount = suspiciousSnapshot.documents.count
 
             return ModerationStats(
@@ -947,7 +947,7 @@ class ModerationViewModel: ObservableObject {
         try await banUserInFirestore(userId: userId, reason: reason)
 
         // Remove from moderation queue if present
-        let queueSnapshot = try await db.collection("moderationQueue")
+        let queueSnapshot = try await db.collection("moderation_queue")
             .whereField("reportedUserId", isEqualTo: userId)
             .getDocuments()
 
