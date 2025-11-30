@@ -339,7 +339,8 @@ class AuthService: ObservableObject, AuthServiceProtocol {
                 do {
                     var photoURLs: [String] = []
                     for (index, image) in photos.enumerated() {
-                        let url = try await ImageUploadService.shared.uploadImage(image, userId: userId, index: index)
+                        let path = "users/\(userId)/photos/photo_\(index)_\(UUID().uuidString).jpg"
+                        let url = try await ImageUploadService.shared.uploadImage(image, path: path)
                         photoURLs.append(url)
                     }
 
