@@ -171,7 +171,7 @@ struct SettingsView: View {
                         PrivacySettingsView()
                     } label: {
                         HStack {
-                            Image(systemName: "hand.raised.shield")
+                            Image(systemName: "hand.raised.fill")
                             Text("Privacy Controls")
                         }
                     }
