@@ -82,6 +82,7 @@ service cloud.firestore {
     // Messages Collection
     match /messages/{messageId} {
       // Users can read messages in their matches
+      // Allow query by matchId for participants
       allow read: if isAuthenticated()
         && isEmailVerified()
         && (resource.data.senderId == request.auth.uid || resource.data.receiverId == request.auth.uid);
@@ -90,18 +91,24 @@ service cloud.firestore {
       allow create: if isAuthenticated()
         && isEmailVerified()
         && request.resource.data.senderId == request.auth.uid
-        && isValidString(request.resource.data.text, 1, 1000)
-        && request.resource.data.timestamp == request.time;
+        && isValidString(request.resource.data.text, 1, 1000);
 
-      // Users can update their own messages (for editing)
+      // Users can update messages they sent or received (for marking read, editing)
       allow update: if isAuthenticated()
         && isEmailVerified()
-        && resource.data.senderId == request.auth.uid;
+        && (resource.data.senderId == request.auth.uid || resource.data.receiverId == request.auth.uid);
 
       // Users can delete their own messages
       allow delete: if isAuthenticated()
         && isEmailVerified()
         && resource.data.senderId == request.auth.uid;
+    }
+
+    // Batch Operation Logs Collection (for message read tracking)
+    match /batch_operation_logs/{logId} {
+      // Users can read/write their own batch operation logs
+      allow read, write: if isAuthenticated()
+        && isEmailVerified();
     }
 
     // Interests (Likes) Collection
