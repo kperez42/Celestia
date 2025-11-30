@@ -59,9 +59,11 @@ class UserService: ObservableObject, UserServiceProtocol {
 
         Logger.shared.debug("UserService.fetchUsers called - lookingFor: \(lookingFor ?? "nil"), ageRange: \(ageRange?.description ?? "nil")", category: .database)
 
+        // NOTE: profileStatus filter moved to client-side to avoid needing new composite index
+        // Server-side filter would require index: profileStatus + showMeInSearch + gender + age + lastActive
+        // Client-side filter excludes: pending, suspended, flagged profiles
         var query = db.collection("users")
             .whereField("showMeInSearch", isEqualTo: true)
-            .whereField("profileStatus", isEqualTo: "active") // SAFETY: Only show approved profiles
             .order(by: "lastActive", descending: true)
             .limit(to: limit)
 
@@ -115,6 +117,13 @@ class UserService: ObservableObject, UserServiceProtocol {
                     guard user.id != excludingUserId else { return false }
                     // Exclude duplicates already in the array
                     guard let userId = user.id, !existingIds.contains(userId) else { return false }
+                    // SAFETY: Client-side profileStatus filter (avoids complex composite index)
+                    // Exclude: pending (unapproved), suspended, flagged profiles
+                    // Include: active, or empty/nil (existing users without field set)
+                    let status = user.profileStatus.lowercased()
+                    if status == "pending" || status == "suspended" || status == "flagged" {
+                        return false
+                    }
                     return true
                 }
 
