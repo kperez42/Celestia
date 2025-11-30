@@ -93,8 +93,12 @@ struct MainTabView: View {
             // This eliminates battery drain from constant polling
             guard let userId = authService.currentUser?.id else { return }
 
-            // PERFORMANCE: Removed 500ms delay - set up listeners immediately
-            // The delay was causing tab navigation to feel sluggish
+            // Small delay to ensure auth token is fully propagated
+            // This prevents brief "permission denied" errors in logs during signup
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+
+            // Verify user is still authenticated after delay
+            guard authService.currentUser?.id == userId else { return }
 
             // Set up real-time listener for matches
             // AUDIT FIX: This single listener now handles both:
