@@ -396,6 +396,94 @@ struct FeedDiscoverView: View {
 
     private var emptyStateView: some View {
         VStack(spacing: 20) {
+            // Check if user's profile is pending approval
+            if authService.currentUser?.profileStatus == "pending" {
+                pendingApprovalView
+            } else {
+                regularEmptyStateView
+            }
+        }
+        .padding(40)
+    }
+
+    private var pendingApprovalView: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "clock.badge.checkmark")
+                .font(.system(size: 60))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.orange, .yellow],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            Text("Profile Under Review")
+                .font(.title2)
+                .fontWeight(.bold)
+
+            Text("Your profile is being reviewed by our team to ensure a safe community. Once approved, you'll be able to discover and connect with others.")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+
+            VStack(spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                    Text("Profile created")
+                        .font(.subheadline)
+                }
+
+                HStack(spacing: 8) {
+                    Image(systemName: "hourglass.circle.fill")
+                        .foregroundColor(.orange)
+                    Text("Waiting for approval")
+                        .font(.subheadline)
+                }
+
+                HStack(spacing: 8) {
+                    Image(systemName: "circle")
+                        .foregroundColor(.gray.opacity(0.5))
+                    Text("Start discovering")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                }
+            }
+            .padding(.vertical, 12)
+
+            Text("This usually takes less than 24 hours")
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+            Button {
+                Task {
+                    await refreshFeed()
+                }
+            } label: {
+                HStack {
+                    Image(systemName: "arrow.clockwise")
+                    Text("Check Status")
+                }
+                .fontWeight(.semibold)
+                .foregroundColor(.white)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
+                .background(
+                    LinearGradient(
+                        colors: [.orange, .yellow],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(12)
+            }
+        }
+    }
+
+    private var regularEmptyStateView: some View {
+        VStack(spacing: 20) {
             Image(systemName: "person.2.slash")
                 .font(.system(size: 60))
                 .foregroundColor(.gray.opacity(0.5))
@@ -426,7 +514,6 @@ struct FeedDiscoverView: View {
                 .cornerRadius(12)
             }
         }
-        .padding(40)
     }
 
     // MARK: - Error State
