@@ -56,25 +56,46 @@ struct EmailVerificationView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
 
-            // Spam folder warning
-            HStack(spacing: 10) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundColor(.orange)
-                    .font(.title3)
+            // Spam folder warning - styled to match page theme
+            HStack(spacing: 12) {
+                Image(systemName: "tray.fill")
+                    .font(.system(size: 24))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Can't find the email?")
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Check your spam folder")
                         .font(.subheadline)
                         .fontWeight(.semibold)
-                    Text("Check your spam or junk folder. The email may have been filtered there.")
+                        .foregroundColor(.primary)
+                    Text("The email might be in your spam or junk folder")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
+
+                Spacer()
             }
-            .padding()
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.orange.opacity(0.1))
-            .cornerRadius(12)
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.purple.opacity(0.08))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [.purple.opacity(0.3), .pink.opacity(0.3)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1
+                            )
+                    )
+            )
             .padding(.horizontal, 32)
 
             Spacer()
