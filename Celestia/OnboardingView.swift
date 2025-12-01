@@ -2122,9 +2122,9 @@ struct OnboardingView: View {
             gender = user.gender ?? "Male"
 
             // Calculate birthday from age (approximate)
-            if let age = user.age {
+            if user.age > 0 {
                 let calendar = Calendar.current
-                birthday = calendar.date(byAdding: .year, value: -age, to: Date()) ?? birthday
+                birthday = calendar.date(byAdding: .year, value: -user.age, to: Date()) ?? birthday
             }
 
             // Step 2: About & Location
