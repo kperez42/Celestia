@@ -16,6 +16,7 @@ struct PendingApprovalView: View {
     @State private var pulseAnimation = false
     @State private var progressAnimation = false
     @State private var stepAnimations: [Bool] = [false, false, false]
+    @State private var showStillPendingToast = false
 
     private var user: User? {
         authService.currentUser
@@ -328,6 +329,7 @@ struct PendingApprovalView: View {
                     // Action buttons
                     VStack(spacing: 12) {
                         Button(action: {
+                            HapticManager.shared.impact(.medium)
                             Task {
                                 await checkApprovalStatus()
                             }
@@ -360,6 +362,7 @@ struct PendingApprovalView: View {
                         .disabled(isRefreshing)
 
                         Button(action: {
+                            HapticManager.shared.impact(.light)
                             authService.signOut()
                         }) {
                             Text("Sign Out")
@@ -378,6 +381,33 @@ struct PendingApprovalView: View {
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Profile Status")
             .navigationBarTitleDisplayMode(.inline)
+            .overlay(alignment: .top) {
+                // Still pending toast
+                if showStillPendingToast {
+                    HStack(spacing: 10) {
+                        Image(systemName: "clock.badge.checkmark")
+                            .foregroundColor(.blue)
+                        Text("Still under review - check back soon!")
+                            .font(.subheadline.weight(.medium))
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(
+                        Capsule()
+                            .fill(Color(.systemBackground))
+                            .shadow(color: .black.opacity(0.15), radius: 10, y: 4)
+                    )
+                    .padding(.top, 60)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .onAppear {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                            withAnimation(.easeOut(duration: 0.3)) {
+                                showStillPendingToast = false
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -396,8 +426,11 @@ struct PendingApprovalView: View {
             } else if user.profileStatus == "rejected" {
                 HapticManager.shared.notification(.warning)
             } else {
-                // Still pending
+                // Still pending - show friendly toast
                 HapticManager.shared.impact(.light)
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    showStillPendingToast = true
+                }
             }
         }
     }

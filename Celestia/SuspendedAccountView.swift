@@ -205,6 +205,7 @@ struct SuspendedAccountView: View {
                     // Action buttons
                     VStack(spacing: 12) {
                         Button(action: {
+                            HapticManager.shared.impact(.medium)
                             Task {
                                 await checkSuspensionStatus()
                             }
@@ -234,6 +235,7 @@ struct SuspendedAccountView: View {
                         .disabled(isRefreshing)
 
                         Button(action: {
+                            HapticManager.shared.impact(.light)
                             authService.signOut()
                         }) {
                             Text("Sign Out")

@@ -255,6 +255,7 @@ struct ProfileRejectionFeedbackView: View {
                         }
 
                         Button(action: {
+                            HapticManager.shared.impact(.medium)
                             Task {
                                 await requestReReview()
                             }
@@ -284,6 +285,7 @@ struct ProfileRejectionFeedbackView: View {
                         .disabled(isUpdating)
 
                         Button(action: {
+                            HapticManager.shared.impact(.light)
                             authService.signOut()
                         }) {
                             Text("Sign Out")

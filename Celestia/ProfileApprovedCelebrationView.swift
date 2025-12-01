@@ -205,19 +205,28 @@ struct ProfileApprovedCelebrationView: View {
     }
 
     private func generateConfetti() {
-        let colors: [Color] = [.red, .orange, .yellow, .green, .blue, .purple, .pink]
-        let shapes = ["circle.fill", "star.fill", "heart.fill", "diamond.fill"]
+        let colors: [Color] = [
+            .red, .orange, .yellow, .green, .blue, .purple, .pink,
+            .mint, .cyan, .indigo, .teal
+        ]
+        let shapes = [
+            "circle.fill", "star.fill", "heart.fill", "diamond.fill",
+            "sparkle", "seal.fill", "hexagon.fill", "triangle.fill"
+        ]
 
-        for i in 0..<50 {
+        let screenWidth = UIScreen.main.bounds.width
+
+        // Generate more confetti for a bigger celebration
+        for i in 0..<80 {
             let piece = ConfettiPiece(
                 id: i,
                 color: colors.randomElement()!,
                 shape: shapes.randomElement()!,
-                x: CGFloat.random(in: -20...UIScreen.main.bounds.width + 20),
-                y: -50,
+                x: CGFloat.random(in: -30...screenWidth + 30),
+                y: CGFloat.random(in: -80...-20),
                 rotation: Double.random(in: 0...360),
-                scale: CGFloat.random(in: 0.5...1.2),
-                delay: Double.random(in: 0...1.5)
+                scale: CGFloat.random(in: 0.4...1.3),
+                delay: Double.random(in: 0...2.0)
             )
             confettiPieces.append(piece)
         }
@@ -247,6 +256,19 @@ struct ConfettiPiece: Identifiable {
     let rotation: Double
     let scale: CGFloat
     let delay: Double
+    let horizontalDrift: CGFloat  // Pre-calculated drift for smooth animation
+
+    init(id: Int, color: Color, shape: String, x: CGFloat, y: CGFloat, rotation: Double, scale: CGFloat, delay: Double) {
+        self.id = id
+        self.color = color
+        self.shape = shape
+        self.x = x
+        self.y = y
+        self.rotation = rotation
+        self.scale = scale
+        self.delay = delay
+        self.horizontalDrift = CGFloat.random(in: -60...60)
+    }
 }
 
 // MARK: - Confetti View
@@ -255,31 +277,49 @@ struct ConfettiView: View {
     let piece: ConfettiPiece
     @State private var falling = false
     @State private var rotating = false
+    @State private var swaying = false
+
+    // Pre-calculated animation durations for consistency
+    private var fallDuration: Double {
+        2.5 + (Double(piece.id % 15) * 0.1)
+    }
+
+    private var rotationDuration: Double {
+        1.5 + (Double(piece.id % 10) * 0.15)
+    }
 
     var body: some View {
         Image(systemName: piece.shape)
-            .font(.system(size: 14))
+            .font(.system(size: 12 + CGFloat(piece.id % 6)))
             .foregroundColor(piece.color)
             .scaleEffect(piece.scale)
-            .rotationEffect(.degrees(rotating ? piece.rotation + 360 : piece.rotation))
+            .rotationEffect(.degrees(rotating ? piece.rotation + 720 : piece.rotation))
+            .rotation3DEffect(.degrees(swaying ? 25 : -25), axis: (x: 1, y: 0, z: 0))
             .position(
-                x: piece.x + (falling ? CGFloat.random(in: -50...50) : 0),
+                x: piece.x + (falling ? piece.horizontalDrift : 0),
                 y: falling ? UIScreen.main.bounds.height + 100 : piece.y
             )
             .opacity(falling ? 0 : 1)
             .onAppear {
                 withAnimation(
-                    .easeIn(duration: Double.random(in: 2.5...4.0))
+                    .easeIn(duration: fallDuration)
                     .delay(piece.delay)
                 ) {
                     falling = true
                 }
                 withAnimation(
-                    .linear(duration: Double.random(in: 1.5...3.0))
+                    .linear(duration: rotationDuration)
                     .repeatForever(autoreverses: false)
                     .delay(piece.delay)
                 ) {
                     rotating = true
+                }
+                withAnimation(
+                    .easeInOut(duration: 0.3)
+                    .repeatForever(autoreverses: true)
+                    .delay(piece.delay)
+                ) {
+                    swaying = true
                 }
             }
     }
