@@ -785,15 +785,15 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
     }
 }
 
-// Convenience initializer with default placeholder
-extension CachedAsyncImage where Placeholder == ProgressView<EmptyView, EmptyView> {
+// Convenience initializer with default placeholder - NO loading animation for cleaner look
+extension CachedAsyncImage where Placeholder == EmptyView {
     init(
         url: URL?,
         @ViewBuilder content: @escaping (Image) -> Content
     ) {
         self.url = url
         self.content = content
-        self.placeholder = { ProgressView() }
+        self.placeholder = { EmptyView() }
 
         // PERFORMANCE: Check cache immediately on init for instant display
         if let url = url {
@@ -892,22 +892,26 @@ struct CachedProfileImage: View {
                     }
                 }
             } else {
-                // Loading state
-                ZStack {
-                    Circle()
-                        .fill(Color.gray.opacity(0.2))
-                        .frame(width: size, height: size)
-
-                    if isLoading {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .purple))
+                // Static placeholder - no loading animation for cleaner look
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.purple.opacity(0.3), Color.pink.opacity(0.2)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: size, height: size)
+                    .overlay(
+                        Image(systemName: "person.fill")
+                            .font(.system(size: size * 0.4))
+                            .foregroundColor(.white.opacity(0.6))
+                    )
+                    .onAppear {
+                        if !hasCheckedCache || (image == nil && !isLoading) {
+                            loadImage()
+                        }
                     }
-                }
-                .onAppear {
-                    if !hasCheckedCache || (image == nil && !isLoading) {
-                        loadImage()
-                    }
-                }
             }
         }
         // PERFORMANCE FIX: Cancel image loading when view disappears
@@ -1148,21 +1152,18 @@ struct CachedCardImage: View {
                 }
 
                 if image == nil && loadError == nil {
-                    // Loading state with brand gradient - optimized shimmer
-                    ZStack {
-                        LinearGradient(
-                            colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.05)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-
-                        if isLoading {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .purple))
-                                .scaleEffect(1.2)
-                        }
-                    }
+                    // Static placeholder - no loading animation for cleaner look
+                    LinearGradient(
+                        colors: [Color.purple.opacity(0.2), Color.pink.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
                     .frame(width: displayWidth, height: displayHeight)
+                    .overlay(
+                        Image(systemName: "person.fill")
+                            .font(.system(size: min(displayWidth, displayHeight) * 0.3))
+                            .foregroundColor(.white.opacity(0.4))
+                    )
                     .onAppear {
                         // Only load if we haven't checked cache yet or need to fetch
                         if !hasCheckedCache {
@@ -1344,13 +1345,22 @@ struct HighQualityCardImage: View {
                         }
                     }
                 } else {
-                    // Loading shimmer
-                    ShimmerView()
-                        .onAppear {
-                            if !hasCheckedCache {
-                                loadImage()
-                            }
+                    // Static placeholder - no loading animation for cleaner look
+                    LinearGradient(
+                        colors: [Color.purple.opacity(0.2), Color.pink.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .overlay(
+                        Image(systemName: "person.fill")
+                            .font(.system(size: 50))
+                            .foregroundColor(.white.opacity(0.4))
+                    )
+                    .onAppear {
+                        if !hasCheckedCache {
+                            loadImage()
                         }
+                    }
                 }
             }
             .frame(width: geometry.size.width, height: targetHeight)

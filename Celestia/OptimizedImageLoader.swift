@@ -323,17 +323,19 @@ struct OptimizedProfileCardImage: View {
                 .frame(width: width, height: height)
                 .clipped()
         } placeholder: {
+            // Static placeholder - no loading animation
             Rectangle()
                 .fill(
                     LinearGradient(
-                        colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.05)],
+                        colors: [Color.purple.opacity(0.2), Color.pink.opacity(0.1)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
                 .overlay(
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .purple))
+                    Image(systemName: "person.fill")
+                        .font(.system(size: min(width, height) * 0.3))
+                        .foregroundColor(.white.opacity(0.4))
                 )
         }
     }
@@ -359,12 +361,20 @@ struct OptimizedThumbnailImage: View {
                 .frame(width: size, height: size)
                 .clipShape(Circle())
         } placeholder: {
+            // Static placeholder - no loading animation
             Circle()
-                .fill(Color.gray.opacity(0.2))
+                .fill(
+                    LinearGradient(
+                        colors: [Color.purple.opacity(0.3), Color.pink.opacity(0.2)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
                 .frame(width: size, height: size)
                 .overlay(
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .purple))
+                    Image(systemName: "person.fill")
+                        .font(.system(size: size * 0.4))
+                        .foregroundColor(.white.opacity(0.6))
                 )
         }
     }
