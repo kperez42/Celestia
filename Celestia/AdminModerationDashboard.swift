@@ -405,6 +405,9 @@ struct ReportDetailView: View {
     @State private var actionReason = ""
     @State private var showingConfirmation = false
     @State private var isProcessing = false
+    @State private var showPhotoGallery = false
+    @State private var selectedPhotoIndex = 0
+    @State private var photosToShow: [String] = []
 
     var body: some View {
         ScrollView {
@@ -433,7 +436,7 @@ struct ReportDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    // PERFORMANCE: Use CachedAsyncImage
+    // PERFORMANCE: Use CachedAsyncImage - Tap photo to view full screen
     private func userInfoCard(_ user: ModerationReport.UserInfo) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Reported User")
@@ -448,6 +451,16 @@ struct ReportDetailView: View {
                     }
                     .frame(width: 60, height: 60)
                     .clipShape(Circle())
+                    .overlay(
+                        Circle()
+                            .stroke(Color.blue.opacity(0.3), lineWidth: 2)
+                    )
+                    .onTapGesture {
+                        photosToShow = [photoURL]
+                        selectedPhotoIndex = 0
+                        showPhotoGallery = true
+                        HapticManager.shared.impact(.light)
+                    }
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -459,12 +472,24 @@ struct ReportDetailView: View {
                     Text("ID: \(user.id)")
                         .font(.caption2)
                         .foregroundColor(.secondary)
+                    if user.photoURL != nil {
+                        Text("Tap photo to view")
+                            .font(.caption2)
+                            .foregroundColor(.blue)
+                    }
                 }
             }
         }
         .padding()
         .background(Color(.systemGray6))
         .cornerRadius(12)
+        .fullScreenCover(isPresented: $showPhotoGallery) {
+            AdminPhotoGalleryView(
+                photos: photosToShow,
+                selectedIndex: $selectedPhotoIndex,
+                isPresented: $showPhotoGallery
+            )
+        }
     }
 
     private var reportDetailsCard: some View {
@@ -661,11 +686,14 @@ struct SuspiciousProfileDetailView: View {
     @State private var showingBanConfirmation = false
     @State private var banReason = ""
     @State private var isBanning = false
+    @State private var showPhotoGallery = false
+    @State private var selectedPhotoIndex = 0
+    @State private var photosToShow: [String] = []
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                // User info - PERFORMANCE: Use CachedAsyncImage
+                // User info - PERFORMANCE: Use CachedAsyncImage - Tap to view full screen
                 if let user = item.user {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Suspicious Profile")
@@ -680,6 +708,16 @@ struct SuspiciousProfileDetailView: View {
                                 }
                                 .frame(width: 60, height: 60)
                                 .clipShape(Circle())
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.orange.opacity(0.3), lineWidth: 2)
+                                )
+                                .onTapGesture {
+                                    photosToShow = [photoURL]
+                                    selectedPhotoIndex = 0
+                                    showPhotoGallery = true
+                                    HapticManager.shared.impact(.light)
+                                }
                             }
 
                             VStack(alignment: .leading, spacing: 4) {
@@ -688,12 +726,24 @@ struct SuspiciousProfileDetailView: View {
                                 Text("ID: \(user.id)")
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
+                                if user.photoURL != nil {
+                                    Text("Tap photo to view")
+                                        .font(.caption2)
+                                        .foregroundColor(.blue)
+                                }
                             }
                         }
                     }
                     .padding()
                     .background(Color(.systemGray6))
                     .cornerRadius(12)
+                    .fullScreenCover(isPresented: $showPhotoGallery) {
+                        AdminPhotoGalleryView(
+                            photos: photosToShow,
+                            selectedIndex: $selectedPhotoIndex,
+                            isPresented: $showPhotoGallery
+                        )
+                    }
                 }
 
                 // Detection details
@@ -1516,10 +1566,11 @@ struct PendingProfileCard: View {
     @State private var isRejecting = false
     @State private var showRejectAlert = false
     @State private var currentPhotoIndex = 0
+    @State private var showPhotoGallery = false
 
     var body: some View {
         VStack(spacing: 0) {
-            // Photo Gallery
+            // Photo Gallery - Tap to view full screen
             ZStack(alignment: .bottom) {
                 TabView(selection: $currentPhotoIndex) {
                     ForEach(Array(profile.photos.enumerated()), id: \.offset) { index, photoURL in
@@ -1548,6 +1599,12 @@ struct PendingProfileCard: View {
                             }
                             .frame(height: 280)
                             .clipped()
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                currentPhotoIndex = index
+                                showPhotoGallery = true
+                                HapticManager.shared.impact(.light)
+                            }
                             .tag(index)
                         }
                     }
@@ -1567,9 +1624,20 @@ struct PendingProfileCard: View {
                     .padding(.bottom, 12)
                 }
 
-                // Photo count badge
+                // Photo count badge + tap hint
                 HStack {
+                    // Tap to view hint
+                    Label("Tap to view", systemImage: "hand.tap")
+                        .font(.caption2.bold())
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(.ultraThinMaterial)
+                        .cornerRadius(12)
+                        .padding(12)
+
                     Spacer()
+
                     Label("\(profile.photos.count)", systemImage: "photo.stack")
                         .font(.caption.bold())
                         .foregroundColor(.white)
@@ -1580,6 +1648,13 @@ struct PendingProfileCard: View {
                         .padding(12)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            }
+            .fullScreenCover(isPresented: $showPhotoGallery) {
+                AdminPhotoGalleryView(
+                    photos: profile.photos,
+                    selectedIndex: $currentPhotoIndex,
+                    isPresented: $showPhotoGallery
+                )
             }
 
             // Profile Info
@@ -1921,6 +1996,209 @@ struct AdminAlertRow: View {
                 Task {
                     await viewModel.markAlertAsRead(alertId: alert.id)
                 }
+            }
+        }
+    }
+}
+
+// MARK: - Admin Photo Gallery View (Clickable Full-Screen with Swipe Navigation)
+
+struct AdminPhotoGalleryView: View {
+    let photos: [String]
+    @Binding var selectedIndex: Int
+    @Binding var isPresented: Bool
+
+    // Swipe-down to dismiss state
+    @State private var dismissDragOffset: CGFloat = 0
+    @State private var isDismissing = false
+
+    // Threshold for dismissing (150 points down)
+    private let dismissThreshold: CGFloat = 150
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                // Black background with opacity based on drag
+                Color.black
+                    .opacity(backgroundOpacity)
+                    .ignoresSafeArea()
+
+                // Photo carousel with smooth swiping
+                TabView(selection: $selectedIndex) {
+                    ForEach(Array(photos.enumerated()), id: \.offset) { index, photoURL in
+                        AdminZoomablePhotoView(
+                            url: URL(string: photoURL),
+                            isCurrentPhoto: index == selectedIndex
+                        )
+                        .tag(index)
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .automatic))
+                .indexViewStyle(.page(backgroundDisplayMode: .always))
+                // Apply dismiss offset and scale
+                .offset(y: dismissDragOffset)
+                .scaleEffect(dismissScale)
+
+                // Close button and counter overlay
+                VStack {
+                    HStack {
+                        // Close button
+                        Button {
+                            HapticManager.shared.impact(.light)
+                            isPresented = false
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.title3.weight(.semibold))
+                                .foregroundColor(.white)
+                                .frame(width: 40, height: 40)
+                                .background(Color.black.opacity(0.5))
+                                .clipShape(Circle())
+                        }
+
+                        Spacer()
+
+                        // Photo counter
+                        Text("\(selectedIndex + 1) / \(photos.count)")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.black.opacity(0.5))
+                            .cornerRadius(20)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 60)
+
+                    Spacer()
+
+                    // Hint text
+                    Text("Swipe left/right to navigate • Pinch to zoom • Swipe down to close")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.7))
+                        .padding(.bottom, 40)
+                }
+                .opacity(controlsOpacity)
+            }
+            // Swipe-down to dismiss gesture
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        // Only allow downward drag for dismiss
+                        if value.translation.height > 0 {
+                            dismissDragOffset = value.translation.height
+                        }
+                    }
+                    .onEnded { value in
+                        if value.translation.height > dismissThreshold {
+                            // Dismiss with animation
+                            isDismissing = true
+                            HapticManager.shared.impact(.light)
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                dismissDragOffset = geometry.size.height
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                isPresented = false
+                            }
+                        } else {
+                            // Snap back
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                dismissDragOffset = 0
+                            }
+                        }
+                    }
+            )
+        }
+        .statusBarHidden()
+    }
+
+    // Computed properties for smooth dismiss animation
+    private var backgroundOpacity: Double {
+        let progress = min(dismissDragOffset / dismissThreshold, 1.0)
+        return 1.0 - (progress * 0.5)
+    }
+
+    private var dismissScale: CGFloat {
+        let progress = min(dismissDragOffset / dismissThreshold, 1.0)
+        return 1.0 - (progress * 0.1)
+    }
+
+    private var controlsOpacity: Double {
+        let progress = min(dismissDragOffset / dismissThreshold, 1.0)
+        return 1.0 - progress
+    }
+}
+
+// MARK: - Admin Zoomable Photo View
+
+struct AdminZoomablePhotoView: View {
+    let url: URL?
+    let isCurrentPhoto: Bool
+
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
+
+    init(url: URL?, isCurrentPhoto: Bool = true) {
+        self.url = url
+        self.isCurrentPhoto = isCurrentPhoto
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            CachedAsyncImage(url: url) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+            } placeholder: {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+            .scaleEffect(scale)
+            .offset(offset)
+            .gesture(
+                MagnificationGesture()
+                    .onChanged { value in
+                        let delta = value / lastScale
+                        lastScale = value
+                        scale = min(max(scale * delta, 1), 4)
+                    }
+                    .onEnded { _ in
+                        lastScale = 1.0
+                        if scale < 1 {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                scale = 1
+                                offset = .zero
+                            }
+                        }
+                    }
+            )
+            .simultaneousGesture(
+                scale > 1 ?
+                DragGesture()
+                    .onChanged { value in
+                        offset = CGSize(
+                            width: lastOffset.width + value.translation.width,
+                            height: lastOffset.height + value.translation.height
+                        )
+                    }
+                    .onEnded { _ in
+                        lastOffset = offset
+                    }
+                : nil
+            )
+            .onTapGesture(count: 2) {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
+                    if scale > 1 {
+                        scale = 1
+                        offset = .zero
+                        lastOffset = .zero
+                    } else {
+                        scale = 2
+                    }
+                }
+                HapticManager.shared.impact(.light)
             }
         }
     }
