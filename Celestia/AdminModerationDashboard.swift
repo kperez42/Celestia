@@ -1555,10 +1555,12 @@ class ModerationViewModel: ObservableObject {
 
                 // Format timestamp
                 var createdAt = "Unknown"
+                var createdAtDate = Date()
                 if let timestamp = data["timestamp"] as? Timestamp {
+                    createdAtDate = timestamp.dateValue()
                     let formatter = RelativeDateTimeFormatter()
                     formatter.unitsStyle = .abbreviated
-                    createdAt = formatter.localizedString(for: timestamp.dateValue(), relativeTo: Date())
+                    createdAt = formatter.localizedString(for: createdAtDate, relativeTo: Date())
                 }
 
                 let profile = PendingProfile(
@@ -1568,10 +1570,24 @@ class ModerationViewModel: ObservableObject {
                     age: data["age"] as? Int ?? 0,
                     gender: data["gender"] as? String ?? "",
                     location: data["location"] as? String ?? "",
+                    country: data["country"] as? String ?? "",
                     photoURL: data["profileImageURL"] as? String,
                     photos: data["photos"] as? [String] ?? [],
                     bio: data["bio"] as? String ?? "",
-                    createdAt: createdAt
+                    createdAt: createdAt,
+                    createdAtDate: createdAtDate,
+                    lookingFor: data["lookingFor"] as? String ?? "",
+                    interests: data["interests"] as? [String] ?? [],
+                    languages: data["languages"] as? [String] ?? [],
+                    height: data["height"] as? Int,
+                    educationLevel: data["educationLevel"] as? String,
+                    religion: data["religion"] as? String,
+                    relationshipGoal: data["relationshipGoal"] as? String,
+                    smoking: data["smoking"] as? String,
+                    drinking: data["drinking"] as? String,
+                    exercise: data["exercise"] as? String,
+                    pets: data["pets"] as? String,
+                    diet: data["diet"] as? String
                 )
                 profiles.append(profile)
             }
@@ -2340,10 +2356,28 @@ struct PendingProfile: Identifiable {
     let age: Int
     let gender: String
     let location: String
+    let country: String
     let photoURL: String?
     let photos: [String]
     let bio: String
     let createdAt: String
+    let createdAtDate: Date
+
+    // Profile preferences
+    let lookingFor: String
+    let interests: [String]
+    let languages: [String]
+
+    // Lifestyle fields
+    let height: Int?
+    let educationLevel: String?
+    let religion: String?
+    let relationshipGoal: String?
+    let smoking: String?
+    let drinking: String?
+    let exercise: String?
+    let pets: String?
+    let diet: String?
 }
 
 // MARK: - Admin Alert Model
@@ -2408,6 +2442,7 @@ struct PendingProfileCard: View {
     @State private var showRejectAlert = false
     @State private var currentPhotoIndex = 0
     @State private var showPhotoGallery = false
+    @State private var showProfileDetail = false
 
     // Admin comment flow
     @State private var selectedRejectionReason: ProfileRejectionReason?
@@ -2513,7 +2548,7 @@ struct PendingProfileCard: View {
 
             // Profile Info
             VStack(alignment: .leading, spacing: 12) {
-                // Name and Age
+                // Name and Age + View Profile button
                 HStack(alignment: .firstTextBaseline) {
                     Text(profile.name)
                         .font(.title2.bold())
@@ -2521,6 +2556,24 @@ struct PendingProfileCard: View {
                         .font(.title3)
                         .foregroundColor(.secondary)
                     Spacer()
+
+                    // View Profile button
+                    Button {
+                        showProfileDetail = true
+                        HapticManager.shared.impact(.light)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "person.circle")
+                            Text("View")
+                        }
+                        .font(.caption.bold())
+                        .foregroundColor(.purple)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color.purple.opacity(0.1))
+                        .cornerRadius(8)
+                    }
+
                     // Time badge
                     Text(profile.createdAt)
                         .font(.caption)
@@ -2540,12 +2593,49 @@ struct PendingProfileCard: View {
                     Label(profile.gender, systemImage: "person.fill")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
+
+                    if !profile.lookingFor.isEmpty {
+                        Label(profile.lookingFor, systemImage: "heart.fill")
+                            .font(.subheadline)
+                            .foregroundColor(.pink)
+                    }
                 }
 
                 // Email
                 Label(profile.email, systemImage: "envelope.fill")
                     .font(.caption)
                     .foregroundColor(.blue)
+
+                // Quick info tags
+                if !profile.interests.isEmpty || !profile.languages.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(profile.interests.prefix(3), id: \.self) { interest in
+                                Text(interest)
+                                    .font(.caption2)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.pink.opacity(0.1))
+                                    .foregroundColor(.pink)
+                                    .cornerRadius(8)
+                            }
+                            ForEach(profile.languages.prefix(2), id: \.self) { language in
+                                Text(language)
+                                    .font(.caption2)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.green.opacity(0.1))
+                                    .foregroundColor(.green)
+                                    .cornerRadius(8)
+                            }
+                            if profile.interests.count > 3 || profile.languages.count > 2 {
+                                Text("+\(max(0, profile.interests.count - 3) + max(0, profile.languages.count - 2)) more")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                }
 
                 // Bio
                 if !profile.bio.isEmpty {
@@ -2690,6 +2780,30 @@ struct PendingProfileCard: View {
                 onCancel: {
                     adminComment = ""
                     selectedRejectionReason = nil
+                }
+            )
+        }
+        // Full Profile Detail Sheet
+        .sheet(isPresented: $showProfileDetail) {
+            AdminPendingProfileDetailView(
+                profile: profile,
+                onApprove: {
+                    showProfileDetail = false
+                    HapticManager.shared.impact(.medium)
+                    Task {
+                        isApproving = true
+                        do {
+                            try await viewModel.approveProfile(userId: profile.id)
+                            HapticManager.shared.notification(.success)
+                        } catch {
+                            HapticManager.shared.notification(.error)
+                        }
+                        isApproving = false
+                    }
+                },
+                onReject: {
+                    showProfileDetail = false
+                    showRejectAlert = true
                 }
             )
         }
@@ -2886,6 +3000,444 @@ struct AdminRejectCommentSheet: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+    }
+}
+
+// MARK: - Admin Pending Profile Detail View
+
+/// Full profile detail view for admin review of pending profiles
+struct AdminPendingProfileDetailView: View {
+    let profile: PendingProfile
+    let onApprove: () -> Void
+    let onReject: () -> Void
+
+    @Environment(\.dismiss) var dismiss
+    @State private var selectedPhotoIndex = 0
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 0) {
+                    // Photos carousel
+                    TabView(selection: $selectedPhotoIndex) {
+                        ForEach(Array(profile.photos.enumerated()), id: \.offset) { index, photoURL in
+                            if let url = URL(string: photoURL) {
+                                AsyncImage(url: url) { phase in
+                                    switch phase {
+                                    case .success(let image):
+                                        image
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                    case .failure:
+                                        Rectangle()
+                                            .fill(Color.gray.opacity(0.2))
+                                            .overlay(
+                                                Image(systemName: "photo")
+                                                    .font(.largeTitle)
+                                                    .foregroundColor(.gray)
+                                            )
+                                    case .empty:
+                                        Rectangle()
+                                            .fill(Color.gray.opacity(0.1))
+                                            .overlay(ProgressView())
+                                    @unknown default:
+                                        EmptyView()
+                                    }
+                                }
+                                .frame(height: 400)
+                                .clipped()
+                                .tag(index)
+                            }
+                        }
+                    }
+                    .frame(height: 400)
+                    .tabViewStyle(.page)
+
+                    // Profile content
+                    VStack(alignment: .leading, spacing: 24) {
+                        // Header
+                        profileHeaderSection
+
+                        // Contact
+                        contactSection
+
+                        // Bio
+                        if !profile.bio.isEmpty {
+                            bioSection
+                        }
+
+                        // Languages
+                        if !profile.languages.isEmpty {
+                            languagesSection
+                        }
+
+                        // Interests
+                        if !profile.interests.isEmpty {
+                            interestsSection
+                        }
+
+                        // Details
+                        if hasDetails {
+                            detailsSection
+                        }
+
+                        // Lifestyle
+                        if hasLifestyle {
+                            lifestyleSection
+                        }
+
+                        // Looking for
+                        lookingForSection
+                    }
+                    .padding(20)
+                    .padding(.bottom, 100)
+                }
+            }
+            .background(Color(.systemGroupedBackground))
+            .ignoresSafeArea(edges: .top)
+            .overlay(alignment: .bottom) {
+                actionButtons
+            }
+            .navigationTitle("Profile Review")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Header Section
+
+    private var profileHeaderSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Text(profile.name)
+                    .font(.system(size: 28, weight: .bold))
+
+                Text("\(profile.age)")
+                    .font(.title2)
+                    .foregroundColor(.secondary)
+            }
+
+            HStack(spacing: 6) {
+                Image(systemName: "mappin.circle.fill")
+                    .foregroundColor(.purple)
+                Text("\(profile.location)\(profile.country.isEmpty ? "" : ", \(profile.country)")")
+                    .foregroundColor(.secondary)
+            }
+            .font(.subheadline)
+
+            HStack(spacing: 8) {
+                Label(profile.gender, systemImage: "person.fill")
+                    .font(.caption)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.blue.opacity(0.1))
+                    .foregroundColor(.blue)
+                    .cornerRadius(8)
+
+                Text("Joined \(profile.createdAtDate.formatted(date: .abbreviated, time: .omitted))")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+
+    // MARK: - Contact Section
+
+    private var contactSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Contact", systemImage: "envelope.fill")
+                .font(.headline)
+                .foregroundColor(.blue)
+
+            Text(profile.email)
+                .font(.subheadline)
+                .foregroundColor(.primary)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+    }
+
+    // MARK: - Bio Section
+
+    private var bioSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("About", systemImage: "text.quote")
+                .font(.headline)
+                .foregroundColor(.purple)
+
+            Text(profile.bio)
+                .font(.body)
+                .foregroundColor(.primary)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+    }
+
+    // MARK: - Languages Section
+
+    private var languagesSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Languages", systemImage: "globe")
+                .font(.headline)
+                .foregroundColor(.green)
+
+            AdminFlowLayout(spacing: 8) {
+                ForEach(profile.languages, id: \.self) { language in
+                    Text(language)
+                        .font(.caption)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.green.opacity(0.1))
+                        .foregroundColor(.green)
+                        .cornerRadius(16)
+                }
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+    }
+
+    // MARK: - Interests Section
+
+    private var interestsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Interests", systemImage: "heart.fill")
+                .font(.headline)
+                .foregroundColor(.pink)
+
+            AdminFlowLayout(spacing: 8) {
+                ForEach(profile.interests, id: \.self) { interest in
+                    Text(interest)
+                        .font(.caption)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.pink.opacity(0.1))
+                        .foregroundColor(.pink)
+                        .cornerRadius(16)
+                }
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+    }
+
+    // MARK: - Details Section
+
+    private var hasDetails: Bool {
+        profile.height != nil ||
+        (profile.educationLevel != nil && profile.educationLevel != "Prefer not to say" && !profile.educationLevel!.isEmpty) ||
+        (profile.religion != nil && profile.religion != "Prefer not to say" && !profile.religion!.isEmpty) ||
+        (profile.relationshipGoal != nil && profile.relationshipGoal != "Prefer not to say" && !profile.relationshipGoal!.isEmpty)
+    }
+
+    private var detailsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Details", systemImage: "person.text.rectangle")
+                .font(.headline)
+                .foregroundColor(.indigo)
+
+            VStack(spacing: 10) {
+                if let height = profile.height {
+                    AdminDetailRow(icon: "ruler", label: "Height", value: "\(height) cm")
+                }
+                if let education = profile.educationLevel, education != "Prefer not to say", !education.isEmpty {
+                    AdminDetailRow(icon: "graduationcap.fill", label: "Education", value: education)
+                }
+                if let religion = profile.religion, religion != "Prefer not to say", !religion.isEmpty {
+                    AdminDetailRow(icon: "sparkles", label: "Religion", value: religion)
+                }
+                if let goal = profile.relationshipGoal, goal != "Prefer not to say", !goal.isEmpty {
+                    AdminDetailRow(icon: "heart.circle", label: "Looking for", value: goal)
+                }
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+    }
+
+    // MARK: - Lifestyle Section
+
+    private var hasLifestyle: Bool {
+        (profile.smoking != nil && profile.smoking != "Prefer not to say" && !profile.smoking!.isEmpty) ||
+        (profile.drinking != nil && profile.drinking != "Prefer not to say" && !profile.drinking!.isEmpty) ||
+        (profile.exercise != nil && profile.exercise != "Prefer not to say" && !profile.exercise!.isEmpty) ||
+        (profile.diet != nil && profile.diet != "Prefer not to say" && !profile.diet!.isEmpty) ||
+        (profile.pets != nil && profile.pets != "Prefer not to say" && !profile.pets!.isEmpty)
+    }
+
+    private var lifestyleSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Lifestyle", systemImage: "leaf.fill")
+                .font(.headline)
+                .foregroundColor(.green)
+
+            VStack(spacing: 10) {
+                if let smoking = profile.smoking, smoking != "Prefer not to say", !smoking.isEmpty {
+                    AdminDetailRow(icon: "smoke", label: "Smoking", value: smoking)
+                }
+                if let drinking = profile.drinking, drinking != "Prefer not to say", !drinking.isEmpty {
+                    AdminDetailRow(icon: "wineglass", label: "Drinking", value: drinking)
+                }
+                if let exercise = profile.exercise, exercise != "Prefer not to say", !exercise.isEmpty {
+                    AdminDetailRow(icon: "figure.run", label: "Exercise", value: exercise)
+                }
+                if let diet = profile.diet, diet != "Prefer not to say", !diet.isEmpty {
+                    AdminDetailRow(icon: "fork.knife", label: "Diet", value: diet)
+                }
+                if let pets = profile.pets, pets != "Prefer not to say", !pets.isEmpty {
+                    AdminDetailRow(icon: "pawprint.fill", label: "Pets", value: pets)
+                }
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+    }
+
+    // MARK: - Looking For Section
+
+    private var lookingForSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Interested In", systemImage: "heart.text.square")
+                .font(.headline)
+                .foregroundColor(.orange)
+
+            Text(profile.lookingFor.isEmpty ? "Everyone" : profile.lookingFor)
+                .font(.body)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+    }
+
+    // MARK: - Action Buttons
+
+    private var actionButtons: some View {
+        HStack(spacing: 16) {
+            Button {
+                HapticManager.shared.notification(.error)
+                onReject()
+            } label: {
+                HStack {
+                    Image(systemName: "xmark")
+                    Text("Reject")
+                }
+                .font(.headline)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(Color.red)
+                .cornerRadius(16)
+            }
+
+            Button {
+                HapticManager.shared.notification(.success)
+                onApprove()
+            } label: {
+                HStack {
+                    Image(systemName: "checkmark")
+                    Text("Approve")
+                }
+                .font(.headline)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(Color.green)
+                .cornerRadius(16)
+            }
+        }
+        .padding()
+        .background(
+            Color(.systemBackground)
+                .shadow(color: .black.opacity(0.1), radius: 10, y: -5)
+        )
+    }
+}
+
+// MARK: - Admin Detail Row (for pending profile detail)
+
+private struct AdminDetailRow: View {
+    let icon: String
+    let label: String
+    let value: String
+
+    var body: some View {
+        HStack {
+            Image(systemName: icon)
+                .foregroundColor(.secondary)
+                .frame(width: 24)
+
+            Text(label)
+                .foregroundColor(.secondary)
+
+            Spacer()
+
+            Text(value)
+                .fontWeight(.medium)
+        }
+        .font(.subheadline)
+    }
+}
+
+// MARK: - Admin Flow Layout for tags
+
+private struct AdminFlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let result = AdminFlowResult(in: proposal.width ?? 0, subviews: subviews, spacing: spacing)
+        return result.size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = AdminFlowResult(in: bounds.width, subviews: subviews, spacing: spacing)
+        for (index, subview) in subviews.enumerated() {
+            subview.place(at: CGPoint(x: bounds.minX + result.positions[index].x,
+                                       y: bounds.minY + result.positions[index].y),
+                          proposal: .unspecified)
+        }
+    }
+
+    struct AdminFlowResult {
+        var size: CGSize = .zero
+        var positions: [CGPoint] = []
+
+        init(in maxWidth: CGFloat, subviews: Subviews, spacing: CGFloat) {
+            var x: CGFloat = 0
+            var y: CGFloat = 0
+            var maxHeight: CGFloat = 0
+
+            for subview in subviews {
+                let size = subview.sizeThatFits(.unspecified)
+                if x + size.width > maxWidth, x > 0 {
+                    x = 0
+                    y += maxHeight + spacing
+                    maxHeight = 0
+                }
+                positions.append(CGPoint(x: x, y: y))
+                maxHeight = max(maxHeight, size.height)
+                x += size.width + spacing
+            }
+            self.size = CGSize(width: maxWidth, height: y + maxHeight)
+        }
     }
 }
 
