@@ -268,7 +268,7 @@ struct AdminFullScreenPhotoViewer: View {
                 // Photo viewer with horizontal scroll
                 TabView(selection: $selectedIndex) {
                     ForEach(Array(photos.enumerated()), id: \.offset) { index, photoURL in
-                        AdminZoomablePhotoView(photoURL: photoURL)
+                        AdminApprovalZoomablePhotoView(photoURL: photoURL)
                             .tag(index)
                     }
                 }
@@ -322,9 +322,9 @@ struct AdminFullScreenPhotoViewer: View {
     }
 }
 
-// MARK: - Admin Zoomable Photo View
+// MARK: - Admin Approval Zoomable Photo View
 
-struct AdminZoomablePhotoView: View {
+struct AdminApprovalZoomablePhotoView: View {
     let photoURL: String
 
     @State private var scale: CGFloat = 1.0
