@@ -44,6 +44,12 @@ struct OnboardingView: View {
     @State private var selectedInterests: [String] = []
     @State private var selectedLanguages: [String] = []
 
+    // Step 6: Additional Details (Optional)
+    @State private var height: Int? = nil
+    @State private var relationshipGoal: String = "Prefer not to say"
+    @State private var ageRangeMin: Int = 18
+    @State private var ageRangeMax: Int = 50
+
     @State private var isLoading = false
     @State private var showError = false
     @State private var errorMessage = ""
@@ -52,7 +58,11 @@ struct OnboardingView: View {
     
     let genderOptions = ["Male", "Female", "Non-binary", "Other"]
     let lookingForOptions = ["Men", "Women", "Everyone"]
-    let totalSteps = 5
+    let totalSteps = 6
+
+    // Step 6 options
+    let relationshipGoalOptions = ["Prefer not to say", "Casual Dating", "Long-term Relationship", "Marriage", "Friendship", "Not Sure Yet"]
+    let heightOptions: [Int] = Array(140...220) // cm range
     
     let availableInterests = [
         "Travel", "Music", "Movies", "Sports", "Food",
@@ -99,6 +109,7 @@ struct OnboardingView: View {
                         step3View.tag(2)
                         step4View.tag(3)
                         step5View.tag(4)
+                        step6View.tag(5)
                     }
                     .tabViewStyle(.page(indexDisplayMode: .never))
                     .accessibleAnimation(.easeInOut, value: currentStep)
@@ -272,18 +283,20 @@ struct OnboardingView: View {
         case 1: return "About You"
         case 2: return "Your Photos"
         case 3: return "Preferences"
-        case 4: return "Finishing Up"
+        case 4: return "Interests"
+        case 5: return "Better Matches"
         default: return ""
         }
     }
-    
+
     private var stepSubtitle: String {
         switch currentStep {
         case 0: return "Tell us who you are"
         case 1: return "Share your story"
         case 2: return "Show your best self"
         case 3: return "What you're looking for"
-        case 4: return "Almost there!"
+        case 4: return "What makes you unique"
+        case 5: return "Optional • Skip anytime"
         default: return ""
         }
     }
@@ -1087,9 +1100,276 @@ struct OnboardingView: View {
             .padding(.top, 20)
         }
     }
-    
+
+    // MARK: - Step 6: Better Matches (Optional)
+
+    private var step6View: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 24) {
+                // Icon
+                ZStack {
+                    Circle()
+                        .fill(Color.green.opacity(0.15))
+                        .frame(width: 100, height: 100)
+
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 50))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.green, .mint],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+
+                VStack(spacing: 8) {
+                    Text("Get Better Matches")
+                        .font(.title)
+                        .fontWeight(.bold)
+
+                    Text("These details help find your perfect match")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+
+                    // Optional badge
+                    HStack(spacing: 6) {
+                        Image(systemName: "hand.tap.fill")
+                            .font(.caption)
+                        Text("Optional - Skip anytime")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                    }
+                    .foregroundColor(.green)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.green.opacity(0.1))
+                    .cornerRadius(20)
+                    .padding(.top, 4)
+                }
+
+                VStack(spacing: 20) {
+                    // Relationship Goal
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "heart.text.square.fill")
+                                .foregroundColor(.pink)
+                            Text("What are you looking for?")
+                                .font(.headline)
+                        }
+
+                        ForEach(relationshipGoalOptions.filter { $0 != "Prefer not to say" }, id: \.self) { goal in
+                            Button {
+                                withAnimation(.spring(response: 0.3)) {
+                                    relationshipGoal = goal
+                                    HapticManager.shared.selection()
+                                }
+                            } label: {
+                                HStack {
+                                    Text(goal)
+                                        .fontWeight(.medium)
+
+                                    Spacer()
+
+                                    if relationshipGoal == goal {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(.pink)
+                                    } else {
+                                        Image(systemName: "circle")
+                                            .foregroundColor(.gray.opacity(0.3))
+                                    }
+                                }
+                                .padding()
+                                .background(
+                                    relationshipGoal == goal ?
+                                    LinearGradient(
+                                        colors: [Color.pink.opacity(0.1), Color.purple.opacity(0.05)],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    ) :
+                                    LinearGradient(colors: [Color.white], startPoint: .leading, endPoint: .trailing)
+                                )
+                                .cornerRadius(12)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(
+                                            relationshipGoal == goal ? Color.pink.opacity(0.5) : Color.gray.opacity(0.2),
+                                            lineWidth: 1
+                                        )
+                                )
+                            }
+                            .foregroundColor(.primary)
+                        }
+                    }
+
+                    // Height
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "ruler")
+                                .foregroundColor(.blue)
+                            Text("Your Height")
+                                .font(.headline)
+
+                            Spacer()
+
+                            if let h = height {
+                                Text("\(h) cm (\(heightToFeetInches(h)))")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.blue)
+                            }
+                        }
+
+                        HStack(spacing: 12) {
+                            // Height picker
+                            Menu {
+                                ForEach(heightOptions, id: \.self) { h in
+                                    Button("\(h) cm (\(heightToFeetInches(h)))") {
+                                        height = h
+                                        HapticManager.shared.selection()
+                                    }
+                                }
+                            } label: {
+                                HStack {
+                                    Text(height != nil ? "\(height!) cm" : "Select Height")
+                                        .foregroundColor(height != nil ? .primary : .gray)
+                                    Spacer()
+                                    Image(systemName: "chevron.down")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                }
+                                .padding()
+                                .background(Color.white)
+                                .cornerRadius(12)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+                                )
+                            }
+
+                            // Clear button
+                            if height != nil {
+                                Button {
+                                    height = nil
+                                    HapticManager.shared.impact(.light)
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.title2)
+                                        .foregroundColor(.gray)
+                                }
+                            }
+                        }
+                    }
+
+                    // Age Range Preference
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "person.2.fill")
+                                .foregroundColor(.purple)
+                            Text("Preferred Age Range")
+                                .font(.headline)
+
+                            Spacer()
+
+                            Text("\(ageRangeMin) - \(ageRangeMax)")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.purple)
+                        }
+
+                        VStack(spacing: 16) {
+                            // Min Age
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Minimum: \(ageRangeMin)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+
+                                Slider(
+                                    value: Binding(
+                                        get: { Double(ageRangeMin) },
+                                        set: { ageRangeMin = Int($0) }
+                                    ),
+                                    in: 18...Double(ageRangeMax - 1),
+                                    step: 1
+                                )
+                                .tint(.purple)
+                            }
+
+                            // Max Age
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Maximum: \(ageRangeMax)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+
+                                Slider(
+                                    value: Binding(
+                                        get: { Double(ageRangeMax) },
+                                        set: { ageRangeMax = Int($0) }
+                                    ),
+                                    in: Double(ageRangeMin + 1)...99,
+                                    step: 1
+                                )
+                                .tint(.purple)
+                            }
+                        }
+                        .padding()
+                        .background(Color.white)
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.purple.opacity(0.2), lineWidth: 1)
+                        )
+                    }
+                }
+
+                // Benefit card
+                HStack(spacing: 12) {
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                        .font(.title2)
+                        .foregroundColor(.green)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("40% More Matches")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+
+                        Text("Users with complete profiles get significantly more matches")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
+                }
+                .padding()
+                .background(
+                    LinearGradient(
+                        colors: [Color.green.opacity(0.1), Color.mint.opacity(0.05)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.green.opacity(0.3), lineWidth: 1)
+                )
+            }
+            .padding(20)
+            .padding(.top, 20)
+        }
+    }
+
+    // Helper to convert cm to feet/inches
+    private func heightToFeetInches(_ cm: Int) -> String {
+        let totalInches = Double(cm) / 2.54
+        let feet = Int(totalInches / 12)
+        let inches = Int(totalInches.truncatingRemainder(dividingBy: 12))
+        return "\(feet)'\(inches)\""
+    }
+
     // MARK: - Navigation Buttons
-    
+
     private var navigationButtons: some View {
         HStack(spacing: 12) {
             if currentStep > 0 {
@@ -1183,6 +1463,8 @@ struct OnboardingView: View {
             return true
         case 4:
             return true
+        case 5:
+            return true // Step 6 is optional, always allow proceeding
         default:
             return false
         }
@@ -1244,6 +1526,12 @@ struct OnboardingView: View {
                 user.profileImageURL = photoURLs.first ?? ""
                 user.interests = selectedInterests
                 user.languages = selectedLanguages
+
+                // Step 6 optional fields
+                user.height = height
+                user.relationshipGoal = (relationshipGoal == "Prefer not to say") ? nil : relationshipGoal
+                user.ageRangeMin = ageRangeMin
+                user.ageRangeMax = ageRangeMax
 
                 try await authService.updateUser(user)
 
