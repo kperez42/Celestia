@@ -17,6 +17,7 @@ struct LikesView: View {
     @State private var selectedUserForDetail: User?
     @State private var showChatWithUser: User?
     @State private var showPremiumUpgrade = false
+    @State private var upgradeContextMessage = ""
 
     // PERFORMANCE: Track if initial load completed to prevent loading flash on tab switches
     @State private var hasCompletedInitialLoad = false
@@ -147,7 +148,7 @@ struct LikesView: View {
                 }
             }
             .sheet(isPresented: $showPremiumUpgrade) {
-                PremiumUpgradeView()
+                PremiumUpgradeView(contextMessage: upgradeContextMessage)
                     .environmentObject(authService)
             }
             .sheet(isPresented: $showFilters) {
@@ -527,6 +528,17 @@ struct LikesView: View {
     }
 
     private func handleLikeBack(user: User) {
+        // Check daily like limit for free users (premium gets unlimited)
+        let isPremium = authService.currentUser?.isPremium ?? false
+        if !isPremium {
+            guard RateLimiter.shared.canSendLike() else {
+                // Show upgrade sheet with context message
+                upgradeContextMessage = "You've reached your daily like limit. Subscribe to continue liking!"
+                showPremiumUpgrade = true
+                return
+            }
+        }
+
         Task {
             let isMatch = await viewModel.likeBackUser(user)
             if isMatch {

@@ -17,6 +17,7 @@ struct SavedProfilesView: View {
     @State private var showClearAllConfirmation = false
     @State private var selectedTab = 0
     @State private var showPremiumUpgrade = false
+    @State private var upgradeContextMessage = ""
 
     // PERFORMANCE: Track if initial load completed to prevent loading flash on tab switches
     @State private var hasCompletedInitialLoad = false
@@ -165,7 +166,7 @@ struct SavedProfilesView: View {
                 .environmentObject(authService)
         }
         .sheet(isPresented: $showPremiumUpgrade) {
-            PremiumUpgradeView()
+            PremiumUpgradeView(contextMessage: upgradeContextMessage)
                 .environmentObject(authService)
         }
         .sheet(isPresented: $showFilters) {
@@ -969,6 +970,17 @@ struct SavedProfilesView: View {
         guard let currentUserId = authService.currentUser?.effectiveId,
               let targetUserId = user.effectiveId else {
             return
+        }
+
+        // Check daily like limit for free users (premium gets unlimited)
+        let isPremium = authService.currentUser?.isPremium ?? false
+        if !isPremium {
+            guard RateLimiter.shared.canSendLike() else {
+                // Show upgrade sheet with context message
+                upgradeContextMessage = "You've reached your daily like limit. Subscribe to continue liking!"
+                showPremiumUpgrade = true
+                return
+            }
         }
 
         Task {

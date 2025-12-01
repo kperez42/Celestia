@@ -25,6 +25,8 @@ struct UserDetailView: View {
     @State private var isLiked = false
     @State private var showingChat = false
     @State private var chatMatch: Match?
+    @State private var showPremiumUpgrade = false
+    @State private var upgradeContextMessage = ""
     @ObservedObject private var savedProfilesVM = SavedProfilesViewModel.shared
 
     // Photo viewer state
@@ -98,6 +100,10 @@ struct UserDetailView: View {
                         .environmentObject(authService)
                 }
             }
+        }
+        .sheet(isPresented: $showPremiumUpgrade) {
+            PremiumUpgradeView(contextMessage: upgradeContextMessage)
+                .environmentObject(authService)
         }
     }
 
@@ -613,6 +619,19 @@ struct UserDetailView: View {
         }
 
         HapticManager.shared.impact(.medium)
+
+        // Check daily like limit for free users when liking (not unliking)
+        if !isLiked {
+            let isPremium = authService.currentUser?.isPremium ?? false
+            if !isPremium {
+                guard RateLimiter.shared.canSendLike() else {
+                    // Show upgrade sheet with context message
+                    upgradeContextMessage = "You've reached your daily like limit. Subscribe to continue liking!"
+                    showPremiumUpgrade = true
+                    return
+                }
+            }
+        }
 
         if isLiked {
             // Unlike the user

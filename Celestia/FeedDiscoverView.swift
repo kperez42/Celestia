@@ -33,6 +33,7 @@ struct FeedDiscoverView: View {
     // Direct messaging state - using dedicated struct for item-based presentation
     @State private var chatPresentation: ChatPresentation?
     @State private var showPremiumUpgrade = false
+    @State private var upgradeContextMessage = ""
 
     struct ChatPresentation: Identifiable {
         let id = UUID()
@@ -166,7 +167,7 @@ struct FeedDiscoverView: View {
                     }
                 }
                 .sheet(isPresented: $showPremiumUpgrade) {
-                    PremiumUpgradeView()
+                    PremiumUpgradeView(contextMessage: upgradeContextMessage)
                         .environmentObject(authService)
                 }
         }
@@ -1035,11 +1036,9 @@ struct FeedDiscoverView: View {
         let isPremium = authService.currentUser?.isPremium ?? false
         if !isPremium {
             guard RateLimiter.shared.canSendLike() else {
-                showToast(
-                    message: "Daily like limit reached (\(AppConstants.RateLimit.maxLikesPerDay) likes). Upgrade for unlimited!",
-                    icon: "exclamationmark.triangle.fill",
-                    color: .orange
-                )
+                // Show upgrade sheet with context message instead of toast
+                upgradeContextMessage = "You've reached your daily like limit. Subscribe to continue liking!"
+                showPremiumUpgrade = true
                 return
             }
         }
