@@ -1778,17 +1778,26 @@ class SavedProfilesViewModel: ObservableObject {
             }
 
             // Step 4: Combine metadata with fetched users
+            // Filter out users who are not active (pending, suspended, flagged, banned)
             var profiles: [SavedProfile] = []
             var skippedCount = 0
 
             for metadata in savedMetadata {
                 if let user = fetchedUsers[metadata.userId] {
-                    profiles.append(SavedProfile(
-                        id: metadata.id,
-                        user: user,
-                        savedAt: metadata.savedAt,
-                        note: metadata.note
-                    ))
+                    // Only include users with active profileStatus
+                    let status = user.profileStatus.lowercased()
+                    if status == "active" || status.isEmpty {
+                        profiles.append(SavedProfile(
+                            id: metadata.id,
+                            user: user,
+                            savedAt: metadata.savedAt,
+                            note: metadata.note
+                        ))
+                    } else {
+                        // User is pending/suspended/flagged - don't show
+                        skippedCount += 1
+                        Logger.shared.debug("Skipped saved profile - user not active: \(metadata.userId) (status: \(status))", category: .general)
+                    }
                 } else {
                     // User no longer exists or failed to fetch
                     skippedCount += 1
