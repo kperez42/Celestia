@@ -175,7 +175,10 @@ struct ChatView: View {
             let isActiveMatch = messageService.activeMatchId == match.id
             let messagesAreForThisMatch = messageService.messages.first?.matchId == match.id
             if newCount > 0 && !hasLoadedMessagesForThisChat && (isActiveMatch || messagesAreForThisMatch) {
-                hasLoadedMessagesForThisChat = true
+                // FIX: Defer state change to avoid "Modifying state during view update" warning
+                Task { @MainActor in
+                    hasLoadedMessagesForThisChat = true
+                }
             }
             // SWIFTUI FIX: Defer safety check with longer delay to avoid modifying state during view update
             // Only check if message count actually increased (not on initial load or deletions)
@@ -192,7 +195,10 @@ struct ChatView: View {
             let isActiveMatch = messageService.activeMatchId == match.id
             let messagesAreForThisMatch = messageService.messages.isEmpty || messageService.messages.first?.matchId == match.id
             if !isLoading && !hasLoadedMessagesForThisChat && (isActiveMatch || messagesAreForThisMatch) {
-                hasLoadedMessagesForThisChat = true
+                // FIX: Defer state change to avoid "Modifying state during view update" warning
+                Task { @MainActor in
+                    hasLoadedMessagesForThisChat = true
+                }
             }
         }
         .task {
@@ -383,6 +389,7 @@ struct ChatView: View {
                     // BUGFIX: Use hasLoadedMessagesForThisChat to prevent flash of conversation starters
                     // before messages are loaded. This fixes a race condition where the view renders
                     // before onAppear sets the loading state.
+                    // FIX: Don't show conversation starters if there was an error loading messages
                     if messageService.messages.isEmpty, let currentUser = authService.currentUser {
                         if messageService.isLoading || !hasLoadedMessagesForThisChat {
                             // Show loading state - either service is loading OR we haven't confirmed load for this chat
@@ -392,6 +399,27 @@ struct ChatView: View {
                                 Text("Loading messages...")
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .padding(.top, 100)
+                        } else if messageService.error != nil {
+                            // Show error state instead of conversation starters if there was a load error
+                            VStack(spacing: 16) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.largeTitle)
+                                    .foregroundColor(.orange)
+                                Text("Couldn't load messages")
+                                    .font(.headline)
+                                Text("Pull down to try again")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                Button("Retry") {
+                                    if let matchId = match.id {
+                                        messageService.listenToMessages(matchId: matchId)
+                                    }
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(.purple)
                             }
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .padding(.top, 100)
@@ -925,11 +953,14 @@ struct ChatView: View {
         // Check both the message matchId AND the service's active matchId for double validation
         let messagesAreForThisMatch = (messageService.messages.first?.matchId == matchId) ||
                                        (messageService.activeMatchId == matchId && !messageService.messages.isEmpty)
-        if messagesAreForThisMatch {
-            hasLoadedMessagesForThisChat = true
-        } else {
-            // Reset the flag when switching to a different chat
-            hasLoadedMessagesForThisChat = false
+        // FIX: Defer state change to avoid "Modifying state during view update" warning
+        Task { @MainActor in
+            if messagesAreForThisMatch {
+                hasLoadedMessagesForThisChat = true
+            } else {
+                // Reset the flag when switching to a different chat
+                hasLoadedMessagesForThisChat = false
+            }
         }
 
         messageService.listenToMessages(matchId: matchId)

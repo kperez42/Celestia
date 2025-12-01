@@ -18,6 +18,8 @@ struct WelcomeView: View {
     @State private var animateGradient = false
     @State private var showContent = false
     @State private var featureTimer: Timer?
+    @State private var showAwarenessSlides = false
+    @State private var navigateToSignUp = false
 
     let features = [
         Feature(icon: "heart.circle.fill", title: "Find Your Match", description: "Meet amazing people near you"),
@@ -74,6 +76,16 @@ struct WelcomeView: View {
                 // Invalidate timer to prevent memory leak
                 featureTimer?.invalidate()
                 featureTimer = nil
+            }
+            // Awareness slides shown before signup
+            .fullScreenCover(isPresented: $showAwarenessSlides) {
+                WelcomeAwarenessSlidesView {
+                    // After completing awareness slides, navigate to signup
+                    showAwarenessSlides = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        navigateToSignUp = true
+                    }
+                }
             }
         }
     }
@@ -198,12 +210,13 @@ struct WelcomeView: View {
     }
     
     // MARK: - CTA Buttons
-    
+
     private var ctaButtons: some View {
         VStack(spacing: 15) {
-            // Create Account - Primary
-            NavigationLink {
-                SignUpView()
+            // Create Account - Primary (shows awareness slides first)
+            Button {
+                HapticManager.shared.impact(.medium)
+                showAwarenessSlides = true
             } label: {
                 HStack(spacing: 12) {
                     Image(systemName: "sparkles")
@@ -240,6 +253,12 @@ struct WelcomeView: View {
             .accessibilityHint("Start creating your Celestia account")
             .accessibilityIdentifier(AccessibilityIdentifier.signUpButton)
             .scaleButton()
+
+            // Hidden NavigationLink for programmatic navigation after awareness slides
+            NavigationLink(destination: SignUpView(), isActive: $navigateToSignUp) {
+                EmptyView()
+            }
+            .hidden()
             
             // Sign In - Secondary
             NavigationLink {
@@ -400,7 +419,293 @@ struct Feature {
     let description: String
 }
 
+// MARK: - Welcome Awareness Slides View
+// Shows app guidelines and features BEFORE signup to educate new users
+
+struct WelcomeAwarenessSlidesView: View {
+    @Environment(\.dismiss) var dismiss
+    @State private var currentPage = 0
+    let onComplete: () -> Void
+
+    // Awareness slides content - educates users about the app
+    let slides: [AwarenessSlide] = [
+        AwarenessSlide(
+            icon: "star.circle.fill",
+            title: "Welcome to Celestia!",
+            description: "Your journey to meaningful connections starts here. Let us show you how it works!",
+            color: .purple,
+            tips: [
+                "Be authentic and genuine in your profile",
+                "Add photos that show your personality",
+                "Write a bio that sparks conversation"
+            ]
+        ),
+        AwarenessSlide(
+            icon: "hand.point.up.left.fill",
+            title: "Discover & Swipe",
+            description: "Swipe right to like someone, or left to pass. When you both like each other, it's a match!",
+            color: .pink,
+            tips: [
+                "Tap the profile to view more details",
+                "Super Like to stand out from the crowd",
+                "Take your time - quality over quantity"
+            ]
+        ),
+        AwarenessSlide(
+            icon: "heart.fill",
+            title: "Make Matches",
+            description: "When someone you liked also likes you back, you'll both be notified and can start chatting!",
+            color: .red,
+            tips: [
+                "Matches appear in your Matches tab",
+                "Send the first message to break the ice",
+                "Be respectful and genuine"
+            ]
+        ),
+        AwarenessSlide(
+            icon: "message.fill",
+            title: "Start Conversations",
+            description: "Once matched, send a message to start getting to know each other better.",
+            color: .blue,
+            tips: [
+                "Ask about their interests",
+                "Reference something from their profile",
+                "Be yourself and have fun!"
+            ]
+        ),
+        AwarenessSlide(
+            icon: "person.crop.circle.fill.badge.checkmark",
+            title: "Complete Your Profile",
+            description: "High-quality profiles get 5x more matches. Add photos, write a bio, and share your interests!",
+            color: .green,
+            tips: [
+                "Add 4-6 clear photos of yourself",
+                "Write a bio that shows your personality",
+                "Select interests to find like-minded people"
+            ]
+        ),
+        AwarenessSlide(
+            icon: "shield.checkered",
+            title: "Stay Safe",
+            description: "Your safety is our priority. We review all profiles and provide tools to report inappropriate behavior.",
+            color: .orange,
+            tips: [
+                "Meet in public places for first dates",
+                "Tell a friend about your plans",
+                "Trust your instincts always",
+                "Report and block suspicious accounts"
+            ]
+        )
+    ]
+
+    var body: some View {
+        ZStack {
+            // Background gradient
+            LinearGradient(
+                colors: [slides[currentPage].color.opacity(0.15), Color.white],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                // Header with skip button
+                HStack {
+                    // Progress dots
+                    HStack(spacing: 8) {
+                        ForEach(0..<slides.count, id: \.self) { index in
+                            Circle()
+                                .fill(currentPage >= index ? slides[currentPage].color : Color.gray.opacity(0.3))
+                                .frame(width: currentPage == index ? 12 : 8, height: currentPage == index ? 12 : 8)
+                                .animation(.spring(response: 0.3), value: currentPage)
+                        }
+                    }
+
+                    Spacer()
+
+                    Button {
+                        onComplete()
+                    } label: {
+                        Text("Skip")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(slides[currentPage].color)
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 20)
+
+                // Swipeable slides
+                TabView(selection: $currentPage) {
+                    ForEach(Array(slides.enumerated()), id: \.element.id) { index, slide in
+                        AwarenessSlideView(slide: slide)
+                            .tag(index)
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+
+                // Navigation buttons
+                HStack(spacing: 16) {
+                    if currentPage > 0 {
+                        Button {
+                            withAnimation(.spring(response: 0.3)) {
+                                currentPage -= 1
+                                HapticManager.shared.impact(.light)
+                            }
+                        } label: {
+                            HStack {
+                                Image(systemName: "chevron.left")
+                                Text("Back")
+                            }
+                            .fontWeight(.semibold)
+                            .foregroundColor(slides[currentPage].color)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(Color.white)
+                            .cornerRadius(16)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(slides[currentPage].color, lineWidth: 2)
+                            )
+                        }
+                    }
+
+                    Button {
+                        if currentPage < slides.count - 1 {
+                            withAnimation(.spring(response: 0.3)) {
+                                currentPage += 1
+                                HapticManager.shared.impact(.medium)
+                            }
+                        } else {
+                            HapticManager.shared.notification(.success)
+                            onComplete()
+                        }
+                    } label: {
+                        HStack {
+                            Text(currentPage < slides.count - 1 ? "Next" : "Get Started")
+                                .fontWeight(.semibold)
+
+                            Image(systemName: currentPage < slides.count - 1 ? "chevron.right" : "arrow.right.circle.fill")
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            LinearGradient(
+                                colors: [slides[currentPage].color, slides[currentPage].color.opacity(0.8)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .cornerRadius(16)
+                        .shadow(color: slides[currentPage].color.opacity(0.3), radius: 10, y: 5)
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 40)
+            }
+        }
+    }
+}
+
+// MARK: - Awareness Slide Model
+
+struct AwarenessSlide: Identifiable {
+    let id = UUID()
+    let icon: String
+    let title: String
+    let description: String
+    let color: Color
+    let tips: [String]
+}
+
+// MARK: - Awareness Slide View
+
+struct AwarenessSlideView: View {
+    let slide: AwarenessSlide
+
+    var body: some View {
+        VStack(spacing: 32) {
+            Spacer()
+
+            // Icon with glow effect
+            ZStack {
+                Circle()
+                    .fill(slide.color.opacity(0.15))
+                    .frame(width: 180, height: 180)
+                    .blur(radius: 20)
+
+                Circle()
+                    .fill(slide.color.opacity(0.1))
+                    .frame(width: 150, height: 150)
+
+                Image(systemName: slide.icon)
+                    .font(.system(size: 80))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [slide.color, slide.color.opacity(0.7)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+
+            VStack(spacing: 16) {
+                Text(slide.title)
+                    .font(.title)
+                    .fontWeight(.bold)
+                    .multilineTextAlignment(.center)
+
+                Text(slide.description)
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+            }
+
+            // Tips section
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(slide.tips, id: \.self) { tip in
+                    HStack(alignment: .top, spacing: 12) {
+                        ZStack {
+                            Circle()
+                                .fill(slide.color.opacity(0.15))
+                                .frame(width: 28, height: 28)
+
+                            Image(systemName: "checkmark")
+                                .font(.caption.bold())
+                                .foregroundColor(slide.color)
+                        }
+
+                        Text(tip)
+                            .font(.subheadline)
+                            .foregroundColor(.primary.opacity(0.8))
+
+                        Spacer()
+                    }
+                }
+            }
+            .padding(20)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.white)
+                    .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
+            )
+            .padding(.horizontal, 24)
+
+            Spacer()
+        }
+        .padding(.vertical)
+    }
+}
+
 #Preview {
     WelcomeView()
         .environmentObject(AuthService.shared)
+}
+
+#Preview("Awareness Slides") {
+    WelcomeAwarenessSlidesView {
+        print("Completed")
+    }
 }

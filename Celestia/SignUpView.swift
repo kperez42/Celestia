@@ -67,23 +67,29 @@ struct SignUpView: View {
             ZStack {
                 Color(.systemGroupedBackground)
                     .ignoresSafeArea()
-                
-                ScrollView {
-                    VStack(spacing: 25) {
-                        // Progress indicator
-                        HStack(spacing: 10) {
-                            ForEach(1...4, id: \.self) { step in
-                                Circle()
-                                    .fill(currentStep >= step ? Color.purple : Color.gray.opacity(0.3))
-                                    .frame(width: 12, height: 12)
-                                    .scaleEffect(currentStep == step ? 1.2 : 1.0)
-                                    .accessibleAnimation(.spring(response: 0.3, dampingFraction: 0.6), value: currentStep)
+
+                ScrollViewReader { scrollProxy in
+                    ScrollView {
+                        VStack(spacing: 25) {
+                            // Invisible anchor for scrolling to top
+                            Color.clear
+                                .frame(height: 1)
+                                .id("top")
+
+                            // Progress indicator
+                            HStack(spacing: 10) {
+                                ForEach(1...4, id: \.self) { step in
+                                    Circle()
+                                        .fill(currentStep >= step ? Color.purple : Color.gray.opacity(0.3))
+                                        .frame(width: 12, height: 12)
+                                        .scaleEffect(currentStep == step ? 1.2 : 1.0)
+                                        .accessibleAnimation(.spring(response: 0.3, dampingFraction: 0.6), value: currentStep)
+                                }
                             }
-                        }
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel("Sign up progress")
-                        .accessibilityValue("Step \(currentStep) of 4")
-                        .padding(.top, 20)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("Sign up progress")
+                            .accessibilityValue("Step \(currentStep) of 4")
+                            .padding(.top, 10)
                         
                         // Header
                         VStack(spacing: 10) {
@@ -197,21 +203,32 @@ struct SignUpView: View {
                         .padding(.horizontal, 30)
                         .padding(.bottom, 30)
                     }
+                    }
+                    .scrollDismissesKeyboard(.interactively)
+                    // FIX: Auto-scroll to top when changing steps
+                    .onChange(of: currentStep) { _, _ in
+                        withAnimation {
+                            scrollProxy.scrollTo("top", anchor: .top)
+                        }
+                    }
                 }
-                .scrollDismissesKeyboard(.interactively)
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                // FIX: Only show X button on step 1 (when there's no Back button)
+                // On steps 2-4, the Back button serves as navigation
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .foregroundColor(.primary)
+                    if currentStep == 1 {
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .foregroundColor(.primary)
+                        }
+                        .accessibilityLabel("Close")
+                        .accessibilityHint("Cancel sign up and return")
+                        .accessibilityIdentifier(AccessibilityIdentifier.closeButton)
                     }
-                    .accessibilityLabel("Close")
-                    .accessibilityHint("Cancel sign up and return")
-                    .accessibilityIdentifier(AccessibilityIdentifier.closeButton)
                 }
             }
         }

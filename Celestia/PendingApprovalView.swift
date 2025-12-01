@@ -407,7 +407,7 @@ struct PendingApprovalView: View {
                     .environmentObject(authService)
             }
             .fullScreenCover(isPresented: $showOnboarding) {
-                OnboardingView()
+                OnboardingView(isEditingExistingProfile: true)
                     .environmentObject(authService)
             }
             .task {
