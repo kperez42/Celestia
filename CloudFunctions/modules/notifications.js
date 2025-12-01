@@ -8,49 +8,85 @@ const functions = require('firebase-functions');
 
 /**
  * Sends a push notification via FCM
+ * Configured for reliable delivery like Instagram - works when app is closed
  * @param {string} token - FCM token
  * @param {object} notification - Notification data
  * @returns {object} Result
  */
 async function sendPushNotification(token, notification) {
   try {
+    // Convert data values to strings (FCM requirement)
+    const stringData = {};
+    if (notification.data) {
+      for (const [key, value] of Object.entries(notification.data)) {
+        stringData[key] = String(value);
+      }
+    }
+
     const message = {
       token,
+      // Notification payload - this shows the notification to user
       notification: {
         title: notification.title,
         body: notification.body,
         imageUrl: notification.imageUrl
       },
-      data: notification.data || {},
+      // Data payload - for app handling
+      data: stringData,
+      // iOS (APNs) configuration - CRITICAL for background delivery
       apns: {
+        headers: {
+          'apns-priority': '10', // HIGH priority - delivers immediately
+          'apns-push-type': 'alert', // Alert type shows notification
+          'apns-expiration': String(Math.floor(Date.now() / 1000) + 86400) // 24hr expiry
+        },
         payload: {
           aps: {
+            alert: {
+              title: notification.title,
+              body: notification.body
+            },
             sound: notification.sound || 'default',
-            badge: notification.badge || 0,
+            badge: notification.badge || 1,
             category: notification.category || 'DEFAULT',
-            'mutable-content': 1 // Enable rich notifications
+            'mutable-content': 1, // Enable rich notifications
+            'content-available': 1 // CRITICAL: Wake app in background
           }
         },
         fcm_options: {
           image: notification.imageUrl
         }
       },
+      // Android configuration
       android: {
+        priority: 'high', // HIGH priority for immediate delivery
+        ttl: 86400000, // 24 hour time-to-live
         notification: {
           sound: notification.sound || 'default',
-          channelId: notification.channel || 'default',
-          priority: 'high',
+          channelId: notification.channel || 'high_priority',
+          priority: 'max', // Maximum priority
           defaultSound: true,
           defaultVibrateTimings: true,
           defaultLightSettings: true,
-          imageUrl: notification.imageUrl
+          imageUrl: notification.imageUrl,
+          notificationCount: notification.badge || 1
+        }
+      },
+      // Web push (optional)
+      webpush: {
+        headers: {
+          Urgency: 'high'
         }
       }
     };
 
     const response = await admin.messaging().send(message);
 
-    functions.logger.info('Push notification sent', { token, messageId: response });
+    functions.logger.info('Push notification sent successfully', {
+      token: token.substring(0, 20) + '...',
+      messageId: response,
+      title: notification.title
+    });
 
     return {
       success: true,
@@ -58,7 +94,18 @@ async function sendPushNotification(token, notification) {
     };
 
   } catch (error) {
-    functions.logger.error('Push notification failed', { error: error.message, token });
+    functions.logger.error('Push notification failed', {
+      error: error.message,
+      errorCode: error.code,
+      token: token.substring(0, 20) + '...'
+    });
+
+    // If token is invalid, we should clean it up
+    if (error.code === 'messaging/registration-token-not-registered' ||
+        error.code === 'messaging/invalid-registration-token') {
+      functions.logger.warn('Invalid FCM token detected - should be cleaned up');
+    }
+
     throw error;
   }
 }
