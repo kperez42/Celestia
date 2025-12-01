@@ -13,59 +13,73 @@ struct AdminModerationDashboard: View {
     @StateObject private var viewModel = ModerationViewModel()
     @State private var selectedTab = 0
     @State private var showingAlerts = false
+    @Namespace private var tabAnimation
+
+    // Tab configuration with icons and colors
+    private let tabs: [(name: String, icon: String, color: Color)] = [
+        ("New", "person.badge.plus", .blue),
+        ("Reports", "exclamationmark.triangle.fill", .orange),
+        ("Suspicious", "eye.trianglebadge.exclamationmark", .red),
+        ("ID Review", "person.text.rectangle", .purple),
+        ("Stats", "chart.bar.fill", .green)
+    ]
 
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Tab selector - scrollable for more tabs
+                // Enhanced Tab selector with icons, badges, and smooth animations
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(["New", "Reports", "Suspicious", "ID Review", "Stats"], id: \.self) { tab in
-                            let index = ["New", "Reports", "Suspicious", "ID Review", "Stats"].firstIndex(of: tab) ?? 0
-                            Button(action: { selectedTab = index }) {
-                                Text(tab)
-                                    .font(.subheadline.weight(.medium))
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 8)
-                                    .background(selectedTab == index ? Color.blue : Color(.systemGray5))
-                                    .foregroundColor(selectedTab == index ? .white : .primary)
-                                    .cornerRadius(8)
-                            }
-                            // Show badge for pending accounts
-                            .overlay(alignment: .topTrailing) {
-                                if tab == "New" && viewModel.pendingProfiles.count > 0 {
-                                    Text("\(viewModel.pendingProfiles.count)")
-                                        .font(.caption2.bold())
-                                        .foregroundColor(.white)
-                                        .padding(4)
-                                        .background(Color.red)
-                                        .clipShape(Circle())
-                                        .offset(x: 6, y: -6)
+                        ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
+                            AdminTabButton(
+                                tab: tab,
+                                isSelected: selectedTab == index,
+                                badgeCount: getBadgeCount(for: index),
+                                namespace: tabAnimation
+                            ) {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                                    selectedTab = index
                                 }
+                                HapticManager.shared.impact(.light)
                             }
                         }
                     }
-                    .padding(.horizontal)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 4)
                 }
-                .padding(.vertical, 8)
+                .padding(.vertical, 12)
+                .background(
+                    // Frosted glass effect background
+                    Rectangle()
+                        .fill(.ultraThinMaterial)
+                        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+                )
+                .overlay(alignment: .bottom) {
+                    // Subtle separator line
+                    Rectangle()
+                        .fill(Color(.separator).opacity(0.3))
+                        .frame(height: 0.5)
+                }
 
-                // Content
-                Group {
-                    switch selectedTab {
-                    case 0:
-                        pendingProfilesView
-                    case 1:
-                        reportsListView
-                    case 2:
-                        suspiciousProfilesView
-                    case 3:
-                        idVerificationReviewView
-                    case 4:
-                        statsView
-                    default:
-                        pendingProfilesView
-                    }
+                // Content with smooth transitions
+                TabView(selection: $selectedTab) {
+                    pendingProfilesView
+                        .tag(0)
+
+                    reportsListView
+                        .tag(1)
+
+                    suspiciousProfilesView
+                        .tag(2)
+
+                    idVerificationReviewView
+                        .tag(3)
+
+                    statsView
+                        .tag(4)
                 }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .animation(.easeInOut(duration: 0.25), value: selectedTab)
             }
             .navigationTitle("Moderation")
             .toolbar {
@@ -112,12 +126,24 @@ struct AdminModerationDashboard: View {
         }
     }
 
+    // MARK: - Badge Count Helper
+
+    private func getBadgeCount(for tabIndex: Int) -> Int {
+        switch tabIndex {
+        case 0: return viewModel.pendingProfiles.count  // New accounts
+        case 1: return viewModel.reports.count          // Reports
+        case 2: return viewModel.suspiciousProfiles.count // Suspicious
+        case 3: return 0  // ID Review count comes from embedded view
+        default: return 0
+        }
+    }
+
     // MARK: - Reports List
 
     private var reportsListView: some View {
         Group {
             if viewModel.isLoading {
-                ProgressView("Loading reports...")
+                ReportsLoadingView()
             } else if let error = viewModel.errorMessage {
                 // Show error state with admin access hint
                 VStack(spacing: 20) {
@@ -164,14 +190,7 @@ struct AdminModerationDashboard: View {
     private var pendingProfilesView: some View {
         Group {
             if viewModel.isLoading {
-                VStack(spacing: 16) {
-                    ProgressView()
-                        .scaleEffect(1.2)
-                    Text("Loading new accounts...")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                PendingProfilesLoadingView()
             } else if viewModel.pendingProfiles.isEmpty {
                 emptyState(
                     icon: "person.crop.circle.badge.checkmark",
@@ -207,7 +226,7 @@ struct AdminModerationDashboard: View {
     private var suspiciousProfilesView: some View {
         Group {
             if viewModel.isLoading {
-                ProgressView("Loading suspicious profiles...")
+                SuspiciousProfilesLoadingView()
             } else if viewModel.suspiciousProfiles.isEmpty {
                 emptyState(
                     icon: "checkmark.circle.fill",
@@ -236,10 +255,48 @@ struct AdminModerationDashboard: View {
     // MARK: - Stats
 
     private var statsView: some View {
+        Group {
+            if viewModel.isLoading {
+                StatsLoadingView()
+            } else {
+                statsContentView
+            }
+        }
+    }
+
+    private var statsContentView: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Summary cards
-                HStack(spacing: 12) {
+                // Header
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Dashboard")
+                            .font(.title2.bold())
+                        Text("Moderation overview")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+
+                    // Last updated indicator
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(.green)
+                            .frame(width: 8, height: 8)
+                        Text("Live")
+                            .font(.caption.weight(.medium))
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                }
+                .padding(.horizontal)
+                .padding(.top, 8)
+
+                // Summary cards in grid
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                     StatCard(
                         title: "Total Reports",
                         value: "\(viewModel.stats.totalReports)",
@@ -253,9 +310,7 @@ struct AdminModerationDashboard: View {
                         icon: "clock.fill",
                         color: .orange
                     )
-                }
 
-                HStack(spacing: 12) {
                     StatCard(
                         title: "Resolved",
                         value: "\(viewModel.stats.resolvedReports)",
@@ -270,60 +325,143 @@ struct AdminModerationDashboard: View {
                         color: .red
                     )
                 }
+                .padding(.horizontal)
 
-                Divider()
-
-                // Recent activity
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Recent Activity")
-                        .font(.headline)
+                // Recent activity card
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.headline)
+                            .foregroundColor(.purple)
+                        Text("Recent Activity")
+                            .font(.headline)
+                        Spacer()
+                    }
 
                     if viewModel.reports.isEmpty && viewModel.suspiciousProfiles.isEmpty {
-                        Text("No recent activity")
-                            .foregroundColor(.secondary)
+                        HStack {
+                            Spacer()
+                            VStack(spacing: 8) {
+                                Image(systemName: "tray")
+                                    .font(.title2)
+                                    .foregroundColor(.secondary)
+                                Text("No recent activity")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.vertical, 20)
+                            Spacer()
+                        }
                     } else {
-                        ForEach(viewModel.reports.prefix(5)) { report in
-                            HStack {
-                                Image(systemName: "exclamationmark.circle.fill")
-                                    .foregroundColor(.orange)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(report.reason)
-                                        .font(.subheadline)
-                                    Text(report.timestamp)
+                        VStack(spacing: 12) {
+                            ForEach(viewModel.reports.prefix(5)) { report in
+                                HStack(spacing: 12) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(Color.orange.opacity(0.15))
+                                            .frame(width: 36, height: 36)
+                                        Image(systemName: "exclamationmark.circle.fill")
+                                            .foregroundColor(.orange)
+                                    }
+
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(report.reason)
+                                            .font(.subheadline.weight(.medium))
+                                        Text(report.timestamp)
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+
+                                    Spacer()
+
+                                    Image(systemName: "chevron.right")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
-                                Spacer()
                             }
                         }
                     }
                 }
                 .padding()
-                .background(Color(.systemGray6))
-                .cornerRadius(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color(.systemBackground))
+                        .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .strokeBorder(Color(.separator).opacity(0.2), lineWidth: 1)
+                )
+                .padding(.horizontal)
             }
-            .padding()
+            .padding(.bottom, 20)
         }
+        .background(Color(.systemGroupedBackground))
     }
 
     // MARK: - Empty State
 
     private func emptyState(icon: String, title: String, message: String) -> some View {
-        VStack(spacing: 20) {
-            Image(systemName: icon)
-                .font(.system(size: 60))
-                .foregroundColor(.green)
+        VStack(spacing: 24) {
+            // Animated icon container
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.green.opacity(0.15), .green.opacity(0.05)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 120, height: 120)
 
-            Text(title)
-                .font(.title2.bold())
+                Circle()
+                    .fill(.green.opacity(0.1))
+                    .frame(width: 90, height: 90)
 
-            Text(message)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
+                Image(systemName: icon)
+                    .font(.system(size: 44, weight: .medium))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.green, .green.opacity(0.7)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .symbolEffect(.pulse, options: .repeating)
+            }
+
+            VStack(spacing: 8) {
+                Text(title)
+                    .font(.title2.bold())
+                    .foregroundColor(.primary)
+
+                Text(message)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 50)
+            }
+
+            // Refresh hint
+            Button {
+                Task { await viewModel.refresh() }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.clockwise")
+                    Text("Refresh")
+                }
+                .font(.subheadline.weight(.medium))
+                .foregroundColor(.blue)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
+                .background(Color.blue.opacity(0.1))
+                .cornerRadius(20)
+            }
+            .padding(.top, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemGroupedBackground))
     }
 }
 
@@ -405,6 +543,9 @@ struct ReportDetailView: View {
     @State private var actionReason = ""
     @State private var showingConfirmation = false
     @State private var isProcessing = false
+    @State private var showPhotoGallery = false
+    @State private var selectedPhotoIndex = 0
+    @State private var photosToShow: [String] = []
 
     var body: some View {
         ScrollView {
@@ -433,7 +574,7 @@ struct ReportDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    // PERFORMANCE: Use CachedAsyncImage
+    // PERFORMANCE: Use CachedAsyncImage - Tap photo to view full screen
     private func userInfoCard(_ user: ModerationReport.UserInfo) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Reported User")
@@ -448,6 +589,16 @@ struct ReportDetailView: View {
                     }
                     .frame(width: 60, height: 60)
                     .clipShape(Circle())
+                    .overlay(
+                        Circle()
+                            .stroke(Color.blue.opacity(0.3), lineWidth: 2)
+                    )
+                    .onTapGesture {
+                        photosToShow = [photoURL]
+                        selectedPhotoIndex = 0
+                        showPhotoGallery = true
+                        HapticManager.shared.impact(.light)
+                    }
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -459,12 +610,24 @@ struct ReportDetailView: View {
                     Text("ID: \(user.id)")
                         .font(.caption2)
                         .foregroundColor(.secondary)
+                    if user.photoURL != nil {
+                        Text("Tap photo to view")
+                            .font(.caption2)
+                            .foregroundColor(.blue)
+                    }
                 }
             }
         }
         .padding()
         .background(Color(.systemGray6))
         .cornerRadius(12)
+        .fullScreenCover(isPresented: $showPhotoGallery) {
+            AdminPhotoGalleryView(
+                photos: photosToShow,
+                selectedIndex: $selectedPhotoIndex,
+                isPresented: $showPhotoGallery
+            )
+        }
     }
 
     private var reportDetailsCard: some View {
@@ -661,11 +824,14 @@ struct SuspiciousProfileDetailView: View {
     @State private var showingBanConfirmation = false
     @State private var banReason = ""
     @State private var isBanning = false
+    @State private var showPhotoGallery = false
+    @State private var selectedPhotoIndex = 0
+    @State private var photosToShow: [String] = []
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                // User info - PERFORMANCE: Use CachedAsyncImage
+                // User info - PERFORMANCE: Use CachedAsyncImage - Tap to view full screen
                 if let user = item.user {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Suspicious Profile")
@@ -680,6 +846,16 @@ struct SuspiciousProfileDetailView: View {
                                 }
                                 .frame(width: 60, height: 60)
                                 .clipShape(Circle())
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.orange.opacity(0.3), lineWidth: 2)
+                                )
+                                .onTapGesture {
+                                    photosToShow = [photoURL]
+                                    selectedPhotoIndex = 0
+                                    showPhotoGallery = true
+                                    HapticManager.shared.impact(.light)
+                                }
                             }
 
                             VStack(alignment: .leading, spacing: 4) {
@@ -688,12 +864,24 @@ struct SuspiciousProfileDetailView: View {
                                 Text("ID: \(user.id)")
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
+                                if user.photoURL != nil {
+                                    Text("Tap photo to view")
+                                        .font(.caption2)
+                                        .foregroundColor(.blue)
+                                }
                             }
                         }
                     }
                     .padding()
                     .background(Color(.systemGray6))
                     .cornerRadius(12)
+                    .fullScreenCover(isPresented: $showPhotoGallery) {
+                        AdminPhotoGalleryView(
+                            photos: photosToShow,
+                            selectedIndex: $selectedPhotoIndex,
+                            isPresented: $showPhotoGallery
+                        )
+                    }
                 }
 
                 // Detection details
@@ -961,6 +1149,9 @@ class ModerationViewModel: ObservableObject {
             "showMeInSearch": true  // Make user visible to others
         ])
 
+        // Send push notification to user about approval
+        await sendProfileStatusNotification(userId: userId, status: "approved", reason: nil, reasonCode: nil)
+
         // Refresh to update list
         await loadQueue()
         Logger.shared.info("Profile approved: \(userId)", category: .moderation)
@@ -977,9 +1168,28 @@ class ModerationViewModel: ObservableObject {
             "showMeInSearch": false
         ])
 
+        // Send push notification to user about rejection
+        await sendProfileStatusNotification(userId: userId, status: "rejected", reason: reasonMessage, reasonCode: reasonCode)
+
         // Refresh to update list
         await loadQueue()
         Logger.shared.info("Profile rejected: \(userId) - Reason: \(reasonCode)", category: .moderation)
+    }
+
+    /// Send profile status notification via Cloud Function
+    private func sendProfileStatusNotification(userId: String, status: String, reason: String?, reasonCode: String?) async {
+        do {
+            let callable = functions.httpsCallable("sendProfileStatusNotification")
+            _ = try await callable.call([
+                "userId": userId,
+                "status": status,
+                "reason": reason ?? "",
+                "reasonCode": reasonCode ?? ""
+            ])
+            Logger.shared.info("Profile status notification sent to \(userId)", category: .moderation)
+        } catch {
+            Logger.shared.error("Failed to send profile status notification", category: .moderation, error: error)
+        }
     }
 
     /// Load reports from Firestore
@@ -1222,11 +1432,35 @@ class ModerationViewModel: ObservableObject {
             "showMeInSearch": false
         ])
 
+        // Send push notification to user about suspension
+        await sendSuspensionNotification(userId: userId, reason: reason, days: days, suspendedUntil: suspendedUntil)
+
         Logger.shared.info("User suspended for \(days) days: \(userId)", category: .moderation)
+    }
+
+    /// Send suspension notification via Cloud Function
+    private func sendSuspensionNotification(userId: String, reason: String, days: Int, suspendedUntil: Date) async {
+        do {
+            let callable = functions.httpsCallable("sendSuspensionNotification")
+            let formatter = ISO8601DateFormatter()
+            _ = try await callable.call([
+                "userId": userId,
+                "reason": reason,
+                "days": days,
+                "suspendedUntil": formatter.string(from: suspendedUntil)
+            ])
+            Logger.shared.info("Suspension notification sent to \(userId)", category: .moderation)
+        } catch {
+            Logger.shared.error("Failed to send suspension notification", category: .moderation, error: error)
+        }
     }
 
     /// Warn user in Firestore
     private func warnUserInFirestore(userId: String, reason: String) async throws {
+        // Get current warning count first
+        let userDoc = try await db.collection("users").document(userId).getDocument()
+        let currentCount = userDoc.data()?["warningCount"] as? Int ?? 0
+
         try await db.collection("users").document(userId).updateData([
             "warnings": FieldValue.arrayUnion([
                 [
@@ -1234,10 +1468,30 @@ class ModerationViewModel: ObservableObject {
                     "timestamp": Timestamp(date: Date())
                 ]
             ]),
-            "warningCount": FieldValue.increment(Int64(1))
+            "warningCount": FieldValue.increment(Int64(1)),
+            "hasUnreadWarning": true,
+            "lastWarningReason": reason
         ])
 
+        // Send push notification to user about warning
+        await sendWarningNotification(userId: userId, reason: reason, warningCount: currentCount + 1)
+
         Logger.shared.info("Warning issued to user: \(userId)", category: .moderation)
+    }
+
+    /// Send warning notification via Cloud Function
+    private func sendWarningNotification(userId: String, reason: String, warningCount: Int) async {
+        do {
+            let callable = functions.httpsCallable("sendWarningNotification")
+            _ = try await callable.call([
+                "userId": userId,
+                "reason": reason,
+                "warningCount": warningCount
+            ])
+            Logger.shared.info("Warning notification sent to \(userId)", category: .moderation)
+        } catch {
+            Logger.shared.error("Failed to send warning notification", category: .moderation, error: error)
+        }
     }
 }
 
@@ -1516,44 +1770,64 @@ struct PendingProfileCard: View {
     @State private var isRejecting = false
     @State private var showRejectAlert = false
     @State private var currentPhotoIndex = 0
+    @State private var showPhotoGallery = false
+
+    // Admin comment flow
+    @State private var selectedRejectionReason: ProfileRejectionReason?
+    @State private var showAdminCommentSheet = false
+    @State private var adminComment = ""
+
+    // Fixed height for consistent card sizing
+    private let photoHeight: CGFloat = 280
 
     var body: some View {
         VStack(spacing: 0) {
-            // Photo Gallery
+            // Photo Gallery - Tap to view full screen (fixed height container)
             ZStack(alignment: .bottom) {
                 TabView(selection: $currentPhotoIndex) {
                     ForEach(Array(profile.photos.enumerated()), id: \.offset) { index, photoURL in
                         if let url = URL(string: photoURL) {
-                            AsyncImage(url: url) { phase in
-                                switch phase {
-                                case .success(let image):
-                                    image
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                case .failure:
-                                    Rectangle()
-                                        .fill(Color.gray.opacity(0.2))
-                                        .overlay(
-                                            Image(systemName: "photo")
-                                                .font(.largeTitle)
-                                                .foregroundColor(.gray)
-                                        )
-                                case .empty:
-                                    Rectangle()
-                                        .fill(Color.gray.opacity(0.1))
-                                        .overlay(ProgressView())
-                                @unknown default:
-                                    EmptyView()
+                            GeometryReader { geo in
+                                AsyncImage(url: url) { phase in
+                                    switch phase {
+                                    case .success(let image):
+                                        image
+                                            .resizable()
+                                            .scaledToFill()
+                                            .frame(width: geo.size.width, height: photoHeight)
+                                            .clipped()
+                                    case .failure:
+                                        Rectangle()
+                                            .fill(Color.gray.opacity(0.2))
+                                            .frame(width: geo.size.width, height: photoHeight)
+                                            .overlay(
+                                                Image(systemName: "photo")
+                                                    .font(.largeTitle)
+                                                    .foregroundColor(.gray)
+                                            )
+                                    case .empty:
+                                        Rectangle()
+                                            .fill(Color.gray.opacity(0.1))
+                                            .frame(width: geo.size.width, height: photoHeight)
+                                            .overlay(ProgressView())
+                                    @unknown default:
+                                        EmptyView()
+                                    }
+                                }
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    currentPhotoIndex = index
+                                    showPhotoGallery = true
+                                    HapticManager.shared.impact(.light)
                                 }
                             }
-                            .frame(height: 280)
-                            .clipped()
+                            .frame(height: photoHeight)
                             .tag(index)
                         }
                     }
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
-                .frame(height: 280)
+                .frame(height: photoHeight)
 
                 // Photo indicators
                 if profile.photos.count > 1 {
@@ -1567,9 +1841,20 @@ struct PendingProfileCard: View {
                     .padding(.bottom, 12)
                 }
 
-                // Photo count badge
+                // Photo count badge + tap hint
                 HStack {
+                    // Tap to view hint
+                    Label("Tap to view", systemImage: "hand.tap")
+                        .font(.caption2.bold())
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(.ultraThinMaterial)
+                        .cornerRadius(12)
+                        .padding(12)
+
                     Spacer()
+
                     Label("\(profile.photos.count)", systemImage: "photo.stack")
                         .font(.caption.bold())
                         .foregroundColor(.white)
@@ -1580,6 +1865,13 @@ struct PendingProfileCard: View {
                         .padding(12)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            }
+            .fullScreenCover(isPresented: $showPhotoGallery) {
+                AdminPhotoGalleryView(
+                    photos: profile.photos,
+                    selectedIndex: $currentPhotoIndex,
+                    isPresented: $showPhotoGallery
+                )
             }
 
             // Profile Info
@@ -1633,7 +1925,10 @@ struct PendingProfileCard: View {
                 // Action Buttons
                 HStack(spacing: 16) {
                     // Reject Button
-                    Button(action: { showRejectAlert = true }) {
+                    Button(action: {
+                        HapticManager.shared.impact(.light)
+                        showRejectAlert = true
+                    }) {
                         HStack(spacing: 8) {
                             if isRejecting {
                                 ProgressView()
@@ -1662,9 +1957,16 @@ struct PendingProfileCard: View {
 
                     // Approve Button
                     Button(action: {
+                        HapticManager.shared.impact(.medium)
                         Task {
                             isApproving = true
-                            try? await viewModel.approveProfile(userId: profile.id)
+                            do {
+                                try await viewModel.approveProfile(userId: profile.id)
+                                HapticManager.shared.notification(.success)
+                            } catch {
+                                HapticManager.shared.notification(.error)
+                                Logger.shared.error("Failed to approve profile", category: .moderation, error: error)
+                            }
                             isApproving = false
                         }
                     }) {
@@ -1701,44 +2003,252 @@ struct PendingProfileCard: View {
         .cornerRadius(20)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
         .confirmationDialog("Reject Profile", isPresented: $showRejectAlert, titleVisibility: .visible) {
-            Button("No Clear Face Photo", role: .destructive) {
-                rejectWithReason(ProfileRejectionReason.noFacePhoto)
+            // Photo Issues
+            Button("📸 No Clear Face Photo", role: .destructive) {
+                selectReasonAndShowComment(.noFacePhoto)
             }
-            Button("Inappropriate/Adult Content", role: .destructive) {
-                rejectWithReason(ProfileRejectionReason.inappropriatePhotos)
+            Button("📷 Low Quality Photos", role: .destructive) {
+                selectReasonAndShowComment(.lowQualityPhotos)
             }
-            Button("Fake/Stock Photos", role: .destructive) {
-                rejectWithReason(ProfileRejectionReason.fakePhotos)
+            Button("🔍 Fake/Stock Photos", role: .destructive) {
+                selectReasonAndShowComment(.fakePhotos)
             }
-            Button("Empty/Incomplete Bio", role: .destructive) {
-                rejectWithReason(ProfileRejectionReason.incompleteBio)
+            Button("🚫 Inappropriate Content", role: .destructive) {
+                selectReasonAndShowComment(.inappropriatePhotos)
             }
-            Button("Suspected Underage", role: .destructive) {
-                rejectWithReason(ProfileRejectionReason.underage)
+            // Bio Issues
+            Button("✏️ Incomplete Bio", role: .destructive) {
+                selectReasonAndShowComment(.incompleteBio)
             }
-            Button("Spam/Promotional", role: .destructive) {
-                rejectWithReason(ProfileRejectionReason.spam)
+            Button("📵 Contact Info in Bio", role: .destructive) {
+                selectReasonAndShowComment(.contactInfoInBio)
             }
-            Button("Offensive Content", role: .destructive) {
-                rejectWithReason(ProfileRejectionReason.offensiveContent)
+            // Account Issues
+            Button("🔞 Suspected Underage", role: .destructive) {
+                selectReasonAndShowComment(.underage)
+            }
+            Button("📢 Spam/Promotional", role: .destructive) {
+                selectReasonAndShowComment(.spam)
+            }
+            Button("⚠️ Offensive Content", role: .destructive) {
+                selectReasonAndShowComment(.offensiveContent)
+            }
+            Button("👥 Multiple Accounts", role: .destructive) {
+                selectReasonAndShowComment(.multipleAccounts)
             }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Select a reason for rejecting \(profile.name)'s profile")
+            Text("Select why \(profile.name)'s profile needs changes")
+        }
+        // Admin Comment Sheet (optional note before rejecting)
+        .sheet(isPresented: $showAdminCommentSheet) {
+            AdminRejectCommentSheet(
+                profileName: profile.name,
+                reason: selectedRejectionReason,
+                adminComment: $adminComment,
+                isRejecting: $isRejecting,
+                onSubmit: {
+                    submitRejection()
+                },
+                onCancel: {
+                    adminComment = ""
+                    selectedRejectionReason = nil
+                }
+            )
         }
     }
 
-    private func rejectWithReason(_ reason: ProfileRejectionReason) {
+    /// Select a rejection reason and show the optional admin comment sheet
+    private func selectReasonAndShowComment(_ reason: ProfileRejectionReason) {
+        selectedRejectionReason = reason
+        adminComment = ""
+        showAdminCommentSheet = true
+    }
+
+    /// Submit the rejection with optional admin comment
+    private func submitRejection() {
+        guard let reason = selectedRejectionReason else { return }
+        HapticManager.shared.impact(.medium)
         Task {
             isRejecting = true
-            try? await viewModel.rejectProfile(
-                userId: profile.id,
-                reasonCode: reason.code,
-                reasonMessage: reason.userMessage,
-                fixInstructions: reason.fixInstructions
-            )
+
+            // Build fix instructions - add admin comment if provided
+            var finalInstructions = reason.fixInstructions
+            if !adminComment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                finalInstructions += "\n\n📝 Additional Note from Admin:\n\(adminComment)"
+            }
+
+            do {
+                try await viewModel.rejectProfile(
+                    userId: profile.id,
+                    reasonCode: reason.code,
+                    reasonMessage: reason.userMessage,
+                    fixInstructions: finalInstructions
+                )
+                HapticManager.shared.notification(.warning)
+            } catch {
+                HapticManager.shared.notification(.error)
+                Logger.shared.error("Failed to reject profile", category: .moderation, error: error)
+            }
+
             isRejecting = false
+            adminComment = ""
+            selectedRejectionReason = nil
         }
+    }
+
+}
+
+// MARK: - Admin Reject Comment Sheet
+
+/// Sheet for adding optional admin comment before rejecting a profile
+struct AdminRejectCommentSheet: View {
+    let profileName: String
+    let reason: ProfileRejectionReason?
+    @Binding var adminComment: String
+    @Binding var isRejecting: Bool
+    let onSubmit: () -> Void
+    let onCancel: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @FocusState private var isTextFieldFocused: Bool
+
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 20) {
+                // Reason summary card
+                if let reason = reason {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.orange)
+                            Text("Rejection Reason")
+                                .font(.headline)
+                        }
+
+                        Text(reason.userMessage)
+                            .font(.subheadline)
+                            .foregroundColor(.primary)
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.orange.opacity(0.1))
+                            .cornerRadius(12)
+                    }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(16)
+                }
+
+                // Admin comment input
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Image(systemName: "pencil.and.scribble")
+                            .foregroundColor(.blue)
+                        Text("Admin Comment")
+                            .font(.headline)
+                        Text("(Optional)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Text("Add a personal note for \(profileName). Leave blank to use only the standard message.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    TextEditor(text: $adminComment)
+                        .focused($isTextFieldFocused)
+                        .frame(minHeight: 120, maxHeight: 200)
+                        .padding(12)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .strokeBorder(Color(.separator), lineWidth: 1)
+                        )
+                        .overlay(alignment: .topLeading) {
+                            if adminComment.isEmpty {
+                                Text("e.g., \"Please upload a photo without sunglasses\" or \"Your main photo should be just you, not a group photo\"")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary.opacity(0.6))
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 20)
+                                    .allowsHitTesting(false)
+                            }
+                        }
+                }
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(16)
+
+                Spacer()
+
+                // Action buttons
+                VStack(spacing: 12) {
+                    // Reject button
+                    Button(action: {
+                        dismiss()
+                        onSubmit()
+                    }) {
+                        HStack(spacing: 10) {
+                            if isRejecting {
+                                ProgressView()
+                                    .tint(.white)
+                            } else {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.title3)
+                                Text(adminComment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Reject Profile" : "Reject with Comment")
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            LinearGradient(
+                                colors: [.red, .red.opacity(0.85)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .cornerRadius(14)
+                        .shadow(color: .red.opacity(0.3), radius: 8, y: 4)
+                    }
+                    .disabled(isRejecting)
+
+                    // Cancel button
+                    Button(action: {
+                        dismiss()
+                        onCancel()
+                    }) {
+                        Text("Cancel")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundColor(.secondary)
+                    }
+                    .disabled(isRejecting)
+                }
+            }
+            .padding()
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("Reject \(profileName)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                        onCancel()
+                    }
+                    .disabled(isRejecting)
+                }
+            }
+            .onAppear {
+                // Auto-focus the text field
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    isTextFieldFocused = true
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 }
 
@@ -1753,6 +2263,9 @@ enum ProfileRejectionReason {
     case underage
     case spam
     case offensiveContent
+    case lowQualityPhotos
+    case contactInfoInBio
+    case multipleAccounts
 
     var code: String {
         switch self {
@@ -1763,44 +2276,145 @@ enum ProfileRejectionReason {
         case .underage: return "underage"
         case .spam: return "spam"
         case .offensiveContent: return "offensive_content"
+        case .lowQualityPhotos: return "low_quality_photos"
+        case .contactInfoInBio: return "contact_info_bio"
+        case .multipleAccounts: return "multiple_accounts"
         }
     }
 
     var userMessage: String {
         switch self {
         case .noFacePhoto:
-            return "Your profile needs a clear photo showing your face"
+            return "We need a clear photo showing your face"
         case .inappropriatePhotos:
-            return "One or more of your photos contains inappropriate content"
+            return "Some photos contain content that isn't allowed"
         case .fakePhotos:
-            return "Your photos appear to be stock images or from another person"
+            return "We detected photos that may not be authentic"
         case .incompleteBio:
-            return "Your profile bio is empty or too short"
+            return "Your bio needs more detail about yourself"
         case .underage:
-            return "We couldn't verify that you meet our minimum age requirement"
+            return "Age verification is required"
         case .spam:
-            return "Your profile appears to be promotional or spam"
+            return "Your profile contains promotional content"
         case .offensiveContent:
-            return "Your profile contains offensive or hateful content"
+            return "Some content violates our community guidelines"
+        case .lowQualityPhotos:
+            return "Your photos are too blurry or low quality"
+        case .contactInfoInBio:
+            return "Contact information isn't allowed in bios"
+        case .multipleAccounts:
+            return "Multiple accounts aren't permitted"
         }
     }
 
     var fixInstructions: String {
         switch self {
         case .noFacePhoto:
-            return "Please upload at least one photo that clearly shows your face. Group photos, photos with sunglasses, or photos taken from far away won't be accepted."
+            return """
+            📸 Upload a clear, well-lit photo where your face is fully visible
+
+            ✅ Good photos:
+            • Face clearly visible and in focus
+            • Good lighting (natural light works great!)
+            • Just you in the photo
+
+            ❌ Avoid:
+            • Sunglasses or hats covering your face
+            • Group photos as your main picture
+            • Photos from far away
+            """
         case .inappropriatePhotos:
-            return "Please remove any photos containing nudity, explicit content, or suggestive material. Your photos should be appropriate for all audiences."
+            return """
+            🚫 Please remove photos that contain:
+            • Nudity or sexually suggestive content
+            • Violent or graphic imagery
+            • Drug or alcohol use
+
+            ✅ Keep it classy! Show your personality through photos of your hobbies, travel, or daily life.
+            """
         case .fakePhotos:
-            return "Please upload real photos of yourself. Using someone else's photos or stock images violates our community guidelines."
+            return """
+            🔍 We want to see the real you!
+
+            Please upload genuine photos of yourself. Using:
+            • Celebrity photos
+            • Stock images
+            • Someone else's pictures
+
+            ...violates our guidelines and may result in a permanent ban.
+            """
         case .incompleteBio:
-            return "Please write a bio that's at least 20 characters long. Tell others about your interests, hobbies, or what you're looking for."
+            return """
+            ✏️ Tell people about yourself!
+
+            A good bio includes:
+            • Your interests and hobbies
+            • What you're looking for
+            • Something unique about you
+
+            Aim for at least 2-3 sentences. This helps you get better matches!
+            """
         case .underage:
-            return "If you believe this is a mistake, please contact support with a valid ID to verify your age. Users must be 18 or older."
+            return """
+            🔞 All users must be 18 or older.
+
+            If you believe this is a mistake, please contact support with a valid government-issued ID to verify your age.
+
+            We take age verification seriously to keep our community safe.
+            """
         case .spam:
-            return "Please remove any promotional content, links, or business advertisements from your profile. This platform is for genuine connections only."
+            return """
+            🚫 Please remove any:
+            • Business promotions or advertisements
+            • Links to other websites
+            • Social media handles
+            • Phone numbers or email addresses
+
+            This app is for genuine connections, not marketing!
+            """
         case .offensiveContent:
-            return "Please remove any content that could be considered hateful, discriminatory, or offensive. Our community is built on respect."
+            return """
+            🤝 Our community is built on respect.
+
+            Please remove any content that is:
+            • Hateful or discriminatory
+            • Threatening or harassing
+            • Politically extreme
+
+            Everyone deserves to feel welcome here.
+            """
+        case .lowQualityPhotos:
+            return """
+            📷 Your photos need better quality!
+
+            Tips for better photos:
+            • Use good lighting (natural daylight is best)
+            • Keep the camera steady or use a tripod
+            • Clean your camera lens
+            • Take photos at a reasonable distance
+
+            Clear photos help you get more matches!
+            """
+        case .contactInfoInBio:
+            return """
+            📵 Please remove contact information from your bio
+
+            This includes:
+            • Phone numbers
+            • Email addresses
+            • Social media handles (Instagram, Snapchat, etc.)
+            • External links
+
+            For your safety, share contact info through our messaging system after matching!
+            """
+        case .multipleAccounts:
+            return """
+            ⚠️ Each person can only have one account.
+
+            If you have another account, please delete it and use only this one.
+
+            If you believe this is a mistake, please contact support to resolve the issue.
+            """
         }
     }
 }
@@ -1923,6 +2537,278 @@ struct AdminAlertRow: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Admin Photo Gallery View (Clickable Full-Screen with Swipe Navigation)
+
+struct AdminPhotoGalleryView: View {
+    let photos: [String]
+    @Binding var selectedIndex: Int
+    @Binding var isPresented: Bool
+
+    // Swipe-down to dismiss state
+    @State private var dismissDragOffset: CGFloat = 0
+    @State private var isDismissing = false
+
+    // Threshold for dismissing (150 points down)
+    private let dismissThreshold: CGFloat = 150
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                // Black background with opacity based on drag
+                Color.black
+                    .opacity(backgroundOpacity)
+                    .ignoresSafeArea()
+
+                // Photo carousel with smooth swiping
+                TabView(selection: $selectedIndex) {
+                    ForEach(Array(photos.enumerated()), id: \.offset) { index, photoURL in
+                        AdminZoomablePhotoView(
+                            url: URL(string: photoURL),
+                            isCurrentPhoto: index == selectedIndex
+                        )
+                        .tag(index)
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .automatic))
+                .indexViewStyle(.page(backgroundDisplayMode: .always))
+                // Apply dismiss offset and scale
+                .offset(y: dismissDragOffset)
+                .scaleEffect(dismissScale)
+
+                // Close button and counter overlay
+                VStack {
+                    HStack {
+                        // Close button
+                        Button {
+                            HapticManager.shared.impact(.light)
+                            isPresented = false
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.title3.weight(.semibold))
+                                .foregroundColor(.white)
+                                .frame(width: 40, height: 40)
+                                .background(Color.black.opacity(0.5))
+                                .clipShape(Circle())
+                        }
+
+                        Spacer()
+
+                        // Photo counter
+                        Text("\(selectedIndex + 1) / \(photos.count)")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.black.opacity(0.5))
+                            .cornerRadius(20)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 60)
+
+                    Spacer()
+
+                    // Hint text
+                    Text("Swipe left/right to navigate • Pinch to zoom • Swipe down to close")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.7))
+                        .padding(.bottom, 40)
+                }
+                .opacity(controlsOpacity)
+            }
+            // Swipe-down to dismiss gesture
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        // Only allow downward drag for dismiss
+                        if value.translation.height > 0 {
+                            dismissDragOffset = value.translation.height
+                        }
+                    }
+                    .onEnded { value in
+                        if value.translation.height > dismissThreshold {
+                            // Dismiss with animation
+                            isDismissing = true
+                            HapticManager.shared.impact(.light)
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                dismissDragOffset = geometry.size.height
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                isPresented = false
+                            }
+                        } else {
+                            // Snap back
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                dismissDragOffset = 0
+                            }
+                        }
+                    }
+            )
+        }
+        .statusBarHidden()
+    }
+
+    // Computed properties for smooth dismiss animation
+    private var backgroundOpacity: Double {
+        let progress = min(dismissDragOffset / dismissThreshold, 1.0)
+        return 1.0 - (progress * 0.5)
+    }
+
+    private var dismissScale: CGFloat {
+        let progress = min(dismissDragOffset / dismissThreshold, 1.0)
+        return 1.0 - (progress * 0.1)
+    }
+
+    private var controlsOpacity: Double {
+        let progress = min(dismissDragOffset / dismissThreshold, 1.0)
+        return 1.0 - progress
+    }
+}
+
+// MARK: - Admin Zoomable Photo View
+
+struct AdminZoomablePhotoView: View {
+    let url: URL?
+    let isCurrentPhoto: Bool
+
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
+
+    init(url: URL?, isCurrentPhoto: Bool = true) {
+        self.url = url
+        self.isCurrentPhoto = isCurrentPhoto
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            CachedAsyncImage(url: url) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+            } placeholder: {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+            .scaleEffect(scale)
+            .offset(offset)
+            .gesture(
+                MagnificationGesture()
+                    .onChanged { value in
+                        let delta = value / lastScale
+                        lastScale = value
+                        scale = min(max(scale * delta, 1), 4)
+                    }
+                    .onEnded { _ in
+                        lastScale = 1.0
+                        if scale < 1 {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                scale = 1
+                                offset = .zero
+                            }
+                        }
+                    }
+            )
+            .simultaneousGesture(
+                scale > 1 ?
+                DragGesture()
+                    .onChanged { value in
+                        offset = CGSize(
+                            width: lastOffset.width + value.translation.width,
+                            height: lastOffset.height + value.translation.height
+                        )
+                    }
+                    .onEnded { _ in
+                        lastOffset = offset
+                    }
+                : nil
+            )
+            .onTapGesture(count: 2) {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
+                    if scale > 1 {
+                        scale = 1
+                        offset = .zero
+                        lastOffset = .zero
+                    } else {
+                        scale = 2
+                    }
+                }
+                HapticManager.shared.impact(.light)
+            }
+        }
+    }
+}
+
+// MARK: - Admin Tab Button Component
+
+struct AdminTabButton: View {
+    let tab: (name: String, icon: String, color: Color)
+    let isSelected: Bool
+    let badgeCount: Int
+    let namespace: Namespace.ID
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                Image(systemName: tab.icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .symbolEffect(.bounce, value: isSelected)
+
+                Text(tab.name)
+                    .font(.system(size: 14, weight: .semibold))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 11)
+            .foregroundColor(isSelected ? .white : .primary.opacity(0.8))
+            .background {
+                if isSelected {
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [tab.color, tab.color.opacity(0.85)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .shadow(color: tab.color.opacity(0.4), radius: 8, y: 4)
+                        .matchedGeometryEffect(id: "tab_background", in: namespace)
+                } else {
+                    Capsule()
+                        .fill(Color(.systemGray5).opacity(0.8))
+                }
+            }
+            .overlay {
+                if isSelected {
+                    Capsule()
+                        .strokeBorder(Color.white.opacity(0.25), lineWidth: 1)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .scaleEffect(isSelected ? 1.02 : 1.0)
+        // Badge overlay
+        .overlay(alignment: .topTrailing) {
+            if badgeCount > 0 {
+                Text(badgeCount > 99 ? "99+" : "\(badgeCount)")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(
+                        Capsule()
+                            .fill(Color.red)
+                            .shadow(color: .red.opacity(0.4), radius: 4, y: 2)
+                    )
+                    .offset(x: 10, y: -8)
+                    .transition(.scale.combined(with: .opacity))
+            }
+        }
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: badgeCount)
     }
 }
 

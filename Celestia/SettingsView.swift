@@ -69,6 +69,34 @@ struct SettingsView: View {
                                 .fontWeight(.medium)
                         }
                     }
+
+                    // Profile Status
+                    if let user = authService.currentUser {
+                        HStack {
+                            Text("Profile Status")
+                            Spacer()
+                            HStack(spacing: 4) {
+                                Image(systemName: profileStatusIcon(for: user.profileStatus))
+                                    .font(.caption)
+                                    .foregroundColor(profileStatusColor(for: user.profileStatus))
+                                Text(profileStatusText(for: user.profileStatus))
+                                    .foregroundColor(profileStatusColor(for: user.profileStatus))
+                            }
+                        }
+
+                        // ID Verification Status
+                        HStack {
+                            Text("ID Verification")
+                            Spacer()
+                            HStack(spacing: 4) {
+                                Image(systemName: verificationStatusIcon(for: user))
+                                    .font(.caption)
+                                    .foregroundColor(verificationStatusColor(for: user))
+                                Text(verificationStatusText(for: user))
+                                    .foregroundColor(verificationStatusColor(for: user))
+                            }
+                        }
+                    }
                 }
 
                 Section {
@@ -457,6 +485,79 @@ struct SettingsView: View {
         guard let email = authService.currentUser?.email else { return false }
         let adminEmails = ["perezkevin640@gmail.com", "admin@celestia.app"]
         return adminEmails.contains(email.lowercased())
+    }
+
+    // MARK: - Profile Status Helpers
+
+    private func profileStatusIcon(for status: String?) -> String {
+        switch status?.lowercased() {
+        case "approved":
+            return "checkmark.seal.fill"
+        case "pending":
+            return "clock.fill"
+        case "rejected":
+            return "xmark.circle.fill"
+        default:
+            return "questionmark.circle.fill"
+        }
+    }
+
+    private func profileStatusColor(for status: String?) -> Color {
+        switch status?.lowercased() {
+        case "approved":
+            return .green
+        case "pending":
+            return .orange
+        case "rejected":
+            return .red
+        default:
+            return .gray
+        }
+    }
+
+    private func profileStatusText(for status: String?) -> String {
+        switch status?.lowercased() {
+        case "approved":
+            return "Approved"
+        case "pending":
+            return "Pending Review"
+        case "rejected":
+            return "Needs Updates"
+        default:
+            return "Unknown"
+        }
+    }
+
+    // MARK: - Verification Status Helpers
+
+    private func verificationStatusIcon(for user: User) -> String {
+        if user.isVerified {
+            return "checkmark.shield.fill"
+        } else if user.idVerificationRejected {
+            return "xmark.shield.fill"
+        } else {
+            return "shield"
+        }
+    }
+
+    private func verificationStatusColor(for user: User) -> Color {
+        if user.isVerified {
+            return .green
+        } else if user.idVerificationRejected {
+            return .red
+        } else {
+            return .gray
+        }
+    }
+
+    private func verificationStatusText(for user: User) -> String {
+        if user.isVerified {
+            return "Verified"
+        } else if user.idVerificationRejected {
+            return "Rejected"
+        } else {
+            return "Not Verified"
+        }
     }
 }
 

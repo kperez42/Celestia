@@ -56,6 +56,11 @@ struct User: Identifiable, Codable, Equatable {
     var premiumTier: String?
     var subscriptionExpiryDate: Date?
 
+    // ID Verification Rejection (when ID verification is rejected)
+    var idVerificationRejected: Bool = false
+    var idVerificationRejectedAt: Date?
+    var idVerificationRejectionReason: String?
+
     // Admin Access (for moderation dashboard)
     var isAdmin: Bool = false
 
@@ -70,6 +75,17 @@ struct User: Identifiable, Codable, Equatable {
     var profileStatusReasonCode: String?       // Machine-readable code (e.g., "no_face_photo")
     var profileStatusFixInstructions: String?  // Detailed fix instructions for user
     var profileStatusUpdatedAt: Date?
+
+    // Suspension Info (set by admin when suspending user)
+    var isSuspended: Bool = false
+    var suspendedAt: Date?
+    var suspendedUntil: Date?
+    var suspendReason: String?
+
+    // Warnings (accumulated from reports)
+    var warningCount: Int = 0
+    var hasUnreadWarning: Bool = false         // Show warning notice to user
+    var lastWarningReason: String?             // Most recent warning reason
     
     // Preferences
     var ageRangeMin: Int
@@ -165,11 +181,21 @@ struct User: Identifiable, Codable, Equatable {
         try container.encode(isAdmin, forKey: .isAdmin)
         try container.encodeIfPresent(premiumTier, forKey: .premiumTier)
         try container.encodeIfPresent(subscriptionExpiryDate, forKey: .subscriptionExpiryDate)
+        try container.encode(idVerificationRejected, forKey: .idVerificationRejected)
+        try container.encodeIfPresent(idVerificationRejectedAt, forKey: .idVerificationRejectedAt)
+        try container.encodeIfPresent(idVerificationRejectionReason, forKey: .idVerificationRejectionReason)
         try container.encode(profileStatus, forKey: .profileStatus)
         try container.encodeIfPresent(profileStatusReason, forKey: .profileStatusReason)
         try container.encodeIfPresent(profileStatusReasonCode, forKey: .profileStatusReasonCode)
         try container.encodeIfPresent(profileStatusFixInstructions, forKey: .profileStatusFixInstructions)
         try container.encodeIfPresent(profileStatusUpdatedAt, forKey: .profileStatusUpdatedAt)
+        try container.encode(isSuspended, forKey: .isSuspended)
+        try container.encodeIfPresent(suspendedAt, forKey: .suspendedAt)
+        try container.encodeIfPresent(suspendedUntil, forKey: .suspendedUntil)
+        try container.encodeIfPresent(suspendReason, forKey: .suspendReason)
+        try container.encode(warningCount, forKey: .warningCount)
+        try container.encode(hasUnreadWarning, forKey: .hasUnreadWarning)
+        try container.encodeIfPresent(lastWarningReason, forKey: .lastWarningReason)
         try container.encode(ageRangeMin, forKey: .ageRangeMin)
         try container.encode(ageRangeMax, forKey: .ageRangeMax)
         try container.encode(maxDistance, forKey: .maxDistance)
@@ -206,7 +232,10 @@ struct User: Identifiable, Codable, Equatable {
         case languages, interests, photos, profileImageURL
         case timestamp, lastActive, isOnline
         case isPremium, isVerified, isAdmin, premiumTier, subscriptionExpiryDate
+        case idVerificationRejected, idVerificationRejectedAt, idVerificationRejectionReason
         case profileStatus, profileStatusReason, profileStatusReasonCode, profileStatusFixInstructions, profileStatusUpdatedAt
+        case isSuspended, suspendedAt, suspendedUntil, suspendReason
+        case warningCount, hasUnreadWarning, lastWarningReason
         case ageRangeMin, ageRangeMax, maxDistance, showMeInSearch
         case likesGiven, likesReceived, matchCount, profileViews
         case fcmToken, notificationsEnabled
@@ -260,12 +289,36 @@ struct User: Identifiable, Codable, Equatable {
             self.subscriptionExpiryDate = expiryDate.dateValue()
         }
 
+        // ID Verification rejection info
+        self.idVerificationRejected = dictionary["idVerificationRejected"] as? Bool ?? false
+        if let rejectedAt = dictionary["idVerificationRejectedAt"] as? Timestamp {
+            self.idVerificationRejectedAt = rejectedAt.dateValue()
+        }
+        self.idVerificationRejectionReason = dictionary["idVerificationRejectionReason"] as? String
+
         // Profile Status (for moderation quarantine)
         self.profileStatus = dictionary["profileStatus"] as? String ?? "pending"
         self.profileStatusReason = dictionary["profileStatusReason"] as? String
+        self.profileStatusReasonCode = dictionary["profileStatusReasonCode"] as? String
+        self.profileStatusFixInstructions = dictionary["profileStatusFixInstructions"] as? String
         if let statusUpdatedAt = dictionary["profileStatusUpdatedAt"] as? Timestamp {
             self.profileStatusUpdatedAt = statusUpdatedAt.dateValue()
         }
+
+        // Suspension info
+        self.isSuspended = dictionary["isSuspended"] as? Bool ?? false
+        if let suspendedAtTs = dictionary["suspendedAt"] as? Timestamp {
+            self.suspendedAt = suspendedAtTs.dateValue()
+        }
+        if let suspendedUntilTs = dictionary["suspendedUntil"] as? Timestamp {
+            self.suspendedUntil = suspendedUntilTs.dateValue()
+        }
+        self.suspendReason = dictionary["suspendReason"] as? String
+
+        // Warnings
+        self.warningCount = dictionary["warningCount"] as? Int ?? 0
+        self.hasUnreadWarning = dictionary["hasUnreadWarning"] as? Bool ?? false
+        self.lastWarningReason = dictionary["lastWarningReason"] as? String
 
         self.ageRangeMin = dictionary["ageRangeMin"] as? Int ?? 18
         self.ageRangeMax = dictionary["ageRangeMax"] as? Int ?? 99

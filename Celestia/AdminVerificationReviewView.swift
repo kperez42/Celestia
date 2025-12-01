@@ -10,6 +10,7 @@ import SwiftUI
 import FirebaseFirestore
 import FirebaseAuth
 import FirebaseStorage
+import FirebaseFunctions
 
 // MARK: - Pending Verification Model
 
@@ -173,17 +174,20 @@ struct VerificationRowView: View {
                 }
             }
 
-            // Side-by-side photo previews
+            // Side-by-side photo previews (fixed size containers)
             HStack(spacing: 12) {
-                // ID Photo
+                // ID Photo - fixed 120x80 container
                 VStack(spacing: 4) {
                     AsyncImage(url: URL(string: verification.idPhotoURL)) { image in
                         image
                             .resizable()
                             .scaledToFill()
+                            .frame(width: 120, height: 80)
+                            .clipped()
                     } placeholder: {
                         Rectangle()
                             .fill(Color.gray.opacity(0.2))
+                            .frame(width: 120, height: 80)
                             .overlay(
                                 ProgressView()
                                     .scaleEffect(0.7)
@@ -191,22 +195,24 @@ struct VerificationRowView: View {
                     }
                     .frame(width: 120, height: 80)
                     .cornerRadius(8)
-                    .clipped()
 
                     Text(verification.idType)
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
 
-                // Selfie Photo
+                // Selfie Photo - fixed 120x80 container
                 VStack(spacing: 4) {
                     AsyncImage(url: URL(string: verification.selfiePhotoURL)) { image in
                         image
                             .resizable()
                             .scaledToFill()
+                            .frame(width: 120, height: 80)
+                            .clipped()
                     } placeholder: {
                         Rectangle()
                             .fill(Color.gray.opacity(0.2))
+                            .frame(width: 120, height: 80)
                             .overlay(
                                 ProgressView()
                                     .scaleEffect(0.7)
@@ -214,7 +220,6 @@ struct VerificationRowView: View {
                     }
                     .frame(width: 120, height: 80)
                     .cornerRadius(8)
-                    .clipped()
 
                     Text("Selfie")
                         .font(.caption2)
@@ -282,6 +287,11 @@ struct VerificationDetailView: View {
     @State private var rejectReason = ""
     @State private var selectedImageURL: String?
 
+    // Both photos for gallery navigation
+    private var allPhotos: [String] {
+        [verification.idPhotoURL, verification.selfiePhotoURL]
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
@@ -304,7 +314,7 @@ struct VerificationDetailView: View {
             rejectReasonSheet
         }
         .fullScreenCover(item: $selectedImageURL) { url in
-            FullScreenImageView(imageURL: url)
+            FullScreenImageView(imageURL: url, allImageURLs: allPhotos)
         }
     }
 
@@ -359,8 +369,18 @@ struct VerificationDetailView: View {
 
     private var photosSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Submitted Documents")
-                .font(.headline)
+            HStack {
+                Text("Submitted Documents")
+                    .font(.headline)
+                Spacer()
+                // Gallery hint
+                HStack(spacing: 4) {
+                    Image(systemName: "hand.tap")
+                    Text("Tap to view")
+                }
+                .font(.caption2)
+                .foregroundColor(.blue)
+            }
 
             // ID Photo
             VStack(alignment: .leading, spacing: 8) {
@@ -373,8 +393,13 @@ struct VerificationDetailView: View {
                         .resizable()
                         .scaledToFit()
                         .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.blue.opacity(0.3), lineWidth: 2)
+                        )
                         .onTapGesture {
                             selectedImageURL = verification.idPhotoURL
+                            HapticManager.shared.impact(.light)
                         }
                 } placeholder: {
                     Rectangle()
@@ -387,9 +412,9 @@ struct VerificationDetailView: View {
                 }
                 .frame(maxHeight: 250)
 
-                Text("Tap to view full size")
+                Text("Tap to view full size • Swipe to compare")
                     .font(.caption2)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.blue)
             }
 
             // Selfie Photo
@@ -403,8 +428,13 @@ struct VerificationDetailView: View {
                         .resizable()
                         .scaledToFit()
                         .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.purple.opacity(0.3), lineWidth: 2)
+                        )
                         .onTapGesture {
                             selectedImageURL = verification.selfiePhotoURL
+                            HapticManager.shared.impact(.light)
                         }
                 } placeholder: {
                     Rectangle()
@@ -417,16 +447,16 @@ struct VerificationDetailView: View {
                 }
                 .frame(maxHeight: 250)
 
-                Text("Tap to view full size")
+                Text("Tap to view full size • Swipe to compare")
                     .font(.caption2)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.purple)
             }
 
             // Comparison hint
             HStack {
                 Image(systemName: "info.circle.fill")
                     .foregroundColor(.blue)
-                Text("Compare the selfie with the ID photo to verify identity")
+                Text("Tap any photo to open full-screen gallery. Swipe left/right to compare ID and selfie.")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -561,50 +591,208 @@ struct VerificationDetailView: View {
     }
 }
 
-// MARK: - Full Screen Image View
+// MARK: - Full Screen Image View (Enhanced with Swipe Navigation)
 
 struct FullScreenImageView: View {
     let imageURL: String
+    var allImageURLs: [String]? = nil  // Optional array for gallery mode
     @Environment(\.dismiss) private var dismiss
     @State private var scale: CGFloat = 1.0
+    @State private var currentIndex: Int = 0
+    @State private var dismissDragOffset: CGFloat = 0
+
+    private let dismissThreshold: CGFloat = 150
+
+    init(imageURL: String, allImageURLs: [String]? = nil) {
+        self.imageURL = imageURL
+        self.allImageURLs = allImageURLs
+        // Find initial index if in gallery mode
+        if let urls = allImageURLs, let index = urls.firstIndex(of: imageURL) {
+            _currentIndex = State(initialValue: index)
+        }
+    }
+
+    private var photos: [String] {
+        allImageURLs ?? [imageURL]
+    }
 
     var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
+        GeometryReader { geometry in
+            ZStack {
+                Color.black
+                    .opacity(backgroundOpacity)
+                    .ignoresSafeArea()
 
-            AsyncImage(url: URL(string: imageURL)) { image in
+                if photos.count > 1 {
+                    // Gallery mode with swipe navigation
+                    TabView(selection: $currentIndex) {
+                        ForEach(Array(photos.enumerated()), id: \.offset) { index, url in
+                            ZoomableIDPhotoView(url: URL(string: url))
+                                .tag(index)
+                        }
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .automatic))
+                    .indexViewStyle(.page(backgroundDisplayMode: .always))
+                    .offset(y: dismissDragOffset)
+                    .scaleEffect(dismissScale)
+                } else {
+                    // Single image mode
+                    ZoomableIDPhotoView(url: URL(string: imageURL))
+                        .offset(y: dismissDragOffset)
+                        .scaleEffect(dismissScale)
+                }
+
+                // Controls overlay
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button(action: { dismiss() }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 30))
+                                .foregroundColor(.white)
+                                .padding()
+                        }
+                    }
+
+                    Spacer()
+
+                    // Photo counter and label
+                    VStack(spacing: 8) {
+                        if photos.count > 1 {
+                            Text("\(currentIndex + 1) / \(photos.count)")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Color.black.opacity(0.5))
+                                .cornerRadius(20)
+
+                            // Label for current photo
+                            Text(currentIndex == 0 ? "ID Document" : "Selfie Photo")
+                                .font(.caption.bold())
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(currentIndex == 0 ? Color.blue : Color.purple)
+                                .cornerRadius(12)
+                        }
+
+                        Text("Swipe left/right • Pinch to zoom • Swipe down to close")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.7))
+                    }
+                    .padding(.bottom, 40)
+                }
+                .opacity(controlsOpacity)
+            }
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        if value.translation.height > 0 {
+                            dismissDragOffset = value.translation.height
+                        }
+                    }
+                    .onEnded { value in
+                        if value.translation.height > dismissThreshold {
+                            HapticManager.shared.impact(.light)
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                dismissDragOffset = geometry.size.height
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                dismiss()
+                            }
+                        } else {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                dismissDragOffset = 0
+                            }
+                        }
+                    }
+            )
+        }
+        .statusBarHidden()
+    }
+
+    private var backgroundOpacity: Double {
+        let progress = min(dismissDragOffset / dismissThreshold, 1.0)
+        return 1.0 - (progress * 0.5)
+    }
+
+    private var dismissScale: CGFloat {
+        let progress = min(dismissDragOffset / dismissThreshold, 1.0)
+        return 1.0 - (progress * 0.1)
+    }
+
+    private var controlsOpacity: Double {
+        let progress = min(dismissDragOffset / dismissThreshold, 1.0)
+        return 1.0 - progress
+    }
+}
+
+// MARK: - Zoomable ID Photo View
+
+struct ZoomableIDPhotoView: View {
+    let url: URL?
+
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
+
+    var body: some View {
+        GeometryReader { geometry in
+            AsyncImage(url: url) { image in
                 image
                     .resizable()
                     .scaledToFit()
-                    .scaleEffect(scale)
-                    .gesture(
-                        MagnificationGesture()
-                            .onChanged { value in
-                                scale = value
-                            }
-                            .onEnded { _ in
-                                withAnimation {
-                                    scale = max(1.0, min(scale, 3.0))
-                                }
-                            }
-                    )
             } placeholder: {
                 ProgressView()
                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
             }
-
-            // Close button
-            VStack {
-                HStack {
-                    Spacer()
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 30))
-                            .foregroundColor(.white)
-                            .padding()
+            .frame(width: geometry.size.width, height: geometry.size.height)
+            .scaleEffect(scale)
+            .offset(offset)
+            .gesture(
+                MagnificationGesture()
+                    .onChanged { value in
+                        let delta = value / lastScale
+                        lastScale = value
+                        scale = min(max(scale * delta, 1), 4)
+                    }
+                    .onEnded { _ in
+                        lastScale = 1.0
+                        if scale < 1 {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                scale = 1
+                                offset = .zero
+                            }
+                        }
+                    }
+            )
+            .simultaneousGesture(
+                scale > 1 ?
+                DragGesture()
+                    .onChanged { value in
+                        offset = CGSize(
+                            width: lastOffset.width + value.translation.width,
+                            height: lastOffset.height + value.translation.height
+                        )
+                    }
+                    .onEnded { _ in
+                        lastOffset = offset
+                    }
+                : nil
+            )
+            .onTapGesture(count: 2) {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
+                    if scale > 1 {
+                        scale = 1
+                        offset = .zero
+                        lastOffset = .zero
+                    } else {
+                        scale = 2
                     }
                 }
-                Spacer()
+                HapticManager.shared.impact(.light)
             }
         }
     }
@@ -625,6 +813,7 @@ class AdminVerificationReviewViewModel: ObservableObject {
     @Published var errorMessage = ""
 
     private let db = Firestore.firestore()
+    private let functions = Functions.functions()
 
     // MARK: - Load Pending Verifications
 
@@ -709,6 +898,9 @@ class AdminVerificationReviewViewModel: ObservableObject {
                 "idVerificationRejectionReason": reason
             ])
 
+            // Send push notification to user about rejection
+            await sendIDVerificationRejectionNotification(userId: verification.userId, reason: reason)
+
             // Remove from local list
             pendingVerifications.removeAll { $0.id == verification.id }
 
@@ -718,6 +910,20 @@ class AdminVerificationReviewViewModel: ObservableObject {
             Logger.shared.error("Failed to reject verification", category: .general, error: error)
             errorMessage = "Failed to reject: \(error.localizedDescription)"
             showingError = true
+        }
+    }
+
+    /// Send ID verification rejection notification via Cloud Function
+    private func sendIDVerificationRejectionNotification(userId: String, reason: String) async {
+        do {
+            let callable = functions.httpsCallable("sendIDVerificationRejectionNotification")
+            _ = try await callable.call([
+                "userId": userId,
+                "reason": reason
+            ])
+            Logger.shared.info("ID verification rejection notification sent to \(userId)", category: .general)
+        } catch {
+            Logger.shared.error("Failed to send ID verification rejection notification", category: .general, error: error)
         }
     }
 
@@ -900,6 +1106,14 @@ struct VerificationCardView: View {
     @State private var showingFullPhoto = false
     @State private var selectedPhotoURL: String = ""
 
+    // Fixed photo height for consistent card sizing
+    private let photoHeight: CGFloat = 140
+
+    // Both photos for gallery navigation
+    private var allPhotos: [String] {
+        [verification.idPhotoURL, verification.selfiePhotoURL]
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
@@ -939,12 +1153,24 @@ struct VerificationCardView: View {
             }
             .padding()
 
-            // Photos - side by side comparison
+            // Tap hint
+            HStack {
+                Image(systemName: "hand.tap")
+                    .font(.caption2)
+                Text("Tap photos to view full screen")
+                    .font(.caption2)
+            }
+            .foregroundColor(.secondary)
+            .padding(.horizontal)
+            .padding(.bottom, 8)
+
+            // Photos - side by side comparison with fixed height (tap to open gallery)
             HStack(spacing: 2) {
-                // ID Photo
+                // ID Photo - fixed size container
                 Button(action: {
                     selectedPhotoURL = verification.idPhotoURL
                     showingFullPhoto = true
+                    HapticManager.shared.impact(.light)
                 }) {
                     VStack(spacing: 0) {
                         AsyncImage(url: URL(string: verification.idPhotoURL)) { image in
@@ -956,7 +1182,8 @@ struct VerificationCardView: View {
                                 .fill(Color.gray.opacity(0.2))
                                 .overlay(ProgressView())
                         }
-                        .frame(height: 150)
+                        .frame(height: photoHeight)
+                        .frame(maxWidth: .infinity)
                         .clipped()
 
                         Text(verification.idType)
@@ -969,10 +1196,11 @@ struct VerificationCardView: View {
                     }
                 }
 
-                // Selfie Photo
+                // Selfie Photo - fixed size container
                 Button(action: {
                     selectedPhotoURL = verification.selfiePhotoURL
                     showingFullPhoto = true
+                    HapticManager.shared.impact(.light)
                 }) {
                     VStack(spacing: 0) {
                         AsyncImage(url: URL(string: verification.selfiePhotoURL)) { image in
@@ -984,7 +1212,8 @@ struct VerificationCardView: View {
                                 .fill(Color.gray.opacity(0.2))
                                 .overlay(ProgressView())
                         }
-                        .frame(height: 150)
+                        .frame(height: photoHeight)
+                        .frame(maxWidth: .infinity)
                         .clipped()
 
                         Text("Selfie")
@@ -1033,7 +1262,7 @@ struct VerificationCardView: View {
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
         .fullScreenCover(isPresented: $showingFullPhoto) {
-            FullScreenImageView(imageURL: selectedPhotoURL)
+            FullScreenImageView(imageURL: selectedPhotoURL, allImageURLs: allPhotos)
         }
     }
 }
