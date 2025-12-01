@@ -11,6 +11,8 @@ import FirebaseFirestore
 struct SuspendedAccountView: View {
     @EnvironmentObject var authService: AuthService
     @State private var isRefreshing = false
+    @State private var appearAnimation = false
+    @State private var animateIcon = false
 
     private var user: User? {
         authService.currentUser
@@ -38,18 +40,44 @@ struct SuspendedAccountView: View {
                 VStack(spacing: 24) {
                     // Header icon
                     ZStack {
+                        // Outer pulse ring
+                        Circle()
+                            .stroke(Color.red.opacity(0.3), lineWidth: 2)
+                            .frame(width: 120, height: 120)
+                            .scaleEffect(animateIcon ? 1.2 : 1.0)
+                            .opacity(animateIcon ? 0 : 0.8)
+
                         Circle()
                             .fill(Color.red.opacity(0.15))
                             .frame(width: 100, height: 100)
 
                         Image(systemName: "exclamationmark.octagon.fill")
                             .font(.system(size: 50))
-                            .foregroundColor(.red)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.red, .red.opacity(0.7)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .symbolEffect(.pulse, options: .repeating)
                     }
                     .padding(.top, 40)
+                    .scaleEffect(appearAnimation ? 1 : 0.8)
+                    .opacity(appearAnimation ? 1 : 0)
+                    .onAppear {
+                        withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: false)) {
+                            animateIcon = true
+                        }
+                        withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.1)) {
+                            appearAnimation = true
+                        }
+                    }
 
                     // Title
                     Text("Account Suspended")
+                        .opacity(appearAnimation ? 1 : 0)
+                        .offset(y: appearAnimation ? 0 : 20)
                         .font(.title.bold())
                         .multilineTextAlignment(.center)
 
@@ -97,6 +125,9 @@ struct SuspendedAccountView: View {
                         .background(Color.orange.opacity(0.1))
                         .cornerRadius(16)
                         .padding(.horizontal)
+                        .opacity(appearAnimation ? 1 : 0)
+                        .offset(y: appearAnimation ? 0 : 30)
+                        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.2), value: appearAnimation)
                     }
 
                     // Reason card
@@ -114,6 +145,9 @@ struct SuspendedAccountView: View {
                     .background(Color.red.opacity(0.1))
                     .cornerRadius(16)
                     .padding(.horizontal)
+                    .opacity(appearAnimation ? 1 : 0)
+                    .offset(y: appearAnimation ? 0 : 30)
+                    .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.3), value: appearAnimation)
 
                     // Guidelines reminder
                     VStack(alignment: .leading, spacing: 12) {
@@ -139,6 +173,9 @@ struct SuspendedAccountView: View {
                         }
                     }
                     .padding(.top, 8)
+                    .opacity(appearAnimation ? 1 : 0)
+                    .offset(y: appearAnimation ? 0 : 30)
+                    .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.4), value: appearAnimation)
 
                     // What happens next
                     VStack(alignment: .leading, spacing: 16) {
@@ -159,6 +196,9 @@ struct SuspendedAccountView: View {
                     .background(Color.blue.opacity(0.1))
                     .cornerRadius(16)
                     .padding(.horizontal)
+                    .opacity(appearAnimation ? 1 : 0)
+                    .offset(y: appearAnimation ? 0 : 30)
+                    .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.5), value: appearAnimation)
 
                     Spacer(minLength: 40)
 
@@ -204,6 +244,9 @@ struct SuspendedAccountView: View {
                     }
                     .padding(.horizontal)
                     .padding(.bottom, 40)
+                    .opacity(appearAnimation ? 1 : 0)
+                    .offset(y: appearAnimation ? 0 : 30)
+                    .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.6), value: appearAnimation)
                 }
             }
             .navigationTitle("Account Status")

@@ -12,6 +12,8 @@ struct ProfileRejectionFeedbackView: View {
     @State private var showEditProfile = false
     @State private var isUpdating = false
     @State private var animateIcon = false
+    @State private var showSuccessAlert = false
+    @State private var appearAnimation = false
 
     private var user: User? {
         authService.currentUser
@@ -57,9 +59,15 @@ struct ProfileRejectionFeedbackView: View {
                             .symbolEffect(.pulse, options: .repeating)
                     }
                     .padding(.top, 30)
+                    .scaleEffect(appearAnimation ? 1 : 0.8)
+                    .opacity(appearAnimation ? 1 : 0)
                     .onAppear {
                         withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: false)) {
                             animateIcon = true
+                        }
+                        // Staggered entrance animation
+                        withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.1)) {
+                            appearAnimation = true
                         }
                     }
 
@@ -73,6 +81,8 @@ struct ProfileRejectionFeedbackView: View {
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     }
+                    .opacity(appearAnimation ? 1 : 0)
+                    .offset(y: appearAnimation ? 0 : 20)
 
                     // Steps to fix card
                     VStack(spacing: 0) {
@@ -114,6 +124,9 @@ struct ProfileRejectionFeedbackView: View {
                             .strokeBorder(Color(.separator).opacity(0.2), lineWidth: 1)
                     )
                     .padding(.horizontal)
+                    .opacity(appearAnimation ? 1 : 0)
+                    .offset(y: appearAnimation ? 0 : 30)
+                    .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.2), value: appearAnimation)
 
                     // Reason card
                     VStack(alignment: .leading, spacing: 14) {
@@ -147,6 +160,9 @@ struct ProfileRejectionFeedbackView: View {
                             .strokeBorder(Color.orange.opacity(0.2), lineWidth: 1)
                     )
                     .padding(.horizontal)
+                    .opacity(appearAnimation ? 1 : 0)
+                    .offset(y: appearAnimation ? 0 : 30)
+                    .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.3), value: appearAnimation)
 
                     // Fix instructions card
                     if let instructions = user?.profileStatusFixInstructions, !instructions.isEmpty {
@@ -181,6 +197,9 @@ struct ProfileRejectionFeedbackView: View {
                                 .strokeBorder(Color.blue.opacity(0.2), lineWidth: 1)
                         )
                         .padding(.horizontal)
+                        .opacity(appearAnimation ? 1 : 0)
+                        .offset(y: appearAnimation ? 0 : 30)
+                        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.4), value: appearAnimation)
                     }
 
                     // Common issues section
@@ -202,6 +221,9 @@ struct ProfileRejectionFeedbackView: View {
                         .padding(.horizontal)
                     }
                     .padding(.top, 4)
+                    .opacity(appearAnimation ? 1 : 0)
+                    .offset(y: appearAnimation ? 0 : 30)
+                    .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.5), value: appearAnimation)
 
                     Spacer(minLength: 20)
 
@@ -272,6 +294,9 @@ struct ProfileRejectionFeedbackView: View {
                     }
                     .padding(.horizontal)
                     .padding(.bottom, 30)
+                    .opacity(appearAnimation ? 1 : 0)
+                    .offset(y: appearAnimation ? 0 : 30)
+                    .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.6), value: appearAnimation)
                 }
             }
             .background(Color(.systemGroupedBackground))
@@ -280,6 +305,11 @@ struct ProfileRejectionFeedbackView: View {
             .sheet(isPresented: $showEditProfile) {
                 ProfileEditView()
                     .environmentObject(authService)
+            }
+            .alert("Re-Review Requested!", isPresented: $showSuccessAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text("Your profile has been submitted for re-review. We'll check it again soon!")
             }
         }
     }
@@ -415,23 +445,28 @@ struct ProfileRejectionFeedbackView: View {
         guard let userId = user?.id else { return }
 
         isUpdating = true
-        defer { isUpdating = false }
 
         do {
             // Update profile status to "pending" for re-review
             try await Firestore.firestore().collection("users").document(userId).updateData([
                 "profileStatus": "pending",
-                "profileStatusReason": nil,
-                "profileStatusReasonCode": nil,
-                "profileStatusFixInstructions": nil,
+                "profileStatusReason": FieldValue.delete(),
+                "profileStatusReasonCode": FieldValue.delete(),
+                "profileStatusFixInstructions": FieldValue.delete(),
                 "profileStatusUpdatedAt": FieldValue.serverTimestamp()
             ])
 
-            // Refresh user data
+            HapticManager.shared.notification(.success)
+
+            // Brief delay to show success animation before transitioning
+            try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+
+            // Refresh user data - this will trigger navigation to main app
             await authService.fetchUser()
 
-            HapticManager.shared.notification(.success)
+            isUpdating = false
         } catch {
+            isUpdating = false
             Logger.shared.error("Failed to request re-review", category: .database, error: error)
             HapticManager.shared.notification(.error)
         }
