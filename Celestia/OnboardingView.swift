@@ -18,11 +18,16 @@ struct OnboardingView: View {
     @StateObject private var personalizedManager = PersonalizedOnboardingManager.shared
     @StateObject private var profileScorer = ProfileQualityScorer.shared
 
+    // Parameter to skip goal selection for existing users updating their profile
+    var isEditingExistingProfile: Bool = false
+
     @State private var currentStep = 0
     @State private var progress: CGFloat = 0
     @State private var showGoalSelection = true
     @State private var showTutorial = false
     @State private var showCompletionCelebration = false
+    @State private var hasLoadedExistingData = false
+    @State private var existingPhotoURLs: [String] = [] // Track existing photos to avoid re-upload
 
     // Step 1: Basics
     @State private var fullName = ""
@@ -178,6 +183,18 @@ struct OnboardingView: View {
                 withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
                     animateContent = true
                     progress = CGFloat(currentStep + 1) / CGFloat(totalSteps)
+                }
+
+                // Skip goal selection for existing users editing their profile
+                if isEditingExistingProfile {
+                    showGoalSelection = false
+                }
+            }
+            .task {
+                // Load existing user data when editing profile
+                if isEditingExistingProfile && !hasLoadedExistingData {
+                    await loadExistingUserData()
+                    hasLoadedExistingData = true
                 }
             }
             .onChange(of: currentStep) { _, newStep in
@@ -2089,6 +2106,82 @@ struct OnboardingView: View {
                     showError = true
                 }
             }
+        }
+    }
+
+    // MARK: - Load Existing User Data
+
+    /// Pre-populate all fields with existing user data for profile editing
+    /// This ensures data is preserved when users navigate back and forth
+    private func loadExistingUserData() async {
+        guard let user = authService.currentUser else { return }
+
+        await MainActor.run {
+            // Step 1: Basics
+            fullName = user.fullName ?? ""
+            gender = user.gender ?? "Male"
+
+            // Calculate birthday from age (approximate)
+            if let age = user.age {
+                let calendar = Calendar.current
+                birthday = calendar.date(byAdding: .year, value: -age, to: Date()) ?? birthday
+            }
+
+            // Step 2: About & Location
+            bio = user.bio ?? ""
+            location = user.location ?? ""
+            country = user.country ?? ""
+
+            // Step 4: Preferences
+            lookingFor = user.lookingFor ?? "Everyone"
+            selectedInterests = user.interests ?? []
+            selectedLanguages = user.languages ?? []
+
+            // Step 6: Better Matches
+            height = user.height
+            relationshipGoal = user.relationshipGoal ?? "Prefer not to say"
+            ageRangeMin = user.ageRangeMin ?? 18
+            ageRangeMax = user.ageRangeMax ?? 50
+            maxDistance = user.maxDistance ?? 50
+
+            // Step 7 & 8: Lifestyle
+            educationLevel = user.educationLevel ?? ""
+            religion = user.religion ?? ""
+            smoking = user.smoking ?? ""
+            drinking = user.drinking ?? ""
+            exercise = user.exercise ?? ""
+            pets = user.pets ?? ""
+            diet = user.diet ?? ""
+
+            // Store existing photo URLs to avoid re-uploading unchanged photos
+            existingPhotoURLs = user.photos ?? []
+        }
+
+        // Load existing photos as UIImages for display
+        if let photoURLs = authService.currentUser?.photos, !photoURLs.isEmpty {
+            await loadExistingPhotos(from: photoURLs)
+        }
+    }
+
+    /// Load existing photos from URLs into UIImages for display in the photo picker
+    private func loadExistingPhotos(from urls: [String]) async {
+        var loadedImages: [UIImage] = []
+
+        for urlString in urls {
+            guard let url = URL(string: urlString) else { continue }
+
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                if let image = UIImage(data: data) {
+                    loadedImages.append(image)
+                }
+            } catch {
+                Logger.shared.error("Failed to load existing photo: \(urlString)", category: .storage, error: error)
+            }
+        }
+
+        await MainActor.run {
+            photoImages = loadedImages
         }
     }
 }
