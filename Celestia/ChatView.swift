@@ -170,8 +170,11 @@ struct ChatView: View {
             editMessageSheet
         }
         .onChange(of: messageService.messages.count) { oldCount, newCount in
-            // BUGFIX: Mark as loaded when messages are populated
-            if newCount > 0 && !hasLoadedMessagesForThisChat {
+            // BUGFIX: Only mark as loaded when messages are populated AND for THIS match
+            // This prevents race condition when switching between chats
+            let isActiveMatch = messageService.activeMatchId == match.id
+            let messagesAreForThisMatch = messageService.messages.first?.matchId == match.id
+            if newCount > 0 && !hasLoadedMessagesForThisChat && (isActiveMatch || messagesAreForThisMatch) {
                 hasLoadedMessagesForThisChat = true
             }
             // SWIFTUI FIX: Defer safety check with longer delay to avoid modifying state during view update
@@ -184,9 +187,11 @@ struct ChatView: View {
             }
         }
         .onChange(of: messageService.isLoading) { _, isLoading in
-            // BUGFIX: Mark as loaded once service finishes loading
+            // BUGFIX: Mark as loaded once service finishes loading for THIS match
             // This ensures we only show conversation starters AFTER we confirm no messages exist
-            if !isLoading && !hasLoadedMessagesForThisChat {
+            let isActiveMatch = messageService.activeMatchId == match.id
+            let messagesAreForThisMatch = messageService.messages.isEmpty || messageService.messages.first?.matchId == match.id
+            if !isLoading && !hasLoadedMessagesForThisChat && (isActiveMatch || messagesAreForThisMatch) {
                 hasLoadedMessagesForThisChat = true
             }
         }
@@ -914,10 +919,17 @@ struct ChatView: View {
         guard let currentUserId = authService.currentUser?.id else { return }
         guard let otherUserId = otherUser.id else { return }
 
-        // BUGFIX: If messages are already cached for this match, mark as loaded immediately
-        // This prevents showing loading state when messages are already available
-        if !messageService.messages.isEmpty {
+        // BUGFIX: Only mark as loaded if messages are actually for THIS match
+        // This prevents race condition where messages from a different chat cause
+        // conversation starters to flash when opening a new chat
+        // Check both the message matchId AND the service's active matchId for double validation
+        let messagesAreForThisMatch = (messageService.messages.first?.matchId == matchId) ||
+                                       (messageService.activeMatchId == matchId && !messageService.messages.isEmpty)
+        if messagesAreForThisMatch {
             hasLoadedMessagesForThisChat = true
+        } else {
+            // Reset the flag when switching to a different chat
+            hasLoadedMessagesForThisChat = false
         }
 
         messageService.listenToMessages(matchId: matchId)

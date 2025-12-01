@@ -62,6 +62,10 @@ class MessageService: ObservableObject, MessageServiceProtocol, ListenerLifecycl
     // AUDIT FIX: Track current matchId to prevent stale listener callbacks
     private var currentMatchId: String?
 
+    /// Public accessor to check which match messages are currently loaded for
+    /// This helps prevent race conditions when switching between chats
+    var activeMatchId: String? { currentMatchId }
+
     // AUDIT FIX: Track loading task for proper cancellation
     private var loadingTask: Task<Void, Never>?
 
