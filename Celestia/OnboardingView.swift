@@ -764,10 +764,10 @@ struct OnboardingView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 10) {
-                        photoTipRow(icon: "face.smiling.fill", text: "Clear face photo as your first pic", color: .green)
-                        photoTipRow(icon: "person.fill", text: "Include a full body photo", color: .blue)
+                        photoTipRow(icon: "face.smiling.fill", text: "Show your smile - it's your best feature!", color: .green)
                         photoTipRow(icon: "sun.max.fill", text: "Good lighting makes you shine", color: .orange)
-                        photoTipRow(icon: "person.3.fill", text: "Solo photos work best", color: .purple)
+                        photoTipRow(icon: "camera.fill", text: "Mix it up with different angles", color: .blue)
+                        photoTipRow(icon: "sparkles", text: "Be yourself - authenticity wins", color: .purple)
                     }
                 }
                 .padding(16)
