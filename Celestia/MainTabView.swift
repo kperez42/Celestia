@@ -19,6 +19,16 @@ struct MainTabView: View {
     @State private var unreadCount = 0
     @State private var newMatchesCount = 0
 
+    // Admin check
+    private var isAdminUser: Bool {
+        if authService.currentUser?.isAdmin == true {
+            return true
+        }
+        guard let email = authService.currentUser?.email else { return false }
+        let adminEmails = ["perezkevin640@gmail.com", "admin@celestia.app"]
+        return adminEmails.contains(email.lowercased())
+    }
+
     // AUDIT FIX: Removed separate unreadListener
     // Now using Match.unreadCount from matchService which:
     // 1. Only counts from active matches
@@ -57,6 +67,14 @@ struct MainTabView: View {
                     ProfileView()
                 }
                 .tag(4)
+
+                // Admin - Only for admin users
+                if isAdminUser {
+                    LazyTabContent(tabIndex: 5, currentTab: selectedTab) {
+                        AdminImageApprovalView()
+                    }
+                    .tag(5)
+                }
             }
             .tabViewStyle(.automatic)
             .ignoresSafeArea(.keyboard)
@@ -182,6 +200,18 @@ struct MainTabView: View {
                     badgeCount: 0
                 ) {
                     selectedTab = 4
+                }
+
+                // Admin (only for admin users)
+                if isAdminUser {
+                    TabBarButton(
+                        icon: "shield.fill",
+                        title: "Admin",
+                        isSelected: selectedTab == 5,
+                        badgeCount: 0
+                    ) {
+                        selectedTab = 5
+                    }
                 }
         }
         .padding(.horizontal, 8)
