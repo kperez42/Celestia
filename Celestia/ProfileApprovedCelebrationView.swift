@@ -222,8 +222,8 @@ struct ProfileApprovedCelebrationView: View {
                 id: i,
                 color: colors.randomElement()!,
                 shape: shapes.randomElement()!,
-                x: CGFloat.random(in: -30...screenWidth + 30),
-                y: CGFloat.random(in: -80...-20),
+                x: CGFloat.random(in: (-30)...(screenWidth + 30)),
+                y: CGFloat.random(in: (-80)...(-20)),
                 rotation: Double.random(in: 0...360),
                 scale: CGFloat.random(in: 0.4...1.3),
                 delay: Double.random(in: 0...2.0)

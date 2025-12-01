@@ -23,8 +23,8 @@ struct PendingApprovalView: View {
     }
 
     private var submittedTimeAgo: String {
-        guard let createdAt = user?.createdAt else { return "Recently" }
-        let interval = Date().timeIntervalSince(createdAt)
+        guard let timestamp = user?.timestamp else { return "Recently" }
+        let interval = Date().timeIntervalSince(timestamp)
         let hours = Int(interval / 3600)
         let minutes = Int((interval.truncatingRemainder(dividingBy: 3600)) / 60)
 
