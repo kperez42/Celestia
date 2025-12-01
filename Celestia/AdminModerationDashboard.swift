@@ -13,6 +13,7 @@ struct AdminModerationDashboard: View {
     @StateObject private var viewModel = ModerationViewModel()
     @State private var selectedTab = 0
     @State private var showingAlerts = false
+    @Namespace private var tabAnimation
 
     // Tab configuration with icons and colors
     private let tabs: [(name: String, icon: String, color: Color)] = [
@@ -26,79 +27,59 @@ struct AdminModerationDashboard: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Enhanced Tab selector with icons and badges
+                // Enhanced Tab selector with icons, badges, and smooth animations
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
+                    HStack(spacing: 8) {
                         ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
-                            Button(action: {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            AdminTabButton(
+                                tab: tab,
+                                isSelected: selectedTab == index,
+                                badgeCount: getBadgeCount(for: index),
+                                namespace: tabAnimation
+                            ) {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
                                     selectedTab = index
                                 }
                                 HapticManager.shared.impact(.light)
-                            }) {
-                                HStack(spacing: 6) {
-                                    Image(systemName: tab.icon)
-                                        .font(.caption.weight(.semibold))
-                                    Text(tab.name)
-                                        .font(.subheadline.weight(.medium))
-                                }
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 10)
-                                .background(
-                                    Group {
-                                        if selectedTab == index {
-                                            LinearGradient(
-                                                colors: [tab.color, tab.color.opacity(0.8)],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                        } else {
-                                            Color(.systemGray5)
-                                        }
-                                    }
-                                )
-                                .foregroundColor(selectedTab == index ? .white : .primary)
-                                .cornerRadius(12)
-                                .shadow(color: selectedTab == index ? tab.color.opacity(0.3) : .clear, radius: 4, y: 2)
-                            }
-                            // Show badge counts for relevant tabs
-                            .overlay(alignment: .topTrailing) {
-                                let badgeCount = getBadgeCount(for: index)
-                                if badgeCount > 0 {
-                                    Text("\(badgeCount)")
-                                        .font(.caption2.bold())
-                                        .foregroundColor(.white)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background(Color.red)
-                                        .clipShape(Capsule())
-                                        .offset(x: 8, y: -8)
-                                }
                             }
                         }
                     }
-                    .padding(.horizontal)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 4)
                 }
-                .padding(.vertical, 10)
-                .background(Color(.systemBackground))
+                .padding(.vertical, 12)
+                .background(
+                    // Frosted glass effect background
+                    Rectangle()
+                        .fill(.ultraThinMaterial)
+                        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+                )
+                .overlay(alignment: .bottom) {
+                    // Subtle separator line
+                    Rectangle()
+                        .fill(Color(.separator).opacity(0.3))
+                        .frame(height: 0.5)
+                }
 
-                // Content
-                Group {
-                    switch selectedTab {
-                    case 0:
-                        pendingProfilesView
-                    case 1:
-                        reportsListView
-                    case 2:
-                        suspiciousProfilesView
-                    case 3:
-                        idVerificationReviewView
-                    case 4:
-                        statsView
-                    default:
-                        pendingProfilesView
-                    }
+                // Content with smooth transitions
+                TabView(selection: $selectedTab) {
+                    pendingProfilesView
+                        .tag(0)
+
+                    reportsListView
+                        .tag(1)
+
+                    suspiciousProfilesView
+                        .tag(2)
+
+                    idVerificationReviewView
+                        .tag(3)
+
+                    statsView
+                        .tag(4)
                 }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .animation(.easeInOut(duration: 0.25), value: selectedTab)
             }
             .navigationTitle("Moderation")
             .toolbar {
@@ -283,8 +264,36 @@ struct AdminModerationDashboard: View {
     private var statsView: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Summary cards
-                HStack(spacing: 12) {
+                // Header
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Dashboard")
+                            .font(.title2.bold())
+                        Text("Moderation overview")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+
+                    // Last updated indicator
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(.green)
+                            .frame(width: 8, height: 8)
+                        Text("Live")
+                            .font(.caption.weight(.medium))
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                }
+                .padding(.horizontal)
+                .padding(.top, 8)
+
+                // Summary cards in grid
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                     StatCard(
                         title: "Total Reports",
                         value: "\(viewModel.stats.totalReports)",
@@ -298,9 +307,7 @@ struct AdminModerationDashboard: View {
                         icon: "clock.fill",
                         color: .orange
                     )
-                }
 
-                HStack(spacing: 12) {
                     StatCard(
                         title: "Resolved",
                         value: "\(viewModel.stats.resolvedReports)",
@@ -315,60 +322,143 @@ struct AdminModerationDashboard: View {
                         color: .red
                     )
                 }
+                .padding(.horizontal)
 
-                Divider()
-
-                // Recent activity
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Recent Activity")
-                        .font(.headline)
+                // Recent activity card
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.headline)
+                            .foregroundColor(.purple)
+                        Text("Recent Activity")
+                            .font(.headline)
+                        Spacer()
+                    }
 
                     if viewModel.reports.isEmpty && viewModel.suspiciousProfiles.isEmpty {
-                        Text("No recent activity")
-                            .foregroundColor(.secondary)
+                        HStack {
+                            Spacer()
+                            VStack(spacing: 8) {
+                                Image(systemName: "tray")
+                                    .font(.title2)
+                                    .foregroundColor(.secondary)
+                                Text("No recent activity")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.vertical, 20)
+                            Spacer()
+                        }
                     } else {
-                        ForEach(viewModel.reports.prefix(5)) { report in
-                            HStack {
-                                Image(systemName: "exclamationmark.circle.fill")
-                                    .foregroundColor(.orange)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(report.reason)
-                                        .font(.subheadline)
-                                    Text(report.timestamp)
+                        VStack(spacing: 12) {
+                            ForEach(viewModel.reports.prefix(5)) { report in
+                                HStack(spacing: 12) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(Color.orange.opacity(0.15))
+                                            .frame(width: 36, height: 36)
+                                        Image(systemName: "exclamationmark.circle.fill")
+                                            .foregroundColor(.orange)
+                                    }
+
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(report.reason)
+                                            .font(.subheadline.weight(.medium))
+                                        Text(report.timestamp)
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+
+                                    Spacer()
+
+                                    Image(systemName: "chevron.right")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
-                                Spacer()
                             }
                         }
                     }
                 }
                 .padding()
-                .background(Color(.systemGray6))
-                .cornerRadius(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color(.systemBackground))
+                        .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .strokeBorder(Color(.separator).opacity(0.2), lineWidth: 1)
+                )
+                .padding(.horizontal)
             }
-            .padding()
+            .padding(.bottom, 20)
         }
+        .background(Color(.systemGroupedBackground))
     }
 
     // MARK: - Empty State
 
     private func emptyState(icon: String, title: String, message: String) -> some View {
-        VStack(spacing: 20) {
-            Image(systemName: icon)
-                .font(.system(size: 60))
-                .foregroundColor(.green)
+        VStack(spacing: 24) {
+            // Animated icon container
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.green.opacity(0.15), .green.opacity(0.05)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 120, height: 120)
 
-            Text(title)
-                .font(.title2.bold())
+                Circle()
+                    .fill(.green.opacity(0.1))
+                    .frame(width: 90, height: 90)
 
-            Text(message)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
+                Image(systemName: icon)
+                    .font(.system(size: 44, weight: .medium))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.green, .green.opacity(0.7)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .symbolEffect(.pulse, options: .repeating)
+            }
+
+            VStack(spacing: 8) {
+                Text(title)
+                    .font(.title2.bold())
+                    .foregroundColor(.primary)
+
+                Text(message)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 50)
+            }
+
+            // Refresh hint
+            Button {
+                Task { await viewModel.refresh() }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.clockwise")
+                    Text("Refresh")
+                }
+                .font(.subheadline.weight(.medium))
+                .foregroundColor(.blue)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
+                .background(Color.blue.opacity(0.1))
+                .cornerRadius(20)
+            }
+            .padding(.top, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemGroupedBackground))
     }
 }
 
@@ -2320,6 +2410,75 @@ struct AdminZoomablePhotoView: View {
                 HapticManager.shared.impact(.light)
             }
         }
+    }
+}
+
+// MARK: - Admin Tab Button Component
+
+struct AdminTabButton: View {
+    let tab: (name: String, icon: String, color: Color)
+    let isSelected: Bool
+    let badgeCount: Int
+    let namespace: Namespace.ID
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                Image(systemName: tab.icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .symbolEffect(.bounce, value: isSelected)
+
+                Text(tab.name)
+                    .font(.system(size: 14, weight: .semibold))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 11)
+            .foregroundColor(isSelected ? .white : .primary.opacity(0.8))
+            .background {
+                if isSelected {
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [tab.color, tab.color.opacity(0.85)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .shadow(color: tab.color.opacity(0.4), radius: 8, y: 4)
+                        .matchedGeometryEffect(id: "tab_background", in: namespace)
+                } else {
+                    Capsule()
+                        .fill(Color(.systemGray5).opacity(0.8))
+                }
+            }
+            .overlay {
+                if isSelected {
+                    Capsule()
+                        .strokeBorder(Color.white.opacity(0.25), lineWidth: 1)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .scaleEffect(isSelected ? 1.02 : 1.0)
+        // Badge overlay
+        .overlay(alignment: .topTrailing) {
+            if badgeCount > 0 {
+                Text(badgeCount > 99 ? "99+" : "\(badgeCount)")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(
+                        Capsule()
+                            .fill(Color.red)
+                            .shadow(color: .red.opacity(0.4), radius: 4, y: 2)
+                    )
+                    .offset(x: 10, y: -8)
+                    .transition(.scale.combined(with: .opacity))
+            }
+        }
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: badgeCount)
     }
 }
 

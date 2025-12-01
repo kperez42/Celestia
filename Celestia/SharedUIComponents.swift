@@ -23,26 +23,55 @@ struct StatCard: View {
     }
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 12) {
+            // Icon with gradient background
             if let icon = icon {
-                Image(systemName: icon)
-                    .font(.title2)
-                    .foregroundColor(color)
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [color.opacity(0.2), color.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 44, height: 44)
+
+                    Image(systemName: icon)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [color, color.opacity(0.8)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                }
             }
 
-            Text(value)
-                .font(icon != nil ? .title3 : .title)
-                .fontWeight(.bold)
-                .foregroundColor(icon != nil ? .primary : color)
+            VStack(spacing: 4) {
+                Text(value)
+                    .font(.system(size: icon != nil ? 24 : 28, weight: .bold, design: .rounded))
+                    .foregroundColor(.primary)
 
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.secondary)
+                Text(title)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
+            }
         }
         .frame(maxWidth: .infinity)
-        .padding()
-        .background(icon != nil ? Color.white : color.opacity(0.1))
-        .cornerRadius(12)
+        .padding(.vertical, 16)
+        .padding(.horizontal, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(.systemBackground))
+                .shadow(color: color.opacity(0.1), radius: 8, y: 4)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(color.opacity(0.15), lineWidth: 1)
+        )
     }
 }
 
