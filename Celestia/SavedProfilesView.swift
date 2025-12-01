@@ -22,11 +22,6 @@ struct SavedProfilesView: View {
     // PERFORMANCE: Track if initial load completed to prevent loading flash on tab switches
     @State private var hasCompletedInitialLoad = false
 
-    // Filter and sort state
-    @State private var showFilters = false
-    @State private var selectedAgeFilter: SavedAgeFilter = .all
-    @State private var selectedSortOption: SavedSortOption = .recent
-
     // Note editing state
     @State private var editingNoteForProfile: SavedProfile?
     @State private var noteText = ""
@@ -41,71 +36,10 @@ struct SavedProfilesView: View {
         let user: User
     }
 
-    enum SavedAgeFilter: String, CaseIterable {
-        case all = "All Ages"
-        case under25 = "Under 25"
-        case twenties = "25-30"
-        case thirties = "30-40"
-        case over40 = "40+"
-
-        func matches(age: Int) -> Bool {
-            switch self {
-            case .all: return true
-            case .under25: return age < 25
-            case .twenties: return age >= 25 && age <= 30
-            case .thirties: return age > 30 && age <= 40
-            case .over40: return age > 40
-            }
-        }
-    }
-
-    enum SavedSortOption: String, CaseIterable {
-        case recent = "Recently Saved"
-        case oldest = "Oldest First"
-        case ageYoungest = "Youngest First"
-        case ageOldest = "Age: Oldest"
-        case nameAZ = "Name A-Z"
-    }
-
     private let tabs = ["My Saves", "Viewed", "Saved"]
 
     private var isPremium: Bool {
         authService.currentUser?.isPremium ?? false
-    }
-
-    // MARK: - Filtered Profiles
-
-    private var filteredSavedProfiles: [SavedProfile] {
-        applyFiltersAndSort(to: viewModel.savedProfiles)
-    }
-
-    private func applyFiltersAndSort(to profiles: [SavedProfile]) -> [SavedProfile] {
-        var result = profiles
-
-        // Apply age filter
-        if selectedAgeFilter != .all {
-            result = result.filter { selectedAgeFilter.matches(age: $0.user.age) }
-        }
-
-        // Apply sort
-        switch selectedSortOption {
-        case .recent:
-            result.sort { $0.savedAt > $1.savedAt }
-        case .oldest:
-            result.sort { $0.savedAt < $1.savedAt }
-        case .ageYoungest:
-            result.sort { $0.user.age < $1.user.age }
-        case .ageOldest:
-            result.sort { $0.user.age > $1.user.age }
-        case .nameAZ:
-            result.sort { $0.user.fullName.localizedCompare($1.user.fullName) == .orderedAscending }
-        }
-
-        return result
-    }
-
-    private var hasActiveFilters: Bool {
-        selectedAgeFilter != .all || selectedSortOption != .recent
     }
 
     var body: some View {
@@ -168,9 +102,6 @@ struct SavedProfilesView: View {
         .sheet(isPresented: $showPremiumUpgrade) {
             PremiumUpgradeView(contextMessage: upgradeContextMessage)
                 .environmentObject(authService)
-        }
-        .sheet(isPresented: $showFilters) {
-            filterSheet
         }
         .sheet(isPresented: $showNoteSheet) {
             noteEditSheet
@@ -262,47 +193,8 @@ struct SavedProfilesView: View {
         Group {
             if viewModel.savedProfiles.isEmpty {
                 emptyStateView(message: "No saved profiles yet", hint: "Tap the bookmark icon on any profile to save it")
-            } else if filteredSavedProfiles.isEmpty && hasActiveFilters {
-                // Filters active but no results
-                VStack(spacing: 24) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 60))
-                        .foregroundColor(.gray.opacity(0.5))
-
-                    VStack(spacing: 8) {
-                        Text("No matches found")
-                            .font(.title3)
-                            .fontWeight(.semibold)
-
-                        Text("Try adjusting your filters")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-
-                    Button {
-                        selectedAgeFilter = .all
-                        selectedSortOption = .recent
-                        HapticManager.shared.impact(.light)
-                    } label: {
-                        Text("Clear Filters")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 12)
-                            .background(
-                                LinearGradient(
-                                    colors: [.orange, .pink],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .cornerRadius(20)
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                profilesGrid(profiles: filteredSavedProfiles)
+                profilesGrid(profiles: viewModel.savedProfiles)
             }
         }
     }
@@ -418,50 +310,24 @@ struct SavedProfilesView: View {
 
                     Spacer()
 
-                    VStack(alignment: .trailing, spacing: 8) {
-                        // Filter button
+                    // Clear all button
+                    if !viewModel.savedProfiles.isEmpty {
                         Button {
-                            showFilters = true
+                            showClearAllConfirmation = true
                             HapticManager.shared.impact(.light)
                         } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "line.3.horizontal.decrease.circle")
-                                    .font(.system(size: 14))
-                                Text("Filter")
+                            HStack(spacing: 4) {
+                                Image(systemName: "trash")
+                                    .font(.caption)
+                                Text("Clear")
                                     .font(.caption)
                                     .fontWeight(.medium)
-                                if hasActiveFilters {
-                                    Circle()
-                                        .fill(Color.yellow)
-                                        .frame(width: 6, height: 6)
-                                }
                             }
-                            .foregroundColor(.white.opacity(0.9))
+                            .foregroundColor(.white.opacity(0.8))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
-                            .background(Color.white.opacity(0.2))
+                            .background(Color.red.opacity(0.3))
                             .cornerRadius(20)
-                        }
-
-                        // Clear all button
-                        if !viewModel.savedProfiles.isEmpty {
-                            Button {
-                                showClearAllConfirmation = true
-                                HapticManager.shared.impact(.light)
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "trash")
-                                        .font(.caption)
-                                    Text("Clear")
-                                        .font(.caption)
-                                        .fontWeight(.medium)
-                                }
-                                .foregroundColor(.white.opacity(0.8))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(Color.red.opacity(0.3))
-                                .cornerRadius(20)
-                            }
                         }
                     }
                 }
@@ -479,28 +345,6 @@ struct SavedProfilesView: View {
     private func profilesGrid(profiles: [SavedProfile]) -> some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 16) {
-                // Filter indicator if filters are active
-                if hasActiveFilters {
-                    HStack(spacing: 8) {
-                        Image(systemName: "line.3.horizontal.decrease.circle.fill")
-                            .font(.caption)
-                            .foregroundColor(.orange)
-                        Text("Filtered: \(profiles.count) of \(viewModel.savedProfiles.count) profiles")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Spacer()
-                        Button("Clear") {
-                            selectedAgeFilter = .all
-                            selectedSortOption = .recent
-                            HapticManager.shared.impact(.light)
-                        }
-                        .font(.caption)
-                        .foregroundColor(.orange)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                }
-
                 // Saved profiles grid
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
                     ForEach(profiles) { saved in
@@ -746,74 +590,6 @@ struct SavedProfilesView: View {
             .padding(.top, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    // MARK: - Filter Sheet
-
-    private var filterSheet: some View {
-        NavigationStack {
-            List {
-                Section("Age Range") {
-                    ForEach(SavedAgeFilter.allCases, id: \.self) { filter in
-                        Button {
-                            selectedAgeFilter = filter
-                            HapticManager.shared.selection()
-                        } label: {
-                            HStack {
-                                Text(filter.rawValue)
-                                    .foregroundColor(.primary)
-                                Spacer()
-                                if selectedAgeFilter == filter {
-                                    Image(systemName: "checkmark")
-                                        .foregroundColor(.orange)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Section("Sort By") {
-                    ForEach(SavedSortOption.allCases, id: \.self) { option in
-                        Button {
-                            selectedSortOption = option
-                            HapticManager.shared.selection()
-                        } label: {
-                            HStack {
-                                Text(option.rawValue)
-                                    .foregroundColor(.primary)
-                                Spacer()
-                                if selectedSortOption == option {
-                                    Image(systemName: "checkmark")
-                                        .foregroundColor(.orange)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Section {
-                    Button {
-                        selectedAgeFilter = .all
-                        selectedSortOption = .recent
-                        HapticManager.shared.impact(.light)
-                    } label: {
-                        Text("Reset Filters")
-                            .foregroundColor(.red)
-                    }
-                }
-            }
-            .navigationTitle("Filters")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        showFilters = false
-                    }
-                    .fontWeight(.semibold)
-                }
-            }
-        }
-        .presentationDetents([.medium])
     }
 
     // MARK: - Note Edit Sheet
