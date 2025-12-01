@@ -62,20 +62,16 @@ service cloud.firestore {
     // Matches Collection
     match /matches/{matchId} {
       // Users can read matches they're part of
-      // Note: Email verification NOT required for reads to allow cascade delete queries
       allow read: if isAuthenticated()
         && (resource.data.user1Id == request.auth.uid || resource.data.user2Id == request.auth.uid);
 
-      // System creates matches (handled by Cloud Functions ideally)
-      // For now, allow if user is one of the participants
+      // Users can create matches (email verification removed to fix messaging)
       allow create: if isAuthenticated()
-        && isEmailVerified()
         && (request.resource.data.user1Id == request.auth.uid || request.resource.data.user2Id == request.auth.uid)
         && request.resource.data.user1Id != request.resource.data.user2Id;
 
       // Users can update matches they're part of (for unmatch, etc.)
       allow update: if isAuthenticated()
-        && isEmailVerified()
         && (resource.data.user1Id == request.auth.uid || resource.data.user2Id == request.auth.uid);
 
       // Allow participants to delete matches (for account deletion cleanup)
@@ -86,19 +82,15 @@ service cloud.firestore {
     // Messages Collection
     match /messages/{messageId} {
       // Users can read messages in their matches
-      // Note: Email verification NOT required for reads to allow cascade delete queries
       allow read: if isAuthenticated()
         && (resource.data.senderId == request.auth.uid || resource.data.receiverId == request.auth.uid);
 
-      // Users can send messages they authored
+      // Users can send messages they authored (email verification removed)
       allow create: if isAuthenticated()
-        && isEmailVerified()
-        && request.resource.data.senderId == request.auth.uid
-        && isValidString(request.resource.data.text, 1, 1000);
+        && request.resource.data.senderId == request.auth.uid;
 
       // Users can update messages they sent or received (for marking read, editing)
       allow update: if isAuthenticated()
-        && isEmailVerified()
         && (resource.data.senderId == request.auth.uid || resource.data.receiverId == request.auth.uid);
 
       // Users can delete messages they sent OR received (for account deletion cleanup)

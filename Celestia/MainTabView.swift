@@ -45,36 +45,38 @@ struct MainTabView: View {
                     warningBanner
                 }
 
-                // Main content - ZStack approach to avoid iOS "More" tab issue
+                // Main content - All views stay loaded, use opacity for instant switching
                 ZStack {
-                    // Discover - always loaded
+                    // Discover
                     FeedDiscoverView(selectedTab: $selectedTab)
                         .opacity(selectedTab == 0 ? 1 : 0)
-                        .zIndex(selectedTab == 0 ? 1 : 0)
+                        .allowsHitTesting(selectedTab == 0)
 
                     // Likes
-                    if selectedTab == 1 {
-                        LikesView()
-                    }
+                    LikesView()
+                        .opacity(selectedTab == 1 ? 1 : 0)
+                        .allowsHitTesting(selectedTab == 1)
 
                     // Messages
-                    if selectedTab == 2 {
-                        MessagesView(selectedTab: $selectedTab)
-                    }
+                    MessagesView(selectedTab: $selectedTab)
+                        .opacity(selectedTab == 2 ? 1 : 0)
+                        .allowsHitTesting(selectedTab == 2)
 
                     // Saved
-                    if selectedTab == 3 {
-                        SavedProfilesView()
-                    }
+                    SavedProfilesView()
+                        .opacity(selectedTab == 3 ? 1 : 0)
+                        .allowsHitTesting(selectedTab == 3)
 
                     // Profile
-                    if selectedTab == 4 {
-                        ProfileView()
-                    }
+                    ProfileView()
+                        .opacity(selectedTab == 4 ? 1 : 0)
+                        .allowsHitTesting(selectedTab == 4)
 
                     // Admin - Only for admin users
-                    if isAdminUser && selectedTab == 5 {
+                    if isAdminUser {
                         AdminModerationDashboard()
+                            .opacity(selectedTab == 5 ? 1 : 0)
+                            .allowsHitTesting(selectedTab == 5)
                     }
                 }
                 .ignoresSafeArea(.keyboard)
