@@ -15,6 +15,8 @@ struct AdminImageApprovalView: View {
     @State private var selectedUser: PendingUserForApproval?
     @State private var showingPhotoViewer = false
     @State private var selectedPhotoIndex = 0
+    @State private var selectedUserForDetail: PendingUserForApproval?
+    @State private var showingUserDetail = false
 
     var body: some View {
         NavigationStack {
@@ -47,6 +49,10 @@ struct AdminImageApprovalView: View {
                                         Task {
                                             await viewModel.rejectUser(user)
                                         }
+                                    },
+                                    onViewProfile: {
+                                        selectedUserForDetail = user
+                                        showingUserDetail = true
                                     }
                                 )
                             }
@@ -92,6 +98,25 @@ struct AdminImageApprovalView: View {
                     )
                 }
             }
+            .sheet(isPresented: $showingUserDetail) {
+                if let user = selectedUserForDetail {
+                    AdminPendingUserDetailView(
+                        user: user,
+                        onApprove: {
+                            showingUserDetail = false
+                            Task {
+                                await viewModel.approveUser(user)
+                            }
+                        },
+                        onReject: {
+                            showingUserDetail = false
+                            Task {
+                                await viewModel.rejectUser(user)
+                            }
+                        }
+                    )
+                }
+            }
             .task {
                 await viewModel.loadPendingUsers()
             }
@@ -125,21 +150,38 @@ struct PendingUserCard: View {
     let onPhotoTap: (Int) -> Void
     let onApprove: () -> Void
     let onReject: () -> Void
+    let onViewProfile: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // User info header
+            // User info header - tappable to view full profile
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(user.fullName)
                         .font(.headline)
 
-                    Text("\(user.age) • \(user.location)")
+                    Text("\(user.age) • \(user.gender) • \(user.location)")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
 
                 Spacer()
+
+                // View profile button
+                Button {
+                    onViewProfile()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "person.circle")
+                        Text("View")
+                    }
+                    .font(.caption)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.blue.opacity(0.1))
+                    .foregroundColor(.blue)
+                    .cornerRadius(8)
+                }
 
                 Text("\(user.photos.count) photos")
                     .font(.caption)
@@ -148,6 +190,10 @@ struct PendingUserCard: View {
                     .background(Color.purple.opacity(0.1))
                     .foregroundColor(.purple)
                     .cornerRadius(8)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                onViewProfile()
             }
 
             // Photo grid - tap to expand
@@ -422,9 +468,24 @@ class AdminImageApprovalViewModel: ObservableObject {
                     id: doc.documentID,
                     fullName: fullName,
                     age: data["age"] as? Int ?? 0,
+                    gender: data["gender"] as? String ?? "",
                     location: data["location"] as? String ?? "Unknown",
+                    country: data["country"] as? String ?? "",
+                    bio: data["bio"] as? String ?? "",
                     photos: photos,
-                    createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? Date()
+                    interests: data["interests"] as? [String] ?? [],
+                    languages: data["languages"] as? [String] ?? [],
+                    lookingFor: data["lookingFor"] as? String ?? "",
+                    createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? Date(),
+                    height: data["height"] as? Int,
+                    educationLevel: data["educationLevel"] as? String,
+                    religion: data["religion"] as? String,
+                    relationshipGoal: data["relationshipGoal"] as? String,
+                    smoking: data["smoking"] as? String,
+                    drinking: data["drinking"] as? String,
+                    exercise: data["exercise"] as? String,
+                    pets: data["pets"] as? String,
+                    diet: data["diet"] as? String
                 )
             }
 
@@ -483,9 +544,423 @@ struct PendingUserForApproval: Identifiable {
     let id: String
     let fullName: String
     let age: Int
+    let gender: String
     let location: String
+    let country: String
+    let bio: String
     let photos: [String]
+    let interests: [String]
+    let languages: [String]
+    let lookingFor: String
     let createdAt: Date
+
+    // Lifestyle fields
+    let height: Int?
+    let educationLevel: String?
+    let religion: String?
+    let relationshipGoal: String?
+    let smoking: String?
+    let drinking: String?
+    let exercise: String?
+    let pets: String?
+    let diet: String?
+}
+
+// MARK: - Admin Pending User Detail View
+
+struct AdminPendingUserDetailView: View {
+    let user: PendingUserForApproval
+    let onApprove: () -> Void
+    let onReject: () -> Void
+
+    @Environment(\.dismiss) var dismiss
+    @State private var selectedPhotoIndex = 0
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 0) {
+                    // Photos carousel
+                    TabView(selection: $selectedPhotoIndex) {
+                        ForEach(Array(user.photos.enumerated()), id: \.offset) { index, photoURL in
+                            CachedAsyncImage(url: URL(string: photoURL)) { image in
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                            }
+                            .frame(height: 400)
+                            .clipped()
+                            .tag(index)
+                        }
+                    }
+                    .frame(height: 400)
+                    .tabViewStyle(.page)
+
+                    // Profile content
+                    VStack(alignment: .leading, spacing: 24) {
+                        // Header
+                        headerSection
+
+                        // Bio
+                        if !user.bio.isEmpty {
+                            bioSection
+                        }
+
+                        // Languages
+                        if !user.languages.isEmpty {
+                            languagesSection
+                        }
+
+                        // Interests
+                        if !user.interests.isEmpty {
+                            interestsSection
+                        }
+
+                        // Details
+                        if hasDetails {
+                            detailsSection
+                        }
+
+                        // Lifestyle
+                        if hasLifestyle {
+                            lifestyleSection
+                        }
+
+                        // Looking for
+                        lookingForSection
+                    }
+                    .padding(20)
+                    .padding(.bottom, 100)
+                }
+            }
+            .background(Color(.systemGroupedBackground))
+            .ignoresSafeArea(edges: .top)
+            .overlay(alignment: .bottom) {
+                actionButtons
+            }
+            .navigationTitle("Profile Review")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Header Section
+
+    private var headerSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Text(user.fullName)
+                    .font(.system(size: 28, weight: .bold))
+
+                Text("\(user.age)")
+                    .font(.title2)
+                    .foregroundColor(.secondary)
+            }
+
+            HStack(spacing: 6) {
+                Image(systemName: "mappin.circle.fill")
+                    .foregroundColor(.purple)
+                Text("\(user.location), \(user.country)")
+                    .foregroundColor(.secondary)
+            }
+            .font(.subheadline)
+
+            HStack(spacing: 8) {
+                Label(user.gender, systemImage: "person.fill")
+                    .font(.caption)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.blue.opacity(0.1))
+                    .foregroundColor(.blue)
+                    .cornerRadius(8)
+
+                Text("Joined \(user.createdAt.formatted(date: .abbreviated, time: .omitted))")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+
+    // MARK: - Bio Section
+
+    private var bioSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("About", systemImage: "text.quote")
+                .font(.headline)
+                .foregroundColor(.purple)
+
+            Text(user.bio)
+                .font(.body)
+                .foregroundColor(.primary)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+    }
+
+    // MARK: - Languages Section
+
+    private var languagesSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Languages", systemImage: "globe")
+                .font(.headline)
+                .foregroundColor(.green)
+
+            FlowLayout(spacing: 8) {
+                ForEach(user.languages, id: \.self) { language in
+                    Text(language)
+                        .font(.caption)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.green.opacity(0.1))
+                        .foregroundColor(.green)
+                        .cornerRadius(16)
+                }
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+    }
+
+    // MARK: - Interests Section
+
+    private var interestsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Interests", systemImage: "heart.fill")
+                .font(.headline)
+                .foregroundColor(.pink)
+
+            FlowLayout(spacing: 8) {
+                ForEach(user.interests, id: \.self) { interest in
+                    Text(interest)
+                        .font(.caption)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.pink.opacity(0.1))
+                        .foregroundColor(.pink)
+                        .cornerRadius(16)
+                }
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+    }
+
+    // MARK: - Details Section
+
+    private var hasDetails: Bool {
+        user.height != nil ||
+        (user.educationLevel != nil && user.educationLevel != "Prefer not to say") ||
+        (user.religion != nil && user.religion != "Prefer not to say") ||
+        (user.relationshipGoal != nil && user.relationshipGoal != "Prefer not to say")
+    }
+
+    private var detailsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Details", systemImage: "person.text.rectangle")
+                .font(.headline)
+                .foregroundColor(.indigo)
+
+            VStack(spacing: 10) {
+                if let height = user.height {
+                    DetailRowView(icon: "ruler", label: "Height", value: "\(height) cm")
+                }
+                if let education = user.educationLevel, education != "Prefer not to say", !education.isEmpty {
+                    DetailRowView(icon: "graduationcap.fill", label: "Education", value: education)
+                }
+                if let religion = user.religion, religion != "Prefer not to say", !religion.isEmpty {
+                    DetailRowView(icon: "sparkles", label: "Religion", value: religion)
+                }
+                if let goal = user.relationshipGoal, goal != "Prefer not to say", !goal.isEmpty {
+                    DetailRowView(icon: "heart.circle", label: "Looking for", value: goal)
+                }
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+    }
+
+    // MARK: - Lifestyle Section
+
+    private var hasLifestyle: Bool {
+        (user.smoking != nil && user.smoking != "Prefer not to say") ||
+        (user.drinking != nil && user.drinking != "Prefer not to say") ||
+        (user.exercise != nil && user.exercise != "Prefer not to say") ||
+        (user.diet != nil && user.diet != "Prefer not to say") ||
+        (user.pets != nil && user.pets != "Prefer not to say")
+    }
+
+    private var lifestyleSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Lifestyle", systemImage: "leaf.fill")
+                .font(.headline)
+                .foregroundColor(.green)
+
+            VStack(spacing: 10) {
+                if let smoking = user.smoking, smoking != "Prefer not to say", !smoking.isEmpty {
+                    DetailRowView(icon: "smoke", label: "Smoking", value: smoking)
+                }
+                if let drinking = user.drinking, drinking != "Prefer not to say", !drinking.isEmpty {
+                    DetailRowView(icon: "wineglass", label: "Drinking", value: drinking)
+                }
+                if let exercise = user.exercise, exercise != "Prefer not to say", !exercise.isEmpty {
+                    DetailRowView(icon: "figure.run", label: "Exercise", value: exercise)
+                }
+                if let diet = user.diet, diet != "Prefer not to say", !diet.isEmpty {
+                    DetailRowView(icon: "fork.knife", label: "Diet", value: diet)
+                }
+                if let pets = user.pets, pets != "Prefer not to say", !pets.isEmpty {
+                    DetailRowView(icon: "pawprint.fill", label: "Pets", value: pets)
+                }
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+    }
+
+    // MARK: - Looking For Section
+
+    private var lookingForSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Interested In", systemImage: "heart.text.square")
+                .font(.headline)
+                .foregroundColor(.orange)
+
+            Text(user.lookingFor.isEmpty ? "Everyone" : user.lookingFor)
+                .font(.body)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+    }
+
+    // MARK: - Action Buttons
+
+    private var actionButtons: some View {
+        HStack(spacing: 16) {
+            Button {
+                HapticManager.shared.notification(.error)
+                onReject()
+            } label: {
+                HStack {
+                    Image(systemName: "xmark")
+                    Text("Reject")
+                }
+                .font(.headline)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(Color.red)
+                .cornerRadius(16)
+            }
+
+            Button {
+                HapticManager.shared.notification(.success)
+                onApprove()
+            } label: {
+                HStack {
+                    Image(systemName: "checkmark")
+                    Text("Approve")
+                }
+                .font(.headline)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(Color.green)
+                .cornerRadius(16)
+            }
+        }
+        .padding()
+        .background(
+            Color(.systemBackground)
+                .shadow(color: .black.opacity(0.1), radius: 10, y: -5)
+        )
+    }
+}
+
+// MARK: - Detail Row View (for admin detail view)
+
+private struct DetailRowView: View {
+    let icon: String
+    let label: String
+    let value: String
+
+    var body: some View {
+        HStack {
+            Image(systemName: icon)
+                .foregroundColor(.secondary)
+                .frame(width: 24)
+
+            Text(label)
+                .foregroundColor(.secondary)
+
+            Spacer()
+
+            Text(value)
+                .fontWeight(.medium)
+        }
+        .font(.subheadline)
+    }
+}
+
+// MARK: - Flow Layout for tags
+
+private struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let result = FlowResult(in: proposal.width ?? 0, subviews: subviews, spacing: spacing)
+        return result.size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = FlowResult(in: bounds.width, subviews: subviews, spacing: spacing)
+        for (index, subview) in subviews.enumerated() {
+            subview.place(at: CGPoint(x: bounds.minX + result.positions[index].x,
+                                       y: bounds.minY + result.positions[index].y),
+                          proposal: .unspecified)
+        }
+    }
+
+    struct FlowResult {
+        var size: CGSize = .zero
+        var positions: [CGPoint] = []
+
+        init(in maxWidth: CGFloat, subviews: Subviews, spacing: CGFloat) {
+            var x: CGFloat = 0
+            var y: CGFloat = 0
+            var maxHeight: CGFloat = 0
+
+            for subview in subviews {
+                let size = subview.sizeThatFits(.unspecified)
+                if x + size.width > maxWidth, x > 0 {
+                    x = 0
+                    y += maxHeight + spacing
+                    maxHeight = 0
+                }
+                positions.append(CGPoint(x: x, y: y))
+                maxHeight = max(maxHeight, size.height)
+                x += size.width + spacing
+            }
+            self.size = CGSize(width: maxWidth, height: y + maxHeight)
+        }
+    }
 }
 
 #Preview {
