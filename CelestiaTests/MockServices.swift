@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import UIKit
 @testable import Celestia
 
 // MARK: - Mock Auth Service
@@ -17,6 +18,7 @@ class MockAuthService: AuthServiceProtocol {
     var isLoading: Bool = false
     var errorMessage: String?
     var isEmailVerified: Bool = false
+    var isInitialized: Bool = true
 
     var signInCalled = false
     var signInEmail: String?
@@ -40,7 +42,7 @@ class MockAuthService: AuthServiceProtocol {
         isEmailVerified = true
     }
 
-    func createUser(withEmail email: String, password: String, fullName: String, age: Int, gender: String, lookingFor: String, location: String, country: String, referralCode: String = "") async throws {
+    func createUser(withEmail email: String, password: String, fullName: String, age: Int, gender: String, lookingFor: String, location: String, country: String, referralCode: String = "", photos: [UIImage] = []) async throws {
         createUserCalled = true
 
         if shouldFail {
@@ -71,6 +73,7 @@ class MockAuthService: AuthServiceProtocol {
     func resetPassword(email: String) async throws {}
     func sendEmailVerification() async throws {}
     func reloadUser() async throws {}
+    func waitForInitialization() async {}
 }
 
 // MARK: - Mock User Service
