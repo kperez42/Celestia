@@ -110,7 +110,7 @@ struct ContentView: View {
         isAuthenticated = (authService.userSession != nil)
         needsEmailVerification = isAuthenticated && !authService.isEmailVerified
 
-        let profileStatus = authService.currentUser?.profileStatus?.lowercased()
+        let profileStatus = authService.currentUser?.profileStatus.lowercased()
 
         // Check if account is suspended
         isSuspended = isAuthenticated && (authService.currentUser?.isSuspended == true || profileStatus == "suspended")
