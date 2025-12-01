@@ -80,10 +80,15 @@ service cloud.firestore {
     }
 
     // Messages Collection
+    // Messages have a matchId field with format: {userId1}_{userId2} (sorted)
     match /messages/{messageId} {
       // Users can read messages in their matches
+      // FIX: Use matchId pattern matching to work with matchId-based queries
+      // Since matchId = sortedUserIds joined by _, user's ID must be in the matchId
       allow read: if isAuthenticated()
-        && (resource.data.senderId == request.auth.uid || resource.data.receiverId == request.auth.uid);
+        && (resource.data.matchId.matches('.*' + request.auth.uid + '.*')
+            || resource.data.senderId == request.auth.uid
+            || resource.data.receiverId == request.auth.uid);
 
       // Users can send messages they authored (email verification removed)
       allow create: if isAuthenticated()
