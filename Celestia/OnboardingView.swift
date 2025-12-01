@@ -49,9 +49,11 @@ struct OnboardingView: View {
     @State private var relationshipGoal: String = "Prefer not to say"
     @State private var ageRangeMin: Int = 18
     @State private var ageRangeMax: Int = 50
+    @State private var maxDistance: Int = 50
 
     // Step 7: Lifestyle (NEW)
     @State private var educationLevel: String = ""
+    @State private var religion: String = ""
     @State private var smoking: String = ""
     @State private var drinking: String = ""
 
@@ -76,6 +78,7 @@ struct OnboardingView: View {
 
     // Step 7 & 8 options (Lifestyle)
     let educationOptions = ["", "High School", "Some College", "Associate's Degree", "Bachelor's Degree", "Master's Degree", "Doctorate", "Trade School", "Other"]
+    let religionOptions = ["", "Christian", "Catholic", "Jewish", "Muslim", "Hindu", "Buddhist", "Spiritual", "Agnostic", "Atheist", "Other", "Prefer not to say"]
     let smokingOptions = ["", "Never", "Sometimes", "Regularly", "Trying to quit", "Prefer not to say"]
     let drinkingOptions = ["", "Never", "Socially", "Occasionally", "Regularly", "Prefer not to say"]
     let exerciseOptions = ["", "Daily", "Often (3-4x/week)", "Sometimes (1-2x/week)", "Rarely", "Never"]
@@ -1515,6 +1518,52 @@ struct OnboardingView: View {
                                 .stroke(Color.purple.opacity(0.2), lineWidth: 1)
                         )
                     }
+
+                    // Max Distance Preference
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "location.circle.fill")
+                                .foregroundColor(.blue)
+                            Text("Maximum Distance")
+                                .font(.headline)
+
+                            Spacer()
+
+                            Text("\(maxDistance) km")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.blue)
+                        }
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Slider(
+                                value: Binding(
+                                    get: { Double(maxDistance) },
+                                    set: { maxDistance = Int($0) }
+                                ),
+                                in: 5...200,
+                                step: 5
+                            )
+                            .tint(.blue)
+
+                            HStack {
+                                Text("5 km")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                Text("200 km")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .padding()
+                        .background(Color.white)
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.blue.opacity(0.2), lineWidth: 1)
+                        )
+                    }
                 }
 
                 // Benefit card
@@ -1620,6 +1669,15 @@ struct OnboardingView: View {
                         selection: $educationLevel
                     )
 
+                    // Religion
+                    lifestyleOptionSelector(
+                        title: "Religion / Spirituality",
+                        icon: "sparkles",
+                        color: .purple,
+                        options: religionOptions,
+                        selection: $religion
+                    )
+
                     // Smoking
                     lifestyleOptionSelector(
                         title: "Smoking",
@@ -1633,7 +1691,7 @@ struct OnboardingView: View {
                     lifestyleOptionSelector(
                         title: "Drinking",
                         icon: "wineglass.fill",
-                        color: .purple,
+                        color: .pink,
                         options: drinkingOptions,
                         selection: $drinking
                     )
@@ -1989,8 +2047,12 @@ struct OnboardingView: View {
                 user.ageRangeMin = ageRangeMin
                 user.ageRangeMax = ageRangeMax
 
+                // Step 6 - maxDistance
+                user.maxDistance = maxDistance
+
                 // Step 7 & 8 lifestyle fields
                 if !educationLevel.isEmpty { user.educationLevel = educationLevel }
+                if !religion.isEmpty { user.religion = religion }
                 if !smoking.isEmpty { user.smoking = smoking }
                 if !drinking.isEmpty { user.drinking = drinking }
                 if !exercise.isEmpty { user.exercise = exercise }
