@@ -45,50 +45,39 @@ struct MainTabView: View {
                     warningBanner
                 }
 
-                // Main content - PERFORMANCE: Use page style for smoother transitions
-                TabView(selection: $selectedTab) {
-                // Discover - Load immediately (tab 0)
-                FeedDiscoverView(selectedTab: $selectedTab)
-                    .tag(0)
+                // Main content - ZStack approach to avoid iOS "More" tab issue
+                ZStack {
+                    // Discover - always loaded
+                    FeedDiscoverView(selectedTab: $selectedTab)
+                        .opacity(selectedTab == 0 ? 1 : 0)
+                        .zIndex(selectedTab == 0 ? 1 : 0)
 
-                // Likes - Lazy load
-                LazyTabContent(tabIndex: 1, currentTab: selectedTab) {
-                    LikesView()
-                }
-                .tag(1)
+                    // Likes
+                    if selectedTab == 1 {
+                        LikesView()
+                    }
 
-                // Messages - Lazy load
-                LazyTabContent(tabIndex: 2, currentTab: selectedTab) {
-                    MessagesView(selectedTab: $selectedTab)
-                }
-                .tag(2)
+                    // Messages
+                    if selectedTab == 2 {
+                        MessagesView(selectedTab: $selectedTab)
+                    }
 
-                // Saved - Lazy load
-                LazyTabContent(tabIndex: 3, currentTab: selectedTab) {
-                    SavedProfilesView()
-                }
-                .tag(3)
+                    // Saved
+                    if selectedTab == 3 {
+                        SavedProfilesView()
+                    }
 
-                // Profile - Lazy load
-                LazyTabContent(tabIndex: 4, currentTab: selectedTab) {
-                    ProfileView()
-                }
-                .tag(4)
+                    // Profile
+                    if selectedTab == 4 {
+                        ProfileView()
+                    }
 
-                // Admin - Only for admin users
-                if isAdminUser {
-                    LazyTabContent(tabIndex: 5, currentTab: selectedTab) {
+                    // Admin - Only for admin users
+                    if isAdminUser && selectedTab == 5 {
                         AdminModerationDashboard()
                     }
-                    .tag(5)
                 }
-            }
-            .tabViewStyle(.automatic)
-            .ignoresSafeArea(.keyboard)
-            // PERFORMANCE: Disable default animation, use custom smooth transition
-            .transaction { transaction in
-                transaction.animation = nil
-            }
+                .ignoresSafeArea(.keyboard)
             } // End VStack
 
             // Custom Tab Bar
