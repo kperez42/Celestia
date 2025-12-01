@@ -143,7 +143,7 @@ struct AdminModerationDashboard: View {
     private var reportsListView: some View {
         Group {
             if viewModel.isLoading {
-                ProgressView("Loading reports...")
+                ReportsLoadingView()
             } else if let error = viewModel.errorMessage {
                 // Show error state with admin access hint
                 VStack(spacing: 20) {
@@ -190,14 +190,7 @@ struct AdminModerationDashboard: View {
     private var pendingProfilesView: some View {
         Group {
             if viewModel.isLoading {
-                VStack(spacing: 16) {
-                    ProgressView()
-                        .scaleEffect(1.2)
-                    Text("Loading new accounts...")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                PendingProfilesLoadingView()
             } else if viewModel.pendingProfiles.isEmpty {
                 emptyState(
                     icon: "person.crop.circle.badge.checkmark",
@@ -233,7 +226,7 @@ struct AdminModerationDashboard: View {
     private var suspiciousProfilesView: some View {
         Group {
             if viewModel.isLoading {
-                ProgressView("Loading suspicious profiles...")
+                SuspiciousProfilesLoadingView()
             } else if viewModel.suspiciousProfiles.isEmpty {
                 emptyState(
                     icon: "checkmark.circle.fill",
@@ -262,6 +255,16 @@ struct AdminModerationDashboard: View {
     // MARK: - Stats
 
     private var statsView: some View {
+        Group {
+            if viewModel.isLoading {
+                StatsLoadingView()
+            } else {
+                statsContentView
+            }
+        }
+    }
+
+    private var statsContentView: some View {
         ScrollView {
             VStack(spacing: 20) {
                 // Header

@@ -14,9 +14,26 @@ struct PendingApprovalView: View {
     @State private var appearAnimation = false
     @State private var animateIcon = false
     @State private var pulseAnimation = false
+    @State private var progressAnimation = false
+    @State private var stepAnimations: [Bool] = [false, false, false]
 
     private var user: User? {
         authService.currentUser
+    }
+
+    private var submittedTimeAgo: String {
+        guard let createdAt = user?.createdAt else { return "Recently" }
+        let interval = Date().timeIntervalSince(createdAt)
+        let hours = Int(interval / 3600)
+        let minutes = Int((interval.truncatingRemainder(dividingBy: 3600)) / 60)
+
+        if hours > 0 {
+            return "\(hours)h \(minutes)m ago"
+        } else if minutes > 0 {
+            return "\(minutes)m ago"
+        } else {
+            return "Just now"
+        }
     }
 
     var body: some View {
@@ -77,6 +94,20 @@ struct PendingApprovalView: View {
                         }
                         withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.1)) {
                             appearAnimation = true
+                        }
+                        // Animate progress steps sequentially
+                        for i in 0..<3 {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5 + Double(i) * 0.3) {
+                                withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                                    stepAnimations[i] = true
+                                }
+                            }
+                        }
+                        // Start progress bar animation
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                            withAnimation(.easeInOut(duration: 1.0)) {
+                                progressAnimation = true
+                            }
                         }
                     }
 
@@ -141,6 +172,72 @@ struct PendingApprovalView: View {
                     .opacity(appearAnimation ? 1 : 0)
                     .offset(y: appearAnimation ? 0 : 30)
                     .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.2), value: appearAnimation)
+
+                    // Progress Timeline
+                    VStack(spacing: 0) {
+                        HStack {
+                            Text("Review Progress")
+                                .font(.headline)
+                            Spacer()
+                            Text("Submitted \(submittedTimeAgo)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.bottom, 16)
+
+                        // Progress steps
+                        HStack(spacing: 0) {
+                            // Step 1: Submitted
+                            ReviewStepView(
+                                icon: "paperplane.fill",
+                                title: "Submitted",
+                                isCompleted: true,
+                                isActive: false,
+                                color: .green,
+                                isAnimated: stepAnimations[0]
+                            )
+
+                            // Connector line
+                            ProgressConnector(isCompleted: true, isAnimated: progressAnimation)
+
+                            // Step 2: In Review
+                            ReviewStepView(
+                                icon: "eye.fill",
+                                title: "In Review",
+                                isCompleted: false,
+                                isActive: true,
+                                color: .blue,
+                                isAnimated: stepAnimations[1]
+                            )
+
+                            // Connector line
+                            ProgressConnector(isCompleted: false, isAnimated: progressAnimation)
+
+                            // Step 3: Decision
+                            ReviewStepView(
+                                icon: "checkmark.seal.fill",
+                                title: "Decision",
+                                isCompleted: false,
+                                isActive: false,
+                                color: .purple,
+                                isAnimated: stepAnimations[2]
+                            )
+                        }
+                    }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color(.systemBackground))
+                            .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .strokeBorder(Color(.separator).opacity(0.2), lineWidth: 1)
+                    )
+                    .padding(.horizontal)
+                    .opacity(appearAnimation ? 1 : 0)
+                    .offset(y: appearAnimation ? 0 : 30)
+                    .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.25), value: appearAnimation)
 
                     // What we're checking
                     VStack(alignment: .leading, spacing: 16) {
@@ -303,6 +400,83 @@ struct PendingApprovalView: View {
                 HapticManager.shared.impact(.light)
             }
         }
+    }
+}
+
+// MARK: - Review Step Component
+
+private struct ReviewStepView: View {
+    let icon: String
+    let title: String
+    let isCompleted: Bool
+    let isActive: Bool
+    let color: Color
+    let isAnimated: Bool
+
+    var body: some View {
+        VStack(spacing: 8) {
+            ZStack {
+                // Background circle
+                Circle()
+                    .fill(isCompleted ? color : (isActive ? color.opacity(0.15) : Color(.systemGray5)))
+                    .frame(width: 44, height: 44)
+
+                // Pulse ring for active step
+                if isActive {
+                    Circle()
+                        .stroke(color.opacity(0.3), lineWidth: 2)
+                        .frame(width: 52, height: 52)
+                        .scaleEffect(isAnimated ? 1.2 : 1.0)
+                        .opacity(isAnimated ? 0 : 1)
+                        .animation(.easeOut(duration: 1.5).repeatForever(autoreverses: false), value: isAnimated)
+                }
+
+                // Icon
+                Image(systemName: icon)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(isCompleted ? .white : (isActive ? color : .gray))
+            }
+            .scaleEffect(isAnimated ? 1.0 : 0.5)
+            .opacity(isAnimated ? 1.0 : 0)
+
+            Text(title)
+                .font(.caption2.weight(.medium))
+                .foregroundColor(isCompleted || isActive ? .primary : .secondary)
+                .opacity(isAnimated ? 1.0 : 0)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - Progress Connector
+
+private struct ProgressConnector: View {
+    let isCompleted: Bool
+    let isAnimated: Bool
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                // Background line
+                Rectangle()
+                    .fill(Color(.systemGray4))
+                    .frame(height: 3)
+
+                // Progress line
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.green, .blue],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(width: isCompleted ? (isAnimated ? geometry.size.width : 0) : 0, height: 3)
+            }
+        }
+        .frame(height: 3)
+        .frame(maxWidth: 50)
+        .offset(y: -12) // Center with the circles
     }
 }
 
