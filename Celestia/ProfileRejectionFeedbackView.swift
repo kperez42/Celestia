@@ -305,7 +305,7 @@ struct ProfileRejectionFeedbackView: View {
             .navigationTitle("Profile Review")
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showEditProfile) {
-                ProfileEditView()
+                EditProfileView()
                     .environmentObject(authService)
             }
             .alert("Re-Review Requested!", isPresented: $showSuccessAlert) {
