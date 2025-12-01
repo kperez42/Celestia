@@ -485,6 +485,17 @@ struct WelcomeAwarenessSlidesView: View {
             ]
         ),
         AwarenessSlide(
+            icon: "checklist",
+            title: "What We Review",
+            description: "All profiles are reviewed before going live. Here's what our team checks to keep Celestia safe and authentic:",
+            color: .blue,
+            tips: [
+                "Profile Photos - Clear, appropriate photos that show you",
+                "Bio & Information - Complete and authentic profile details",
+                "Community Guidelines - Content follows our safety policies"
+            ]
+        ),
+        AwarenessSlide(
             icon: "shield.checkered",
             title: "Stay Safe",
             description: "Your safety is our priority. We review all profiles and provide tools to report inappropriate behavior.",
