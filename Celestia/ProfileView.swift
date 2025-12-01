@@ -296,30 +296,31 @@ struct ProfileView: View {
 
     private func heroSection(user: User) -> some View {
         ZStack(alignment: .bottom) {
-            // Clean, professional gradient background
+            // Vibrant gradient background with decorative elements
             ZStack {
                 LinearGradient(
                     colors: [
-                        Color(.systemBackground),
-                        Color(.systemGray6)
+                        Color.purple.opacity(0.9),
+                        Color.pink.opacity(0.7),
+                        Color.blue.opacity(0.6)
                     ],
-                    startPoint: .top,
-                    endPoint: .bottom
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
                 )
 
-                // Subtle decorative accent
+                // Decorative circles for depth
                 GeometryReader { geo in
                     Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.purple.opacity(0.08), Color.pink.opacity(0.05)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 300, height: 300)
-                        .blur(radius: 60)
-                        .offset(x: geo.size.width / 2 - 150, y: 20)
+                        .fill(Color.white.opacity(0.1))
+                        .frame(width: 200, height: 200)
+                        .blur(radius: 40)
+                        .offset(x: -80, y: 50)
+
+                    Circle()
+                        .fill(Color.yellow.opacity(0.15))
+                        .frame(width: 120, height: 120)
+                        .blur(radius: 30)
+                        .offset(x: geo.size.width - 60, y: 100)
                 }
             }
             .frame(height: 340)
@@ -348,7 +349,7 @@ struct ProfileView: View {
                     HStack(spacing: 8) {
                         Text(user.fullName)
                             .font(.largeTitle.weight(.bold))
-                            .foregroundColor(.primary)
+                            .foregroundColor(.white)
                             .lineLimit(1)
                             .truncationMode(.tail)
 
@@ -356,18 +357,14 @@ struct ProfileView: View {
                             Image(systemName: "checkmark.seal.fill")
                                 .font(.title3)
                                 .foregroundColor(.blue)
+                                .shadow(color: .blue.opacity(0.5), radius: 5)
                         }
 
                         if user.isPremium {
                             Image(systemName: "crown.fill")
                                 .font(.title3)
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [.purple, .pink],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
+                                .foregroundColor(.yellow)
+                                .shadow(color: .yellow.opacity(0.7), radius: 8)
                         }
                     }
 
@@ -387,7 +384,7 @@ struct ProfileView: View {
                         Text("\(user.age) years old")
                             .font(.subheadline)
                     }
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.white.opacity(0.9))
                 }
                 .padding(.bottom, 40)
             }
@@ -404,9 +401,9 @@ struct ProfileView: View {
                         ShareLink(item: shareURL, subject: Text("Check out \(user.fullName)'s profile"), message: Text("See \(user.fullName) on Celestia!")) {
                             Image(systemName: "square.and.arrow.up")
                                 .font(.title3)
-                                .foregroundColor(.primary)
+                                .foregroundColor(.white)
                                 .frame(width: 44, height: 44)
-                                .background(Color(.systemGray5))
+                                .background(Color.white.opacity(0.2))
                                 .clipShape(Circle())
                         }
                         .simultaneousGesture(TapGesture().onEnded {
@@ -424,9 +421,9 @@ struct ProfileView: View {
                     } label: {
                         Image(systemName: "gearshape.fill")
                             .font(.title3)
-                            .foregroundColor(.primary)
+                            .foregroundColor(.white)
                             .frame(width: 44, height: 44)
-                            .background(Color(.systemGray5))
+                            .background(Color.white.opacity(0.2))
                             .clipShape(Circle())
                     }
                     .accessibilityLabel("Settings")
