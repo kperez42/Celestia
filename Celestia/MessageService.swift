@@ -1028,7 +1028,281 @@ class MessageService: ObservableObject, MessageServiceProtocol, ListenerLifecycl
 
         Logger.shared.info("All messages deleted successfully for match: \(matchId)", category: .messaging)
     }
-    
+
+    // MARK: - Message Editing
+
+    /// Edit a message's text content
+    /// Only the sender can edit their own messages within 15 minutes of sending
+    func editMessage(messageId: String, newText: String, senderId: String) async throws {
+        let sanitizedText = InputSanitizer.standard(newText)
+
+        guard !sanitizedText.isEmpty else {
+            throw CelestiaError.messageNotSent
+        }
+
+        guard sanitizedText.count <= AppConstants.Limits.maxMessageLength else {
+            throw CelestiaError.messageTooLong
+        }
+
+        // Validate content
+        do {
+            let validationResponse = try await BackendAPIService.shared.validateContent(
+                sanitizedText,
+                type: .message
+            )
+            guard validationResponse.isAppropriate else {
+                throw CelestiaError.inappropriateContentWithReasons(validationResponse.violations)
+            }
+        } catch let error as BackendAPIError {
+            // If validation service is unavailable, allow the edit
+            Logger.shared.warning("Server-side validation unavailable for edit", category: .moderation)
+        }
+
+        // Get the original message to verify ownership and time limit
+        let messageDoc = try await db.collection("messages").document(messageId).getDocument()
+
+        guard let messageData = messageDoc.data(),
+              let messageSenderId = messageData["senderId"] as? String,
+              messageSenderId == senderId else {
+            throw CelestiaError.unauthorized
+        }
+
+        // Check if message was sent within the last 15 minutes
+        if let timestamp = messageData["timestamp"] as? Timestamp {
+            let messageDate = timestamp.dateValue()
+            let minutesSinceSent = Date().timeIntervalSince(messageDate) / 60
+            guard minutesSinceSent <= 15 else {
+                throw CelestiaError.editTimeLimitExceeded
+            }
+        }
+
+        // Store original text if this is the first edit
+        var updateData: [String: Any] = [
+            "text": sanitizedText,
+            "isEdited": true,
+            "editedAt": FieldValue.serverTimestamp()
+        ]
+
+        if messageData["originalText"] == nil {
+            updateData["originalText"] = messageData["text"] as? String ?? ""
+        }
+
+        try await db.collection("messages").document(messageId).updateData(updateData)
+
+        // Update local message
+        await MainActor.run {
+            if let index = messages.firstIndex(where: { $0.id == messageId }) {
+                messages[index].text = sanitizedText
+                messages[index].isEdited = true
+                messages[index].editedAt = Date()
+                if messages[index].originalText == nil {
+                    messages[index].originalText = messageData["text"] as? String
+                }
+            }
+        }
+
+        Logger.shared.info("Message edited successfully: \(messageId)", category: .messaging)
+    }
+
+    // MARK: - Message Reactions
+
+    /// Add a reaction to a message
+    func addReaction(messageId: String, emoji: String, userId: String) async throws {
+        let reaction = MessageReaction(emoji: emoji, userId: userId)
+
+        // Use arrayUnion to add reaction atomically
+        try await db.collection("messages").document(messageId).updateData([
+            "reactions": FieldValue.arrayUnion([[
+                "emoji": emoji,
+                "userId": userId,
+                "timestamp": Timestamp(date: reaction.timestamp)
+            ]])
+        ])
+
+        // Update local message
+        await MainActor.run {
+            if let index = messages.firstIndex(where: { $0.id == messageId }) {
+                // Check if user already has this reaction
+                if !messages[index].hasUserReacted(userId: userId, emoji: emoji) {
+                    messages[index].reactions.append(reaction)
+                }
+            }
+        }
+
+        Logger.shared.info("Reaction added: \(emoji) to message: \(messageId)", category: .messaging)
+
+        // Send notification to message owner
+        NotificationCenter.default.post(
+            name: .messageReactionAdded,
+            object: nil,
+            userInfo: ["messageId": messageId, "emoji": emoji, "userId": userId]
+        )
+    }
+
+    /// Remove a reaction from a message
+    func removeReaction(messageId: String, emoji: String, userId: String) async throws {
+        // Get current message to find the exact reaction to remove
+        let messageDoc = try await db.collection("messages").document(messageId).getDocument()
+
+        guard let data = messageDoc.data(),
+              let reactions = data["reactions"] as? [[String: Any]] else {
+            return
+        }
+
+        // Find the reaction to remove
+        guard let reactionToRemove = reactions.first(where: {
+            ($0["emoji"] as? String) == emoji && ($0["userId"] as? String) == userId
+        }) else {
+            return
+        }
+
+        // Use arrayRemove to remove reaction atomically
+        try await db.collection("messages").document(messageId).updateData([
+            "reactions": FieldValue.arrayRemove([reactionToRemove])
+        ])
+
+        // Update local message
+        await MainActor.run {
+            if let index = messages.firstIndex(where: { $0.id == messageId }) {
+                messages[index].reactions.removeAll { $0.userId == userId && $0.emoji == emoji }
+            }
+        }
+
+        Logger.shared.info("Reaction removed: \(emoji) from message: \(messageId)", category: .messaging)
+    }
+
+    /// Toggle a reaction on a message (add if not present, remove if present)
+    func toggleReaction(messageId: String, emoji: String, userId: String) async throws {
+        // Check if user already has this reaction
+        let hasReaction = await MainActor.run {
+            messages.first(where: { $0.id == messageId })?.hasUserReacted(userId: userId, emoji: emoji) ?? false
+        }
+
+        if hasReaction {
+            try await removeReaction(messageId: messageId, emoji: emoji, userId: userId)
+        } else {
+            try await addReaction(messageId: messageId, emoji: emoji, userId: userId)
+        }
+    }
+
+    // MARK: - Message Reply
+
+    /// Send a message as a reply to another message
+    func sendReplyMessage(
+        matchId: String,
+        senderId: String,
+        receiverId: String,
+        text: String,
+        replyTo: MessageReply
+    ) async throws {
+        // Generate a local ID for tracking
+        let localMessageId = UUID().uuidString
+        pendingMessageIds.insert(localMessageId)
+
+        defer {
+            pendingMessageIds.remove(localMessageId)
+        }
+
+        let sanitizedText = InputSanitizer.standard(text)
+
+        guard !sanitizedText.isEmpty else {
+            throw CelestiaError.messageNotSent
+        }
+
+        guard sanitizedText.count <= AppConstants.Limits.maxMessageLength else {
+            throw CelestiaError.messageTooLong
+        }
+
+        // Check network
+        guard networkMonitor.isConnected else {
+            Logger.shared.info("Offline - queueing reply message for later delivery", category: .messaging)
+            // For now, queue as regular message (reply context will be lost)
+            await queueMessageForOfflineDelivery(
+                matchId: matchId,
+                senderId: senderId,
+                receiverId: receiverId,
+                text: sanitizedText
+            )
+            return
+        }
+
+        // Validate content
+        let validationPassed = try await performContentValidation(text: sanitizedText)
+        guard validationPassed else { return }
+
+        // Create message with reply
+        let message = Message(
+            matchId: matchId,
+            senderId: senderId,
+            receiverId: receiverId,
+            text: sanitizedText,
+            replyTo: replyTo
+        )
+
+        // Add optimistic message
+        await addOptimisticMessage(message, localId: localMessageId)
+
+        // Send to Firestore
+        do {
+            let documentRef = try db.collection("messages").addDocument(from: message)
+            Logger.shared.info("Reply message sent: \(documentRef.documentID)", category: .messaging)
+
+            // Update match with last message info
+            try await db.collection("matches").document(matchId).updateData([
+                "lastMessage": sanitizedText,
+                "lastMessageTimestamp": FieldValue.serverTimestamp(),
+                "lastMessageSenderId": senderId,
+                "unreadCount.\(receiverId)": FieldValue.increment(Int64(1))
+            ])
+
+            // Send notification
+            await sendMessageNotificationWithFallback(message: message, senderId: senderId, matchId: matchId)
+
+        } catch {
+            await removeOptimisticMessage(localId: localMessageId)
+            throw error
+        }
+    }
+
+    // MARK: - Real-time Read Receipts
+
+    /// Listen for read receipt updates on sent messages
+    func listenToReadReceipts(matchId: String, senderId: String) {
+        // This is handled by the main message listener
+        // Read status updates come through the snapshot listener
+        Logger.shared.debug("Read receipts listening via main message listener for match: \(matchId)", category: .messaging)
+    }
+
+    /// Mark a specific message as read with real-time update
+    func markMessageAsRead(messageId: String, userId: String) async {
+        do {
+            try await db.collection("messages").document(messageId).updateData([
+                "isRead": true,
+                "readAt": FieldValue.serverTimestamp()
+            ])
+
+            // Update local message
+            await MainActor.run {
+                if let index = messages.firstIndex(where: { $0.id == messageId }) {
+                    messages[index].isRead = true
+                    messages[index].readAt = Date()
+                }
+            }
+
+            Logger.shared.debug("Message marked as read: \(messageId)", category: .messaging)
+        } catch {
+            Logger.shared.error("Failed to mark message as read", category: .messaging, error: error)
+        }
+    }
+
+    // MARK: - Get Single Message
+
+    /// Get a single message by ID
+    func getMessage(messageId: String) async throws -> Message? {
+        let document = try await db.collection("messages").document(messageId).getDocument()
+        return try document.data(as: Message.self)
+    }
+
     deinit {
         // AUDIT FIX: Cancel loading task to prevent memory leaks
         loadingTask?.cancel()
@@ -1049,4 +1323,11 @@ extension Notification.Name {
 
     /// Posted when a message is successfully queued for offline delivery
     static let messageQueued = Notification.Name("messageQueued")
+
+    /// Posted when a reaction is added to a message
+    /// userInfo contains: "messageId" (String), "emoji" (String), "userId" (String)
+    static let messageReactionAdded = Notification.Name("messageReactionAdded")
+
+    /// Posted when a reaction is removed from a message
+    static let messageReactionRemoved = Notification.Name("messageReactionRemoved")
 }

@@ -108,11 +108,22 @@ struct MessageBubbleSimple: View {
     }
 }
 
-// Gradient version with ViewBuilder pattern
+// Gradient version with ViewBuilder pattern - Enhanced with reactions, editing, and replies
 struct MessageBubbleGradient: View {
     let message: Message
     let isFromCurrentUser: Bool
-    
+    var currentUserId: String? = nil
+    var onReaction: ((String) -> Void)? = nil
+    var onReply: (() -> Void)? = nil
+    var onEdit: (() -> Void)? = nil
+    var onTapReplyPreview: ((String) -> Void)? = nil
+
+    @State private var showReactionPicker = false
+    @State private var showContextMenu = false
+
+    // Common reaction emojis
+    private let quickReactions = ["❤️", "😂", "😮", "😢", "👍", "🔥"]
+
     var body: some View {
         HStack {
             if isFromCurrentUser {
@@ -120,59 +131,89 @@ struct MessageBubbleGradient: View {
             }
 
             VStack(alignment: isFromCurrentUser ? .trailing : .leading, spacing: 4) {
-                // Message content (image or text)
-                if let imageURL = message.imageURL, !imageURL.isEmpty {
-                    // Image message - using cached image for better scroll performance
-                    CachedAsyncImage(url: URL(string: imageURL)) { image in
-                        image
-                            .resizable()
-                            .scaledToFill()
-                            .frame(maxWidth: 250, maxHeight: 300)
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
-                            .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
-                    } placeholder: {
-                        ProgressView()
-                            .frame(width: 250, height: 200)
-                            .background(Color.gray.opacity(0.1))
-                            .cornerRadius(16)
-                    }
-
-                    // Caption if text exists
-                    if !message.text.isEmpty {
-                        Text(message.text)
-                            .font(.subheadline)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .foregroundColor(isFromCurrentUser ? .white : .primary)
-                            .background {
-                                if isFromCurrentUser {
-                                    LinearGradient(
-                                        colors: [Color.purple.opacity(0.9), Color.pink.opacity(0.9)],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                } else {
-                                    Color(.systemGray5)
-                                }
-                            }
-                            .cornerRadius(12)
-                    }
-                } else {
-                    // Text message
-                    Text(message.text)
-                        .padding(12)
-                        .background {
-                            bubbleBackground
-                        }
-                        .foregroundColor(isFromCurrentUser ? .white : .primary)
-                        .cornerRadius(16)
+                // Reply preview if this message is a reply
+                if let replyTo = message.replyTo {
+                    replyPreviewView(replyTo: replyTo)
                 }
 
-                // Timestamp with read indicators
+                // Message content (image or text)
+                VStack(alignment: isFromCurrentUser ? .trailing : .leading, spacing: 0) {
+                    if let imageURL = message.imageURL, !imageURL.isEmpty {
+                        // Image message - using cached image for better scroll performance
+                        CachedAsyncImage(url: URL(string: imageURL)) { image in
+                            image
+                                .resizable()
+                                .scaledToFill()
+                                .frame(maxWidth: 250, maxHeight: 300)
+                                .clipShape(RoundedRectangle(cornerRadius: 16))
+                                .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+                        } placeholder: {
+                            ProgressView()
+                                .frame(width: 250, height: 200)
+                                .background(Color.gray.opacity(0.1))
+                                .cornerRadius(16)
+                        }
+
+                        // Caption if text exists
+                        if !message.text.isEmpty && message.text != "📷 Photo" {
+                            Text(message.text)
+                                .font(.subheadline)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .foregroundColor(isFromCurrentUser ? .white : .primary)
+                                .background {
+                                    if isFromCurrentUser {
+                                        LinearGradient(
+                                            colors: [Color.purple.opacity(0.9), Color.pink.opacity(0.9)],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    } else {
+                                        Color(.systemGray5)
+                                    }
+                                }
+                                .cornerRadius(12)
+                        }
+                    } else {
+                        // Text message
+                        Text(message.text)
+                            .padding(12)
+                            .background {
+                                bubbleBackground
+                            }
+                            .foregroundColor(isFromCurrentUser ? .white : .primary)
+                            .cornerRadius(16)
+                    }
+                }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    // Single tap does nothing, handled by context menu
+                }
+                .onLongPressGesture {
+                    showReactionPicker = true
+                    HapticManager.shared.impact(.medium)
+                }
+                .contextMenu {
+                    messageContextMenu
+                }
+
+                // Reactions display
+                if message.hasReactions {
+                    reactionsView
+                }
+
+                // Timestamp with read/edited indicators
                 HStack(spacing: 4) {
                     Text(message.timestamp.timeAgoDisplay())
                         .font(.caption2)
                         .foregroundColor(.secondary)
+
+                    // Edited indicator
+                    if message.isEdited {
+                        Text("(edited)")
+                            .font(.caption2)
+                            .foregroundColor(.secondary.opacity(0.7))
+                    }
 
                     if isFromCurrentUser {
                         if message.isRead {
@@ -202,8 +243,167 @@ struct MessageBubbleGradient: View {
                 Spacer(minLength: 60)
             }
         }
+        .sheet(isPresented: $showReactionPicker) {
+            reactionPickerSheet
+                .presentationDetents([.height(120)])
+                .presentationDragIndicator(.visible)
+        }
     }
-    
+
+    // MARK: - Reply Preview
+
+    @ViewBuilder
+    private func replyPreviewView(replyTo: MessageReply) -> some View {
+        Button {
+            onTapReplyPreview?(replyTo.messageId)
+        } label: {
+            HStack(spacing: 8) {
+                Rectangle()
+                    .fill(isFromCurrentUser ? Color.white.opacity(0.5) : Color.purple.opacity(0.5))
+                    .frame(width: 3)
+                    .cornerRadius(2)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(replyTo.senderName)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(isFromCurrentUser ? .white.opacity(0.9) : .purple)
+
+                    if let imageURL = replyTo.imageURL, !imageURL.isEmpty {
+                        HStack(spacing: 4) {
+                            Image(systemName: "photo")
+                                .font(.caption2)
+                            Text("Photo")
+                                .font(.caption)
+                        }
+                        .foregroundColor(isFromCurrentUser ? .white.opacity(0.7) : .secondary)
+                    } else {
+                        Text(replyTo.text)
+                            .font(.caption)
+                            .foregroundColor(isFromCurrentUser ? .white.opacity(0.7) : .secondary)
+                            .lineLimit(1)
+                    }
+                }
+
+                Spacer()
+            }
+            .padding(8)
+            .background(isFromCurrentUser ? Color.white.opacity(0.15) : Color.gray.opacity(0.1))
+            .cornerRadius(8)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Reactions View
+
+    @ViewBuilder
+    private var reactionsView: some View {
+        HStack(spacing: 4) {
+            ForEach(message.uniqueReactionEmojis, id: \.self) { emoji in
+                let count = message.reactionCount(for: emoji)
+                let hasUserReacted = currentUserId.map { message.hasUserReacted(userId: $0, emoji: emoji) } ?? false
+
+                Button {
+                    onReaction?(emoji)
+                } label: {
+                    HStack(spacing: 2) {
+                        Text(emoji)
+                            .font(.system(size: 12))
+                        if count > 1 {
+                            Text("\(count)")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(hasUserReacted ? Color.purple.opacity(0.2) : Color.gray.opacity(0.15))
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(hasUserReacted ? Color.purple.opacity(0.5) : Color.clear, lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    // MARK: - Context Menu
+
+    @ViewBuilder
+    private var messageContextMenu: some View {
+        // Reply button
+        Button {
+            onReply?()
+        } label: {
+            Label("Reply", systemImage: "arrowshape.turn.up.left")
+        }
+
+        // Quick reactions
+        Menu {
+            ForEach(quickReactions, id: \.self) { emoji in
+                Button {
+                    onReaction?(emoji)
+                } label: {
+                    Text(emoji)
+                }
+            }
+        } label: {
+            Label("React", systemImage: "face.smiling")
+        }
+
+        // Edit button (only for own messages within 15 min)
+        if isFromCurrentUser, canEditMessage {
+            Button {
+                onEdit?()
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+        }
+
+        Divider()
+
+        // Copy text
+        Button {
+            UIPasteboard.general.string = message.text
+            HapticManager.shared.notification(.success)
+        } label: {
+            Label("Copy", systemImage: "doc.on.doc")
+        }
+    }
+
+    // MARK: - Reaction Picker Sheet
+
+    @ViewBuilder
+    private var reactionPickerSheet: some View {
+        VStack(spacing: 16) {
+            Text("Add Reaction")
+                .font(.headline)
+
+            HStack(spacing: 20) {
+                ForEach(quickReactions, id: \.self) { emoji in
+                    Button {
+                        onReaction?(emoji)
+                        showReactionPicker = false
+                        HapticManager.shared.impact(.light)
+                    } label: {
+                        Text(emoji)
+                            .font(.system(size: 32))
+                    }
+                }
+            }
+        }
+        .padding()
+    }
+
+    // MARK: - Helpers
+
+    private var canEditMessage: Bool {
+        let minutesSinceSent = Date().timeIntervalSince(message.timestamp) / 60
+        return minutesSinceSent <= 15
+    }
+
     @ViewBuilder
     private var bubbleBackground: some View {
         if isFromCurrentUser {

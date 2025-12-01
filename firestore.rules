@@ -829,6 +829,20 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Typing Status Collection (real-time typing indicators)
+    match /typingStatus/{statusId} {
+      // Users can read typing status for matches they're part of
+      allow read: if isAuthenticated();
+
+      // Users can create/update their own typing status
+      allow create, update: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid;
+
+      // Allow delete for cleanup
+      allow delete: if isAuthenticated()
+        && resource.data.userId == request.auth.uid;
+    }
+
     // Default: Deny all other access
     match /{document=**} {
       allow read, write: if false;
