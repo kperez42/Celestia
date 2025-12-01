@@ -13,6 +13,8 @@ struct AdminModerationDashboard: View {
     @StateObject private var viewModel = ModerationViewModel()
     @State private var selectedTab = 0
     @State private var showingAlerts = false
+    @State private var lastRefreshed = Date()
+    @State private var isRefreshing = false
     @Namespace private var tabAnimation
 
     // Tab configuration with icons and colors
@@ -25,59 +27,69 @@ struct AdminModerationDashboard: View {
     ]
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Enhanced Tab selector with icons, badges, and smooth animations
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
-                        AdminTabButton(
-                            tab: tab,
-                            isSelected: selectedTab == index,
-                            badgeCount: getBadgeCount(for: index),
-                            namespace: tabAnimation
-                        ) {
-                            selectedTab = index
+        NavigationStack {
+            VStack(spacing: 0) {
+                // Dashboard Header
+                adminHeader
+
+                // Enhanced Tab selector with icons, badges, and smooth animations
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
+                            AdminTabButton(
+                                tab: tab,
+                                isSelected: selectedTab == index,
+                                badgeCount: getBadgeCount(for: index),
+                                namespace: tabAnimation
+                            ) {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    selectedTab = index
+                                }
+                                HapticManager.shared.selection()
+                            }
                         }
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 4)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 4)
+                .padding(.vertical, 12)
+                .background(
+                    // Frosted glass effect background
+                    Rectangle()
+                        .fill(.ultraThinMaterial)
+                        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+                )
+                .overlay(alignment: .bottom) {
+                    // Subtle separator line
+                    Rectangle()
+                        .fill(Color(.separator).opacity(0.3))
+                        .frame(height: 0.5)
+                }
+
+                // Content - no extra animation modifiers for smooth native swiping
+                TabView(selection: $selectedTab) {
+                    pendingProfilesView
+                        .tag(0)
+
+                    reportsListView
+                        .tag(1)
+
+                    suspiciousProfilesView
+                        .tag(2)
+
+                    idVerificationReviewView
+                        .tag(3)
+
+                    statsView
+                        .tag(4)
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
             }
-            .padding(.vertical, 12)
-            .background(
-                // Frosted glass effect background
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-                    .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
-            )
-            .overlay(alignment: .bottom) {
-                // Subtle separator line
-                Rectangle()
-                    .fill(Color(.separator).opacity(0.3))
-                    .frame(height: 0.5)
-            }
-
-            // Content - no extra animation modifiers for smooth native swiping
-            TabView(selection: $selectedTab) {
-                pendingProfilesView
-                    .tag(0)
-
-                reportsListView
-                    .tag(1)
-
-                suspiciousProfilesView
-                    .tag(2)
-
-                idVerificationReviewView
-                    .tag(3)
-
-                statsView
-                    .tag(4)
-            }
-            .tabViewStyle(.page(indexDisplayMode: .never))
+            .navigationBarHidden(true)
         }
         .task {
             await viewModel.loadQueue()
+            lastRefreshed = Date()
         }
         .onAppear {
             viewModel.startListeningToAlerts()
@@ -88,6 +100,131 @@ struct AdminModerationDashboard: View {
         .sheet(isPresented: $showingAlerts) {
             AdminAlertsSheet(viewModel: viewModel)
         }
+        .refreshable {
+            isRefreshing = true
+            await viewModel.refresh()
+            lastRefreshed = Date()
+            isRefreshing = false
+        }
+    }
+
+    // MARK: - Admin Header
+
+    private var adminHeader: some View {
+        HStack(spacing: 12) {
+            // Admin badge and title
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [.purple, .pink],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 36, height: 36)
+
+                        Image(systemName: "shield.checkered")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Admin Dashboard")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+
+                        Text("Last updated \(lastRefreshed.formatted(.relative(presentation: .named)))")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+
+            Spacer()
+
+            // Quick stats pill
+            HStack(spacing: 8) {
+                quickStatPill(
+                    count: viewModel.pendingProfiles.count + viewModel.reports.count,
+                    label: "Pending",
+                    color: .orange
+                )
+            }
+
+            // Alerts button
+            Button {
+                showingAlerts = true
+                HapticManager.shared.impact(.light)
+            } label: {
+                ZStack(alignment: .topTrailing) {
+                    Circle()
+                        .fill(Color(.systemGray5))
+                        .frame(width: 40, height: 40)
+
+                    Image(systemName: "bell.fill")
+                        .font(.system(size: 16))
+                        .foregroundColor(.primary)
+
+                    if viewModel.unreadAlertCount > 0 {
+                        Text("\(viewModel.unreadAlertCount)")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(4)
+                            .background(Circle().fill(Color.red))
+                            .offset(x: 4, y: -4)
+                    }
+                }
+            }
+
+            // Refresh button
+            Button {
+                Task {
+                    isRefreshing = true
+                    HapticManager.shared.impact(.light)
+                    await viewModel.refresh()
+                    lastRefreshed = Date()
+                    isRefreshing = false
+                    HapticManager.shared.notification(.success)
+                }
+            } label: {
+                ZStack {
+                    Circle()
+                        .fill(Color(.systemGray5))
+                        .frame(width: 40, height: 40)
+
+                    if isRefreshing {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.primary)
+                    }
+                }
+            }
+            .disabled(isRefreshing)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Color(.systemBackground))
+    }
+
+    private func quickStatPill(count: Int, label: String, color: Color) -> some View {
+        HStack(spacing: 4) {
+            Text("\(count)")
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .foregroundColor(color)
+            Text(label)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(color.opacity(0.1))
+        .cornerRadius(12)
     }
 
     // MARK: - Badge Count Helper
