@@ -382,19 +382,16 @@ service cloud.firestore {
     // Likes Collection
     match /likes/{likeId} {
       // Users can read likes they sent or received
-      // Note: Email verification NOT required for reads to allow cascade delete queries
       allow read: if isAuthenticated()
         && (resource.data.fromUserId == request.auth.uid || resource.data.toUserId == request.auth.uid);
 
       // Users can create likes they send
       allow create: if isAuthenticated()
-        && isEmailVerified()
         && request.resource.data.fromUserId == request.auth.uid
         && request.resource.data.fromUserId != request.resource.data.toUserId;
 
       // Users can update likes they sent (for unlike/reactivate)
       allow update: if isAuthenticated()
-        && isEmailVerified()
         && resource.data.fromUserId == request.auth.uid;
 
       // Users can delete likes they sent OR received (for account deletion cleanup)
@@ -405,18 +402,15 @@ service cloud.firestore {
     // Passes Collection
     match /passes/{passId} {
       // Users can read passes they created
-      // Note: Email verification NOT required for reads to allow cascade delete queries
       allow read: if isAuthenticated()
         && resource.data.fromUserId == request.auth.uid;
 
       // Users can create passes
       allow create: if isAuthenticated()
-        && isEmailVerified()
         && request.resource.data.fromUserId == request.auth.uid;
 
       // Users can update their own passes
       allow update: if isAuthenticated()
-        && isEmailVerified()
         && resource.data.fromUserId == request.auth.uid;
 
       // Users can delete their own passes
@@ -427,18 +421,15 @@ service cloud.firestore {
     // Saved Profiles Collection
     match /saved_profiles/{savedId} {
       // Users can read their own saved profiles OR see who saved them
-      // Note: Email verification NOT required for reads to allow cascade delete queries
       allow read: if isAuthenticated()
         && (resource.data.userId == request.auth.uid || resource.data.savedUserId == request.auth.uid);
 
       // Users can save profiles
       allow create: if isAuthenticated()
-        && isEmailVerified()
         && request.resource.data.userId == request.auth.uid;
 
       // Users can update their saved profiles (notes, etc.)
       allow update: if isAuthenticated()
-        && isEmailVerified()
         && resource.data.userId == request.auth.uid;
 
       // Users can remove saved profiles they created OR where they are the saved user (for account deletion cleanup)
@@ -449,18 +440,15 @@ service cloud.firestore {
     // Profile Views Collection
     match /profileViews/{viewId} {
       // Users can read views of their own profile or views they made
-      // Note: Email verification NOT required for reads to allow cascade delete queries
       allow read: if isAuthenticated()
         && (resource.data.viewedUserId == request.auth.uid || resource.data.viewerUserId == request.auth.uid);
 
       // Users can create profile views when they view someone
       allow create: if isAuthenticated()
-        && isEmailVerified()
         && request.resource.data.viewerUserId == request.auth.uid;
 
       // Allow updates for merge operations (timestamp updates on re-views)
       allow update: if isAuthenticated()
-        && isEmailVerified()
         && resource.data.viewerUserId == request.auth.uid;
 
       // Allow users to delete views they made OR views of their profile (for account deletion cleanup)
