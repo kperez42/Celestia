@@ -1614,23 +1614,224 @@ exports.moderateReport = functions.https.onCall(async (data, context) => {
 
 /**
  * Trigger: Auto-notify admins when new report created
+ * Sends PUSH notification to admin devices AND creates in-app notification
  */
 exports.onReportCreated = functions.firestore
   .document('reports/{reportId}')
   .onCreate(async (snap, context) => {
     const reportData = snap.data();
-    const adminsSnapshot = await db.collection('users').where('isAdmin', '==', true).get();
+    const reportId = context.params.reportId;
 
-    await Promise.all(adminsSnapshot.docs.map(adminDoc =>
-      db.collection('notifications').add({
-        userId: adminDoc.id,
-        type: 'new_report',
-        message: `New report: ${reportData.reason}`,
-        reportId: context.params.reportId,
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        read: false
-      })
-    ));
+    functions.logger.info('New report created - notifying admins', {
+      reportId,
+      reason: reportData.reason,
+      reportedUserId: reportData.reportedUserId
+    });
+
+    try {
+      // Get reporter and reported user names for better notification
+      let reporterName = 'A user';
+      let reportedUserName = 'another user';
+
+      if (reportData.reporterId) {
+        const reporterDoc = await db.collection('users').doc(reportData.reporterId).get();
+        if (reporterDoc.exists) {
+          reporterName = reporterDoc.data().firstName || reporterDoc.data().fullName || 'A user';
+        }
+      }
+
+      if (reportData.reportedUserId) {
+        const reportedDoc = await db.collection('users').doc(reportData.reportedUserId).get();
+        if (reportedDoc.exists) {
+          reportedUserName = reportedDoc.data().firstName || reportedDoc.data().fullName || 'a user';
+        }
+      }
+
+      // Send PUSH notification to all admins
+      await notifications.sendAdminNotification({
+        title: '🚨 New Report Submitted',
+        body: `${reporterName} reported ${reportedUserName}: ${reportData.reason || 'No reason provided'}`,
+        alertType: 'new_report',
+        badge: 1,
+        data: {
+          reportId: reportId,
+          reporterId: reportData.reporterId || '',
+          reportedUserId: reportData.reportedUserId || '',
+          reason: reportData.reason || ''
+        }
+      });
+
+      // Also create in-app notifications for admins
+      const adminsSnapshot = await db.collection('users').where('isAdmin', '==', true).get();
+
+      await Promise.all(adminsSnapshot.docs.map(adminDoc =>
+        db.collection('notifications').add({
+          userId: adminDoc.id,
+          type: 'new_report',
+          title: 'New Report',
+          message: `${reporterName} reported ${reportedUserName}: ${reportData.reason}`,
+          reportId: reportId,
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          read: false
+        })
+      ));
+
+      functions.logger.info('Admin notifications sent for report', { reportId });
+
+    } catch (error) {
+      functions.logger.error('Error notifying admins of new report', {
+        reportId,
+        error: error.message
+      });
+    }
+  });
+
+/**
+ * Trigger: Notify admins when suspicious profile is detected
+ * Sends PUSH notification when content moderation flags a profile
+ */
+exports.onSuspiciousProfileDetected = functions.firestore
+  .document('moderationQueue/{itemId}')
+  .onCreate(async (snap, context) => {
+    const queueData = snap.data();
+    const itemId = context.params.itemId;
+
+    functions.logger.info('Suspicious profile added to moderation queue', {
+      itemId,
+      type: queueData.type,
+      userId: queueData.userId || queueData.reportedUserId
+    });
+
+    try {
+      const userId = queueData.userId || queueData.reportedUserId;
+      let userName = 'Unknown user';
+
+      // Get user info
+      if (userId) {
+        const userDoc = await db.collection('users').doc(userId).get();
+        if (userDoc.exists) {
+          userName = userDoc.data().firstName || userDoc.data().fullName || 'A user';
+        }
+      }
+
+      // Determine notification title based on type
+      let title = '⚠️ Suspicious Activity Detected';
+      let body = `${userName} has been flagged for review`;
+
+      if (queueData.type === 'inappropriate_profile_photo') {
+        title = '🖼️ Inappropriate Photo Detected';
+        body = `${userName} uploaded an inappropriate profile photo`;
+      } else if (queueData.type === 'inappropriate_gallery_photo') {
+        title = '🖼️ Gallery Photo Flagged';
+        body = `${userName} uploaded an inappropriate gallery photo`;
+      } else if (queueData.type === 'spam' || queueData.reason?.toLowerCase().includes('spam')) {
+        title = '🚫 Spam Detected';
+        body = `${userName} has been flagged for spam activity`;
+      } else if (queueData.type === 'fake_profile' || queueData.reason?.toLowerCase().includes('fake')) {
+        title = '🎭 Possible Fake Profile';
+        body = `${userName} may be a fake profile`;
+      } else if (queueData.severity === 'high') {
+        title = '🔴 High Priority Alert';
+        body = `${userName} flagged with high severity: ${queueData.reason || 'Review required'}`;
+      }
+
+      // Send PUSH notification to all admins
+      await notifications.sendAdminNotification({
+        title: title,
+        body: body,
+        alertType: 'suspicious_profile',
+        badge: 1,
+        data: {
+          queueItemId: itemId,
+          userId: userId || '',
+          userName: userName,
+          type: queueData.type || 'unknown',
+          severity: queueData.severity || 'medium',
+          reason: queueData.reason || ''
+        }
+      });
+
+      functions.logger.info('Admin notified of suspicious profile', { itemId, userId });
+
+    } catch (error) {
+      functions.logger.error('Error notifying admins of suspicious profile', {
+        itemId,
+        error: error.message
+      });
+    }
+  });
+
+/**
+ * Trigger: Notify admins when flagged content is detected
+ * This catches inappropriate photos, text, etc. that were auto-flagged
+ */
+exports.onFlaggedContentCreated = functions.firestore
+  .document('flagged_content/{contentId}')
+  .onCreate(async (snap, context) => {
+    const contentData = snap.data();
+    const contentId = context.params.contentId;
+
+    // Only send push for high severity content
+    if (contentData.severity !== 'high') {
+      functions.logger.info('Low/medium severity content flagged - skipping push', {
+        contentId,
+        severity: contentData.severity
+      });
+      return;
+    }
+
+    functions.logger.info('High severity content flagged - notifying admins', {
+      contentId,
+      type: contentData.contentType,
+      severity: contentData.severity
+    });
+
+    try {
+      const userId = contentData.userId;
+      let userName = 'Unknown user';
+
+      if (userId && userId !== 'unknown') {
+        const userDoc = await db.collection('users').doc(userId).get();
+        if (userDoc.exists) {
+          userName = userDoc.data().firstName || userDoc.data().fullName || 'A user';
+        }
+      }
+
+      let title = '🔴 Content Violation Detected';
+      let body = `High severity ${contentData.contentType || 'content'} flagged from ${userName}`;
+
+      if (contentData.contentType === 'photo') {
+        title = '🔴 Inappropriate Photo Detected';
+        body = `${userName}'s photo was auto-removed: ${contentData.reason || 'Policy violation'}`;
+      } else if (contentData.contentType === 'text' || contentData.contentType === 'message') {
+        title = '🔴 Inappropriate Text Detected';
+        body = `${userName} sent inappropriate content: ${contentData.reason || 'Policy violation'}`;
+      }
+
+      // Send PUSH notification to all admins
+      await notifications.sendAdminNotification({
+        title: title,
+        body: body,
+        alertType: 'flagged_content',
+        badge: 1,
+        data: {
+          contentId: contentId,
+          userId: userId || '',
+          userName: userName,
+          contentType: contentData.contentType || 'unknown',
+          severity: contentData.severity || 'high',
+          reason: contentData.reason || ''
+        }
+      });
+
+      functions.logger.info('Admin notified of flagged content', { contentId, userId });
+
+    } catch (error) {
+      functions.logger.error('Error notifying admins of flagged content', {
+        contentId,
+        error: error.message
+      });
+    }
   });
 
 /**
