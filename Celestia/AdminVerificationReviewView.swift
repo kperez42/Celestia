@@ -173,17 +173,20 @@ struct VerificationRowView: View {
                 }
             }
 
-            // Side-by-side photo previews
+            // Side-by-side photo previews (fixed size containers)
             HStack(spacing: 12) {
-                // ID Photo
+                // ID Photo - fixed 120x80 container
                 VStack(spacing: 4) {
                     AsyncImage(url: URL(string: verification.idPhotoURL)) { image in
                         image
                             .resizable()
                             .scaledToFill()
+                            .frame(width: 120, height: 80)
+                            .clipped()
                     } placeholder: {
                         Rectangle()
                             .fill(Color.gray.opacity(0.2))
+                            .frame(width: 120, height: 80)
                             .overlay(
                                 ProgressView()
                                     .scaleEffect(0.7)
@@ -191,22 +194,24 @@ struct VerificationRowView: View {
                     }
                     .frame(width: 120, height: 80)
                     .cornerRadius(8)
-                    .clipped()
 
                     Text(verification.idType)
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
 
-                // Selfie Photo
+                // Selfie Photo - fixed 120x80 container
                 VStack(spacing: 4) {
                     AsyncImage(url: URL(string: verification.selfiePhotoURL)) { image in
                         image
                             .resizable()
                             .scaledToFill()
+                            .frame(width: 120, height: 80)
+                            .clipped()
                     } placeholder: {
                         Rectangle()
                             .fill(Color.gray.opacity(0.2))
+                            .frame(width: 120, height: 80)
                             .overlay(
                                 ProgressView()
                                     .scaleEffect(0.7)
@@ -214,7 +219,6 @@ struct VerificationRowView: View {
                     }
                     .frame(width: 120, height: 80)
                     .cornerRadius(8)
-                    .clipped()
 
                     Text("Selfie")
                         .font(.caption2)
@@ -1083,6 +1087,9 @@ struct VerificationCardView: View {
     @State private var showingFullPhoto = false
     @State private var selectedPhotoURL: String = ""
 
+    // Fixed photo height for consistent card sizing
+    private let photoHeight: CGFloat = 140
+
     // Both photos for gallery navigation
     private var allPhotos: [String] {
         [verification.idPhotoURL, verification.selfiePhotoURL]
@@ -1131,16 +1138,16 @@ struct VerificationCardView: View {
             HStack {
                 Image(systemName: "hand.tap")
                     .font(.caption2)
-                Text("Tap photos to view full screen with swipe navigation")
+                Text("Tap photos to view full screen")
                     .font(.caption2)
             }
             .foregroundColor(.secondary)
             .padding(.horizontal)
             .padding(.bottom, 8)
 
-            // Photos - side by side comparison (tap to open gallery)
+            // Photos - side by side comparison with fixed height (tap to open gallery)
             HStack(spacing: 2) {
-                // ID Photo
+                // ID Photo - fixed size container
                 Button(action: {
                     selectedPhotoURL = verification.idPhotoURL
                     showingFullPhoto = true
@@ -1156,7 +1163,8 @@ struct VerificationCardView: View {
                                 .fill(Color.gray.opacity(0.2))
                                 .overlay(ProgressView())
                         }
-                        .frame(height: 150)
+                        .frame(height: photoHeight)
+                        .frame(maxWidth: .infinity)
                         .clipped()
 
                         Text(verification.idType)
@@ -1169,7 +1177,7 @@ struct VerificationCardView: View {
                     }
                 }
 
-                // Selfie Photo
+                // Selfie Photo - fixed size container
                 Button(action: {
                     selectedPhotoURL = verification.selfiePhotoURL
                     showingFullPhoto = true
@@ -1185,7 +1193,8 @@ struct VerificationCardView: View {
                                 .fill(Color.gray.opacity(0.2))
                                 .overlay(ProgressView())
                         }
-                        .frame(height: 150)
+                        .frame(height: photoHeight)
+                        .frame(maxWidth: .infinity)
                         .clipped()
 
                         Text("Selfie")

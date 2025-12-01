@@ -1568,49 +1568,57 @@ struct PendingProfileCard: View {
     @State private var currentPhotoIndex = 0
     @State private var showPhotoGallery = false
 
+    // Fixed height for consistent card sizing
+    private let photoHeight: CGFloat = 280
+
     var body: some View {
         VStack(spacing: 0) {
-            // Photo Gallery - Tap to view full screen
+            // Photo Gallery - Tap to view full screen (fixed height container)
             ZStack(alignment: .bottom) {
                 TabView(selection: $currentPhotoIndex) {
                     ForEach(Array(profile.photos.enumerated()), id: \.offset) { index, photoURL in
                         if let url = URL(string: photoURL) {
-                            AsyncImage(url: url) { phase in
-                                switch phase {
-                                case .success(let image):
-                                    image
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                case .failure:
-                                    Rectangle()
-                                        .fill(Color.gray.opacity(0.2))
-                                        .overlay(
-                                            Image(systemName: "photo")
-                                                .font(.largeTitle)
-                                                .foregroundColor(.gray)
-                                        )
-                                case .empty:
-                                    Rectangle()
-                                        .fill(Color.gray.opacity(0.1))
-                                        .overlay(ProgressView())
-                                @unknown default:
-                                    EmptyView()
+                            GeometryReader { geo in
+                                AsyncImage(url: url) { phase in
+                                    switch phase {
+                                    case .success(let image):
+                                        image
+                                            .resizable()
+                                            .scaledToFill()
+                                            .frame(width: geo.size.width, height: photoHeight)
+                                            .clipped()
+                                    case .failure:
+                                        Rectangle()
+                                            .fill(Color.gray.opacity(0.2))
+                                            .frame(width: geo.size.width, height: photoHeight)
+                                            .overlay(
+                                                Image(systemName: "photo")
+                                                    .font(.largeTitle)
+                                                    .foregroundColor(.gray)
+                                            )
+                                    case .empty:
+                                        Rectangle()
+                                            .fill(Color.gray.opacity(0.1))
+                                            .frame(width: geo.size.width, height: photoHeight)
+                                            .overlay(ProgressView())
+                                    @unknown default:
+                                        EmptyView()
+                                    }
+                                }
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    currentPhotoIndex = index
+                                    showPhotoGallery = true
+                                    HapticManager.shared.impact(.light)
                                 }
                             }
-                            .frame(height: 280)
-                            .clipped()
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                currentPhotoIndex = index
-                                showPhotoGallery = true
-                                HapticManager.shared.impact(.light)
-                            }
+                            .frame(height: photoHeight)
                             .tag(index)
                         }
                     }
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
-                .frame(height: 280)
+                .frame(height: photoHeight)
 
                 // Photo indicators
                 if profile.photos.count > 1 {
