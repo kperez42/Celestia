@@ -358,7 +358,7 @@ struct ImprovedUserDetailSheet: View {
                     .font(.headline)
             }
             
-            FlowLayout4(spacing: 8) {
+            FlowLayout(spacing: 8) {
                 ForEach(user.languages, id: \.self) { language in
                     TagView(text: language, color: .purple)
                 }
@@ -382,7 +382,7 @@ struct ImprovedUserDetailSheet: View {
                     .font(.headline)
             }
             
-            FlowLayout4(spacing: 8) {
+            FlowLayout(spacing: 8) {
                 ForEach(user.interests, id: \.self) { interest in
                     TagView(text: interest, color: .blue)
                 }
@@ -466,9 +466,9 @@ struct TagView: View {
     }
 }
 
-// MARK: - Flow Layout 4
+// MARK: - Flow Layout (Shared Component)
 
-struct FlowLayout4: Layout {
+struct FlowLayout: Layout {
     var spacing: CGFloat = 8
     
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {

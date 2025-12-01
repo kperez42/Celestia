@@ -128,31 +128,31 @@ extension LegalDocumentView {
             LegalSection(title: "Information We Collect") {
                 VStack(alignment: .leading, spacing: 12) {
                     LegalSubsection(title: "Personal Information You Provide") {
-                        BulletPoint("Account information: name, email address, date of birth, gender")
-                        BulletPoint("Profile information: photos, bio, interests, location preferences")
-                        BulletPoint("Communication data: messages sent through our platform")
-                        BulletPoint("Payment information: processed securely through Apple's App Store")
-                        BulletPoint("Verification data: identity verification documents (if applicable)")
+                        SimpleBulletPoint("Account information: name, email address, date of birth, gender")
+                        SimpleBulletPoint("Profile information: photos, bio, interests, location preferences")
+                        SimpleBulletPoint("Communication data: messages sent through our platform")
+                        SimpleBulletPoint("Payment information: processed securely through Apple's App Store")
+                        SimpleBulletPoint("Verification data: identity verification documents (if applicable)")
                     }
 
                     LegalSubsection(title: "Information Collected Automatically") {
-                        BulletPoint("Device information: device type, operating system, unique identifiers")
-                        BulletPoint("Usage data: features used, time spent, interaction patterns")
-                        BulletPoint("Location data: general location based on IP address or device settings")
-                        BulletPoint("Log data: access times, pages viewed, app crashes")
+                        SimpleBulletPoint("Device information: device type, operating system, unique identifiers")
+                        SimpleBulletPoint("Usage data: features used, time spent, interaction patterns")
+                        SimpleBulletPoint("Location data: general location based on IP address or device settings")
+                        SimpleBulletPoint("Log data: access times, pages viewed, app crashes")
                     }
                 }
             }
 
             LegalSection(title: "How We Use Your Information") {
                 VStack(alignment: .leading, spacing: 8) {
-                    BulletPoint("To provide and maintain our dating services")
-                    BulletPoint("To match you with other users based on your preferences")
-                    BulletPoint("To process transactions and send related information")
-                    BulletPoint("To send you technical notices and support messages")
-                    BulletPoint("To detect, prevent, and address fraud and abuse")
-                    BulletPoint("To comply with legal obligations")
-                    BulletPoint("To improve and personalize your experience")
+                    SimpleBulletPoint("To provide and maintain our dating services")
+                    SimpleBulletPoint("To match you with other users based on your preferences")
+                    SimpleBulletPoint("To process transactions and send related information")
+                    SimpleBulletPoint("To send you technical notices and support messages")
+                    SimpleBulletPoint("To detect, prevent, and address fraud and abuse")
+                    SimpleBulletPoint("To comply with legal obligations")
+                    SimpleBulletPoint("To improve and personalize your experience")
                 }
             }
 
@@ -161,10 +161,10 @@ extension LegalDocumentView {
                     Text("We may share your information in the following circumstances:")
                         .font(.subheadline)
 
-                    BulletPoint("With other users: Your profile information is visible to other users of the app")
-                    BulletPoint("Service providers: Third-party vendors who assist in operating our services")
-                    BulletPoint("Legal requirements: When required by law or to protect our rights")
-                    BulletPoint("Business transfers: In connection with a merger, acquisition, or sale of assets")
+                    SimpleBulletPoint("With other users: Your profile information is visible to other users of the app")
+                    SimpleBulletPoint("Service providers: Third-party vendors who assist in operating our services")
+                    SimpleBulletPoint("Legal requirements: When required by law or to protect our rights")
+                    SimpleBulletPoint("Business transfers: In connection with a merger, acquisition, or sale of assets")
 
                     Text("We do NOT sell your personal information to third parties.")
                         .font(.subheadline)
@@ -180,12 +180,12 @@ extension LegalDocumentView {
 
             LegalSection(title: "Your Rights and Choices") {
                 VStack(alignment: .leading, spacing: 8) {
-                    BulletPoint("Access: Request a copy of your personal data")
-                    BulletPoint("Correction: Update or correct inaccurate information")
-                    BulletPoint("Deletion: Request deletion of your account and data")
-                    BulletPoint("Portability: Receive your data in a portable format")
-                    BulletPoint("Opt-out: Unsubscribe from marketing communications")
-                    BulletPoint("Restrict: Limit how we process your data")
+                    SimpleBulletPoint("Access: Request a copy of your personal data")
+                    SimpleBulletPoint("Correction: Update or correct inaccurate information")
+                    SimpleBulletPoint("Deletion: Request deletion of your account and data")
+                    SimpleBulletPoint("Portability: Receive your data in a portable format")
+                    SimpleBulletPoint("Opt-out: Unsubscribe from marketing communications")
+                    SimpleBulletPoint("Restrict: Limit how we process your data")
                 }
             }
 
@@ -201,10 +201,10 @@ extension LegalDocumentView {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Your information may be transferred to and processed in countries other than your own, including the United States. We ensure appropriate safeguards are in place for such transfers, including:")
                         .font(.subheadline)
-                    BulletPoint("Standard Contractual Clauses (SCCs) approved by the European Commission")
-                    BulletPoint("Data Processing Agreements with all third-party processors")
-                    BulletPoint("Encryption of data in transit and at rest")
-                    BulletPoint("Compliance with EU-US Data Privacy Framework where applicable")
+                    SimpleBulletPoint("Standard Contractual Clauses (SCCs) approved by the European Commission")
+                    SimpleBulletPoint("Data Processing Agreements with all third-party processors")
+                    SimpleBulletPoint("Encryption of data in transit and at rest")
+                    SimpleBulletPoint("Compliance with EU-US Data Privacy Framework where applicable")
                 }
             }
 
@@ -212,10 +212,10 @@ extension LegalDocumentView {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("We process your personal data under the following legal bases:")
                         .font(.subheadline)
-                    BulletPoint("Contract: To provide our dating services as agreed in our Terms of Service")
-                    BulletPoint("Consent: For marketing communications and optional features")
-                    BulletPoint("Legitimate Interests: For fraud prevention, security, and service improvement")
-                    BulletPoint("Legal Obligation: To comply with applicable laws and regulations")
+                    SimpleBulletPoint("Contract: To provide our dating services as agreed in our Terms of Service")
+                    SimpleBulletPoint("Consent: For marketing communications and optional features")
+                    SimpleBulletPoint("Legitimate Interests: For fraud prevention, security, and service improvement")
+                    SimpleBulletPoint("Legal Obligation: To comply with applicable laws and regulations")
                 }
             }
 
@@ -239,12 +239,12 @@ extension LegalDocumentView {
                 VStack(alignment: .leading, spacing: 12) {
                     LegalSubsection(title: "California (CCPA/CPRA)") {
                         VStack(alignment: .leading, spacing: 4) {
-                            BulletPoint("Right to know what personal information is collected")
-                            BulletPoint("Right to delete personal information")
-                            BulletPoint("Right to opt-out of sale/sharing of personal information")
-                            BulletPoint("Right to correct inaccurate personal information")
-                            BulletPoint("Right to limit use of sensitive personal information")
-                            BulletPoint("Right to non-discrimination for exercising rights")
+                            SimpleBulletPoint("Right to know what personal information is collected")
+                            SimpleBulletPoint("Right to delete personal information")
+                            SimpleBulletPoint("Right to opt-out of sale/sharing of personal information")
+                            SimpleBulletPoint("Right to correct inaccurate personal information")
+                            SimpleBulletPoint("Right to limit use of sensitive personal information")
+                            SimpleBulletPoint("Right to non-discrimination for exercising rights")
                             Text("We do not sell or share your personal information for cross-context behavioral advertising.")
                                 .font(.caption)
                                 .fontWeight(.semibold)
@@ -254,9 +254,9 @@ extension LegalDocumentView {
 
                     LegalSubsection(title: "Virginia (VCDPA)") {
                         VStack(alignment: .leading, spacing: 4) {
-                            BulletPoint("Right to access, correct, and delete personal data")
-                            BulletPoint("Right to data portability")
-                            BulletPoint("Right to opt-out of targeted advertising and profiling")
+                            SimpleBulletPoint("Right to access, correct, and delete personal data")
+                            SimpleBulletPoint("Right to data portability")
+                            SimpleBulletPoint("Right to opt-out of targeted advertising and profiling")
                         }
                     }
 
@@ -271,10 +271,10 @@ extension LegalDocumentView {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("In the event of a data breach affecting your personal information, we will:")
                         .font(.subheadline)
-                    BulletPoint("Notify affected users within 72 hours of discovery (as required by GDPR)")
-                    BulletPoint("Notify relevant supervisory authorities as required by law")
-                    BulletPoint("Provide information about the breach and steps you can take")
-                    BulletPoint("Offer appropriate remediation such as credit monitoring if applicable")
+                    SimpleBulletPoint("Notify affected users within 72 hours of discovery (as required by GDPR)")
+                    SimpleBulletPoint("Notify relevant supervisory authorities as required by law")
+                    SimpleBulletPoint("Provide information about the breach and steps you can take")
+                    SimpleBulletPoint("Offer appropriate remediation such as credit monitoring if applicable")
                 }
             }
 
@@ -316,10 +316,10 @@ extension LegalDocumentView {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("To use Celestia, you must:")
                         .font(.subheadline)
-                    BulletPoint("Be at least 18 years of age")
-                    BulletPoint("Be legally capable of entering into a binding contract")
-                    BulletPoint("Not be prohibited from using our services under applicable law")
-                    BulletPoint("Not have been previously banned from our platform")
+                    SimpleBulletPoint("Be at least 18 years of age")
+                    SimpleBulletPoint("Be legally capable of entering into a binding contract")
+                    SimpleBulletPoint("Not be prohibited from using our services under applicable law")
+                    SimpleBulletPoint("Not have been previously banned from our platform")
                 }
             }
 
@@ -327,11 +327,11 @@ extension LegalDocumentView {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("When creating an account, you agree to:")
                         .font(.subheadline)
-                    BulletPoint("Provide accurate, current, and complete information")
-                    BulletPoint("Maintain the security of your account credentials")
-                    BulletPoint("Promptly update any changes to your information")
-                    BulletPoint("Accept responsibility for all activities under your account")
-                    BulletPoint("Use only one account per person")
+                    SimpleBulletPoint("Provide accurate, current, and complete information")
+                    SimpleBulletPoint("Maintain the security of your account credentials")
+                    SimpleBulletPoint("Promptly update any changes to your information")
+                    SimpleBulletPoint("Accept responsibility for all activities under your account")
+                    SimpleBulletPoint("Use only one account per person")
                 }
             }
 
@@ -341,16 +341,16 @@ extension LegalDocumentView {
                         .font(.subheadline)
                         .fontWeight(.semibold)
 
-                    BulletPoint("Harass, abuse, or harm other users")
-                    BulletPoint("Post false, misleading, or fraudulent content")
-                    BulletPoint("Upload illegal, obscene, or offensive material")
-                    BulletPoint("Impersonate another person or entity")
-                    BulletPoint("Use the service for commercial purposes without permission")
-                    BulletPoint("Attempt to access other users' accounts")
-                    BulletPoint("Transmit viruses, malware, or harmful code")
-                    BulletPoint("Scrape, collect, or harvest user data")
-                    BulletPoint("Circumvent security or access restrictions")
-                    BulletPoint("Violate any applicable laws or regulations")
+                    SimpleBulletPoint("Harass, abuse, or harm other users")
+                    SimpleBulletPoint("Post false, misleading, or fraudulent content")
+                    SimpleBulletPoint("Upload illegal, obscene, or offensive material")
+                    SimpleBulletPoint("Impersonate another person or entity")
+                    SimpleBulletPoint("Use the service for commercial purposes without permission")
+                    SimpleBulletPoint("Attempt to access other users' accounts")
+                    SimpleBulletPoint("Transmit viruses, malware, or harmful code")
+                    SimpleBulletPoint("Scrape, collect, or harvest user data")
+                    SimpleBulletPoint("Circumvent security or access restrictions")
+                    SimpleBulletPoint("Violate any applicable laws or regulations")
                 }
             }
 
@@ -373,9 +373,9 @@ extension LegalDocumentView {
 
                     LegalSubsection(title: "Billing & Payment") {
                         VStack(alignment: .leading, spacing: 4) {
-                            BulletPoint("Payment is charged to your Apple ID account at confirmation of purchase")
-                            BulletPoint("Prices are in US dollars unless otherwise stated")
-                            BulletPoint("Prices may vary by location and are subject to change")
+                            SimpleBulletPoint("Payment is charged to your Apple ID account at confirmation of purchase")
+                            SimpleBulletPoint("Prices are in US dollars unless otherwise stated")
+                            SimpleBulletPoint("Prices may vary by location and are subject to change")
                         }
                     }
 
@@ -385,8 +385,8 @@ extension LegalDocumentView {
                                 .font(.caption)
                                 .fontWeight(.semibold)
                                 .foregroundColor(.red)
-                            BulletPoint("Your account will be charged for renewal within 24 hours prior to the end of the current period")
-                            BulletPoint("The renewal charge will be the same as the initial subscription price unless you are notified of a price change")
+                            SimpleBulletPoint("Your account will be charged for renewal within 24 hours prior to the end of the current period")
+                            SimpleBulletPoint("The renewal charge will be the same as the initial subscription price unless you are notified of a price change")
                         }
                     }
 
@@ -394,17 +394,17 @@ extension LegalDocumentView {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("You may manage or cancel your subscription at any time through your Apple ID account settings:")
                                 .font(.caption)
-                            BulletPoint("Go to Settings > [Your Name] > Subscriptions on your iOS device")
-                            BulletPoint("Select Celestia and choose Cancel Subscription")
-                            BulletPoint("Cancellation takes effect at the end of the current billing period")
+                            SimpleBulletPoint("Go to Settings > [Your Name] > Subscriptions on your iOS device")
+                            SimpleBulletPoint("Select Celestia and choose Cancel Subscription")
+                            SimpleBulletPoint("Cancellation takes effect at the end of the current billing period")
                         }
                     }
 
                     LegalSubsection(title: "Refund Policy") {
                         VStack(alignment: .leading, spacing: 4) {
-                            BulletPoint("Refunds are subject to Apple's refund policy")
-                            BulletPoint("No refunds for partial subscription periods")
-                            BulletPoint("Request refunds through Apple at reportaproblem.apple.com")
+                            SimpleBulletPoint("Refunds are subject to Apple's refund policy")
+                            SimpleBulletPoint("No refunds for partial subscription periods")
+                            SimpleBulletPoint("Request refunds through Apple at reportaproblem.apple.com")
                             Text("Deleting the app does not cancel your subscription.")
                                 .font(.caption)
                                 .fontWeight(.semibold)
@@ -414,9 +414,9 @@ extension LegalDocumentView {
 
                     LegalSubsection(title: "Free Trials") {
                         VStack(alignment: .leading, spacing: 4) {
-                            BulletPoint("Free trials automatically convert to paid subscriptions")
-                            BulletPoint("Cancel before the trial ends to avoid charges")
-                            BulletPoint("Unused portion of free trial is forfeited upon subscription purchase")
+                            SimpleBulletPoint("Free trials automatically convert to paid subscriptions")
+                            SimpleBulletPoint("Cancel before the trial ends to avoid charges")
+                            SimpleBulletPoint("Unused portion of free trial is forfeited upon subscription purchase")
                         }
                     }
                 }
@@ -426,11 +426,11 @@ extension LegalDocumentView {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Celestia may offer virtual items (such as Super Likes or Boosts) for purchase:")
                         .font(.subheadline)
-                    BulletPoint("Virtual items have no cash value and cannot be exchanged for cash")
-                    BulletPoint("Virtual items are non-refundable and non-transferable")
-                    BulletPoint("Virtual items may expire or be modified at our discretion")
-                    BulletPoint("Unused virtual items are forfeited upon account termination")
-                    BulletPoint("We reserve the right to modify virtual item pricing and availability")
+                    SimpleBulletPoint("Virtual items have no cash value and cannot be exchanged for cash")
+                    SimpleBulletPoint("Virtual items are non-refundable and non-transferable")
+                    SimpleBulletPoint("Virtual items may expire or be modified at our discretion")
+                    SimpleBulletPoint("Unused virtual items are forfeited upon account termination")
+                    SimpleBulletPoint("We reserve the right to modify virtual item pricing and availability")
                 }
             }
 
@@ -445,12 +445,12 @@ extension LegalDocumentView {
                         .fontWeight(.semibold)
                         .foregroundColor(.red)
 
-                    BulletPoint("Online dating involves inherent risks including meeting strangers")
-                    BulletPoint("You are solely responsible for your interactions with other users")
-                    BulletPoint("Celestia does not conduct criminal background checks on users")
-                    BulletPoint("We cannot guarantee the identity, intentions, or conduct of any user")
-                    BulletPoint("You should take appropriate safety precautions when meeting anyone in person")
-                    BulletPoint("Any meetings or relationships that result from the app are at your own risk")
+                    SimpleBulletPoint("Online dating involves inherent risks including meeting strangers")
+                    SimpleBulletPoint("You are solely responsible for your interactions with other users")
+                    SimpleBulletPoint("Celestia does not conduct criminal background checks on users")
+                    SimpleBulletPoint("We cannot guarantee the identity, intentions, or conduct of any user")
+                    SimpleBulletPoint("You should take appropriate safety precautions when meeting anyone in person")
+                    SimpleBulletPoint("Any meetings or relationships that result from the app are at your own risk")
                 }
             }
 
@@ -463,12 +463,12 @@ extension LegalDocumentView {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("By using Celestia, you represent and warrant that:")
                         .font(.subheadline)
-                    BulletPoint("You are at least 18 years old")
-                    BulletPoint("You are legally permitted to use the service in your jurisdiction")
-                    BulletPoint("You have not been convicted of a felony or sex crime")
-                    BulletPoint("You are not required to register as a sex offender")
-                    BulletPoint("All information you provide is accurate and truthful")
-                    BulletPoint("You will comply with all applicable laws while using the service")
+                    SimpleBulletPoint("You are at least 18 years old")
+                    SimpleBulletPoint("You are legally permitted to use the service in your jurisdiction")
+                    SimpleBulletPoint("You have not been convicted of a felony or sex crime")
+                    SimpleBulletPoint("You are not required to register as a sex offender")
+                    SimpleBulletPoint("All information you provide is accurate and truthful")
+                    SimpleBulletPoint("You will comply with all applicable laws while using the service")
                 }
             }
 
@@ -483,10 +483,10 @@ extension LegalDocumentView {
                         .font(.subheadline)
                         .fontWeight(.semibold)
 
-                    BulletPoint("The accuracy or reliability of user profiles")
-                    BulletPoint("That you will find a compatible match")
-                    BulletPoint("Uninterrupted or error-free service")
-                    BulletPoint("The conduct of other users")
+                    SimpleBulletPoint("The accuracy or reliability of user profiles")
+                    SimpleBulletPoint("That you will find a compatible match")
+                    SimpleBulletPoint("Uninterrupted or error-free service")
+                    SimpleBulletPoint("The conduct of other users")
                 }
             }
 
@@ -507,10 +507,10 @@ extension LegalDocumentView {
 
                     LegalSubsection(title: "Arbitration Rules") {
                         VStack(alignment: .leading, spacing: 4) {
-                            BulletPoint("Arbitration shall be administered by the American Arbitration Association (AAA) under its Consumer Arbitration Rules")
-                            BulletPoint("The arbitration will be conducted in the English language")
-                            BulletPoint("The arbitrator's decision shall be final and binding")
-                            BulletPoint("Judgment on the award may be entered in any court of competent jurisdiction")
+                            SimpleBulletPoint("Arbitration shall be administered by the American Arbitration Association (AAA) under its Consumer Arbitration Rules")
+                            SimpleBulletPoint("The arbitration will be conducted in the English language")
+                            SimpleBulletPoint("The arbitrator's decision shall be final and binding")
+                            SimpleBulletPoint("Judgment on the award may be entered in any court of competent jurisdiction")
                         }
                     }
 
@@ -563,10 +563,10 @@ extension LegalDocumentView {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("By creating an account, you consent to receive electronic communications from us, including:")
                         .font(.subheadline)
-                    BulletPoint("Account notifications and security alerts")
-                    BulletPoint("Service updates and policy changes")
-                    BulletPoint("Match notifications and messages from other users")
-                    BulletPoint("Marketing communications (which you may opt out of)")
+                    SimpleBulletPoint("Account notifications and security alerts")
+                    SimpleBulletPoint("Service updates and policy changes")
+                    SimpleBulletPoint("Match notifications and messages from other users")
+                    SimpleBulletPoint("Marketing communications (which you may opt out of)")
 
                     Text("These electronic communications satisfy any legal requirement that communications be in writing. You may withdraw consent by deleting your account.")
                         .font(.caption)
@@ -582,12 +582,12 @@ extension LegalDocumentView {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("If you believe content on Celestia infringes your copyright, please send a DMCA notice to support@celestia.app including:")
                         .font(.subheadline)
-                    BulletPoint("Identification of the copyrighted work")
-                    BulletPoint("Identification of the infringing material")
-                    BulletPoint("Your contact information")
-                    BulletPoint("A statement of good faith belief")
-                    BulletPoint("A statement of accuracy under penalty of perjury")
-                    BulletPoint("Your physical or electronic signature")
+                    SimpleBulletPoint("Identification of the copyrighted work")
+                    SimpleBulletPoint("Identification of the infringing material")
+                    SimpleBulletPoint("Your contact information")
+                    SimpleBulletPoint("A statement of good faith belief")
+                    SimpleBulletPoint("A statement of accuracy under penalty of perjury")
+                    SimpleBulletPoint("Your physical or electronic signature")
                 }
             }
 
@@ -612,9 +612,9 @@ extension LegalDocumentView {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Celestia may contain links to or integrate with third-party services. We are not responsible for:")
                         .font(.subheadline)
-                    BulletPoint("The content, accuracy, or practices of third-party websites or services")
-                    BulletPoint("Any damages arising from your use of third-party services")
-                    BulletPoint("The privacy practices of third parties")
+                    SimpleBulletPoint("The content, accuracy, or practices of third-party websites or services")
+                    SimpleBulletPoint("Any damages arising from your use of third-party services")
+                    SimpleBulletPoint("The privacy practices of third parties")
 
                     Text("Your use of third-party services is governed by their respective terms and privacy policies.")
                         .font(.caption)
@@ -670,30 +670,30 @@ extension LegalDocumentView {
 
             LegalSection(title: "Be Authentic") {
                 VStack(alignment: .leading, spacing: 8) {
-                    BulletPoint("Use your real name and recent photos")
-                    BulletPoint("Be honest about your age, relationship status, and intentions")
-                    BulletPoint("Don't impersonate others or create fake profiles")
-                    BulletPoint("Represent yourself accurately in your bio and interests")
+                    SimpleBulletPoint("Use your real name and recent photos")
+                    SimpleBulletPoint("Be honest about your age, relationship status, and intentions")
+                    SimpleBulletPoint("Don't impersonate others or create fake profiles")
+                    SimpleBulletPoint("Represent yourself accurately in your bio and interests")
                 }
             }
 
             LegalSection(title: "Be Respectful") {
                 VStack(alignment: .leading, spacing: 8) {
-                    BulletPoint("Treat all users with kindness and dignity")
-                    BulletPoint("Accept rejection gracefully - not everyone will be a match")
-                    BulletPoint("Avoid discriminatory language or behavior")
-                    BulletPoint("Respect boundaries and privacy")
-                    BulletPoint("Communicate honestly and clearly")
+                    SimpleBulletPoint("Treat all users with kindness and dignity")
+                    SimpleBulletPoint("Accept rejection gracefully - not everyone will be a match")
+                    SimpleBulletPoint("Avoid discriminatory language or behavior")
+                    SimpleBulletPoint("Respect boundaries and privacy")
+                    SimpleBulletPoint("Communicate honestly and clearly")
                 }
             }
 
             LegalSection(title: "Keep It Safe") {
                 VStack(alignment: .leading, spacing: 8) {
-                    BulletPoint("Never share personal information publicly")
-                    BulletPoint("Report suspicious or harmful behavior")
-                    BulletPoint("Meet in public places for first dates")
-                    BulletPoint("Trust your instincts - if something feels wrong, report it")
-                    BulletPoint("Don't share financial information or send money")
+                    SimpleBulletPoint("Never share personal information publicly")
+                    SimpleBulletPoint("Report suspicious or harmful behavior")
+                    SimpleBulletPoint("Meet in public places for first dates")
+                    SimpleBulletPoint("Trust your instincts - if something feels wrong, report it")
+                    SimpleBulletPoint("Don't share financial information or send money")
                 }
             }
 
@@ -704,25 +704,25 @@ extension LegalDocumentView {
                         .fontWeight(.semibold)
                         .foregroundColor(.red)
 
-                    BulletPoint("Nudity, sexual content, or pornography")
-                    BulletPoint("Violence, threats, or harassment")
-                    BulletPoint("Hate speech or discrimination")
-                    BulletPoint("Spam, scams, or commercial solicitation")
-                    BulletPoint("Illegal activities or substances")
-                    BulletPoint("Content involving minors")
-                    BulletPoint("Copyrighted material without permission")
+                    SimpleBulletPoint("Nudity, sexual content, or pornography")
+                    SimpleBulletPoint("Violence, threats, or harassment")
+                    SimpleBulletPoint("Hate speech or discrimination")
+                    SimpleBulletPoint("Spam, scams, or commercial solicitation")
+                    SimpleBulletPoint("Illegal activities or substances")
+                    SimpleBulletPoint("Content involving minors")
+                    SimpleBulletPoint("Copyrighted material without permission")
                 }
             }
 
             LegalSection(title: "Prohibited Behaviors") {
                 VStack(alignment: .leading, spacing: 8) {
-                    BulletPoint("Harassment, bullying, or stalking")
-                    BulletPoint("Catfishing or identity fraud")
-                    BulletPoint("Soliciting money or promoting businesses")
-                    BulletPoint("Attempting to meet minors")
-                    BulletPoint("Using the platform while in a committed relationship (without partner's knowledge)")
-                    BulletPoint("Mass messaging or spamming users")
-                    BulletPoint("Sharing others' private information")
+                    SimpleBulletPoint("Harassment, bullying, or stalking")
+                    SimpleBulletPoint("Catfishing or identity fraud")
+                    SimpleBulletPoint("Soliciting money or promoting businesses")
+                    SimpleBulletPoint("Attempting to meet minors")
+                    SimpleBulletPoint("Using the platform while in a committed relationship (without partner's knowledge)")
+                    SimpleBulletPoint("Mass messaging or spamming users")
+                    SimpleBulletPoint("Sharing others' private information")
                 }
             }
 
@@ -732,20 +732,20 @@ extension LegalDocumentView {
                         .font(.subheadline)
                         .fontWeight(.semibold)
                         .foregroundColor(.green)
-                    BulletPoint("Clear photos of your face")
-                    BulletPoint("Recent photos (within the last 2 years)")
-                    BulletPoint("Photos that represent you authentically")
+                    SimpleBulletPoint("Clear photos of your face")
+                    SimpleBulletPoint("Recent photos (within the last 2 years)")
+                    SimpleBulletPoint("Photos that represent you authentically")
 
                     Text("Not Allowed:")
                         .font(.subheadline)
                         .fontWeight(.semibold)
                         .foregroundColor(.red)
                         .padding(.top, 8)
-                    BulletPoint("Group photos as your main photo")
-                    BulletPoint("Photos with nudity or suggestive content")
-                    BulletPoint("Photos of someone else")
-                    BulletPoint("Heavily filtered or misleading photos")
-                    BulletPoint("Photos with contact information")
+                    SimpleBulletPoint("Group photos as your main photo")
+                    SimpleBulletPoint("Photos with nudity or suggestive content")
+                    SimpleBulletPoint("Photos of someone else")
+                    SimpleBulletPoint("Heavily filtered or misleading photos")
+                    SimpleBulletPoint("Photos with contact information")
                 }
             }
 
@@ -753,10 +753,10 @@ extension LegalDocumentView {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("If you encounter violations, please report them immediately:")
                         .font(.subheadline)
-                    BulletPoint("Use the Report button on any profile or message")
-                    BulletPoint("Provide details about the violation")
-                    BulletPoint("Block users who make you uncomfortable")
-                    BulletPoint("Contact support for urgent safety concerns")
+                    SimpleBulletPoint("Use the Report button on any profile or message")
+                    SimpleBulletPoint("Provide details about the violation")
+                    SimpleBulletPoint("Block users who make you uncomfortable")
+                    SimpleBulletPoint("Contact support for urgent safety concerns")
                 }
             }
 
@@ -764,10 +764,10 @@ extension LegalDocumentView {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Violations may result in:")
                         .font(.subheadline)
-                    BulletPoint("Warning notification")
-                    BulletPoint("Temporary account suspension")
-                    BulletPoint("Permanent account ban")
-                    BulletPoint("Reporting to law enforcement (for serious violations)")
+                    SimpleBulletPoint("Warning notification")
+                    SimpleBulletPoint("Temporary account suspension")
+                    SimpleBulletPoint("Permanent account ban")
+                    SimpleBulletPoint("Reporting to law enforcement (for serious violations)")
                 }
             }
         }
@@ -785,21 +785,21 @@ extension LegalDocumentView {
 
             LegalSection(title: "Protect Your Personal Information") {
                 VStack(alignment: .leading, spacing: 8) {
-                    BulletPoint("Never share your home address, workplace, or daily routine")
-                    BulletPoint("Use our in-app messaging until you feel comfortable")
-                    BulletPoint("Don't share financial information or social security numbers")
-                    BulletPoint("Be cautious about sharing your full name early on")
-                    BulletPoint("Consider using a Google Voice number instead of your real phone number")
+                    SimpleBulletPoint("Never share your home address, workplace, or daily routine")
+                    SimpleBulletPoint("Use our in-app messaging until you feel comfortable")
+                    SimpleBulletPoint("Don't share financial information or social security numbers")
+                    SimpleBulletPoint("Be cautious about sharing your full name early on")
+                    SimpleBulletPoint("Consider using a Google Voice number instead of your real phone number")
                 }
             }
 
             LegalSection(title: "Verify Before You Meet") {
                 VStack(alignment: .leading, spacing: 8) {
-                    BulletPoint("Video chat before meeting in person")
-                    BulletPoint("Look for consistent information in their profile")
-                    BulletPoint("Do a reverse image search on their photos")
-                    BulletPoint("Check their social media profiles if available")
-                    BulletPoint("Trust your gut - if something feels off, it probably is")
+                    SimpleBulletPoint("Video chat before meeting in person")
+                    SimpleBulletPoint("Look for consistent information in their profile")
+                    SimpleBulletPoint("Do a reverse image search on their photos")
+                    SimpleBulletPoint("Check their social media profiles if available")
+                    SimpleBulletPoint("Trust your gut - if something feels off, it probably is")
                 }
             }
 
@@ -809,13 +809,13 @@ extension LegalDocumentView {
                         .font(.subheadline)
                         .fontWeight(.semibold)
 
-                    BulletPoint("Always meet in a public place")
-                    BulletPoint("Tell a friend or family member your plans")
-                    BulletPoint("Share your location with someone you trust")
-                    BulletPoint("Arrange your own transportation")
-                    BulletPoint("Don't leave drinks unattended")
-                    BulletPoint("Stay sober and alert")
-                    BulletPoint("Have an exit plan")
+                    SimpleBulletPoint("Always meet in a public place")
+                    SimpleBulletPoint("Tell a friend or family member your plans")
+                    SimpleBulletPoint("Share your location with someone you trust")
+                    SimpleBulletPoint("Arrange your own transportation")
+                    SimpleBulletPoint("Don't leave drinks unattended")
+                    SimpleBulletPoint("Stay sober and alert")
+                    SimpleBulletPoint("Have an exit plan")
                 }
             }
 
@@ -825,14 +825,14 @@ extension LegalDocumentView {
                         .font(.subheadline)
                         .foregroundColor(.red)
 
-                    BulletPoint("Asks for money or financial help")
-                    BulletPoint("Refuses to video chat or meet in public")
-                    BulletPoint("Has inconsistent stories or information")
-                    BulletPoint("Pressures you to move off the app quickly")
-                    BulletPoint("Asks for explicit photos")
-                    BulletPoint("Claims to be in love very quickly")
-                    BulletPoint("Makes you feel uncomfortable or unsafe")
-                    BulletPoint("Claims to be in the military overseas needing money")
+                    SimpleBulletPoint("Asks for money or financial help")
+                    SimpleBulletPoint("Refuses to video chat or meet in public")
+                    SimpleBulletPoint("Has inconsistent stories or information")
+                    SimpleBulletPoint("Pressures you to move off the app quickly")
+                    SimpleBulletPoint("Asks for explicit photos")
+                    SimpleBulletPoint("Claims to be in love very quickly")
+                    SimpleBulletPoint("Makes you feel uncomfortable or unsafe")
+                    SimpleBulletPoint("Claims to be in the military overseas needing money")
                 }
             }
 
@@ -842,12 +842,12 @@ extension LegalDocumentView {
                         .font(.subheadline)
                         .fontWeight(.semibold)
 
-                    BulletPoint("Claim to be overseas (military, business)")
-                    BulletPoint("Express strong feelings very quickly")
-                    BulletPoint("Create emergencies requiring money")
-                    BulletPoint("Ask for gift cards or wire transfers")
-                    BulletPoint("Have professional model-quality photos")
-                    BulletPoint("Can never video chat")
+                    SimpleBulletPoint("Claim to be overseas (military, business)")
+                    SimpleBulletPoint("Express strong feelings very quickly")
+                    SimpleBulletPoint("Create emergencies requiring money")
+                    SimpleBulletPoint("Ask for gift cards or wire transfers")
+                    SimpleBulletPoint("Have professional model-quality photos")
+                    SimpleBulletPoint("Can never video chat")
 
                     Text("NEVER send money to someone you haven't met in person.")
                         .font(.subheadline)
@@ -859,12 +859,12 @@ extension LegalDocumentView {
 
             LegalSection(title: "If You Feel Unsafe") {
                 VStack(alignment: .leading, spacing: 8) {
-                    BulletPoint("Trust your instincts and leave immediately")
-                    BulletPoint("Call 911 if you're in immediate danger")
-                    BulletPoint("Report the user on Celestia")
-                    BulletPoint("Block the person on all platforms")
-                    BulletPoint("Save any threatening messages as evidence")
-                    BulletPoint("Contact local authorities if needed")
+                    SimpleBulletPoint("Trust your instincts and leave immediately")
+                    SimpleBulletPoint("Call 911 if you're in immediate danger")
+                    SimpleBulletPoint("Report the user on Celestia")
+                    SimpleBulletPoint("Block the person on all platforms")
+                    SimpleBulletPoint("Save any threatening messages as evidence")
+                    SimpleBulletPoint("Contact local authorities if needed")
                 }
             }
 
@@ -880,9 +880,9 @@ extension LegalDocumentView {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Help us keep Celestia safe:")
                         .font(.subheadline)
-                    BulletPoint("Report suspicious profiles immediately")
-                    BulletPoint("Report harassment or inappropriate messages")
-                    BulletPoint("Contact support@celestia.app for urgent concerns")
+                    SimpleBulletPoint("Report suspicious profiles immediately")
+                    SimpleBulletPoint("Report harassment or inappropriate messages")
+                    SimpleBulletPoint("Contact support@celestia.app for urgent concerns")
                 }
             }
         }
@@ -905,35 +905,35 @@ extension LegalDocumentView {
             LegalSection(title: "Types of Data We Collect") {
                 VStack(alignment: .leading, spacing: 12) {
                     LegalSubsection(title: "Essential Data") {
-                        BulletPoint("Authentication tokens to keep you logged in")
-                        BulletPoint("Session data for app functionality")
-                        BulletPoint("Security tokens to protect your account")
-                        BulletPoint("Preferences you've set in the app")
+                        SimpleBulletPoint("Authentication tokens to keep you logged in")
+                        SimpleBulletPoint("Session data for app functionality")
+                        SimpleBulletPoint("Security tokens to protect your account")
+                        SimpleBulletPoint("Preferences you've set in the app")
                     }
 
                     LegalSubsection(title: "Analytics Data") {
-                        BulletPoint("App usage patterns and feature interactions")
-                        BulletPoint("Crash reports and performance metrics")
-                        BulletPoint("Device type and operating system")
-                        BulletPoint("General location data")
+                        SimpleBulletPoint("App usage patterns and feature interactions")
+                        SimpleBulletPoint("Crash reports and performance metrics")
+                        SimpleBulletPoint("Device type and operating system")
+                        SimpleBulletPoint("General location data")
                     }
 
                     LegalSubsection(title: "Advertising Identifiers") {
-                        BulletPoint("IDFA (iOS Identifier for Advertisers)")
-                        BulletPoint("Used for measuring ad effectiveness")
-                        BulletPoint("Can be limited in device settings")
+                        SimpleBulletPoint("IDFA (iOS Identifier for Advertisers)")
+                        SimpleBulletPoint("Used for measuring ad effectiveness")
+                        SimpleBulletPoint("Can be limited in device settings")
                     }
                 }
             }
 
             LegalSection(title: "How We Use This Data") {
                 VStack(alignment: .leading, spacing: 8) {
-                    BulletPoint("Maintain your logged-in session")
-                    BulletPoint("Remember your preferences and settings")
-                    BulletPoint("Analyze and improve our services")
-                    BulletPoint("Detect and prevent fraud")
-                    BulletPoint("Measure the effectiveness of marketing")
-                    BulletPoint("Provide personalized experiences")
+                    SimpleBulletPoint("Maintain your logged-in session")
+                    SimpleBulletPoint("Remember your preferences and settings")
+                    SimpleBulletPoint("Analyze and improve our services")
+                    SimpleBulletPoint("Detect and prevent fraud")
+                    SimpleBulletPoint("Measure the effectiveness of marketing")
+                    SimpleBulletPoint("Provide personalized experiences")
                 }
             }
 
@@ -961,19 +961,19 @@ extension LegalDocumentView {
                     Text("You can control data collection through:")
                         .font(.subheadline)
 
-                    BulletPoint("iOS Settings > Privacy > Tracking")
-                    BulletPoint("iOS Settings > Privacy > Analytics & Improvements")
-                    BulletPoint("In-app privacy settings")
-                    BulletPoint("Deleting the app removes local data")
+                    SimpleBulletPoint("iOS Settings > Privacy > Tracking")
+                    SimpleBulletPoint("iOS Settings > Privacy > Analytics & Improvements")
+                    SimpleBulletPoint("In-app privacy settings")
+                    SimpleBulletPoint("Deleting the app removes local data")
                 }
             }
 
             LegalSection(title: "Data Retention") {
                 VStack(alignment: .leading, spacing: 8) {
-                    BulletPoint("Session data: Until you log out or session expires")
-                    BulletPoint("Analytics data: Up to 14 months")
-                    BulletPoint("Crash reports: Up to 90 days")
-                    BulletPoint("Account data: Until account deletion")
+                    SimpleBulletPoint("Session data: Until you log out or session expires")
+                    SimpleBulletPoint("Analytics data: Up to 14 months")
+                    SimpleBulletPoint("Crash reports: Up to 90 days")
+                    SimpleBulletPoint("Account data: Until account deletion")
                 }
             }
 
@@ -981,10 +981,10 @@ extension LegalDocumentView {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("California residents have the right to:")
                         .font(.subheadline)
-                    BulletPoint("Know what data we collect")
-                    BulletPoint("Delete your personal information")
-                    BulletPoint("Opt-out of the sale of personal information")
-                    BulletPoint("Non-discrimination for exercising rights")
+                    SimpleBulletPoint("Know what data we collect")
+                    SimpleBulletPoint("Delete your personal information")
+                    SimpleBulletPoint("Opt-out of the sale of personal information")
+                    SimpleBulletPoint("Non-discrimination for exercising rights")
 
                     Text("We do not sell personal information.")
                         .font(.subheadline)
@@ -997,13 +997,13 @@ extension LegalDocumentView {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("EU/EEA residents have the right to:")
                         .font(.subheadline)
-                    BulletPoint("Access your personal data")
-                    BulletPoint("Rectify inaccurate data")
-                    BulletPoint("Erase your data (right to be forgotten)")
-                    BulletPoint("Restrict processing")
-                    BulletPoint("Data portability")
-                    BulletPoint("Object to processing")
-                    BulletPoint("Withdraw consent at any time")
+                    SimpleBulletPoint("Access your personal data")
+                    SimpleBulletPoint("Rectify inaccurate data")
+                    SimpleBulletPoint("Erase your data (right to be forgotten)")
+                    SimpleBulletPoint("Restrict processing")
+                    SimpleBulletPoint("Data portability")
+                    SimpleBulletPoint("Object to processing")
+                    SimpleBulletPoint("Withdraw consent at any time")
                 }
             }
 
@@ -1066,7 +1066,7 @@ struct LegalSubsection<Content: View>: View {
     }
 }
 
-struct BulletPoint: View {
+struct SimpleBulletPoint: View {
     let text: String
 
     init(_ text: String) {
@@ -1135,9 +1135,9 @@ extension LegalDocumentView {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Subject to your compliance with this EULA, Celestia grants you a limited, non-exclusive, non-transferable, revocable license to:")
                         .font(.subheadline)
-                    BulletPoint("Download and install the app on devices you own or control")
-                    BulletPoint("Use the app for personal, non-commercial purposes")
-                    BulletPoint("Access the features available to your account type")
+                    SimpleBulletPoint("Download and install the app on devices you own or control")
+                    SimpleBulletPoint("Use the app for personal, non-commercial purposes")
+                    SimpleBulletPoint("Access the features available to your account type")
 
                     Text("This license does not allow you to use the app on any device you do not own or control, and you may not distribute or make the app available over a network.")
                         .font(.caption)
@@ -1150,13 +1150,13 @@ extension LegalDocumentView {
                     Text("You agree NOT to:")
                         .font(.subheadline)
                         .fontWeight(.semibold)
-                    BulletPoint("Copy, modify, or distribute the app or its content")
-                    BulletPoint("Reverse engineer, decompile, or disassemble the app")
-                    BulletPoint("Remove or alter any proprietary notices or labels")
-                    BulletPoint("Use the app for any illegal or unauthorized purpose")
-                    BulletPoint("Sublicense, rent, lease, or loan the app to third parties")
-                    BulletPoint("Use automated systems to access the app (bots, scrapers)")
-                    BulletPoint("Circumvent or disable security features")
+                    SimpleBulletPoint("Copy, modify, or distribute the app or its content")
+                    SimpleBulletPoint("Reverse engineer, decompile, or disassemble the app")
+                    SimpleBulletPoint("Remove or alter any proprietary notices or labels")
+                    SimpleBulletPoint("Use the app for any illegal or unauthorized purpose")
+                    SimpleBulletPoint("Sublicense, rent, lease, or loan the app to third parties")
+                    SimpleBulletPoint("Use automated systems to access the app (bots, scrapers)")
+                    SimpleBulletPoint("Circumvent or disable security features")
                 }
             }
 
@@ -1164,10 +1164,10 @@ extension LegalDocumentView {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Celestia and its licensors own all intellectual property rights in the app, including:")
                         .font(.subheadline)
-                    BulletPoint("Software code, algorithms, and architecture")
-                    BulletPoint("User interface design and visual elements")
-                    BulletPoint("Trademarks, logos, and brand identity")
-                    BulletPoint("Documentation and other materials")
+                    SimpleBulletPoint("Software code, algorithms, and architecture")
+                    SimpleBulletPoint("User interface design and visual elements")
+                    SimpleBulletPoint("Trademarks, logos, and brand identity")
+                    SimpleBulletPoint("Documentation and other materials")
 
                     Text("All rights not expressly granted in this EULA are reserved by Celestia.")
                         .font(.caption)
@@ -1184,10 +1184,10 @@ extension LegalDocumentView {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Celestia may release updates that modify the app's functionality:")
                         .font(.subheadline)
-                    BulletPoint("Updates may be downloaded and installed automatically")
-                    BulletPoint("Some updates may be required to continue using the app")
-                    BulletPoint("We may discontinue features with or without notice")
-                    BulletPoint("Your continued use after updates constitutes acceptance")
+                    SimpleBulletPoint("Updates may be downloaded and installed automatically")
+                    SimpleBulletPoint("Some updates may be required to continue using the app")
+                    SimpleBulletPoint("We may discontinue features with or without notice")
+                    SimpleBulletPoint("Your continued use after updates constitutes acceptance")
                 }
             }
 
@@ -1199,8 +1199,8 @@ extension LegalDocumentView {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("If you downloaded the app from Apple's App Store, you also agree to:")
                         .font(.subheadline)
-                    BulletPoint("Apple's Licensed Application End User License Agreement")
-                    BulletPoint("Apple's App Store Terms of Service")
+                    SimpleBulletPoint("Apple's Licensed Application End User License Agreement")
+                    SimpleBulletPoint("Apple's App Store Terms of Service")
 
                     Text("In case of conflict between this EULA and Apple's terms regarding Apple-specific provisions, Apple's terms shall govern.")
                         .font(.caption)
@@ -1212,10 +1212,10 @@ extension LegalDocumentView {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("You acknowledge that:")
                         .font(.subheadline)
-                    BulletPoint("Apple is not responsible for the app or its content")
-                    BulletPoint("Apple has no obligation to provide maintenance or support")
-                    BulletPoint("Apple is not liable for any claims related to the app")
-                    BulletPoint("Apple is a third-party beneficiary of this EULA")
+                    SimpleBulletPoint("Apple is not responsible for the app or its content")
+                    SimpleBulletPoint("Apple has no obligation to provide maintenance or support")
+                    SimpleBulletPoint("Apple is not liable for any claims related to the app")
+                    SimpleBulletPoint("Apple is a third-party beneficiary of this EULA")
                 }
             }
 
@@ -1223,8 +1223,8 @@ extension LegalDocumentView {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("This EULA is effective until terminated. Your rights automatically terminate if you:")
                         .font(.subheadline)
-                    BulletPoint("Fail to comply with any term of this EULA")
-                    BulletPoint("Delete your account or uninstall the app")
+                    SimpleBulletPoint("Fail to comply with any term of this EULA")
+                    SimpleBulletPoint("Delete your account or uninstall the app")
 
                     Text("Upon termination, you must cease all use of the app and delete all copies.")
                         .font(.caption)
@@ -1280,10 +1280,10 @@ extension LegalDocumentView {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("We aim to conform to the following standards:")
                         .font(.subheadline)
-                    BulletPoint("Web Content Accessibility Guidelines (WCAG) 2.1 Level AA")
-                    BulletPoint("Apple's Human Interface Guidelines for Accessibility")
-                    BulletPoint("Section 508 of the Rehabilitation Act (where applicable)")
-                    BulletPoint("Americans with Disabilities Act (ADA) requirements")
+                    SimpleBulletPoint("Web Content Accessibility Guidelines (WCAG) 2.1 Level AA")
+                    SimpleBulletPoint("Apple's Human Interface Guidelines for Accessibility")
+                    SimpleBulletPoint("Section 508 of the Rehabilitation Act (where applicable)")
+                    SimpleBulletPoint("Americans with Disabilities Act (ADA) requirements")
                 }
             }
 
@@ -1291,37 +1291,37 @@ extension LegalDocumentView {
                 VStack(alignment: .leading, spacing: 12) {
                     LegalSubsection(title: "VoiceOver Support") {
                         VStack(alignment: .leading, spacing: 4) {
-                            BulletPoint("Full VoiceOver compatibility throughout the app")
-                            BulletPoint("Descriptive labels for all interactive elements")
-                            BulletPoint("Logical reading order and navigation")
-                            BulletPoint("Meaningful image descriptions")
+                            SimpleBulletPoint("Full VoiceOver compatibility throughout the app")
+                            SimpleBulletPoint("Descriptive labels for all interactive elements")
+                            SimpleBulletPoint("Logical reading order and navigation")
+                            SimpleBulletPoint("Meaningful image descriptions")
                         }
                     }
 
                     LegalSubsection(title: "Visual Accommodations") {
                         VStack(alignment: .leading, spacing: 4) {
-                            BulletPoint("Support for Dynamic Type (adjustable text sizes)")
-                            BulletPoint("High contrast color combinations")
-                            BulletPoint("Respect for system-wide Dark Mode preferences")
-                            BulletPoint("No reliance on color alone to convey information")
+                            SimpleBulletPoint("Support for Dynamic Type (adjustable text sizes)")
+                            SimpleBulletPoint("High contrast color combinations")
+                            SimpleBulletPoint("Respect for system-wide Dark Mode preferences")
+                            SimpleBulletPoint("No reliance on color alone to convey information")
                         }
                     }
 
                     LegalSubsection(title: "Motor Accessibility") {
                         VStack(alignment: .leading, spacing: 4) {
-                            BulletPoint("Support for Switch Control")
-                            BulletPoint("Adequate touch target sizes (minimum 44x44 points)")
-                            BulletPoint("No time-limited interactions required")
-                            BulletPoint("Alternative navigation methods supported")
+                            SimpleBulletPoint("Support for Switch Control")
+                            SimpleBulletPoint("Adequate touch target sizes (minimum 44x44 points)")
+                            SimpleBulletPoint("No time-limited interactions required")
+                            SimpleBulletPoint("Alternative navigation methods supported")
                         }
                     }
 
                     LegalSubsection(title: "Cognitive Accessibility") {
                         VStack(alignment: .leading, spacing: 4) {
-                            BulletPoint("Clear and consistent navigation")
-                            BulletPoint("Simple, understandable language")
-                            BulletPoint("Predictable interface behavior")
-                            BulletPoint("Support for Reduce Motion preference")
+                            SimpleBulletPoint("Clear and consistent navigation")
+                            SimpleBulletPoint("Simple, understandable language")
+                            SimpleBulletPoint("Predictable interface behavior")
+                            SimpleBulletPoint("Support for Reduce Motion preference")
                         }
                     }
                 }
@@ -1329,13 +1329,13 @@ extension LegalDocumentView {
 
             LegalSection(title: "Assistive Technologies Supported") {
                 VStack(alignment: .leading, spacing: 8) {
-                    BulletPoint("VoiceOver screen reader")
-                    BulletPoint("Voice Control")
-                    BulletPoint("Switch Control")
-                    BulletPoint("AssistiveTouch")
-                    BulletPoint("Full Keyboard Access")
-                    BulletPoint("Zoom magnification")
-                    BulletPoint("Spoken Content (Speak Selection, Speak Screen)")
+                    SimpleBulletPoint("VoiceOver screen reader")
+                    SimpleBulletPoint("Voice Control")
+                    SimpleBulletPoint("Switch Control")
+                    SimpleBulletPoint("AssistiveTouch")
+                    SimpleBulletPoint("Full Keyboard Access")
+                    SimpleBulletPoint("Zoom magnification")
+                    SimpleBulletPoint("Spoken Content (Speak Selection, Speak Screen)")
                 }
             }
 
@@ -1343,9 +1343,9 @@ extension LegalDocumentView {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("We are working to address the following areas:")
                         .font(.subheadline)
-                    BulletPoint("Some user-uploaded images may lack alternative text")
-                    BulletPoint("Complex gesture interactions have keyboard alternatives being developed")
-                    BulletPoint("Third-party content may not meet our accessibility standards")
+                    SimpleBulletPoint("Some user-uploaded images may lack alternative text")
+                    SimpleBulletPoint("Complex gesture interactions have keyboard alternatives being developed")
+                    SimpleBulletPoint("Third-party content may not meet our accessibility standards")
 
                     Text("We are actively working to resolve these issues and improve accessibility across all features.")
                         .font(.caption)
@@ -1357,10 +1357,10 @@ extension LegalDocumentView {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Our accessibility program includes:")
                         .font(.subheadline)
-                    BulletPoint("Regular automated accessibility testing")
-                    BulletPoint("Manual testing with assistive technologies")
-                    BulletPoint("User feedback incorporation")
-                    BulletPoint("Ongoing staff training on accessibility best practices")
+                    SimpleBulletPoint("Regular automated accessibility testing")
+                    SimpleBulletPoint("Manual testing with assistive technologies")
+                    SimpleBulletPoint("User feedback incorporation")
+                    SimpleBulletPoint("Ongoing staff training on accessibility best practices")
                 }
             }
 
@@ -1388,10 +1388,10 @@ extension LegalDocumentView {
                     Text("When contacting us, please include:")
                         .font(.subheadline)
                         .padding(.top, 8)
-                    BulletPoint("Description of the accessibility issue")
-                    BulletPoint("The assistive technology you are using")
-                    BulletPoint("Your device type and iOS version")
-                    BulletPoint("Steps to reproduce the issue")
+                    SimpleBulletPoint("Description of the accessibility issue")
+                    SimpleBulletPoint("The assistive technology you are using")
+                    SimpleBulletPoint("Your device type and iOS version")
+                    SimpleBulletPoint("Steps to reproduce the issue")
                 }
             }
 
@@ -1407,10 +1407,10 @@ extension LegalDocumentView {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("We are committed to continuous improvement of our accessibility:")
                         .font(.subheadline)
-                    BulletPoint("Regular accessibility audits are conducted")
-                    BulletPoint("User feedback is reviewed and incorporated")
-                    BulletPoint("New features are designed with accessibility in mind")
-                    BulletPoint("Development team receives ongoing accessibility training")
+                    SimpleBulletPoint("Regular accessibility audits are conducted")
+                    SimpleBulletPoint("User feedback is reviewed and incorporated")
+                    SimpleBulletPoint("New features are designed with accessibility in mind")
+                    SimpleBulletPoint("Development team receives ongoing accessibility training")
                 }
             }
 
