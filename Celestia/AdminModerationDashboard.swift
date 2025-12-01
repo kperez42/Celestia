@@ -1760,6 +1760,24 @@ class ModerationViewModel: ObservableObject {
         Logger.shared.info("Profile rejected: \(userId) - Reason: \(reasonCode)", category: .moderation)
     }
 
+    /// Flag a profile for extended review - hides user from others while under investigation
+    /// The user will see FlaggedAccountView (ContentView.swift routes profileStatus="flagged")
+    func flagProfile(userId: String, reason: String) async throws {
+        try await db.collection("users").document(userId).updateData([
+            "profileStatus": "flagged",
+            "profileStatusReason": reason,
+            "profileStatusUpdatedAt": FieldValue.serverTimestamp(),
+            "showMeInSearch": false  // Hide from other users during review
+        ])
+
+        // Send push notification to user about flagged status
+        await sendProfileStatusNotification(userId: userId, status: "flagged", reason: reason, reasonCode: nil)
+
+        // Refresh to update list
+        await loadQueue()
+        Logger.shared.info("Profile flagged for review: \(userId) - Reason: \(reason)", category: .moderation)
+    }
+
     /// Send profile status notification via Cloud Function
     private func sendProfileStatusNotification(userId: String, status: String, reason: String?, reasonCode: String?) async {
         do {
@@ -2439,7 +2457,10 @@ struct PendingProfileCard: View {
     @ObservedObject var viewModel: ModerationViewModel
     @State private var isApproving = false
     @State private var isRejecting = false
+    @State private var isFlagging = false
     @State private var showRejectAlert = false
+    @State private var showFlagAlert = false
+    @State private var flagReason = ""
     @State private var currentPhotoIndex = 0
     @State private var showPhotoGallery = false
     @State private var showProfileDetail = false
@@ -2680,7 +2701,38 @@ struct PendingProfileCard: View {
                         .foregroundColor(.white)
                         .cornerRadius(12)
                     }
-                    .disabled(isApproving || isRejecting)
+                    .disabled(isApproving || isRejecting || isFlagging)
+
+                    // Flag for Review Button (orange)
+                    Button(action: {
+                        HapticManager.shared.impact(.light)
+                        showFlagAlert = true
+                    }) {
+                        HStack(spacing: 8) {
+                            if isFlagging {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                    .tint(.white)
+                            } else {
+                                Image(systemName: "flag.fill")
+                                    .font(.title3.bold())
+                            }
+                            Text("Flag")
+                                .fontWeight(.semibold)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(
+                            LinearGradient(
+                                colors: [Color.orange, Color.orange.opacity(0.8)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                    }
+                    .disabled(isApproving || isRejecting || isFlagging)
 
                     // Approve Button
                     Button(action: {
@@ -2721,7 +2773,7 @@ struct PendingProfileCard: View {
                         .foregroundColor(.white)
                         .cornerRadius(12)
                     }
-                    .disabled(isApproving || isRejecting)
+                    .disabled(isApproving || isRejecting || isFlagging)
                 }
             }
             .padding(16)
@@ -2782,6 +2834,19 @@ struct PendingProfileCard: View {
                     selectedRejectionReason = nil
                 }
             )
+        }
+        // Flag for extended review alert
+        // User will be shown FlaggedAccountView (ContentView.swift handles routing)
+        .alert("Flag for Extended Review", isPresented: $showFlagAlert) {
+            TextField("Reason for flagging", text: $flagReason)
+            Button("Flag Profile", role: .destructive) {
+                submitFlag()
+            }
+            Button("Cancel", role: .cancel) {
+                flagReason = ""
+            }
+        } message: {
+            Text("This will hide the profile from other users and notify them that their profile is under review. Add a reason for the flag.")
         }
         // Full Profile Detail Sheet
         .sheet(isPresented: $showProfileDetail) {
@@ -2845,6 +2910,24 @@ struct PendingProfileCard: View {
             isRejecting = false
             adminComment = ""
             selectedRejectionReason = nil
+        }
+    }
+
+    /// Submit the flag action
+    private func submitFlag() {
+        guard !flagReason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        HapticManager.shared.impact(.medium)
+        Task {
+            isFlagging = true
+            do {
+                try await viewModel.flagProfile(userId: profile.id, reason: flagReason)
+                HapticManager.shared.notification(.warning)
+            } catch {
+                HapticManager.shared.notification(.error)
+                Logger.shared.error("Failed to flag profile", category: .moderation, error: error)
+            }
+            isFlagging = false
+            flagReason = ""
         }
     }
 
