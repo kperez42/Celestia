@@ -968,6 +968,26 @@ exports.sendReportResolvedNotification = functions.https.onCall(async (data, con
 });
 
 /**
+ * Sends an appeal resolution notification to a user
+ * Called when admin approves or rejects an appeal
+ */
+exports.sendAppealResolvedNotification = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { userId, approved, response } = data;
+
+  try {
+    await notifications.sendAppealResolvedNotification(userId, approved, response);
+    return { success: true };
+  } catch (error) {
+    functions.logger.error('Send appeal resolved notification error', { error: error.message });
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
  * Sends a profile status notification to a user
  * Called when profile is approved or rejected
  */

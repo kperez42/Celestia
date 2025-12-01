@@ -21,6 +21,7 @@ struct AdminModerationDashboard: View {
     private let tabs: [(name: String, icon: String, color: Color)] = [
         ("New", "person.badge.plus", .blue),
         ("Reports", "exclamationmark.triangle.fill", .orange),
+        ("Appeals", "envelope.open.fill", .cyan),
         ("Suspicious", "eye.trianglebadge.exclamationmark", .red),
         ("ID Review", "person.text.rectangle", .purple),
         ("Stats", "chart.bar.fill", .green)
@@ -74,14 +75,17 @@ struct AdminModerationDashboard: View {
                     reportsListView
                         .tag(1)
 
-                    suspiciousProfilesView
+                    appealsListView
                         .tag(2)
 
-                    idVerificationReviewView
+                    suspiciousProfilesView
                         .tag(3)
 
-                    statsView
+                    idVerificationReviewView
                         .tag(4)
+
+                    statsView
+                        .tag(5)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
             }
@@ -233,8 +237,9 @@ struct AdminModerationDashboard: View {
         switch tabIndex {
         case 0: return viewModel.pendingProfiles.count  // New accounts
         case 1: return viewModel.reports.count          // Reports
-        case 2: return viewModel.suspiciousProfiles.count // Suspicious
-        case 3: return 0  // ID Review count comes from embedded view
+        case 2: return viewModel.appeals.count          // Appeals
+        case 3: return viewModel.suspiciousProfiles.count // Suspicious
+        case 4: return 0  // ID Review count comes from embedded view
         default: return 0
         }
     }
@@ -279,6 +284,31 @@ struct AdminModerationDashboard: View {
                         ReportDetailView(report: report, viewModel: viewModel)
                     } label: {
                         ReportRowView(report: report)
+                    }
+                }
+                .listStyle(.plain)
+            }
+        }
+    }
+
+    // MARK: - Appeals List
+
+    private var appealsListView: some View {
+        Group {
+            if viewModel.isLoading {
+                AppealsLoadingView()
+            } else if viewModel.appeals.isEmpty {
+                emptyState(
+                    icon: "checkmark.seal.fill",
+                    title: "No Pending Appeals",
+                    message: "All user appeals have been reviewed"
+                )
+            } else {
+                List(viewModel.appeals) { appeal in
+                    NavigationLink {
+                        AppealDetailView(appeal: appeal, viewModel: viewModel)
+                    } label: {
+                        AppealRowView(appeal: appeal)
                     }
                 }
                 .listStyle(.plain)
@@ -867,6 +897,314 @@ struct ReportDetailView: View {
     }
 }
 
+// MARK: - Appeal Row View
+
+struct AppealRowView: View {
+    let appeal: UserAppeal
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                // Appeal type badge
+                Text(appeal.typeDisplayName)
+                    .font(.caption.bold())
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(appeal.type == "ban" ? Color.red : Color.orange)
+                    .cornerRadius(6)
+
+                Spacer()
+
+                // Timestamp
+                Text(appeal.submittedAt)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            // User info
+            if let user = appeal.user {
+                HStack(spacing: 8) {
+                    if let photoURL = user.photoURL {
+                        CachedAsyncImage(url: URL(string: photoURL)) { image in
+                            image.resizable()
+                        } placeholder: {
+                            Color.gray
+                        }
+                        .frame(width: 40, height: 40)
+                        .clipShape(Circle())
+                    } else {
+                        Circle()
+                            .fill(Color(.systemGray4))
+                            .frame(width: 40, height: 40)
+                            .overlay(
+                                Image(systemName: "person.fill")
+                                    .foregroundColor(.gray)
+                            )
+                    }
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(user.name)
+                            .font(.subheadline.bold())
+                        Text(user.email)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+
+            // Appeal message preview
+            Text(appeal.appealMessage)
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .lineLimit(2)
+                .padding(.top, 2)
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Appeal Detail View
+
+struct AppealDetailView: View {
+    let appeal: UserAppeal
+    @ObservedObject var viewModel: ModerationViewModel
+    @Environment(\.dismiss) var dismiss
+
+    @State private var adminResponse = ""
+    @State private var showingApproveConfirmation = false
+    @State private var showingRejectConfirmation = false
+    @State private var isProcessing = false
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                // Header
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text(appeal.typeDisplayName)
+                            .font(.title2.bold())
+
+                        Spacer()
+
+                        Text(appeal.submittedAt)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    // Status badge
+                    HStack {
+                        Image(systemName: "clock.fill")
+                            .foregroundColor(.orange)
+                        Text("Pending Review")
+                            .font(.subheadline)
+                            .foregroundColor(.orange)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.orange.opacity(0.1))
+                    .cornerRadius(8)
+                }
+
+                Divider()
+
+                // User information
+                if let user = appeal.user {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("User Information")
+                            .font(.headline)
+
+                        HStack(spacing: 12) {
+                            if let photoURL = user.photoURL {
+                                CachedAsyncImage(url: URL(string: photoURL)) { image in
+                                    image.resizable()
+                                } placeholder: {
+                                    Color.gray
+                                }
+                                .frame(width: 60, height: 60)
+                                .clipShape(Circle())
+                            } else {
+                                Circle()
+                                    .fill(Color(.systemGray4))
+                                    .frame(width: 60, height: 60)
+                                    .overlay(
+                                        Image(systemName: "person.fill")
+                                            .font(.title)
+                                            .foregroundColor(.gray)
+                                    )
+                            }
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(user.name)
+                                    .font(.headline)
+                                Text(user.email)
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+
+                                HStack(spacing: 4) {
+                                    if user.isBanned {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundColor(.red)
+                                        Text("Banned")
+                                            .font(.caption.bold())
+                                            .foregroundColor(.red)
+                                    } else if user.isSuspended {
+                                        Image(systemName: "pause.circle.fill")
+                                            .foregroundColor(.orange)
+                                        Text("Suspended")
+                                            .font(.caption.bold())
+                                            .foregroundColor(.orange)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                }
+
+                // Original action reason
+                if let actionReason = appeal.actionReason {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Original \(appeal.type == "ban" ? "Ban" : "Suspension") Reason")
+                            .font(.headline)
+
+                        Text(actionReason)
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(8)
+                    }
+                }
+
+                // Appeal message
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("User's Appeal")
+                        .font(.headline)
+
+                    Text(appeal.appealMessage)
+                        .font(.body)
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(8)
+                }
+
+                Divider()
+
+                // Admin response
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Your Response (Optional)")
+                        .font(.headline)
+
+                    TextEditor(text: $adminResponse)
+                        .frame(minHeight: 100)
+                        .padding(8)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color(.systemGray4), lineWidth: 1)
+                        )
+
+                    Text("This message will be sent to the user")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                // Action buttons
+                VStack(spacing: 12) {
+                    // Approve button (lift ban/suspension)
+                    Button {
+                        showingApproveConfirmation = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                            Text("Approve Appeal")
+                        }
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.green)
+                        .cornerRadius(12)
+                    }
+                    .disabled(isProcessing)
+
+                    // Reject button
+                    Button {
+                        showingRejectConfirmation = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "xmark.circle.fill")
+                            Text("Reject Appeal")
+                        }
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.red)
+                        .cornerRadius(12)
+                    }
+                    .disabled(isProcessing)
+                }
+                .padding(.top, 8)
+            }
+            .padding()
+        }
+        .navigationTitle("Appeal Review")
+        .navigationBarTitleDisplayMode(.inline)
+        .alert("Approve Appeal?", isPresented: $showingApproveConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Approve") {
+                resolveAppeal(approved: true)
+            }
+        } message: {
+            Text("This will lift the user's \(appeal.type == "ban" ? "ban" : "suspension") and restore their account access.")
+        }
+        .alert("Reject Appeal?", isPresented: $showingRejectConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Reject", role: .destructive) {
+                resolveAppeal(approved: false)
+            }
+        } message: {
+            Text("The user's \(appeal.type == "ban" ? "ban" : "suspension") will remain in effect.")
+        }
+        .overlay {
+            if isProcessing {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+                ProgressView()
+                    .scaleEffect(1.5)
+                    .tint(.white)
+            }
+        }
+    }
+
+    private func resolveAppeal(approved: Bool) {
+        isProcessing = true
+        Task {
+            do {
+                try await viewModel.resolveAppeal(
+                    appealId: appeal.id,
+                    userId: appeal.userId,
+                    approved: approved,
+                    adminResponse: adminResponse.isEmpty ? (approved ? "Your appeal has been approved." : "Your appeal has been reviewed and denied.") : adminResponse
+                )
+                HapticManager.shared.notification(.success)
+                dismiss()
+            } catch {
+                HapticManager.shared.notification(.error)
+                isProcessing = false
+            }
+            Logger.shared.info("Appeal \(approved ? "approved" : "rejected") for user \(appeal.userId)", category: .moderation)
+        }
+    }
+}
+
 // MARK: - Suspicious Profile Row
 
 struct SuspiciousProfileRowView: View {
@@ -1100,6 +1438,7 @@ class ModerationViewModel: ObservableObject {
     @Published var reports: [ModerationReport] = []
     @Published var suspiciousProfiles: [SuspiciousProfileItem] = []
     @Published var pendingProfiles: [PendingProfile] = []
+    @Published var appeals: [UserAppeal] = []
     @Published var adminAlerts: [AdminAlert] = []
     @Published var unreadAlertCount: Int = 0
     @Published var stats: ModerationStats = ModerationStats()
@@ -1183,16 +1522,18 @@ class ModerationViewModel: ObservableObject {
             async let reportsTask = loadReports()
             async let suspiciousTask = loadSuspiciousProfiles()
             async let pendingTask = loadPendingProfiles()
+            async let appealsTask = loadAppeals()
             async let statsTask = loadStats()
 
-            let (loadedReports, loadedSuspicious, loadedPending, loadedStats) = await (reportsTask, suspiciousTask, pendingTask, statsTask)
+            let (loadedReports, loadedSuspicious, loadedPending, loadedAppeals, loadedStats) = await (reportsTask, suspiciousTask, pendingTask, appealsTask, statsTask)
 
             reports = loadedReports
             suspiciousProfiles = loadedSuspicious
             pendingProfiles = loadedPending
+            appeals = loadedAppeals
             stats = loadedStats
 
-            Logger.shared.info("Admin: Loaded \(reports.count) reports, \(suspiciousProfiles.count) suspicious, \(pendingProfiles.count) pending profiles", category: .moderation)
+            Logger.shared.info("Admin: Loaded \(reports.count) reports, \(suspiciousProfiles.count) suspicious, \(pendingProfiles.count) pending, \(appeals.count) appeals", category: .moderation)
 
             isLoading = false
         }
@@ -1239,6 +1580,132 @@ class ModerationViewModel: ObservableObject {
         } catch {
             Logger.shared.error("Admin: Failed to load pending profiles", category: .moderation, error: error)
             return []
+        }
+    }
+
+    /// Load pending appeals from Firestore
+    private func loadAppeals() async -> [UserAppeal] {
+        do {
+            let snapshot = try await db.collection("appeals")
+                .whereField("status", isEqualTo: "pending")
+                .order(by: "submittedAt", descending: true)
+                .limit(to: 50)
+                .getDocuments()
+
+            var loadedAppeals: [UserAppeal] = []
+
+            for doc in snapshot.documents {
+                let data = doc.data()
+                let userId = data["userId"] as? String ?? ""
+
+                // Fetch user details
+                var userInfo: UserAppeal.UserInfo? = nil
+                if !userId.isEmpty {
+                    if let userDoc = try? await db.collection("users").document(userId).getDocument(),
+                       userDoc.exists,
+                       let userData = userDoc.data() {
+                        userInfo = UserAppeal.UserInfo(
+                            id: userId,
+                            name: userData["fullName"] as? String ?? "Unknown",
+                            email: userData["email"] as? String ?? "",
+                            photoURL: userData["profileImageURL"] as? String,
+                            isSuspended: userData["isSuspended"] as? Bool ?? false,
+                            isBanned: userData["isBanned"] as? Bool ?? false,
+                            suspendReason: userData["suspendReason"] as? String,
+                            banReason: userData["banReason"] as? String
+                        )
+                    }
+                }
+
+                // Format timestamp
+                var submittedAtStr = "Unknown"
+                if let timestamp = data["submittedAt"] as? Timestamp {
+                    let formatter = RelativeDateTimeFormatter()
+                    formatter.unitsStyle = .abbreviated
+                    submittedAtStr = formatter.localizedString(for: timestamp.dateValue(), relativeTo: Date())
+                }
+
+                let appeal = UserAppeal(
+                    id: doc.documentID,
+                    userId: userId,
+                    type: data["type"] as? String ?? "suspension",
+                    appealMessage: data["appealMessage"] as? String ?? "",
+                    status: data["status"] as? String ?? "pending",
+                    submittedAt: submittedAtStr,
+                    user: userInfo
+                )
+                loadedAppeals.append(appeal)
+            }
+
+            return loadedAppeals
+        } catch {
+            Logger.shared.error("Admin: Failed to load appeals", category: .moderation, error: error)
+            return []
+        }
+    }
+
+    /// Resolve an appeal - approve (lift ban/suspension) or reject
+    func resolveAppeal(appealId: String, userId: String, approved: Bool, adminResponse: String) async throws {
+        // Update appeal status
+        try await db.collection("appeals").document(appealId).updateData([
+            "status": approved ? "approved" : "rejected",
+            "resolvedAt": FieldValue.serverTimestamp(),
+            "adminResponse": adminResponse
+        ])
+
+        if approved {
+            // Get user data to determine if banned or suspended
+            let userDoc = try await db.collection("users").document(userId).getDocument()
+            let userData = userDoc.data()
+            let isBanned = userData?["isBanned"] as? Bool ?? false
+
+            if isBanned {
+                // Lift the ban
+                try await db.collection("users").document(userId).updateData([
+                    "isBanned": false,
+                    "bannedAt": FieldValue.delete(),
+                    "banReason": FieldValue.delete(),
+                    "profileStatus": "active",
+                    "showMeInSearch": true
+                ])
+                Logger.shared.info("Ban lifted for user \(userId) via appeal", category: .moderation)
+            } else {
+                // Lift the suspension
+                try await db.collection("users").document(userId).updateData([
+                    "isSuspended": false,
+                    "suspendedAt": FieldValue.delete(),
+                    "suspendedUntil": FieldValue.delete(),
+                    "suspendReason": FieldValue.delete(),
+                    "profileStatus": "active",
+                    "showMeInSearch": true
+                ])
+                Logger.shared.info("Suspension lifted for user \(userId) via appeal", category: .moderation)
+            }
+
+            // Send notification to user about approved appeal
+            await sendAppealResolvedNotification(userId: userId, approved: true, response: adminResponse)
+        } else {
+            // Just notify the user that appeal was rejected
+            await sendAppealResolvedNotification(userId: userId, approved: false, response: adminResponse)
+            Logger.shared.info("Appeal rejected for user \(userId)", category: .moderation)
+        }
+
+        // Refresh queue
+        await loadQueue()
+    }
+
+    /// Send appeal resolution notification via Cloud Function
+    private func sendAppealResolvedNotification(userId: String, approved: Bool, response: String) async {
+        do {
+            let callable = functions.httpsCallable("sendAppealResolvedNotification")
+            _ = try await callable.call([
+                "userId": userId,
+                "approved": approved,
+                "response": response
+            ])
+            Logger.shared.info("Appeal resolution notification sent to \(userId)", category: .moderation)
+        } catch {
+            Logger.shared.error("Failed to send appeal resolution notification", category: .moderation, error: error)
         }
     }
 
@@ -1700,6 +2167,35 @@ struct ModerationReport: Identifiable {
         } else {
             self.reportedUser = nil
         }
+    }
+}
+
+struct UserAppeal: Identifiable {
+    let id: String
+    let userId: String
+    let type: String  // "suspension" or "ban"
+    let appealMessage: String
+    let status: String  // "pending", "approved", "rejected"
+    let submittedAt: String
+    let user: UserInfo?
+
+    struct UserInfo {
+        let id: String
+        let name: String
+        let email: String
+        let photoURL: String?
+        let isSuspended: Bool
+        let isBanned: Bool
+        let suspendReason: String?
+        let banReason: String?
+    }
+
+    var typeDisplayName: String {
+        type == "ban" ? "Ban Appeal" : "Suspension Appeal"
+    }
+
+    var actionReason: String? {
+        user?.isBanned == true ? user?.banReason : user?.suspendReason
     }
 }
 

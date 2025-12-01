@@ -837,6 +837,61 @@ async function sendIDVerificationRejectionNotification(userId, rejectionData) {
   functions.logger.info('ID verification rejection notification sent', { userId, reason });
 }
 
+/**
+ * Sends an appeal resolution notification to a user
+ * @param {string} userId - User to notify
+ * @param {boolean} approved - Whether the appeal was approved
+ * @param {string} response - Admin response message
+ */
+async function sendAppealResolvedNotification(userId, approved, response) {
+  const userDoc = await admin.firestore().collection('users').doc(userId).get();
+
+  if (!userDoc.exists) {
+    functions.logger.error('User not found for appeal resolution notification', { userId });
+    return;
+  }
+
+  const user = userDoc.data();
+  const fcmToken = user.fcmToken;
+
+  if (!fcmToken) {
+    functions.logger.info('No FCM token for user', { userId });
+    return;
+  }
+
+  const title = approved ? "✅ Appeal Approved" : "❌ Appeal Denied";
+  const body = approved
+    ? "Your appeal has been approved. Your account access has been restored."
+    : response || "Your appeal has been reviewed and denied.";
+
+  const notification = {
+    title: title,
+    body: body,
+    sound: 'default',
+    badge: 1,
+    category: 'APPEAL_RESULT',
+    data: {
+      type: 'appeal_resolved',
+      approved: approved,
+      response: response
+    }
+  };
+
+  await sendPushNotification(fcmToken, notification);
+
+  // Log the notification
+  await admin.firestore().collection('notification_logs').add({
+    userId,
+    type: 'appeal_resolved',
+    approved: approved,
+    response: response,
+    sentAt: admin.firestore.FieldValue.serverTimestamp(),
+    delivered: true
+  });
+
+  functions.logger.info('Appeal resolution notification sent', { userId, approved });
+}
+
 module.exports = {
   sendPushNotification,
   sendMatchNotification,
@@ -850,5 +905,6 @@ module.exports = {
   sendSuspensionNotification,
   sendBanNotification,
   sendReportResolvedNotification,
-  sendIDVerificationRejectionNotification
+  sendIDVerificationRejectionNotification,
+  sendAppealResolvedNotification
 };

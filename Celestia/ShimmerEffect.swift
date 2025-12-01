@@ -341,6 +341,41 @@ struct SuspiciousProfilesLoadingView: View {
     }
 }
 
+// MARK: - Appeals Loading View
+
+struct AppealsLoadingView: View {
+    var body: some View {
+        List {
+            ForEach(0..<5) { index in
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        SkeletonShape(width: 100, height: 24, cornerRadius: 6)
+                        Spacer()
+                        SkeletonShape(width: 60, height: 14)
+                    }
+
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(Color(.systemGray5))
+                            .frame(width: 40, height: 40)
+                            .skeletonShimmer(delay: Double(index) * 0.1)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            SkeletonShape(width: 120, height: 16)
+                            SkeletonShape(width: 80, height: 12)
+                        }
+                    }
+
+                    SkeletonShape(height: 40, cornerRadius: 8)
+                        .padding(.top, 4)
+                }
+                .padding(.vertical, 4)
+            }
+        }
+        .listStyle(.plain)
+    }
+}
+
 // MARK: - Preview
 
 #Preview("Profile Card Skeleton") {
