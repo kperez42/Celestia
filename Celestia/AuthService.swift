@@ -1195,7 +1195,8 @@ class AuthService: ObservableObject, AuthServiceProtocol {
 
     /// Optimizes an image for upload: crops to 3:4 portrait ratio, resizes to max 2000px, 95% JPEG quality
     /// This ensures images display perfectly in cards without distortion or unexpected cropping
-    private func optimizeImageForUpload(_ image: UIImage) -> UIImage {
+    /// Note: nonisolated because this is a pure function with no actor-isolated state access
+    nonisolated private func optimizeImageForUpload(_ image: UIImage) -> UIImage {
         // QUALITY: Higher settings for crisp photos on all card sizes
         let maxDimension: CGFloat = 2000  // High resolution for crisp display on all devices
         let targetAspectRatio: CGFloat = 3.0 / 4.0  // Portrait ratio (0.75) - perfect for profile cards
