@@ -684,6 +684,7 @@ struct MatchesView: View {
             }
 
             // PERFORMANCE FIX: Batch fetch all user data instead of N+1 queries
+            // Uses centralized UserService.fetchUsersBatched which runs queries in parallel
             // IMPORTANT: Always fetch fresh user data to ensure status is up-to-date
             let userIdsToFetch = matchService.matches
                 .map { match in
@@ -691,16 +692,12 @@ struct MatchesView: View {
                 }
 
             if !userIdsToFetch.isEmpty {
-                // Batch fetch users in chunks of 10 (Firestore 'in' query limit)
-                let fetchedUsers = try await batchFetchUsers(userIds: userIdsToFetch)
+                // Use centralized batch fetch (parallel queries for better performance)
+                let fetchedUsers = try await userService.fetchUsersBatched(ids: userIdsToFetch)
 
                 await MainActor.run {
                     // Update cache with fresh user data (including current online status)
-                    for user in fetchedUsers {
-                        if let userId = user.id {
-                            matchedUsers[userId] = user
-                        }
-                    }
+                    matchedUsers = fetchedUsers
                 }
             }
         } catch {
@@ -723,45 +720,6 @@ struct MatchesView: View {
         return matchedUsers[otherUserId]
     }
 
-    /// PERFORMANCE: Batch fetch users to prevent N+1 queries
-    /// Firestore 'in' queries support up to 10 values, so we chunk the requests
-    private func batchFetchUsers(userIds: [String]) async throws -> [User] {
-        guard !userIds.isEmpty else { return [] }
-
-        let db = Firestore.firestore()
-        var allUsers: [User] = []
-
-        // Firestore 'in' query limit is 10, so chunk the user IDs
-        let chunks = userIds.chunked(into: 10)
-
-        for chunk in chunks {
-            do {
-                let snapshot = try await db.collection("users")
-                    .whereField(FieldPath.documentID(), in: chunk)
-                    .getDocuments()
-
-                let users = snapshot.documents.compactMap { doc -> User? in
-                    try? doc.data(as: User.self)
-                }
-
-                allUsers.append(contentsOf: users)
-
-                Logger.shared.debug(
-                    "Batch fetched \(users.count) users from chunk of \(chunk.count) IDs",
-                    category: .matching
-                )
-            } catch {
-                Logger.shared.error(
-                    "Failed to batch fetch user chunk",
-                    category: .matching,
-                    error: error
-                )
-                // Continue with other chunks even if one fails
-            }
-        }
-
-        return allUsers
-    }
 }
 
 // MARK: - Match Card Row

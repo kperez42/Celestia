@@ -152,6 +152,40 @@ class UserService: ObservableObject, UserServiceProtocol {
             throw error
         }
     }
+
+    /// PERFORMANCE: Batch fetch users by IDs (reduces N queries to ceil(N/10) queries)
+    /// Uses Firestore's whereIn limitation of 10 items per query
+    func fetchUsersBatched(ids: [String]) async throws -> [String: User] {
+        guard !ids.isEmpty else { return [:] }
+
+        var users: [String: User] = [:]
+        let uniqueIds = Array(Set(ids)) // Remove duplicates
+        let chunks = uniqueIds.chunked(into: 10) // Firestore whereIn limit
+
+        // Run batch queries in parallel for better performance
+        try await withThrowingTaskGroup(of: [User].self) { group in
+            for chunk in chunks {
+                group.addTask {
+                    let snapshot = try await self.db.collection("users")
+                        .whereField(FieldPath.documentID(), in: chunk)
+                        .getDocuments()
+
+                    return snapshot.documents.compactMap { try? $0.data(as: User.self) }
+                }
+            }
+
+            for try await chunkUsers in group {
+                for user in chunkUsers {
+                    if let userId = user.id {
+                        users[userId] = user
+                    }
+                }
+            }
+        }
+
+        Logger.shared.debug("Batch fetched \(users.count) users from \(uniqueIds.count) IDs", category: .performance)
+        return users
+    }
     
     /// Update user profile
     func updateUser(_ user: User) async throws {
