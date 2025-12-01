@@ -25,77 +25,72 @@ struct AdminModerationDashboard: View {
     ]
 
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Enhanced Tab selector with icons, badges, and smooth animations
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
-                            AdminTabButton(
-                                tab: tab,
-                                isSelected: selectedTab == index,
-                                badgeCount: getBadgeCount(for: index),
-                                namespace: tabAnimation
-                            ) {
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
-                                    selectedTab = index
-                                }
-                                HapticManager.shared.impact(.light)
+        VStack(spacing: 0) {
+            // Enhanced Tab selector with icons, badges, and smooth animations
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
+                        AdminTabButton(
+                            tab: tab,
+                            isSelected: selectedTab == index,
+                            badgeCount: getBadgeCount(for: index),
+                            namespace: tabAnimation
+                        ) {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                                selectedTab = index
                             }
+                            HapticManager.shared.impact(.light)
                         }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 4)
                 }
-                .padding(.vertical, 12)
-                .background(
-                    // Frosted glass effect background
-                    Rectangle()
-                        .fill(.ultraThinMaterial)
-                        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
-                )
-                .overlay(alignment: .bottom) {
-                    // Subtle separator line
-                    Rectangle()
-                        .fill(Color(.separator).opacity(0.3))
-                        .frame(height: 0.5)
-                }
-
-                // Content with smooth transitions
-                TabView(selection: $selectedTab) {
-                    pendingProfilesView
-                        .tag(0)
-
-                    reportsListView
-                        .tag(1)
-
-                    suspiciousProfilesView
-                        .tag(2)
-
-                    idVerificationReviewView
-                        .tag(3)
-
-                    statsView
-                        .tag(4)
-                }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                .animation(.easeInOut(duration: 0.25), value: selectedTab)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 4)
             }
-            .navigationTitle("Moderation")
-            .navigationBarTitleDisplayMode(.inline)
-            .navigationBarHidden(true)
-            .task {
-                await viewModel.loadQueue()
+            .padding(.vertical, 12)
+            .background(
+                // Frosted glass effect background
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+            )
+            .overlay(alignment: .bottom) {
+                // Subtle separator line
+                Rectangle()
+                    .fill(Color(.separator).opacity(0.3))
+                    .frame(height: 0.5)
             }
-            .onAppear {
-                viewModel.startListeningToAlerts()
+
+            // Content with smooth transitions
+            TabView(selection: $selectedTab) {
+                pendingProfilesView
+                    .tag(0)
+
+                reportsListView
+                    .tag(1)
+
+                suspiciousProfilesView
+                    .tag(2)
+
+                idVerificationReviewView
+                    .tag(3)
+
+                statsView
+                    .tag(4)
             }
-            .onDisappear {
-                viewModel.stopListeningToAlerts()
-            }
-            .sheet(isPresented: $showingAlerts) {
-                AdminAlertsSheet(viewModel: viewModel)
-            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .animation(.easeInOut(duration: 0.25), value: selectedTab)
+        }
+        .task {
+            await viewModel.loadQueue()
+        }
+        .onAppear {
+            viewModel.startListeningToAlerts()
+        }
+        .onDisappear {
+            viewModel.stopListeningToAlerts()
+        }
+        .sheet(isPresented: $showingAlerts) {
+            AdminAlertsSheet(viewModel: viewModel)
         }
     }
 

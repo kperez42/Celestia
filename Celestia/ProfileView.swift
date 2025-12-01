@@ -14,9 +14,6 @@ struct ProfileView: View {
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
 
-    // When true, ProfileView is embedded in another NavigationStack (no nested nav)
-    var isEmbedded: Bool = false
-
     @State private var showingEditProfile = false
     @State private var showingSettings = false
     @State private var showingPremiumUpgrade = false
@@ -47,15 +44,9 @@ struct ProfileView: View {
     }()
 
     var body: some View {
-        if isEmbedded {
-            profileContent
-                .networkStatusBanner()
-        } else {
-            NavigationStack {
-                profileContent
-            }
+        // No NavigationStack wrapper - this is a standalone tab
+        profileContent
             .networkStatusBanner()
-        }
     }
 
     private var profileContent: some View {
@@ -195,9 +186,6 @@ struct ProfileView: View {
                     profileLoadingView
                 }
             }
-            .navigationTitle(isEmbedded ? "Your Profile" : "")
-            .navigationBarTitleDisplayMode(.inline)
-            .navigationBarHidden(!isEmbedded)
             .accessibilityIdentifier(AccessibilityIdentifier.profileView)
             .sheet(isPresented: $showingEditProfile, onDismiss: {
                 // CACHE FIX: Force refresh profile data when returning from edit
