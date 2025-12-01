@@ -100,6 +100,17 @@ struct MainTabView: View {
             // Verify user is still authenticated after delay
             guard authService.currentUser?.id == userId else { return }
 
+            // PUSH NOTIFICATIONS: Initialize and request permissions
+            await PushNotificationManager.shared.initialize()
+            let granted = await PushNotificationManager.shared.requestAuthorization()
+            if granted {
+                Logger.shared.info("Push notifications enabled for user", category: .general)
+                // Save FCM token to user profile for backend notifications
+                if let fcmToken = PushNotificationManager.shared.fcmToken {
+                    await NotificationService.shared.saveFCMToken(userId: userId, token: fcmToken)
+                }
+            }
+
             // Set up real-time listener for matches
             // AUDIT FIX: This single listener now handles both:
             // - Match updates (for newMatchesCount)

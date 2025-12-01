@@ -22,6 +22,11 @@ enum NotificationCategory: String, CaseIterable, Codable {
     case generalUpdate = "GENERAL_UPDATE"
     case matchReminder = "MATCH_REMINDER"
     case messageReminder = "MESSAGE_REMINDER"
+    // Admin notification categories
+    case adminNewReport = "ADMIN_NEW_REPORT"
+    case adminNewAccount = "ADMIN_NEW_ACCOUNT"
+    case adminIdVerification = "ADMIN_ID_VERIFICATION"
+    case adminSuspiciousActivity = "ADMIN_SUSPICIOUS_ACTIVITY"
 
     var identifier: String {
         return rawValue
@@ -45,6 +50,15 @@ enum NotificationCategory: String, CaseIterable, Codable {
             return "Match Reminder"
         case .messageReminder:
             return "Message Reminder"
+        // Admin notifications
+        case .adminNewReport:
+            return "New Report"
+        case .adminNewAccount:
+            return "New Account"
+        case .adminIdVerification:
+            return "ID Verification"
+        case .adminSuspiciousActivity:
+            return "Suspicious Activity"
         }
     }
 
@@ -177,6 +191,64 @@ enum NotificationCategory: String, CaseIterable, Codable {
                     options: .foreground
                 )
             ]
+        // Admin notification actions
+        case .adminNewReport:
+            return [
+                UNNotificationAction(
+                    identifier: "VIEW_REPORT",
+                    title: "View Report",
+                    options: .foreground
+                ),
+                UNNotificationAction(
+                    identifier: "DISMISS_REPORT",
+                    title: "Dismiss",
+                    options: []
+                )
+            ]
+        case .adminNewAccount:
+            return [
+                UNNotificationAction(
+                    identifier: "REVIEW_ACCOUNT",
+                    title: "Review Account",
+                    options: .foreground
+                ),
+                UNNotificationAction(
+                    identifier: "APPROVE_ACCOUNT",
+                    title: "Approve",
+                    options: [.authenticationRequired]
+                )
+            ]
+        case .adminIdVerification:
+            return [
+                UNNotificationAction(
+                    identifier: "REVIEW_ID",
+                    title: "Review ID",
+                    options: .foreground
+                ),
+                UNNotificationAction(
+                    identifier: "APPROVE_ID",
+                    title: "Approve",
+                    options: [.authenticationRequired]
+                ),
+                UNNotificationAction(
+                    identifier: "REJECT_ID",
+                    title: "Reject",
+                    options: [.destructive, .authenticationRequired]
+                )
+            ]
+        case .adminSuspiciousActivity:
+            return [
+                UNNotificationAction(
+                    identifier: "INVESTIGATE",
+                    title: "Investigate",
+                    options: .foreground
+                ),
+                UNNotificationAction(
+                    identifier: "BAN_USER",
+                    title: "Ban User",
+                    options: [.destructive, .authenticationRequired]
+                )
+            ]
         }
     }
 
@@ -193,6 +265,9 @@ enum NotificationCategory: String, CaseIterable, Codable {
             return [.customDismissAction]
         case .matchReminder, .generalUpdate:
             return [.customDismissAction]
+        // Admin notifications - high priority with sound
+        case .adminNewReport, .adminNewAccount, .adminIdVerification, .adminSuspiciousActivity:
+            return [.customDismissAction, .allowAnnouncement]
         }
     }
 
@@ -213,6 +288,15 @@ enum NotificationCategory: String, CaseIterable, Codable {
             return "reminders"
         case .generalUpdate:
             return "updates"
+        // Admin notifications
+        case .adminNewReport:
+            return "reports"
+        case .adminNewAccount:
+            return "accounts"
+        case .adminIdVerification:
+            return "verifications"
+        case .adminSuspiciousActivity:
+            return "alerts"
         }
     }
 }
@@ -227,6 +311,11 @@ enum NotificationPayload {
     case premiumOffer(title: String, body: String)
     case matchReminder(matchName: String, matchId: String, imageURL: URL?)
     case messageReminder(matchName: String, matchId: String, imageURL: URL?)
+    // Admin notifications
+    case adminNewReport(reporterName: String, reportedName: String, reason: String, reportId: String)
+    case adminNewAccount(userName: String, userId: String, photoURL: URL?)
+    case adminIdVerification(userName: String, userId: String, idType: String, photoURL: URL?)
+    case adminSuspiciousActivity(userName: String, userId: String, activityType: String, riskScore: Int)
 
     var category: NotificationCategory {
         switch self {
@@ -244,6 +333,14 @@ enum NotificationPayload {
             return .matchReminder
         case .messageReminder:
             return .messageReminder
+        case .adminNewReport:
+            return .adminNewReport
+        case .adminNewAccount:
+            return .adminNewAccount
+        case .adminIdVerification:
+            return .adminIdVerification
+        case .adminSuspiciousActivity:
+            return .adminSuspiciousActivity
         }
     }
 
@@ -263,6 +360,15 @@ enum NotificationPayload {
             return "Say hi to \(matchName)!"
         case .messageReminder(let matchName, _, _):
             return "Reply to \(matchName)"
+        // Admin notifications
+        case .adminNewReport(_, let reportedName, _, _):
+            return "New Report: \(reportedName)"
+        case .adminNewAccount(let userName, _, _):
+            return "New Account: \(userName)"
+        case .adminIdVerification(let userName, _, let idType, _):
+            return "ID Verification: \(userName) (\(idType))"
+        case .adminSuspiciousActivity(let userName, _, let activityType, _):
+            return "Alert: \(activityType) - \(userName)"
         }
     }
 
@@ -282,6 +388,15 @@ enum NotificationPayload {
             return "Don't let this match expire"
         case .messageReminder:
             return "They're waiting for your response"
+        // Admin notifications
+        case .adminNewReport(let reporterName, _, let reason, _):
+            return "Reported by \(reporterName): \(reason)"
+        case .adminNewAccount:
+            return "A new account needs review"
+        case .adminIdVerification:
+            return "ID verification request pending review"
+        case .adminSuspiciousActivity(_, _, _, let riskScore):
+            return "Risk score: \(riskScore)/100 - Tap to investigate"
         }
     }
 
@@ -295,6 +410,12 @@ enum NotificationPayload {
              .messageReminder(_, _, let url):
             return url
         case .premiumOffer:
+            return nil
+        // Admin notifications
+        case .adminNewAccount(_, _, let url),
+             .adminIdVerification(_, _, _, let url):
+            return url
+        case .adminNewReport, .adminSuspiciousActivity:
             return nil
         }
     }
@@ -324,6 +445,28 @@ enum NotificationPayload {
         case .messageReminder(let matchName, let matchId, _):
             info["matchName"] = matchName
             info["matchId"] = matchId
+        // Admin notifications
+        case .adminNewReport(let reporterName, let reportedName, let reason, let reportId):
+            info["reporterName"] = reporterName
+            info["reportedName"] = reportedName
+            info["reason"] = reason
+            info["reportId"] = reportId
+            info["isAdmin"] = true
+        case .adminNewAccount(let userName, let userId, _):
+            info["userName"] = userName
+            info["userId"] = userId
+            info["isAdmin"] = true
+        case .adminIdVerification(let userName, let userId, let idType, _):
+            info["userName"] = userName
+            info["userId"] = userId
+            info["idType"] = idType
+            info["isAdmin"] = true
+        case .adminSuspiciousActivity(let userName, let userId, let activityType, let riskScore):
+            info["userName"] = userName
+            info["userId"] = userId
+            info["activityType"] = activityType
+            info["riskScore"] = riskScore
+            info["isAdmin"] = true
         }
 
         if let url = imageURL {
@@ -476,6 +619,9 @@ class NotificationPreferences: ObservableObject {
             return matchRemindersEnabled
         case .messageReminder:
             return messageRemindersEnabled
+        // Admin notifications are always enabled for admin users
+        case .adminNewReport, .adminNewAccount, .adminIdVerification, .adminSuspiciousActivity:
+            return true
         }
     }
 

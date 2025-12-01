@@ -14,40 +14,73 @@ struct AdminModerationDashboard: View {
     @State private var selectedTab = 0
     @State private var showingAlerts = false
 
+    // Tab configuration with icons and colors
+    private let tabs: [(name: String, icon: String, color: Color)] = [
+        ("New", "person.badge.plus", .blue),
+        ("Reports", "exclamationmark.triangle.fill", .orange),
+        ("Suspicious", "eye.trianglebadge.exclamationmark", .red),
+        ("ID Review", "person.text.rectangle", .purple),
+        ("Stats", "chart.bar.fill", .green)
+    ]
+
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Tab selector - scrollable for more tabs
+                // Enhanced Tab selector with icons and badges
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(["New", "Reports", "Suspicious", "ID Review", "Stats"], id: \.self) { tab in
-                            let index = ["New", "Reports", "Suspicious", "ID Review", "Stats"].firstIndex(of: tab) ?? 0
-                            Button(action: { selectedTab = index }) {
-                                Text(tab)
-                                    .font(.subheadline.weight(.medium))
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 8)
-                                    .background(selectedTab == index ? Color.blue : Color(.systemGray5))
-                                    .foregroundColor(selectedTab == index ? .white : .primary)
-                                    .cornerRadius(8)
+                    HStack(spacing: 10) {
+                        ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
+                            Button(action: {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                    selectedTab = index
+                                }
+                                HapticManager.shared.impact(.light)
+                            }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: tab.icon)
+                                        .font(.caption.weight(.semibold))
+                                    Text(tab.name)
+                                        .font(.subheadline.weight(.medium))
+                                }
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 10)
+                                .background(
+                                    Group {
+                                        if selectedTab == index {
+                                            LinearGradient(
+                                                colors: [tab.color, tab.color.opacity(0.8)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        } else {
+                                            Color(.systemGray5)
+                                        }
+                                    }
+                                )
+                                .foregroundColor(selectedTab == index ? .white : .primary)
+                                .cornerRadius(12)
+                                .shadow(color: selectedTab == index ? tab.color.opacity(0.3) : .clear, radius: 4, y: 2)
                             }
-                            // Show badge for pending accounts
+                            // Show badge counts for relevant tabs
                             .overlay(alignment: .topTrailing) {
-                                if tab == "New" && viewModel.pendingProfiles.count > 0 {
-                                    Text("\(viewModel.pendingProfiles.count)")
+                                let badgeCount = getBadgeCount(for: index)
+                                if badgeCount > 0 {
+                                    Text("\(badgeCount)")
                                         .font(.caption2.bold())
                                         .foregroundColor(.white)
-                                        .padding(4)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
                                         .background(Color.red)
-                                        .clipShape(Circle())
-                                        .offset(x: 6, y: -6)
+                                        .clipShape(Capsule())
+                                        .offset(x: 8, y: -8)
                                 }
                             }
                         }
                     }
                     .padding(.horizontal)
                 }
-                .padding(.vertical, 8)
+                .padding(.vertical, 10)
+                .background(Color(.systemBackground))
 
                 // Content
                 Group {
@@ -109,6 +142,18 @@ struct AdminModerationDashboard: View {
             .sheet(isPresented: $showingAlerts) {
                 AdminAlertsSheet(viewModel: viewModel)
             }
+        }
+    }
+
+    // MARK: - Badge Count Helper
+
+    private func getBadgeCount(for tabIndex: Int) -> Int {
+        switch tabIndex {
+        case 0: return viewModel.pendingProfiles.count  // New accounts
+        case 1: return viewModel.reports.count          // Reports
+        case 2: return viewModel.suspiciousProfiles.count // Suspicious
+        case 3: return 0  // ID Review count comes from embedded view
+        default: return 0
         }
     }
 
