@@ -530,6 +530,23 @@ class NotificationPreferences: ObservableObject {
         didSet { save() }
     }
 
+    // Admin notifications (only relevant for admin users)
+    @Published var adminNewAccountsEnabled: Bool {
+        didSet { save() }
+    }
+
+    @Published var adminReportsEnabled: Bool {
+        didSet { save() }
+    }
+
+    @Published var adminIdVerificationEnabled: Bool {
+        didSet { save() }
+    }
+
+    @Published var adminSuspiciousActivityEnabled: Bool {
+        didSet { save() }
+    }
+
     @Published var quietHoursEnabled: Bool {
         didSet { save() }
     }
@@ -568,6 +585,10 @@ class NotificationPreferences: ObservableObject {
         static let accountStatusEnabled = "notif_account_status"
         static let accountWarningsEnabled = "notif_account_warnings"
         static let verificationUpdatesEnabled = "notif_verification_updates"
+        static let adminNewAccountsEnabled = "notif_admin_new_accounts"
+        static let adminReportsEnabled = "notif_admin_reports"
+        static let adminIdVerificationEnabled = "notif_admin_id_verification"
+        static let adminSuspiciousActivityEnabled = "notif_admin_suspicious_activity"
         static let quietHoursEnabled = "notif_quiet_hours_enabled"
         static let quietHoursStart = "notif_quiet_hours_start"
         static let quietHoursEnd = "notif_quiet_hours_end"
@@ -591,6 +612,10 @@ class NotificationPreferences: ObservableObject {
         self.accountStatusEnabled = UserDefaults.standard.bool(forKey: Keys.accountStatusEnabled, default: true)
         self.accountWarningsEnabled = UserDefaults.standard.bool(forKey: Keys.accountWarningsEnabled, default: true)
         self.verificationUpdatesEnabled = UserDefaults.standard.bool(forKey: Keys.verificationUpdatesEnabled, default: true)
+        self.adminNewAccountsEnabled = UserDefaults.standard.bool(forKey: Keys.adminNewAccountsEnabled, default: true)
+        self.adminReportsEnabled = UserDefaults.standard.bool(forKey: Keys.adminReportsEnabled, default: true)
+        self.adminIdVerificationEnabled = UserDefaults.standard.bool(forKey: Keys.adminIdVerificationEnabled, default: true)
+        self.adminSuspiciousActivityEnabled = UserDefaults.standard.bool(forKey: Keys.adminSuspiciousActivityEnabled, default: true)
         self.quietHoursEnabled = UserDefaults.standard.bool(forKey: Keys.quietHoursEnabled, default: false)
         self.soundEnabled = UserDefaults.standard.bool(forKey: Keys.soundEnabled, default: true)
         self.vibrationEnabled = UserDefaults.standard.bool(forKey: Keys.vibrationEnabled, default: true)
@@ -638,9 +663,15 @@ class NotificationPreferences: ObservableObject {
             return matchRemindersEnabled
         case .messageReminder:
             return messageRemindersEnabled
-        // Admin notifications are always enabled for admin users
-        case .adminNewReport, .adminNewAccount, .adminIdVerification, .adminSuspiciousActivity:
-            return true
+        // Admin notifications - controlled by admin preferences
+        case .adminNewReport:
+            return adminReportsEnabled
+        case .adminNewAccount:
+            return adminNewAccountsEnabled
+        case .adminIdVerification:
+            return adminIdVerificationEnabled
+        case .adminSuspiciousActivity:
+            return adminSuspiciousActivityEnabled
         }
     }
 
@@ -678,6 +709,10 @@ class NotificationPreferences: ObservableObject {
         accountStatusEnabled = true
         accountWarningsEnabled = true
         verificationUpdatesEnabled = true
+        adminNewAccountsEnabled = true
+        adminReportsEnabled = true
+        adminIdVerificationEnabled = true
+        adminSuspiciousActivityEnabled = true
     }
 
     func disableAll() {
@@ -705,6 +740,10 @@ class NotificationPreferences: ObservableObject {
         accountStatusEnabled = true
         accountWarningsEnabled = true
         verificationUpdatesEnabled = true
+        adminNewAccountsEnabled = true
+        adminReportsEnabled = true
+        adminIdVerificationEnabled = true
+        adminSuspiciousActivityEnabled = true
         quietHoursEnabled = false
         soundEnabled = true
         vibrationEnabled = true
@@ -725,6 +764,10 @@ class NotificationPreferences: ObservableObject {
         UserDefaults.standard.set(accountStatusEnabled, forKey: Keys.accountStatusEnabled)
         UserDefaults.standard.set(accountWarningsEnabled, forKey: Keys.accountWarningsEnabled)
         UserDefaults.standard.set(verificationUpdatesEnabled, forKey: Keys.verificationUpdatesEnabled)
+        UserDefaults.standard.set(adminNewAccountsEnabled, forKey: Keys.adminNewAccountsEnabled)
+        UserDefaults.standard.set(adminReportsEnabled, forKey: Keys.adminReportsEnabled)
+        UserDefaults.standard.set(adminIdVerificationEnabled, forKey: Keys.adminIdVerificationEnabled)
+        UserDefaults.standard.set(adminSuspiciousActivityEnabled, forKey: Keys.adminSuspiciousActivityEnabled)
         UserDefaults.standard.set(quietHoursEnabled, forKey: Keys.quietHoursEnabled)
         UserDefaults.standard.set(soundEnabled, forKey: Keys.soundEnabled)
         UserDefaults.standard.set(vibrationEnabled, forKey: Keys.vibrationEnabled)

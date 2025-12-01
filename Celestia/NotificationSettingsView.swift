@@ -248,12 +248,63 @@ struct NotificationSettingsView: View {
                     }
                 }
             }
+
+            // Admin Moderation Notifications (only visible for admin users)
+            if isAdminUser {
+                Section {
+                    NotificationToggle(
+                        icon: "person.badge.plus.fill",
+                        title: "New Accounts",
+                        description: "Get notified when new accounts need review",
+                        isOn: $preferences.adminNewAccountsEnabled
+                    )
+
+                    NotificationToggle(
+                        icon: "exclamationmark.triangle.fill",
+                        title: "User Reports",
+                        description: "Get notified about new user reports",
+                        isOn: $preferences.adminReportsEnabled
+                    )
+
+                    NotificationToggle(
+                        icon: "person.text.rectangle.fill",
+                        title: "ID Verifications",
+                        description: "Get notified about pending ID verifications",
+                        isOn: $preferences.adminIdVerificationEnabled
+                    )
+
+                    NotificationToggle(
+                        icon: "eye.trianglebadge.exclamationmark.fill",
+                        title: "Suspicious Activity",
+                        description: "Get notified about suspicious account activity",
+                        isOn: $preferences.adminSuspiciousActivityEnabled
+                    )
+                } header: {
+                    HStack {
+                        Image(systemName: "shield.checkered")
+                            .foregroundColor(.red)
+                        Text("Admin Moderation")
+                    }
+                } footer: {
+                    Text("These notifications help you stay on top of moderation tasks.")
+                }
+            }
         }
         .navigationTitle("Notifications")
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await pushManager.checkPermissionStatus()
         }
+    }
+
+    // MARK: - Admin Check
+
+    private var isAdminUser: Bool {
+        guard let user = AuthService.shared.currentUser else { return false }
+        if user.isAdmin { return true }
+        // Fallback to email whitelist
+        let adminEmails = ["perezkevin640@gmail.com", "admin@celestia.app"]
+        return adminEmails.contains(user.email.lowercased())
     }
 }
 
