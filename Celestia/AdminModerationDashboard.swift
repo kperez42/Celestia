@@ -1769,6 +1769,11 @@ struct PendingProfileCard: View {
     @State private var currentPhotoIndex = 0
     @State private var showPhotoGallery = false
 
+    // Admin comment flow
+    @State private var selectedRejectionReason: ProfileRejectionReason?
+    @State private var showAdminCommentSheet = false
+    @State private var adminComment = ""
+
     // Fixed height for consistent card sizing
     private let photoHeight: CGFloat = 280
 
@@ -1987,54 +1992,243 @@ struct PendingProfileCard: View {
         .confirmationDialog("Reject Profile", isPresented: $showRejectAlert, titleVisibility: .visible) {
             // Photo Issues
             Button("📸 No Clear Face Photo", role: .destructive) {
-                rejectWithReason(ProfileRejectionReason.noFacePhoto)
+                selectReasonAndShowComment(.noFacePhoto)
             }
             Button("📷 Low Quality Photos", role: .destructive) {
-                rejectWithReason(ProfileRejectionReason.lowQualityPhotos)
+                selectReasonAndShowComment(.lowQualityPhotos)
             }
             Button("🔍 Fake/Stock Photos", role: .destructive) {
-                rejectWithReason(ProfileRejectionReason.fakePhotos)
+                selectReasonAndShowComment(.fakePhotos)
             }
             Button("🚫 Inappropriate Content", role: .destructive) {
-                rejectWithReason(ProfileRejectionReason.inappropriatePhotos)
+                selectReasonAndShowComment(.inappropriatePhotos)
             }
             // Bio Issues
             Button("✏️ Incomplete Bio", role: .destructive) {
-                rejectWithReason(ProfileRejectionReason.incompleteBio)
+                selectReasonAndShowComment(.incompleteBio)
             }
             Button("📵 Contact Info in Bio", role: .destructive) {
-                rejectWithReason(ProfileRejectionReason.contactInfoInBio)
+                selectReasonAndShowComment(.contactInfoInBio)
             }
             // Account Issues
             Button("🔞 Suspected Underage", role: .destructive) {
-                rejectWithReason(ProfileRejectionReason.underage)
+                selectReasonAndShowComment(.underage)
             }
             Button("📢 Spam/Promotional", role: .destructive) {
-                rejectWithReason(ProfileRejectionReason.spam)
+                selectReasonAndShowComment(.spam)
             }
             Button("⚠️ Offensive Content", role: .destructive) {
-                rejectWithReason(ProfileRejectionReason.offensiveContent)
+                selectReasonAndShowComment(.offensiveContent)
             }
             Button("👥 Multiple Accounts", role: .destructive) {
-                rejectWithReason(ProfileRejectionReason.multipleAccounts)
+                selectReasonAndShowComment(.multipleAccounts)
             }
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("Select why \(profile.name)'s profile needs changes")
         }
+        // Admin Comment Sheet (optional note before rejecting)
+        .sheet(isPresented: $showAdminCommentSheet) {
+            AdminRejectCommentSheet(
+                profileName: profile.name,
+                reason: selectedRejectionReason,
+                adminComment: $adminComment,
+                isRejecting: $isRejecting,
+                onSubmit: {
+                    submitRejection()
+                },
+                onCancel: {
+                    adminComment = ""
+                    selectedRejectionReason = nil
+                }
+            )
+        }
     }
 
-    private func rejectWithReason(_ reason: ProfileRejectionReason) {
+    /// Select a rejection reason and show the optional admin comment sheet
+    private func selectReasonAndShowComment(_ reason: ProfileRejectionReason) {
+        selectedRejectionReason = reason
+        adminComment = ""
+        showAdminCommentSheet = true
+    }
+
+    /// Submit the rejection with optional admin comment
+    private func submitRejection() {
+        guard let reason = selectedRejectionReason else { return }
         Task {
             isRejecting = true
+
+            // Build fix instructions - add admin comment if provided
+            var finalInstructions = reason.fixInstructions
+            if !adminComment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                finalInstructions += "\n\n📝 Additional Note from Admin:\n\(adminComment)"
+            }
+
             try? await viewModel.rejectProfile(
                 userId: profile.id,
                 reasonCode: reason.code,
                 reasonMessage: reason.userMessage,
-                fixInstructions: reason.fixInstructions
+                fixInstructions: finalInstructions
             )
+
             isRejecting = false
+            adminComment = ""
+            selectedRejectionReason = nil
         }
+    }
+
+}
+
+// MARK: - Admin Reject Comment Sheet
+
+/// Sheet for adding optional admin comment before rejecting a profile
+struct AdminRejectCommentSheet: View {
+    let profileName: String
+    let reason: ProfileRejectionReason?
+    @Binding var adminComment: String
+    @Binding var isRejecting: Bool
+    let onSubmit: () -> Void
+    let onCancel: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @FocusState private var isTextFieldFocused: Bool
+
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 20) {
+                // Reason summary card
+                if let reason = reason {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.orange)
+                            Text("Rejection Reason")
+                                .font(.headline)
+                        }
+
+                        Text(reason.userMessage)
+                            .font(.subheadline)
+                            .foregroundColor(.primary)
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.orange.opacity(0.1))
+                            .cornerRadius(12)
+                    }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(16)
+                }
+
+                // Admin comment input
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Image(systemName: "pencil.and.scribble")
+                            .foregroundColor(.blue)
+                        Text("Admin Comment")
+                            .font(.headline)
+                        Text("(Optional)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Text("Add a personal note for \(profileName). Leave blank to use only the standard message.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    TextEditor(text: $adminComment)
+                        .focused($isTextFieldFocused)
+                        .frame(minHeight: 120, maxHeight: 200)
+                        .padding(12)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .strokeBorder(Color(.separator), lineWidth: 1)
+                        )
+                        .overlay(alignment: .topLeading) {
+                            if adminComment.isEmpty {
+                                Text("e.g., \"Please upload a photo without sunglasses\" or \"Your main photo should be just you, not a group photo\"")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary.opacity(0.6))
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 20)
+                                    .allowsHitTesting(false)
+                            }
+                        }
+                }
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(16)
+
+                Spacer()
+
+                // Action buttons
+                VStack(spacing: 12) {
+                    // Reject button
+                    Button(action: {
+                        dismiss()
+                        onSubmit()
+                    }) {
+                        HStack(spacing: 10) {
+                            if isRejecting {
+                                ProgressView()
+                                    .tint(.white)
+                            } else {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.title3)
+                                Text(adminComment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Reject Profile" : "Reject with Comment")
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            LinearGradient(
+                                colors: [.red, .red.opacity(0.85)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .cornerRadius(14)
+                        .shadow(color: .red.opacity(0.3), radius: 8, y: 4)
+                    }
+                    .disabled(isRejecting)
+
+                    // Cancel button
+                    Button(action: {
+                        dismiss()
+                        onCancel()
+                    }) {
+                        Text("Cancel")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundColor(.secondary)
+                    }
+                    .disabled(isRejecting)
+                }
+            }
+            .padding()
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("Reject \(profileName)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                        onCancel()
+                    }
+                    .disabled(isRejecting)
+                }
+            }
+            .onAppear {
+                // Auto-focus the text field
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    isTextFieldFocused = true
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 }
 
