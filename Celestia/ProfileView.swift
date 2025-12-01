@@ -1357,6 +1357,10 @@ struct ProfileView: View {
     
     // MARK: - Photo Gallery
 
+    /// Fixed dimensions for gallery thumbnails - 3:4 aspect ratio for consistency
+    private static let galleryThumbnailWidth: CGFloat = 150
+    private static let galleryThumbnailHeight: CGFloat = 200
+
     private func photoGallerySection(photos: [String]) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             // Photo count badge
@@ -1387,7 +1391,7 @@ struct ProfileView: View {
             }
             .padding(.horizontal, 20)
 
-            // Photo gallery scroll view
+            // Photo gallery scroll view with high-quality images
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     ForEach(photos.indices, id: \.self) { index in
@@ -1396,15 +1400,15 @@ struct ProfileView: View {
                             showingPhotoViewer = true
                             HapticManager.shared.impact(.light)
                         } label: {
-                            CachedAsyncImage(url: URL(string: photos[index])) { image in
-                                image
-                                    .resizable()
-                                    .interpolation(.high)
-                                    .antialiased(true)
-                                    .aspectRatio(contentMode: .fill)
-                            }
-                            .frame(width: 150, height: 200)  // 3:4 aspect ratio matches optimized images
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            // Use HighQualityCardImage for consistent sizing and quality
+                            // Fixed dimensions ensure gallery thumbnails are uniform
+                            HighQualityCardImage(
+                                url: URL(string: photos[index]),
+                                targetHeight: Self.galleryThumbnailHeight,
+                                cornerRadius: 16,
+                                priority: .normal
+                            )
+                            .frame(width: Self.galleryThumbnailWidth, height: Self.galleryThumbnailHeight)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 16)
                                     .stroke(
@@ -1424,6 +1428,10 @@ struct ProfileView: View {
                 }
                 .padding(.horizontal, 20)
             }
+        }
+        .onAppear {
+            // Prefetch gallery photos for smooth scrolling
+            ImageCache.shared.prefetchImages(urls: photos)
         }
     }
     

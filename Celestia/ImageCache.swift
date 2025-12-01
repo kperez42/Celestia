@@ -1034,9 +1034,11 @@ struct CachedProfileImage: View {
 
 /// Cached async image optimized for card layouts (discover, matches)
 /// PERFORMANCE: Ultra-fast loading with instant cache display and smooth transitions
+/// QUALITY: High-resolution rendering with consistent card sizing
 struct CachedCardImage: View {
     let url: URL?
     let priority: ImageLoadPriority
+    let fixedHeight: CGFloat?  // Optional fixed height for consistent card sizing
 
     @State private var image: UIImage?
     @State private var isLoading = false
@@ -1055,9 +1057,10 @@ struct CachedCardImage: View {
     @State private var currentURL: URL?
 
     // PERFORMANCE: Check cache immediately on init for instant display
-    init(url: URL?, priority: ImageLoadPriority = .normal) {
+    init(url: URL?, priority: ImageLoadPriority = .normal, fixedHeight: CGFloat? = nil) {
         self.url = url
         self.priority = priority
+        self.fixedHeight = fixedHeight
         // Pre-load from cache synchronously if available
         if let url = url {
             let cacheKey = url.absoluteString
@@ -1072,7 +1075,13 @@ struct CachedCardImage: View {
 
     var body: some View {
         GeometryReader { geometry in
-            Group {
+            let displayHeight = fixedHeight ?? geometry.size.height
+            let displayWidth = geometry.size.width
+
+            ZStack {
+                // Background for consistent card appearance
+                Color.gray.opacity(0.05)
+
                 if let image = image {
                     Image(uiImage: image)
                         .resizable()
@@ -1080,7 +1089,7 @@ struct CachedCardImage: View {
                         .antialiased(true)
                         .renderingMode(.original)  // Preserve original colors
                         .aspectRatio(contentMode: .fill)
-                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .frame(width: displayWidth, height: displayHeight)
                         .clipped()
                         .crispImageRendering()  // GPU-accelerated crisp rendering
                         .opacity(imageOpacity)
@@ -1091,7 +1100,7 @@ struct CachedCardImage: View {
                                     imageOpacity = 1.0
                                 }
                             }
-                    }
+                        }
                 }
 
                 if image == nil && loadError != nil {
@@ -1128,7 +1137,7 @@ struct CachedCardImage: View {
                             .cornerRadius(20)
                         }
                     }
-                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .frame(width: displayWidth, height: displayHeight)
                     .background(
                         LinearGradient(
                             colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.05)],
@@ -1153,7 +1162,7 @@ struct CachedCardImage: View {
                                 .scaleEffect(1.2)
                         }
                     }
-                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .frame(width: displayWidth, height: displayHeight)
                     .onAppear {
                         // Only load if we haven't checked cache yet or need to fetch
                         if !hasCheckedCache {
@@ -1164,6 +1173,7 @@ struct CachedCardImage: View {
                     }
                 }
             }
+            .frame(width: displayWidth, height: displayHeight)
         }
         // PERFORMANCE FIX: Cancel image loading when view disappears
         .onDisappear {
@@ -1250,6 +1260,182 @@ struct CachedCardImage: View {
                     self.isLoading = false
                     self.loadError = NSError(domain: "ImageCache", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to load image"])
                 }
+            }
+        }
+    }
+}
+
+// MARK: - High Quality Card Image for Feed/Profile Consistency
+
+/// High-quality image component that maintains consistent card dimensions
+/// Used for feed cards and profile integration with matching visual appearance
+struct HighQualityCardImage: View {
+    let url: URL?
+    let targetHeight: CGFloat
+    let cornerRadius: CGFloat
+    let priority: ImageLoadPriority
+
+    @State private var image: UIImage?
+    @State private var isLoading = false
+    @State private var loadError: Error?
+    @State private var hasCheckedCache = false
+    @State private var loadTask: Task<Void, Never>?
+    @State private var imageOpacity: Double = 0
+
+    init(
+        url: URL?,
+        targetHeight: CGFloat = 400,
+        cornerRadius: CGFloat = 0,
+        priority: ImageLoadPriority = .normal
+    ) {
+        self.url = url
+        self.targetHeight = targetHeight
+        self.cornerRadius = cornerRadius
+        self.priority = priority
+
+        // Pre-load from cache
+        if let url = url {
+            let cacheKey = url.absoluteString
+            if let cachedImage = ImageCache.shared.image(for: cacheKey) {
+                _image = State(initialValue: cachedImage)
+                _hasCheckedCache = State(initialValue: true)
+                _imageOpacity = State(initialValue: 1.0)
+            }
+        }
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                // Solid background ensures consistent card size
+                Color(.systemGray6)
+
+                if let image = image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .interpolation(.high)
+                        .antialiased(true)
+                        .renderingMode(.original)
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: geometry.size.width, height: targetHeight)
+                        .clipped()
+                        .opacity(imageOpacity)
+                        .onAppear {
+                            if imageOpacity < 1.0 {
+                                withAnimation(.easeOut(duration: 0.2)) {
+                                    imageOpacity = 1.0
+                                }
+                            }
+                        }
+                } else if loadError != nil {
+                    // Error placeholder
+                    VStack(spacing: 8) {
+                        Image(systemName: "photo")
+                            .font(.system(size: 40))
+                            .foregroundColor(.gray.opacity(0.5))
+
+                        Button {
+                            loadError = nil
+                            loadImage()
+                        } label: {
+                            Text("Tap to retry")
+                                .font(.caption)
+                                .foregroundColor(.purple)
+                        }
+                    }
+                } else {
+                    // Loading shimmer
+                    ShimmerView()
+                        .onAppear {
+                            if !hasCheckedCache {
+                                loadImage()
+                            }
+                        }
+                }
+            }
+            .frame(width: geometry.size.width, height: targetHeight)
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+        }
+        .frame(height: targetHeight)
+        .onDisappear {
+            loadTask?.cancel()
+            loadTask = nil
+        }
+        .onChange(of: url) { _, newURL in
+            image = nil
+            imageOpacity = 0
+            loadError = nil
+            hasCheckedCache = false
+            loadTask?.cancel()
+
+            if let newURL = newURL {
+                let cacheKey = newURL.absoluteString
+                if let cachedImage = ImageCache.shared.image(for: cacheKey) {
+                    image = cachedImage
+                    imageOpacity = 1.0
+                    hasCheckedCache = true
+                    return
+                }
+            }
+            loadImage()
+        }
+    }
+
+    private func loadImage() {
+        guard let url = url, !isLoading else { return }
+
+        hasCheckedCache = true
+
+        if let cachedImage = ImageCache.shared.image(for: url.absoluteString) {
+            self.image = cachedImage
+            self.imageOpacity = 1.0
+            return
+        }
+
+        loadTask?.cancel()
+        isLoading = true
+        loadError = nil
+
+        loadTask = Task(priority: priority.taskPriority) {
+            let loadedImage = await ImageCache.shared.loadImageAsync(for: url, priority: priority)
+
+            guard !Task.isCancelled else {
+                await MainActor.run { isLoading = false }
+                return
+            }
+
+            await MainActor.run {
+                isLoading = false
+                if let loadedImage = loadedImage {
+                    self.image = loadedImage
+                    self.imageOpacity = 0
+                } else {
+                    self.loadError = NSError(domain: "ImageCache", code: -1)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Shimmer Loading View
+
+/// Animated shimmer effect for loading states
+struct ShimmerView: View {
+    @State private var isAnimating = false
+
+    var body: some View {
+        LinearGradient(
+            colors: [
+                Color.gray.opacity(0.1),
+                Color.gray.opacity(0.2),
+                Color.gray.opacity(0.1)
+            ],
+            startPoint: isAnimating ? .leading : .trailing,
+            endPoint: isAnimating ? .trailing : .leading
+        )
+        .onAppear {
+            withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: false)) {
+                isAnimating = true
             }
         }
     }
