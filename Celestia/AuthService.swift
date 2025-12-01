@@ -361,8 +361,10 @@ class AuthService: ObservableObject, AuthServiceProtocol {
 
                                     Logger.shared.auth("✅ Photo \(index + 1) uploaded successfully", level: .info)
 
-                                    // Cache the image for instant display
-                                    ImageCache.shared.setImage(optimizedImage, for: url)
+                                    // Cache the image for instant display (MainActor isolated)
+                                    await MainActor.run {
+                                        ImageCache.shared.setImage(optimizedImage, for: url)
+                                    }
 
                                     return (index, url)
                                 } catch {
