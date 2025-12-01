@@ -62,7 +62,7 @@ struct SavedProfilesView: View {
         case recent = "Recently Saved"
         case oldest = "Oldest First"
         case ageYoungest = "Youngest First"
-        case ageOldest = "Oldest First"
+        case ageOldest = "Age: Oldest"
         case nameAZ = "Name A-Z"
     }
 

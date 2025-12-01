@@ -394,21 +394,21 @@ struct AdminUserInvestigationView: View {
             }
 
             HStack(spacing: 12) {
-                VerificationBadge(
+                AdminVerificationBadgeView(
                     icon: "phone.fill",
                     label: "Phone",
                     isVerified: isPhoneVerified,
                     color: .green
                 )
 
-                VerificationBadge(
+                AdminVerificationBadgeView(
                     icon: "camera.fill",
                     label: "Photo",
                     isVerified: user.isVerified,
                     color: .blue
                 )
 
-                VerificationBadge(
+                AdminVerificationBadgeView(
                     icon: "crown.fill",
                     label: "Premium",
                     isVerified: user.isPremium,
@@ -755,8 +755,8 @@ struct EnhancedStatusRow: View {
     }
 }
 
-/// Verification badge component
-struct VerificationBadge: View {
+/// Verification badge component for admin view
+struct AdminVerificationBadgeView: View {
     let icon: String
     let label: String
     let isVerified: Bool

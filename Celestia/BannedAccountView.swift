@@ -415,6 +415,15 @@ struct BannedAccountView: View {
     }
 }
 
+// MARK: - Guideline Item Model
+
+private struct GuidelineItem: Hashable {
+    let icon: String
+    let color: Color
+    let title: String
+    let description: String
+}
+
 #Preview {
     BannedAccountView()
         .environmentObject(AuthService.shared)
