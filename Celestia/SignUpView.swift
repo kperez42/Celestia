@@ -78,7 +78,7 @@ struct SignUpView: View {
 
                             // Progress indicator
                             HStack(spacing: 10) {
-                                ForEach(1...4, id: \.self) { step in
+                                ForEach(1...5, id: \.self) { step in
                                     Circle()
                                         .fill(currentStep >= step ? Color.purple : Color.gray.opacity(0.3))
                                         .frame(width: 12, height: 12)
@@ -88,7 +88,7 @@ struct SignUpView: View {
                             }
                             .accessibilityElement(children: .ignore)
                             .accessibilityLabel("Sign up progress")
-                            .accessibilityValue("Step \(currentStep) of 4")
+                            .accessibilityValue("Step \(currentStep) of 5")
                             .padding(.top, 10)
                         
                         // Header
@@ -130,6 +130,12 @@ struct SignUpView: View {
                                     ))
                             case 4:
                                 step4Content
+                                    .transition(.asymmetric(
+                                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                                        removal: .move(edge: .leading).combined(with: .opacity)
+                                    ))
+                            case 5:
+                                step5Content
                                     .transition(.asymmetric(
                                         insertion: .move(edge: .trailing).combined(with: .opacity),
                                         removal: .move(edge: .leading).combined(with: .opacity)
@@ -178,7 +184,7 @@ struct SignUpView: View {
                                     ProgressView()
                                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                 } else {
-                                    Text(currentStep == 4 ? "Create Account" : "Next")
+                                    Text(currentStep == 5 ? "Create Account" : "Next")
                                         .font(.headline)
                                         .foregroundColor(.white)
                                 }
@@ -195,9 +201,9 @@ struct SignUpView: View {
                             .cornerRadius(15)
                             .opacity(canProceed ? 1.0 : 0.5)
                             .disabled(!canProceed || authService.isLoading || isLoadingPhotos)
-                            .accessibilityLabel(currentStep == 4 ? "Create Account" : "Next")
-                            .accessibilityHint(currentStep == 4 ? "Create your account and sign up" : "Continue to next step")
-                            .accessibilityIdentifier(currentStep == 4 ? AccessibilityIdentifier.createAccountButton : AccessibilityIdentifier.nextButton)
+                            .accessibilityLabel(currentStep == 5 ? "Create Account" : "Next")
+                            .accessibilityHint(currentStep == 5 ? "Create your account and sign up" : "Continue to next step")
+                            .accessibilityIdentifier(currentStep == 5 ? AccessibilityIdentifier.createAccountButton : AccessibilityIdentifier.nextButton)
                             .scaleButton()
                         }
                         .padding(.horizontal, 30)
@@ -956,6 +962,204 @@ struct SignUpView: View {
         }
     }
 
+    // MARK: - Step 5: Review Guidelines
+    var step5Content: some View {
+        VStack(spacing: 24) {
+            // Header card
+            VStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.blue.opacity(0.2), Color.purple.opacity(0.15)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 80, height: 80)
+
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.blue.opacity(0.3), Color.purple.opacity(0.2)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 60, height: 60)
+
+                    Image(systemName: "checkmark.shield.fill")
+                        .font(.system(size: 28))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.blue, .purple],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+
+                VStack(spacing: 8) {
+                    Text("Almost there!")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.blue, .purple],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+
+                    Text("Your profile will be reviewed before going live")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .padding(.vertical, 20)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.blue.opacity(0.05), Color.purple.opacity(0.03)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            )
+
+            // What we check section
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Image(systemName: "checklist")
+                        .font(.headline)
+                        .foregroundColor(.purple)
+                    Text("What We're Checking")
+                        .font(.headline)
+                }
+
+                VStack(spacing: 12) {
+                    guidelinesRow(
+                        icon: "person.crop.circle.fill",
+                        title: "Profile Photos",
+                        description: "Clear, appropriate photos that show you",
+                        color: .blue
+                    )
+
+                    guidelinesRow(
+                        icon: "text.alignleft",
+                        title: "Bio & Information",
+                        description: "Complete and authentic profile details",
+                        color: .purple
+                    )
+
+                    guidelinesRow(
+                        icon: "shield.checkered",
+                        title: "Community Guidelines",
+                        description: "Content follows our safety policies",
+                        color: .green
+                    )
+                }
+            }
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(Color(.separator).opacity(0.2), lineWidth: 1)
+            )
+
+            // Info card
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    ZStack {
+                        Circle()
+                            .fill(Color.orange.opacity(0.15))
+                            .frame(width: 36, height: 36)
+                        Image(systemName: "clock.fill")
+                            .font(.system(size: 18))
+                            .foregroundColor(.orange)
+                    }
+
+                    Text("Quick Review")
+                        .font(.headline)
+                }
+
+                Text("Our team reviews profiles within 24 hours. You'll be notified as soon as your profile is approved and ready to go!")
+                    .font(.body)
+                    .foregroundColor(.primary.opacity(0.85))
+                    .lineSpacing(4)
+            }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.orange.opacity(0.08))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(Color.orange.opacity(0.2), lineWidth: 1)
+            )
+
+            // Confirmation checkbox style message
+            HStack(spacing: 12) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.title2)
+                    .foregroundColor(.green)
+
+                Text("By creating your account, you agree to follow our community guidelines")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.green.opacity(0.08))
+            )
+        }
+    }
+
+    private func guidelinesRow(icon: String, title: String, description: String, color: Color) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(color.opacity(0.12))
+                    .frame(width: 38, height: 38)
+
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(color)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.primary)
+
+                Text(description)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineSpacing(2)
+            }
+
+            Spacer()
+
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundColor(.green.opacity(0.7))
+                .font(.body)
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.systemGray6))
+        )
+    }
+
     private func photoTipChip(icon: String, text: String, color: Color) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
@@ -1014,6 +1218,7 @@ struct SignUpView: View {
         case 2: return "Tell us about yourself"
         case 3: return "Where are you from?"
         case 4: return "Show Your Best Self"
+        case 5: return "Review Guidelines"
         default: return ""
         }
     }
@@ -1024,6 +1229,7 @@ struct SignUpView: View {
         case 2: return "This helps us find your perfect match"
         case 3: return "Connect with people near and far"
         case 4: return "Photos help you make meaningful connections"
+        case 5: return "Here's what happens next"
         default: return ""
         }
     }
@@ -1039,6 +1245,8 @@ struct SignUpView: View {
             return !location.isEmpty && !country.isEmpty
         case 4:
             return photoImages.count >= 2
+        case 5:
+            return true // Guidelines step - always can proceed
         default:
             return false
         }
@@ -1046,7 +1254,7 @@ struct SignUpView: View {
 
     // MARK: - Actions
     func handleNext() {
-        if currentStep < 4 {
+        if currentStep < 5 {
             withAnimation {
                 currentStep += 1
             }
