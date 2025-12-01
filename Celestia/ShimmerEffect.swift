@@ -7,9 +7,9 @@
 
 import SwiftUI
 
-// MARK: - Shimmer Effect Modifier
+// MARK: - Skeleton Shimmer Effect Modifier
 
-struct ShimmerEffect: ViewModifier {
+struct SkeletonShimmerEffect: ViewModifier {
     @State private var phase: CGFloat = 0
     let duration: Double
     let delay: Double
@@ -54,8 +54,8 @@ struct ShimmerEffect: ViewModifier {
 }
 
 extension View {
-    func shimmer(duration: Double = 1.5, delay: Double = 0) -> some View {
-        modifier(ShimmerEffect(duration: duration, delay: delay))
+    func skeletonShimmer(duration: Double = 1.5, delay: Double = 0) -> some View {
+        modifier(SkeletonShimmerEffect(duration: duration, delay: delay))
     }
 }
 
@@ -76,7 +76,7 @@ struct SkeletonShape: View {
         RoundedRectangle(cornerRadius: cornerRadius)
             .fill(Color(.systemGray5))
             .frame(width: width, height: height)
-            .shimmer()
+            .skeletonShimmer()
     }
 }
 
@@ -91,7 +91,7 @@ struct ProfileCardSkeleton: View {
             Rectangle()
                 .fill(Color(.systemGray5))
                 .frame(height: 280)
-                .shimmer()
+                .skeletonShimmer()
 
             // Content skeleton
             VStack(alignment: .leading, spacing: 12) {
@@ -165,7 +165,7 @@ struct ReportRowSkeleton: View {
                 Circle()
                     .fill(Color(.systemGray5))
                     .frame(width: 40, height: 40)
-                    .shimmer(delay: delay)
+                    .skeletonShimmer(delay: delay)
 
                 VStack(alignment: .leading, spacing: 4) {
                     SkeletonShape(width: 120, height: 16)
@@ -186,7 +186,7 @@ struct StatCardSkeleton: View {
                 Circle()
                     .fill(Color(.systemGray5))
                     .frame(width: 36, height: 36)
-                    .shimmer()
+                    .skeletonShimmer()
                 Spacer()
             }
 
@@ -276,7 +276,7 @@ struct StatsLoadingView: View {
                         Circle()
                             .fill(Color(.systemGray5))
                             .frame(width: 24, height: 24)
-                            .shimmer()
+                            .skeletonShimmer()
                         SkeletonShape(width: 120, height: 18)
                         Spacer()
                     }
@@ -287,7 +287,7 @@ struct StatsLoadingView: View {
                                 Circle()
                                     .fill(Color(.systemGray5))
                                     .frame(width: 36, height: 36)
-                                    .shimmer(delay: Double(index) * 0.15)
+                                    .skeletonShimmer(delay: Double(index) * 0.15)
 
                                 VStack(alignment: .leading, spacing: 4) {
                                     SkeletonShape(width: 140, height: 14)
@@ -322,7 +322,7 @@ struct SuspiciousProfilesLoadingView: View {
                     Circle()
                         .fill(Color(.systemGray5))
                         .frame(width: 12, height: 12)
-                        .shimmer(delay: Double(index) * 0.1)
+                        .skeletonShimmer(delay: Double(index) * 0.1)
 
                     VStack(alignment: .leading, spacing: 6) {
                         SkeletonShape(width: 120, height: 16)
