@@ -628,14 +628,14 @@ struct OnboardingView: View {
                 // Icon
                 ZStack {
                     Circle()
-                        .fill(Color.purple.opacity(0.15))
+                        .fill(Color.orange.opacity(0.15))
                         .frame(width: 100, height: 100)
 
-                    Image(systemName: "photo.on.rectangle.fill")
+                    Image(systemName: "camera.fill")
                         .font(.system(size: 50))
                         .foregroundStyle(
                             LinearGradient(
-                                colors: [.purple, .pink],
+                                colors: [.orange, .pink],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
@@ -643,40 +643,147 @@ struct OnboardingView: View {
                 }
 
                 VStack(spacing: 8) {
-                    Text("Add Your Photos")
+                    Text("Show Your Best Self")
                         .font(.title)
                         .fontWeight(.bold)
 
-                    Text("Add at least 2 photos to continue")
+                    Text("Great photos get 10x more matches")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+
+                    // Requirement badge
+                    HStack(spacing: 6) {
+                        Image(systemName: photoImages.count >= 2 ? "checkmark.circle.fill" : "info.circle.fill")
+                            .font(.caption)
+                        Text(photoImages.count >= 2 ? "Ready to continue!" : "Add at least 2 photos")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                    }
+                    .foregroundColor(photoImages.count >= 2 ? .green : .orange)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(photoImages.count >= 2 ? Color.green.opacity(0.1) : Color.orange.opacity(0.1))
+                    .cornerRadius(20)
+                    .padding(.top, 4)
                 }
 
-                // Photo Tips Card
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "lightbulb.fill")
-                            .foregroundColor(.yellow)
-                        Text("Photo Tips")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                    }
+                // Photo Progress Card
+                VStack(spacing: 16) {
+                    HStack(spacing: 12) {
+                        // Progress circle
+                        ZStack {
+                            Circle()
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 4)
+                                .frame(width: 50, height: 50)
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        photoTipRow(icon: "face.smiling", text: "Use a clear photo of your face as your first photo")
-                        photoTipRow(icon: "person.fill", text: "Show your full body in at least one photo")
-                        photoTipRow(icon: "sun.max.fill", text: "Good lighting makes a big difference")
-                        photoTipRow(icon: "xmark.circle", text: "Avoid group photos or photos with sunglasses")
+                            Circle()
+                                .trim(from: 0, to: CGFloat(photoImages.count) / 6.0)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [.orange, .pink],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                                )
+                                .frame(width: 50, height: 50)
+                                .rotationEffect(.degrees(-90))
+
+                            Text("\(photoImages.count)")
+                                .font(.headline)
+                                .fontWeight(.bold)
+                                .foregroundColor(.orange)
+                        }
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("\(photoImages.count) of 6 photos")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+
+                            Text(photoImages.count == 0 ? "Add photos to get started" :
+                                 photoImages.count < 2 ? "Add \(2 - photoImages.count) more to continue" :
+                                 photoImages.count < 6 ? "Add more for better matches" : "Maximum photos reached!")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+
+                        Spacer()
+
+                        // Photo quality indicator
+                        if photoImages.count >= 2 {
+                            VStack(spacing: 2) {
+                                Image(systemName: "star.fill")
+                                    .font(.title3)
+                                    .foregroundColor(.yellow)
+                                Text("Good")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
                     }
                 }
                 .padding(16)
                 .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.yellow.opacity(0.08))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.yellow.opacity(0.3), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.white)
+                        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(
+                            LinearGradient(
+                                colors: [.orange.opacity(0.3), .pink.opacity(0.2)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
                         )
+                )
+
+                // Photo Tips Card - Collapsible style
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.yellow.opacity(0.2))
+                                .frame(width: 32, height: 32)
+                            Image(systemName: "lightbulb.fill")
+                                .font(.callout)
+                                .foregroundColor(.yellow)
+                        }
+                        Text("Photo Tips for Success")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+
+                        Spacer()
+
+                        Image(systemName: "sparkles")
+                            .font(.caption)
+                            .foregroundColor(.yellow)
+                    }
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        photoTipRow(icon: "face.smiling.fill", text: "Clear face photo as your first pic", color: .green)
+                        photoTipRow(icon: "person.fill", text: "Include a full body photo", color: .blue)
+                        photoTipRow(icon: "sun.max.fill", text: "Good lighting makes you shine", color: .orange)
+                        photoTipRow(icon: "person.3.fill", text: "Solo photos work best", color: .purple)
+                    }
+                }
+                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.yellow.opacity(0.08), Color.orange.opacity(0.05)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.yellow.opacity(0.3), lineWidth: 1)
                 )
 
                 // Photo grid - Main photo is larger and more prominent
@@ -835,28 +942,46 @@ struct OnboardingView: View {
                     maxSelectionCount: 6 - photoImages.count,
                     matching: .images
                 ) {
-                    HStack(spacing: 10) {
+                    HStack(spacing: 12) {
                         if isUploadingPhotos {
                             ProgressView()
                                 .tint(.white)
                         } else {
-                            Image(systemName: "photo.badge.plus")
-                            Text(photoImages.isEmpty ? "Add Photos" : "Add More Photos")
-                                .fontWeight(.semibold)
+                            ZStack {
+                                Circle()
+                                    .fill(Color.white.opacity(0.2))
+                                    .frame(width: 36, height: 36)
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.title2)
+                            }
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(photoImages.isEmpty ? "Add Photos" : "Add More Photos")
+                                    .fontWeight(.semibold)
+                                Text(photoImages.count >= 6 ? "Maximum reached" : "\(6 - photoImages.count) slots available")
+                                    .font(.caption)
+                                    .opacity(0.8)
+                            }
+                        }
+                        Spacer()
+                        if !isUploadingPhotos {
+                            Image(systemName: "arrow.right.circle.fill")
+                                .font(.title2)
+                                .opacity(0.8)
                         }
                     }
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 20)
                     .padding(.vertical, 16)
                     .background(
                         LinearGradient(
-                            colors: [Color.purple, Color.pink],
+                            colors: photoImages.count >= 6 ? [Color.gray, Color.gray.opacity(0.8)] : [Color.orange, Color.pink],
                             startPoint: .leading,
                             endPoint: .trailing
                         )
                     )
                     .cornerRadius(16)
-                    .shadow(color: .purple.opacity(0.3), radius: 10, y: 5)
+                    .shadow(color: photoImages.count >= 6 ? .clear : .orange.opacity(0.3), radius: 10, y: 5)
                 }
                 .disabled(photoImages.count >= 6 || isUploadingPhotos)
                 .onChange(of: selectedPhotos) { _, newValue in
@@ -867,36 +992,81 @@ struct OnboardingView: View {
                     }
                 }
 
-                // Photo count indicator
-                HStack(spacing: 4) {
+                // Photo count indicator with animation
+                HStack(spacing: 6) {
                     ForEach(0..<6, id: \.self) { index in
-                        Circle()
-                            .fill(index < photoImages.count ? Color.purple : Color.gray.opacity(0.3))
-                            .frame(width: 8, height: 8)
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(
+                                index < photoImages.count ?
+                                LinearGradient(colors: [.orange, .pink], startPoint: .leading, endPoint: .trailing) :
+                                LinearGradient(colors: [Color.gray.opacity(0.3)], startPoint: .leading, endPoint: .trailing)
+                            )
+                            .frame(width: index < photoImages.count ? 24 : 16, height: 6)
+                            .animation(.spring(response: 0.3), value: photoImages.count)
                     }
                 }
-                .padding(.top, 4)
+                .padding(.top, 8)
 
-                Text("\(photoImages.count)/6 photos added")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                // Motivation card
+                HStack(spacing: 12) {
+                    Image(systemName: "heart.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.pink, .red],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("First impressions matter")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                        Text("Profiles with 3+ photos get 5x more likes")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
+                }
+                .padding(14)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.pink.opacity(0.08))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.pink.opacity(0.2), lineWidth: 1)
+                        )
+                )
             }
             .padding(20)
             .padding(.top, 20)
         }
     }
 
-    private func photoTipRow(icon: String, text: String) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: icon)
-                .font(.caption)
-                .foregroundColor(.purple)
-                .frame(width: 16)
+    private func photoTipRow(icon: String, text: String, color: Color = .purple) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.15))
+                    .frame(width: 28, height: 28)
+                Image(systemName: icon)
+                    .font(.caption)
+                    .foregroundColor(color)
+            }
 
             Text(text)
-                .font(.caption)
-                .foregroundColor(.secondary)
+                .font(.subheadline)
+                .foregroundColor(.primary)
+
+            Spacer()
+
+            Image(systemName: "checkmark")
+                .font(.caption2)
+                .foregroundColor(.green.opacity(0.6))
         }
+        .padding(.vertical, 4)
     }
     
     // MARK: - Step 4: Preferences
