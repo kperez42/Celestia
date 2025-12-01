@@ -89,18 +89,32 @@ struct ProfileFeedCard: View {
         }
     }
 
+    // MARK: - Constants
+
+    /// Fixed card image height for consistent card sizing regardless of image dimensions
+    private static let cardImageHeight: CGFloat = 400
+
     // MARK: - Components
 
     private var profileImage: some View {
-        CachedCardImage(url: URL(string: displayPhotoURL))
-            .frame(height: 400)
-            .frame(maxWidth: .infinity)
-            .clipped()
-            .cornerRadius(16, corners: [.topLeft, .topRight])
-            .onTapGesture {
-                HapticManager.shared.impact(.medium)
-                onViewProfile()
-            }
+        // Use HighQualityCardImage for consistent sizing and high-quality rendering
+        // The fixed height ensures cards don't expand based on image aspect ratios
+        HighQualityCardImage(
+            url: URL(string: displayPhotoURL),
+            targetHeight: Self.cardImageHeight,
+            cornerRadius: 0,  // We apply corner radius to specific corners below
+            priority: .normal
+        )
+        .frame(height: Self.cardImageHeight)
+        .frame(maxWidth: .infinity)
+        .clipShape(
+            RoundedCorner(radius: 16, corners: [.topLeft, .topRight])
+        )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            HapticManager.shared.impact(.medium)
+            onViewProfile()
+        }
     }
 
     private var nameRow: some View {
@@ -362,11 +376,14 @@ struct ResponsiveButtonStyle: ButtonStyle {
 // MARK: - Profile Feed Card Skeleton
 
 struct ProfileFeedCardSkeleton: View {
+    /// Match the card image height from ProfileFeedCard for consistent sizing
+    private static let cardImageHeight: CGFloat = 400
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Profile Image skeleton
+            // Profile Image skeleton - uses same fixed height as ProfileFeedCard
             SkeletonView()
-                .frame(height: 400)
+                .frame(height: Self.cardImageHeight)
                 .clipped()
                 .cornerRadius(16, corners: [.topLeft, .topRight])
 

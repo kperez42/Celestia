@@ -1309,18 +1309,23 @@ struct PhotoGalleryView: View {
                                 .foregroundColor(.white.opacity(0.7))
                         }
                     } else {
-                        // PERFORMANCE: Photo gallery with smooth swiping
+                        // PERFORMANCE: Photo gallery with smooth swiping and high-quality images
                         TabView(selection: $selectedPhotoIndex) {
                             ForEach(validPhotos.indices, id: \.self) { index in
-                                // PERFORMANCE: Always immediate - images already cached from card prefetch
-                                CachedCardImage(
-                                    url: URL(string: validPhotos[index]),
-                                    priority: .immediate
-                                )
-                                .aspectRatio(contentMode: .fit)
-                                .onTapGesture {
-                                    HapticManager.shared.impact(.light)
-                                    showZoomableViewer = true
+                                // QUALITY: High-quality image with immediate priority for smooth viewing
+                                // Images fill the available space while maintaining aspect ratio
+                                GeometryReader { imageGeometry in
+                                    CachedCardImage(
+                                        url: URL(string: validPhotos[index]),
+                                        priority: .immediate,
+                                        fixedHeight: imageGeometry.size.height
+                                    )
+                                    .frame(width: imageGeometry.size.width, height: imageGeometry.size.height)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        HapticManager.shared.impact(.light)
+                                        showZoomableViewer = true
+                                    }
                                 }
                                 .tag(index)
                             }
