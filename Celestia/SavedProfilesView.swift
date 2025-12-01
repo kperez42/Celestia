@@ -937,6 +937,7 @@ struct SavedProfilesView: View {
     private func handleMessage(user: User) {
         guard let currentUserId = authService.currentUser?.effectiveId,
               let userId = user.effectiveId else {
+            HapticManager.shared.notification(.error)
             return
         }
 
@@ -951,17 +952,35 @@ struct SavedProfilesView: View {
                     // No match exists - create one to enable messaging
                     Logger.shared.info("Creating conversation with \(user.fullName) from SavedProfilesView", category: .messaging)
                     await MatchService.shared.createMatch(user1Id: currentUserId, user2Id: userId)
-                    existingMatch = try await MatchService.shared.fetchMatch(user1Id: currentUserId, user2Id: userId)
+
+                    // Small delay to ensure Firestore consistency
+                    try await Task.sleep(nanoseconds: 300_000_000) // 300ms
+
+                    // Fetch the newly created match with retry
+                    for attempt in 1...3 {
+                        existingMatch = try await MatchService.shared.fetchMatch(user1Id: currentUserId, user2Id: userId)
+                        if existingMatch != nil { break }
+                        if attempt < 3 {
+                            try await Task.sleep(nanoseconds: 200_000_000) // 200ms between retries
+                        }
+                    }
                 }
 
                 await MainActor.run {
                     if let match = existingMatch {
                         chatPresentation = SavedChatPresentation(match: match, user: user)
                         Logger.shared.info("Opening chat with \(user.fullName)", category: .messaging)
+                    } else {
+                        // Show error feedback when match creation fails
+                        HapticManager.shared.notification(.error)
+                        Logger.shared.error("Failed to create or fetch match for messaging from SavedProfilesView", category: .messaging)
                     }
                 }
             } catch {
                 Logger.shared.error("Error starting conversation from SavedProfilesView", category: .messaging, error: error)
+                await MainActor.run {
+                    HapticManager.shared.notification(.error)
+                }
             }
         }
     }

@@ -296,6 +296,7 @@ struct LikesView: View {
 
         guard let currentUserId = authService.currentUser?.effectiveId,
               let userId = user.effectiveId else {
+            HapticManager.shared.notification(.error)
             return
         }
 
@@ -313,8 +314,17 @@ struct LikesView: View {
                     // Create the match
                     await MatchService.shared.createMatch(user1Id: currentUserId, user2Id: userId)
 
-                    // Fetch the newly created match
-                    existingMatch = try await MatchService.shared.fetchMatch(user1Id: currentUserId, user2Id: userId)
+                    // Small delay to ensure Firestore consistency
+                    try await Task.sleep(nanoseconds: 300_000_000) // 300ms
+
+                    // Fetch the newly created match with retry
+                    for attempt in 1...3 {
+                        existingMatch = try await MatchService.shared.fetchMatch(user1Id: currentUserId, user2Id: userId)
+                        if existingMatch != nil { break }
+                        if attempt < 3 {
+                            try await Task.sleep(nanoseconds: 200_000_000) // 200ms between retries
+                        }
+                    }
                 }
 
                 await MainActor.run {
@@ -322,10 +332,17 @@ struct LikesView: View {
                         // Open chat directly using item-based presentation
                         chatPresentation = ChatPresentation(match: match, user: user)
                         Logger.shared.info("Opening chat with \(user.fullName)", category: .messaging)
+                    } else {
+                        // Show error feedback when match creation fails
+                        HapticManager.shared.notification(.error)
+                        Logger.shared.error("Failed to create or fetch match for messaging from LikesView", category: .messaging)
                     }
                 }
             } catch {
                 Logger.shared.error("Error starting conversation from LikesView", category: .messaging, error: error)
+                await MainActor.run {
+                    HapticManager.shared.notification(.error)
+                }
             }
         }
     }
