@@ -24,12 +24,14 @@ class PhotoUploadService {
             throw CelestiaError.invalidData
         }
 
+        // ImageUploadService.uploadImage expects a directory path
+        // It will append its own UUID filename to the path
         let path: String
         switch imageType {
         case .profile:
             path = "profile_images/\(userId)"
         case .gallery:
-            path = "gallery_photos/\(userId)/photo_\(UUID().uuidString)"
+            path = "gallery_photos/\(userId)"
         case .chat:
             path = "chat_images/\(userId)"
         }

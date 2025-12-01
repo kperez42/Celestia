@@ -196,9 +196,11 @@ class EditProfileViewModel: ObservableObject {
             throw NSError(domain: "EditProfile", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not found"])
         }
 
+        // ImageUploadService.uploadImage expects a directory path
+        // It will append its own UUID filename to the path
         return try await ImageUploadService.shared.uploadImage(
             image,
-            path: "profile_images/\(userId)/profile.jpg"
+            path: "profile_images/\(userId)"
         )
     }
 

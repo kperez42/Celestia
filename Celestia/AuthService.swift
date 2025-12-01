@@ -338,9 +338,11 @@ class AuthService: ObservableObject, AuthServiceProtocol {
                 Logger.shared.auth("Uploading \(photos.count) photos", level: .info)
                 do {
                     var photoURLs: [String] = []
-                    for (index, image) in photos.enumerated() {
-                        let path = "users/\(userId)/photos/photo_\(index)_\(UUID().uuidString).jpg"
-                        let url = try await ImageUploadService.shared.uploadImage(image, path: path)
+                    // ImageUploadService.uploadImage expects a directory path, not a filename
+                    // It will append its own UUID filename to the path
+                    let photosPath = "users/\(userId)/photos"
+                    for image in photos {
+                        let url = try await ImageUploadService.shared.uploadImage(image, path: photosPath)
                         photoURLs.append(url)
                     }
 
@@ -351,6 +353,10 @@ class AuthService: ObservableObject, AuthServiceProtocol {
                     ]
                     try await Firestore.firestore().collection("users").document(userId).updateData(updateData)
                     Logger.shared.auth("Photos uploaded and saved successfully", level: .info)
+
+                    // Update local user object with photos so it's immediately available
+                    user.photos = photoURLs
+                    user.profileImageURL = photoURLs.first ?? ""
                 } catch {
                     Logger.shared.error("Failed to upload photos during signup", category: .authentication, error: error)
                     // Don't fail account creation if photo upload fails - user can add later
