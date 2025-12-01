@@ -108,15 +108,19 @@ struct WelcomeView: View {
     }
     
     // MARK: - Floating Particles
-    
+
     private var floatingParticles: some View {
         GeometryReader { geometry in
+            // Guard against invalid geometry that would cause NaN errors
+            let safeWidth = max(geometry.size.width, 1)
+            let safeHeight = max(geometry.size.height, 1)
+
             ZStack {
                 ForEach(0..<20, id: \.self) { index in
                     FloatingParticle(
                         size: CGFloat.random(in: 4...12),
-                        x: CGFloat.random(in: 0...geometry.size.width),
-                        y: CGFloat.random(in: 0...geometry.size.height),
+                        x: CGFloat.random(in: 0...safeWidth),
+                        y: CGFloat.random(in: 0...safeHeight),
                         duration: Double.random(in: 3...6)
                     )
                 }

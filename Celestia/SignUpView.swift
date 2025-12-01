@@ -187,6 +187,7 @@ struct SignUpView: View {
                                 )
                             )
                             .cornerRadius(15)
+                            .opacity(canProceed ? 1.0 : 0.5)
                             .disabled(!canProceed || authService.isLoading || isLoadingPhotos)
                             .accessibilityLabel(currentStep == 4 ? "Create Account" : "Next")
                             .accessibilityHint(currentStep == 4 ? "Create your account and sign up" : "Continue to next step")
@@ -395,9 +396,52 @@ struct SignUpView: View {
                 .accessibilityValue(lookingFor)
                 .accessibilityIdentifier(AccessibilityIdentifier.lookingForPicker)
             }
+
+            // Validation feedback for step 2
+            if currentStep == 2 {
+                VStack(alignment: .leading, spacing: 6) {
+                    if name.isEmpty {
+                        HStack(spacing: 6) {
+                            Image(systemName: "exclamationmark.circle.fill")
+                                .foregroundColor(.orange)
+                            Text("Please enter your name")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                        }
+                    }
+                    if let ageInt = Int(age) {
+                        if ageInt < 18 {
+                            HStack(spacing: 6) {
+                                Image(systemName: "exclamationmark.circle.fill")
+                                    .foregroundColor(.red)
+                                Text("You must be 18 or older to use Celestia")
+                                    .font(.caption)
+                                    .foregroundColor(.red)
+                            }
+                        }
+                    } else if !age.isEmpty {
+                        HStack(spacing: 6) {
+                            Image(systemName: "exclamationmark.circle.fill")
+                                .foregroundColor(.orange)
+                            Text("Please enter a valid age")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                        }
+                    } else {
+                        HStack(spacing: 6) {
+                            Image(systemName: "exclamationmark.circle.fill")
+                                .foregroundColor(.orange)
+                            Text("Please enter your age")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                        }
+                    }
+                }
+                .padding(.top, 8)
+            }
         }
     }
-    
+
     // MARK: - Step 3: Location
     var step3Content: some View {
         VStack(spacing: 20) {
