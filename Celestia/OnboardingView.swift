@@ -1666,22 +1666,26 @@ struct OnboardingView: View {
                 guard var user = authService.currentUser else { return }
                 guard let userId = user.id else { return }
 
-                // PERFORMANCE FIX: Upload photos in parallel instead of sequentially
+                // PERFORMANCE FIX: Upload photos in parallel while preserving order
                 // This reduces upload time from 30s (6 photos × 5s) to ~5s
-                let photoURLs = try await withThrowingTaskGroup(of: String.self) { group in
-                    // Add upload task for each photo
-                    for image in photoImages {
+                // Using indexed tuples to maintain original photo order (first photo = profile pic)
+                let photoURLs = try await withThrowingTaskGroup(of: (Int, String).self) { group in
+                    // Add upload task for each photo with its index
+                    for (index, image) in photoImages.enumerated() {
                         group.addTask {
-                            try await imageUploadService.uploadProfileImage(image, userId: userId)
+                            let url = try await imageUploadService.uploadProfileImage(image, userId: userId)
+                            return (index, url)
                         }
                     }
 
-                    // Collect all URLs
-                    var urls: [String] = []
-                    for try await url in group {
-                        urls.append(url)
+                    // Collect all URLs with their indices
+                    var indexedURLs: [(Int, String)] = []
+                    for try await result in group {
+                        indexedURLs.append(result)
                     }
-                    return urls
+
+                    // Sort by original index to preserve order (first photo = profile picture)
+                    return indexedURLs.sorted { $0.0 < $1.0 }.map { $0.1 }
                 }
 
                 // Update user
@@ -1704,6 +1708,9 @@ struct OnboardingView: View {
                 user.ageRangeMax = ageRangeMax
 
                 try await authService.updateUser(user)
+
+                // Refresh user data to ensure profile shows updated photos immediately
+                await authService.fetchUser()
 
                 // Track onboarding completion analytics
                 let timeSpent = Date().timeIntervalSince(onboardingStartTime)
