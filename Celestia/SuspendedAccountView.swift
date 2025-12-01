@@ -253,10 +253,26 @@ struct SuspendedAccountView: View {
             }
             .navigationTitle("Account Status")
             .navigationBarTitleDisplayMode(.inline)
+            .task {
+                // Auto-check if suspension has expired on view appear
+                await checkSuspensionOnAppear()
+            }
         }
     }
 
     // MARK: - Helper Methods
+
+    private func checkSuspensionOnAppear() async {
+        // If suspension period has passed, automatically clear it
+        if let until = suspendedUntilDate, until <= Date() {
+            do {
+                try await clearSuspension()
+                HapticManager.shared.notification(.success)
+            } catch {
+                Logger.shared.error("Failed to auto-clear suspension", category: .database, error: error)
+            }
+        }
+    }
 
     private var guidelines: [GuidelineItem] {
         [

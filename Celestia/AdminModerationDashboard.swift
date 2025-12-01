@@ -1960,8 +1960,13 @@ struct PendingProfileCard: View {
                         HapticManager.shared.impact(.medium)
                         Task {
                             isApproving = true
-                            try? await viewModel.approveProfile(userId: profile.id)
-                            HapticManager.shared.notification(.success)
+                            do {
+                                try await viewModel.approveProfile(userId: profile.id)
+                                HapticManager.shared.notification(.success)
+                            } catch {
+                                HapticManager.shared.notification(.error)
+                                Logger.shared.error("Failed to approve profile", category: .moderation, error: error)
+                            }
                             isApproving = false
                         }
                     }) {
@@ -2073,14 +2078,19 @@ struct PendingProfileCard: View {
                 finalInstructions += "\n\n📝 Additional Note from Admin:\n\(adminComment)"
             }
 
-            try? await viewModel.rejectProfile(
-                userId: profile.id,
-                reasonCode: reason.code,
-                reasonMessage: reason.userMessage,
-                fixInstructions: finalInstructions
-            )
+            do {
+                try await viewModel.rejectProfile(
+                    userId: profile.id,
+                    reasonCode: reason.code,
+                    reasonMessage: reason.userMessage,
+                    fixInstructions: finalInstructions
+                )
+                HapticManager.shared.notification(.warning)
+            } catch {
+                HapticManager.shared.notification(.error)
+                Logger.shared.error("Failed to reject profile", category: .moderation, error: error)
+            }
 
-            HapticManager.shared.notification(.warning)
             isRejecting = false
             adminComment = ""
             selectedRejectionReason = nil

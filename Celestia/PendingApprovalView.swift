@@ -381,6 +381,13 @@ struct PendingApprovalView: View {
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Profile Status")
             .navigationBarTitleDisplayMode(.inline)
+            .task {
+                // Auto-refresh status after a short delay when view appears
+                try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+                if !isRefreshing {
+                    await authService.fetchUser()
+                }
+            }
             .overlay(alignment: .top) {
                 // Still pending toast
                 if showStillPendingToast {
