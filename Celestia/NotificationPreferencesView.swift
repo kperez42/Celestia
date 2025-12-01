@@ -174,6 +174,9 @@ struct NotificationPreferencesView: View {
             return $preferences.matchRemindersEnabled
         case .messageReminder:
             return $preferences.messageRemindersEnabled
+        case .adminNewReport, .adminNewAccount, .adminIdVerification, .adminSuspiciousActivity:
+            // Admin categories are not configurable in user preferences
+            return .constant(false)
         }
     }
 
