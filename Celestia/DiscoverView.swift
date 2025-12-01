@@ -88,7 +88,7 @@ struct DiscoverView: View {
                 DiscoverFiltersView()
             }
             .sheet(isPresented: $viewModel.showingUpgradeSheet) {
-                PremiumUpgradeView()
+                PremiumUpgradeView(contextMessage: viewModel.upgradeReason.message)
                     .environmentObject(authService)
             }
             .onChange(of: filters.hasActiveFilters) { _, _ in
