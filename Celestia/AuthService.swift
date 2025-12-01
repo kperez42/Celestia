@@ -333,33 +333,94 @@ class AuthService: ObservableObject, AuthServiceProtocol {
 
             Logger.shared.auth("User saved to Firestore successfully", level: .info)
 
-            // Step 3.5: Upload photos if provided
+            // Step 3.5: Upload photos if provided (using high-quality parallel uploader)
             if !photos.isEmpty {
-                Logger.shared.auth("Uploading \(photos.count) photos", level: .info)
-                do {
-                    var photoURLs: [String] = []
-                    // ImageUploadService.uploadImage expects a directory path, not a filename
-                    // It will append its own UUID filename to the path
-                    let photosPath = "users/\(userId)/photos"
-                    for image in photos {
-                        let url = try await ImageUploadService.shared.uploadImage(image, path: photosPath)
-                        photoURLs.append(url)
+                Logger.shared.auth("📸 Starting upload of \(photos.count) photos (parallel with retries)", level: .info)
+
+                let photosPath = "users/\(userId)/photos"
+
+                // PERFORMANCE: Upload photos in parallel using TaskGroup for maximum speed
+                let uploadedURLs = await withTaskGroup(of: (index: Int, url: String?)?.self) { group in
+                    var results: [(Int, String?)] = []
+
+                    for (index, originalImage) in photos.enumerated() {
+                        group.addTask {
+                            Logger.shared.auth("📤 Uploading photo \(index + 1)/\(photos.count)...", level: .info)
+
+                            // OPTIMIZATION: Optimize image for upload (max 2000px, 92% quality)
+                            let optimizedImage = self.optimizeImageForUpload(originalImage)
+                            Logger.shared.auth("Image optimized: \(optimizedImage.size.width)x\(optimizedImage.size.height)", level: .debug)
+
+                            // Upload with retry logic (3 attempts with exponential backoff)
+                            var lastError: Error?
+                            for attempt in 0..<3 {
+                                do {
+                                    Logger.shared.auth("🔄 Upload attempt \(attempt + 1)/3 for photo \(index + 1)", level: .debug)
+
+                                    let url = try await ImageUploadService.shared.uploadImage(optimizedImage, path: photosPath)
+
+                                    Logger.shared.auth("✅ Photo \(index + 1) uploaded successfully", level: .info)
+
+                                    // Cache the image for instant display
+                                    ImageCache.shared.setImage(optimizedImage, for: url)
+
+                                    return (index, url)
+                                } catch {
+                                    lastError = error
+                                    Logger.shared.auth("❌ Upload attempt \(attempt + 1) failed for photo \(index + 1): \(error.localizedDescription)", level: .warning)
+
+                                    if attempt < 2 {
+                                        // Wait before retry (exponential backoff: 0.5s, 1s)
+                                        let delay = UInt64(pow(2.0, Double(attempt)) * 500_000_000)
+                                        try? await Task.sleep(nanoseconds: delay)
+                                    }
+                                }
+                            }
+
+                            Logger.shared.error("❌ Photo \(index + 1) failed after all retries", category: .authentication, error: lastError)
+                            return nil
+                        }
                     }
 
+                    // Collect results
+                    for await result in group {
+                        if let result = result {
+                            results.append((result.index, result.url))
+                        }
+                    }
+
+                    return results
+                }
+
+                // Sort by index and extract successful URLs
+                let photoURLs = uploadedURLs
+                    .sorted { $0.0 < $1.0 }
+                    .compactMap { $0.1 }
+
+                let successCount = photoURLs.count
+                let failedCount = photos.count - successCount
+
+                Logger.shared.auth("📊 Upload complete: \(successCount) succeeded, \(failedCount) failed", level: .info)
+
+                if !photoURLs.isEmpty {
                     // Update user document with photo URLs
                     let updateData: [String: Any] = [
                         "photos": photoURLs,
                         "profileImageURL": photoURLs.first ?? ""
                     ]
-                    try await Firestore.firestore().collection("users").document(userId).updateData(updateData)
-                    Logger.shared.auth("Photos uploaded and saved successfully", level: .info)
 
-                    // Update local user object with photos so it's immediately available
-                    user.photos = photoURLs
-                    user.profileImageURL = photoURLs.first ?? ""
-                } catch {
-                    Logger.shared.error("Failed to upload photos during signup", category: .authentication, error: error)
-                    // Don't fail account creation if photo upload fails - user can add later
+                    do {
+                        try await Firestore.firestore().collection("users").document(userId).updateData(updateData)
+                        Logger.shared.auth("✅ Photos saved to Firestore successfully", level: .info)
+
+                        // Update local user object with photos so it's immediately available
+                        user.photos = photoURLs
+                        user.profileImageURL = photoURLs.first ?? ""
+                    } catch {
+                        Logger.shared.error("Failed to save photo URLs to Firestore", category: .authentication, error: error)
+                    }
+                } else {
+                    Logger.shared.warning("⚠️ No photos uploaded successfully - user can add later", category: .authentication)
                 }
             }
 
@@ -1126,6 +1187,42 @@ class AuthService: ObservableObject, AuthServiceProtocol {
             }
             throw error
         }
+    }
+
+    // MARK: - Image Optimization
+
+    /// Optimizes an image for upload: resizes to max 2000px dimension, 92% JPEG quality
+    /// Matches the high-quality optimization used in EditProfileView
+    private func optimizeImageForUpload(_ image: UIImage) -> UIImage {
+        // PERFORMANCE: Higher quality for sharper photos on cards
+        let maxDimension: CGFloat = 2000  // Higher resolution for crisp display on all devices
+        let compressionQuality: CGFloat = 0.92  // Higher quality to prevent blurriness
+
+        // Calculate new size maintaining aspect ratio
+        let size = image.size
+        let ratio = min(maxDimension / size.width, maxDimension / size.height)
+
+        if ratio >= 1.0 {
+            // Image is already smaller than max, just return as-is
+            return image
+        }
+
+        let newSize = CGSize(width: size.width * ratio, height: size.height * ratio)
+
+        // PERFORMANCE: Use format optimized for faster rendering
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1.0  // Force 1x scale for smaller file sizes
+        format.opaque = true  // Faster rendering for non-transparent images
+
+        let renderer = UIGraphicsImageRenderer(size: newSize, format: format)
+        let resizedImage = renderer.image { context in
+            // Fill background with white for JPEG optimization
+            UIColor.white.setFill()
+            context.fill(CGRect(origin: .zero, size: newSize))
+            image.draw(in: CGRect(origin: .zero, size: newSize))
+        }
+
+        return resizedImage
     }
 }
 
