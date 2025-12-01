@@ -13,6 +13,9 @@ struct PremiumUpgradeView: View {
     @EnvironmentObject var authService: AuthService
     @StateObject private var storeManager = StoreManager.shared
 
+    // Context message shown when upgrade is triggered for a specific reason
+    var contextMessage: String = ""
+
     @State private var selectedPlan: PremiumPlan = .annual
     @State private var showPurchaseSuccess = false
     @State private var showError = false
@@ -65,6 +68,11 @@ struct PremiumUpgradeView: View {
 
                             // Content sections
                             VStack(spacing: 24) {
+                                // Context-specific banner (shown when triggered by limit)
+                                if !contextMessage.isEmpty {
+                                    contextBanner
+                                }
+
                                 // Limited time banner
                                 if showLimitedOffer {
                                     limitedTimeBanner
@@ -346,6 +354,64 @@ struct PremiumUpgradeView: View {
         case 2: return "Message"
         default: return "Premium"
         }
+    }
+
+    // MARK: - Context Banner (Like Limit / Super Like Limit)
+
+    private var contextBanner: some View {
+        HStack(spacing: 14) {
+            // Icon
+            ZStack {
+                Circle()
+                    .fill(Color.purple.opacity(0.15))
+                    .frame(width: 44, height: 44)
+
+                Image(systemName: "heart.slash.fill")
+                    .font(.title3)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Want to continue?")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundColor(.primary)
+
+                Text(contextMessage)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+            }
+
+            Spacer()
+        }
+        .padding(16)
+        .background(
+            LinearGradient(
+                colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.06)],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        )
+        .background(Color.white)
+        .cornerRadius(16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(
+                    LinearGradient(
+                        colors: [.purple.opacity(0.3), .pink.opacity(0.2)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1.5
+                )
+        )
+        .shadow(color: .purple.opacity(0.15), radius: 10, y: 5)
     }
 
     // MARK: - Limited Time Banner
@@ -1213,13 +1279,26 @@ struct PremiumUpgradeView: View {
             do {
                 try await storeManager.restorePurchases()
 
-                await MainActor.run {
-                    isProcessing = false
+                if storeManager.hasActiveSubscription {
+                    // CRITICAL: Update user's isPremium flag in Firestore after successful restore
+                    if var user = authService.currentUser {
+                        user.isPremium = true
+                        // Get tier from SubscriptionManager
+                        let tier = await SubscriptionManager.shared.currentTier
+                        user.premiumTier = tier.rawValue
+                        user.subscriptionExpiryDate = await SubscriptionManager.shared.expirationDate
+                        try await authService.updateUser(user)
+                        Logger.shared.info("✅ User premium status updated after restore", category: .general)
+                    }
 
-                    if storeManager.hasActiveSubscription {
+                    await MainActor.run {
+                        isProcessing = false
                         showPurchaseSuccess = true
                         HapticManager.shared.notification(.success)
-                    } else {
+                    }
+                } else {
+                    await MainActor.run {
+                        isProcessing = false
                         errorMessage = "No active subscriptions found"
                         showError = true
                     }

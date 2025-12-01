@@ -4,6 +4,39 @@
 //
 //  Core user model
 //
+//  PROFILE STATUS FLOW:
+//  --------------------
+//  profileStatus controls user visibility and app access:
+//
+//  1. "pending"   - New account awaiting admin approval (SignUpView.swift)
+//                   User sees: PendingApprovalView
+//                   Hidden from: Other users in Discover, Likes, Search
+//
+//  2. "active"    - Approved and visible to others
+//                   User sees: MainTabView (full app access)
+//                   Set by: AdminModerationDashboard.approveProfile()
+//
+//  3. "rejected"  - Rejected, user must fix issues
+//                   User sees: ProfileRejectionFeedbackView
+//                   Set by: AdminModerationDashboard.rejectProfile()
+//                   Properties: profileStatusReason, profileStatusReasonCode, profileStatusFixInstructions
+//
+//  4. "flagged"   - Under extended moderator review
+//                   User sees: FlaggedAccountView
+//                   Set by: AdminModerationDashboard.flagProfile()
+//                   Hidden from: Other users during review
+//
+//  5. "suspended" - Temporarily blocked (with end date)
+//                   User sees: SuspendedAccountView
+//                   Properties: isSuspended, suspendedAt, suspendedUntil, suspendReason
+//
+//  6. "banned"    - Permanently blocked
+//                   User sees: BannedAccountView
+//                   Properties: isBanned, bannedAt, banReason
+//
+//  Routing handled by: ContentView.swift (updateAuthenticationState)
+//  Filtering handled by: UserService.swift, LikesView, SavedProfilesView, etc.
+//
 
 import Foundation
 import FirebaseFirestore

@@ -410,6 +410,13 @@ class SeeWhoLikesYouViewModel: ObservableObject {
             }
         }
 
+        // Filter out users who are not active (pending, suspended, flagged, banned)
+        // Only show users with active profileStatus
+        users = users.filter { user in
+            let status = user.profileStatus.lowercased()
+            return status == "active" || status.isEmpty
+        }
+
         // Maintain original order (by like timestamp) by reordering based on input IDs
         let idOrder = Dictionary(uniqueKeysWithValues: ids.enumerated().map { ($1, $0) })
         users.sort { (idOrder[$0.id ?? ""] ?? Int.max) < (idOrder[$1.id ?? ""] ?? Int.max) }

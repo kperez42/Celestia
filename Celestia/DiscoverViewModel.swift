@@ -23,6 +23,24 @@ class DiscoverViewModel: ObservableObject {
     @Published var dragOffset: CGSize = .zero
     @Published var isProcessingAction = false
     @Published var showingUpgradeSheet = false
+    @Published var upgradeReason: UpgradeReason = .general
+
+    enum UpgradeReason {
+        case general
+        case likeLimitReached
+        case superLikesExhausted
+
+        var message: String {
+            switch self {
+            case .general:
+                return ""
+            case .likeLimitReached:
+                return "You've reached your daily like limit. Subscribe to continue liking!"
+            case .superLikesExhausted:
+                return "You're out of Super Likes. Subscribe to get more!"
+            }
+        }
+    }
     @Published var connectionQuality: PerformanceMonitor.ConnectionQuality = .excellent
 
     // Action error feedback
@@ -270,6 +288,7 @@ class DiscoverViewModel: ObservableObject {
             let canLike = await checkDailyLikeLimit()
             if !canLike {
                 isProcessingAction = false
+                upgradeReason = .likeLimitReached
                 showingUpgradeSheet = true
                 Logger.shared.warning("Daily like limit reached. User needs to upgrade to Premium", category: .matching)
                 return
@@ -412,6 +431,7 @@ class DiscoverViewModel: ObservableObject {
         // Check if user has super likes remaining
         if currentUser.superLikesRemaining <= 0 {
             isProcessingAction = false
+            upgradeReason = .superLikesExhausted
             showingUpgradeSheet = true
             Logger.shared.warning("No Super Likes remaining. User needs to purchase more", category: .payment)
             return

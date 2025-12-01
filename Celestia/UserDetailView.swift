@@ -25,6 +25,8 @@ struct UserDetailView: View {
     @State private var isLiked = false
     @State private var showingChat = false
     @State private var chatMatch: Match?
+    @State private var showPremiumUpgrade = false
+    @State private var upgradeContextMessage = ""
     @ObservedObject private var savedProfilesVM = SavedProfilesViewModel.shared
 
     // Photo viewer state
@@ -98,6 +100,10 @@ struct UserDetailView: View {
                         .environmentObject(authService)
                 }
             }
+        }
+        .sheet(isPresented: $showPremiumUpgrade) {
+            PremiumUpgradeView(contextMessage: upgradeContextMessage)
+                .environmentObject(authService)
         }
     }
 
@@ -614,6 +620,19 @@ struct UserDetailView: View {
 
         HapticManager.shared.impact(.medium)
 
+        // Check daily like limit for free users when liking (not unliking)
+        if !isLiked {
+            let isPremium = authService.currentUser?.isPremium ?? false
+            if !isPremium {
+                guard RateLimiter.shared.canSendLike() else {
+                    // Show upgrade sheet with context message
+                    upgradeContextMessage = "You've reached your daily like limit. Subscribe to continue liking!"
+                    showPremiumUpgrade = true
+                    return
+                }
+            }
+        }
+
         if isLiked {
             // Unlike the user
             isProcessing = true
@@ -705,7 +724,18 @@ struct UserDetailView: View {
                     // No match exists - create one to enable messaging
                     Logger.shared.info("Creating conversation with \(user.fullName)", category: .messaging)
                     await MatchService.shared.createMatch(user1Id: currentUserId, user2Id: targetUserId)
-                    existingMatch = try await MatchService.shared.fetchMatch(user1Id: currentUserId, user2Id: targetUserId)
+
+                    // Small delay to ensure Firestore consistency
+                    try await Task.sleep(nanoseconds: 300_000_000) // 300ms
+
+                    // Fetch the newly created match with retry
+                    for attempt in 1...3 {
+                        existingMatch = try await MatchService.shared.fetchMatch(user1Id: currentUserId, user2Id: targetUserId)
+                        if existingMatch != nil { break }
+                        if attempt < 3 {
+                            try await Task.sleep(nanoseconds: 200_000_000) // 200ms between retries
+                        }
+                    }
                 }
 
                 await MainActor.run {
@@ -714,13 +744,13 @@ struct UserDetailView: View {
                         showingChat = true
                         Logger.shared.info("Opening chat with \(user.fullName) from detail view", category: .messaging)
                     } else {
-                        errorMessage = "Unable to start conversation. Try again."
+                        errorMessage = "Unable to start conversation. Please try again."
                         showingError = true
                     }
                 }
             } catch {
                 await MainActor.run {
-                    errorMessage = "Unable to start conversation. Try again."
+                    errorMessage = "Unable to start conversation. Please check your connection."
                     showingError = true
                 }
                 Logger.shared.error("Error starting conversation from detail view", category: .messaging, error: error)

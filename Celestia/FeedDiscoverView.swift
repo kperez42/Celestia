@@ -33,6 +33,7 @@ struct FeedDiscoverView: View {
     // Direct messaging state - using dedicated struct for item-based presentation
     @State private var chatPresentation: ChatPresentation?
     @State private var showPremiumUpgrade = false
+    @State private var upgradeContextMessage = ""
 
     struct ChatPresentation: Identifiable {
         let id = UUID()
@@ -166,7 +167,7 @@ struct FeedDiscoverView: View {
                     }
                 }
                 .sheet(isPresented: $showPremiumUpgrade) {
-                    PremiumUpgradeView()
+                    PremiumUpgradeView(contextMessage: upgradeContextMessage)
                         .environmentObject(authService)
                 }
         }
@@ -1035,11 +1036,9 @@ struct FeedDiscoverView: View {
         let isPremium = authService.currentUser?.isPremium ?? false
         if !isPremium {
             guard RateLimiter.shared.canSendLike() else {
-                showToast(
-                    message: "Daily like limit reached (\(AppConstants.RateLimit.maxLikesPerDay) likes). Upgrade for unlimited!",
-                    icon: "exclamationmark.triangle.fill",
-                    color: .orange
-                )
+                // Show upgrade sheet with context message instead of toast
+                upgradeContextMessage = "You've reached your daily like limit. Subscribe to continue liking!"
+                showPremiumUpgrade = true
                 return
             }
         }
@@ -1235,8 +1234,17 @@ struct FeedDiscoverView: View {
                     // Create the match
                     await MatchService.shared.createMatch(user1Id: currentUserId, user2Id: userId)
 
-                    // Fetch the newly created match
-                    existingMatch = try await MatchService.shared.fetchMatch(user1Id: currentUserId, user2Id: userId)
+                    // Small delay to ensure Firestore consistency
+                    try await Task.sleep(nanoseconds: 300_000_000) // 300ms
+
+                    // Fetch the newly created match with retry
+                    for attempt in 1...3 {
+                        existingMatch = try await MatchService.shared.fetchMatch(user1Id: currentUserId, user2Id: userId)
+                        if existingMatch != nil { break }
+                        if attempt < 3 {
+                            try await Task.sleep(nanoseconds: 200_000_000) // 200ms between retries
+                        }
+                    }
                 }
 
                 await MainActor.run {
@@ -1247,20 +1255,20 @@ struct FeedDiscoverView: View {
                         let truncatedName = user.fullName.count > 20 ? String(user.fullName.prefix(20)) + "..." : user.fullName
                         Logger.shared.info("Opening chat with \(truncatedName)", category: .messaging)
                     } else {
-                        // Shouldn't happen, but handle gracefully
+                        // Show error after retries failed
                         showToast(
-                            message: "Unable to start conversation. Try again.",
+                            message: "Unable to start conversation. Please try again.",
                             icon: "exclamationmark.triangle.fill",
                             color: .red
                         )
-                        Logger.shared.error("Failed to create or fetch match for messaging", category: .messaging)
+                        Logger.shared.error("Failed to create or fetch match for messaging after retries", category: .messaging)
                     }
                 }
             } catch {
                 Logger.shared.error("Error starting conversation", category: .messaging, error: error)
                 await MainActor.run {
                     showToast(
-                        message: "Unable to start conversation. Try again.",
+                        message: "Unable to start conversation. Please check your connection.",
                         icon: "exclamationmark.triangle.fill",
                         color: .red
                     )

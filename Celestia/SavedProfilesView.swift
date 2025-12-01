@@ -17,6 +17,7 @@ struct SavedProfilesView: View {
     @State private var showClearAllConfirmation = false
     @State private var selectedTab = 0
     @State private var showPremiumUpgrade = false
+    @State private var upgradeContextMessage = ""
 
     // PERFORMANCE: Track if initial load completed to prevent loading flash on tab switches
     @State private var hasCompletedInitialLoad = false
@@ -165,7 +166,7 @@ struct SavedProfilesView: View {
                 .environmentObject(authService)
         }
         .sheet(isPresented: $showPremiumUpgrade) {
-            PremiumUpgradeView()
+            PremiumUpgradeView(contextMessage: upgradeContextMessage)
                 .environmentObject(authService)
         }
         .sheet(isPresented: $showFilters) {
@@ -936,6 +937,7 @@ struct SavedProfilesView: View {
     private func handleMessage(user: User) {
         guard let currentUserId = authService.currentUser?.effectiveId,
               let userId = user.effectiveId else {
+            HapticManager.shared.notification(.error)
             return
         }
 
@@ -950,17 +952,35 @@ struct SavedProfilesView: View {
                     // No match exists - create one to enable messaging
                     Logger.shared.info("Creating conversation with \(user.fullName) from SavedProfilesView", category: .messaging)
                     await MatchService.shared.createMatch(user1Id: currentUserId, user2Id: userId)
-                    existingMatch = try await MatchService.shared.fetchMatch(user1Id: currentUserId, user2Id: userId)
+
+                    // Small delay to ensure Firestore consistency
+                    try await Task.sleep(nanoseconds: 300_000_000) // 300ms
+
+                    // Fetch the newly created match with retry
+                    for attempt in 1...3 {
+                        existingMatch = try await MatchService.shared.fetchMatch(user1Id: currentUserId, user2Id: userId)
+                        if existingMatch != nil { break }
+                        if attempt < 3 {
+                            try await Task.sleep(nanoseconds: 200_000_000) // 200ms between retries
+                        }
+                    }
                 }
 
                 await MainActor.run {
                     if let match = existingMatch {
                         chatPresentation = SavedChatPresentation(match: match, user: user)
                         Logger.shared.info("Opening chat with \(user.fullName)", category: .messaging)
+                    } else {
+                        // Show error feedback when match creation fails
+                        HapticManager.shared.notification(.error)
+                        Logger.shared.error("Failed to create or fetch match for messaging from SavedProfilesView", category: .messaging)
                     }
                 }
             } catch {
                 Logger.shared.error("Error starting conversation from SavedProfilesView", category: .messaging, error: error)
+                await MainActor.run {
+                    HapticManager.shared.notification(.error)
+                }
             }
         }
     }
@@ -969,6 +989,17 @@ struct SavedProfilesView: View {
         guard let currentUserId = authService.currentUser?.effectiveId,
               let targetUserId = user.effectiveId else {
             return
+        }
+
+        // Check daily like limit for free users (premium gets unlimited)
+        let isPremium = authService.currentUser?.isPremium ?? false
+        if !isPremium {
+            guard RateLimiter.shared.canSendLike() else {
+                // Show upgrade sheet with context message
+                upgradeContextMessage = "You've reached your daily like limit. Subscribe to continue liking!"
+                showPremiumUpgrade = true
+                return
+            }
         }
 
         Task {
@@ -1747,17 +1778,26 @@ class SavedProfilesViewModel: ObservableObject {
             }
 
             // Step 4: Combine metadata with fetched users
+            // Filter out users who are not active (pending, suspended, flagged, banned)
             var profiles: [SavedProfile] = []
             var skippedCount = 0
 
             for metadata in savedMetadata {
                 if let user = fetchedUsers[metadata.userId] {
-                    profiles.append(SavedProfile(
-                        id: metadata.id,
-                        user: user,
-                        savedAt: metadata.savedAt,
-                        note: metadata.note
-                    ))
+                    // Only include users with active profileStatus
+                    let status = user.profileStatus.lowercased()
+                    if status == "active" || status.isEmpty {
+                        profiles.append(SavedProfile(
+                            id: metadata.id,
+                            user: user,
+                            savedAt: metadata.savedAt,
+                            note: metadata.note
+                        ))
+                    } else {
+                        // User is pending/suspended/flagged - don't show
+                        skippedCount += 1
+                        Logger.shared.debug("Skipped saved profile - user not active: \(metadata.userId) (status: \(status))", category: .general)
+                    }
                 } else {
                     // User no longer exists or failed to fetch
                     skippedCount += 1

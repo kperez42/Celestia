@@ -4,6 +4,27 @@
 //
 //  Created by Kevin Perez on 10/29/25.
 //
+//  PROFILE STATUS FLOW DOCUMENTATION:
+//  ----------------------------------
+//  This view routes users to the appropriate screen based on their account/profile status.
+//
+//  Profile Status Values (defined in User.swift:67-73):
+//  - "pending"   → New account, waiting for admin approval → PendingApprovalView
+//  - "active"    → Approved, visible to other users → MainTabView
+//  - "rejected"  → Rejected, user must fix issues → ProfileRejectionFeedbackView
+//  - "flagged"   → Under moderator review → FlaggedAccountView
+//  - "suspended" → Temporarily blocked → SuspendedAccountView
+//  - "banned"    → Permanently blocked → BannedAccountView
+//
+//  Flow:
+//  1. User signs up → profileStatus = "pending" (SignUpView.swift)
+//  2. Admin reviews in AdminModerationDashboard.swift
+//     - approveProfile() → sets profileStatus = "active", showMeInSearch = true
+//     - rejectProfile() → sets profileStatus = "rejected" with reason
+//     - flagProfile() → sets profileStatus = "flagged" for extended review
+//  3. User is notified via push notification (sendProfileStatusNotification)
+//  4. ContentView routes to appropriate view based on profileStatus
+//
 
 import SwiftUI
 
@@ -13,6 +34,7 @@ struct ContentView: View {
     @State private var needsEmailVerification = false
     @State private var isProfilePending = false
     @State private var isProfileRejected = false
+    @State private var isProfileFlagged = false  // Under moderator review
     @State private var isSuspended = false
     @State private var isBanned = false
     @State private var isLoading = true  // Start with splash screen
@@ -40,8 +62,15 @@ struct ContentView: View {
                         SuspendedAccountView()
                             .environmentObject(authService)
                             .transition(.opacity)
+                    } else if isProfileFlagged {
+                        // Show flagged view for profiles under moderator review
+                        // User can see status and edit profile while waiting
+                        FlaggedAccountView()
+                            .environmentObject(authService)
+                            .transition(.opacity)
                     } else if isProfileRejected {
                         // Show rejection feedback view for rejected profiles
+                        // User must fix issues and request re-review
                         ProfileRejectionFeedbackView()
                             .environmentObject(authService)
                             .transition(.opacity)
@@ -76,6 +105,7 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.3), value: isAuthenticated)
         .animation(.easeInOut(duration: 0.3), value: needsEmailVerification)
         .animation(.easeInOut(duration: 0.3), value: isProfilePending)
+        .animation(.easeInOut(duration: 0.3), value: isProfileFlagged)
         .animation(.easeInOut(duration: 0.3), value: isProfileRejected)
         .animation(.easeInOut(duration: 0.3), value: isSuspended)
         .animation(.easeInOut(duration: 0.3), value: isBanned)
@@ -123,17 +153,20 @@ struct ContentView: View {
 
         let profileStatus = authService.currentUser?.profileStatus.lowercased()
 
-        // Check if account is banned (permanent)
+        // Check statuses in priority order (most severe first)
+        // 1. Banned (permanent) - user cannot access app
         isBanned = isAuthenticated && (authService.currentUser?.isBanned == true || profileStatus == "banned")
-        // Check if account is suspended (temporary)
+        // 2. Suspended (temporary) - user must wait for suspension to end
         isSuspended = isAuthenticated && !isBanned && (authService.currentUser?.isSuspended == true || profileStatus == "suspended")
-        // Check if profile is rejected and needs user action
-        isProfileRejected = isAuthenticated && !isBanned && !isSuspended && profileStatus == "rejected"
-        // Check if profile is pending approval
-        isProfilePending = isAuthenticated && !isBanned && !isSuspended && !isProfileRejected && profileStatus == "pending"
+        // 3. Flagged (under review) - user can view status and edit profile
+        isProfileFlagged = isAuthenticated && !isBanned && !isSuspended && profileStatus == "flagged"
+        // 4. Rejected (needs fixes) - user must fix issues and request re-review
+        isProfileRejected = isAuthenticated && !isBanned && !isSuspended && !isProfileFlagged && profileStatus == "rejected"
+        // 5. Pending (awaiting approval) - user waits for admin review
+        isProfilePending = isAuthenticated && !isBanned && !isSuspended && !isProfileFlagged && !isProfileRejected && profileStatus == "pending"
 
-        // Detect approval transition: was pending/rejected, now approved/active
-        let wasWaitingForApproval = previousProfileStatus == "pending" || previousProfileStatus == "rejected"
+        // Detect approval transition: was pending/rejected/flagged, now approved/active
+        let wasWaitingForApproval = previousProfileStatus == "pending" || previousProfileStatus == "rejected" || previousProfileStatus == "flagged"
         let isNowApproved = profileStatus == "approved" || profileStatus == "active"
 
         if wasWaitingForApproval && isNowApproved && !isLoading {
@@ -148,7 +181,7 @@ struct ContentView: View {
         // Update previous status for next comparison
         previousProfileStatus = profileStatus
 
-        Logger.shared.debug("ContentView: isAuthenticated=\(isAuthenticated), needsEmailVerification=\(needsEmailVerification), isBanned=\(isBanned), isSuspended=\(isSuspended), isProfileRejected=\(isProfileRejected), isProfilePending=\(isProfilePending)", category: .general)
+        Logger.shared.debug("ContentView: isAuthenticated=\(isAuthenticated), needsEmailVerification=\(needsEmailVerification), isBanned=\(isBanned), isSuspended=\(isSuspended), isProfileFlagged=\(isProfileFlagged), isProfileRejected=\(isProfileRejected), isProfilePending=\(isProfilePending)", category: .general)
     }
 }
 

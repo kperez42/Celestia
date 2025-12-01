@@ -62,6 +62,7 @@ struct EditProfileView: View {
     // Preference fields
     @State private var ageRangeMin: Int
     @State private var ageRangeMax: Int
+    @State private var maxDistance: Int
 
     let genderOptions = ["Male", "Female", "Non-binary", "Other"]
     let lookingForOptions = ["Men", "Women", "Everyone"]
@@ -147,6 +148,7 @@ struct EditProfileView: View {
         // Initialize preference fields
         _ageRangeMin = State(initialValue: user?.ageRangeMin ?? 18)
         _ageRangeMax = State(initialValue: user?.ageRangeMax ?? 99)
+        _maxDistance = State(initialValue: user?.maxDistance ?? 50)
     }
     
     var body: some View {
@@ -1266,6 +1268,44 @@ struct EditProfileView: View {
             .padding()
             .background(Color.pink.opacity(0.05))
             .cornerRadius(12)
+
+            // Max Distance Preference
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("Maximum Distance")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+
+                    Spacer()
+
+                    Text("\(maxDistance) km")
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundColor(.blue)
+                }
+
+                VStack(spacing: 8) {
+                    Slider(value: Binding(
+                        get: { Double(maxDistance) },
+                        set: { maxDistance = Int($0) }
+                    ), in: 5...200, step: 5)
+                    .tint(.blue)
+
+                    HStack {
+                        Text("5 km")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Text("200 km")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            .padding()
+            .background(Color.blue.opacity(0.05))
+            .cornerRadius(12)
         }
         .padding(20)
         .background(Color.white)
@@ -2238,6 +2278,7 @@ struct EditProfileView: View {
                 // Update preference fields
                 user.ageRangeMin = ageRangeMin
                 user.ageRangeMax = ageRangeMax
+                user.maxDistance = maxDistance
 
                 try await authService.updateUser(user)
                 

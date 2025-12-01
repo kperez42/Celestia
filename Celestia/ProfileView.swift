@@ -293,34 +293,33 @@ struct ProfileView: View {
     }
 
     // MARK: - Hero Section
-    
+
     private func heroSection(user: User) -> some View {
         ZStack(alignment: .bottom) {
-            // Gradient background with decorative elements
+            // Clean, professional gradient background
             ZStack {
                 LinearGradient(
                     colors: [
-                        Color.purple.opacity(0.9),
-                        Color.pink.opacity(0.7),
-                        Color.blue.opacity(0.6)
+                        Color(.systemBackground),
+                        Color(.systemGray6)
                     ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
+                    startPoint: .top,
+                    endPoint: .bottom
                 )
-                
-                // Decorative circles
+
+                // Subtle decorative accent
                 GeometryReader { geo in
                     Circle()
-                        .fill(Color.white.opacity(0.1))
-                        .frame(width: 200, height: 200)
-                        .blur(radius: 40)
-                        .offset(x: -80, y: 50)
-                    
-                    Circle()
-                        .fill(Color.yellow.opacity(0.15))
-                        .frame(width: 120, height: 120)
-                        .blur(radius: 30)
-                        .offset(x: geo.size.width - 60, y: 100)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.purple.opacity(0.08), Color.pink.opacity(0.05)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 300, height: 300)
+                        .blur(radius: 60)
+                        .offset(x: geo.size.width / 2 - 150, y: 20)
                 }
             }
             .frame(height: 340)
@@ -349,7 +348,7 @@ struct ProfileView: View {
                     HStack(spacing: 8) {
                         Text(user.fullName)
                             .font(.largeTitle.weight(.bold))
-                            .foregroundColor(.white)
+                            .foregroundColor(.primary)
                             .lineLimit(1)
                             .truncationMode(.tail)
 
@@ -357,14 +356,18 @@ struct ProfileView: View {
                             Image(systemName: "checkmark.seal.fill")
                                 .font(.title3)
                                 .foregroundColor(.blue)
-                                .shadow(color: .blue.opacity(0.5), radius: 5)
                         }
 
                         if user.isPremium {
                             Image(systemName: "crown.fill")
                                 .font(.title3)
-                                .foregroundColor(.yellow)
-                                .shadow(color: .yellow.opacity(0.7), radius: 8)
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.purple, .pink],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
                         }
                     }
 
@@ -384,7 +387,7 @@ struct ProfileView: View {
                         Text("\(user.age) years old")
                             .font(.subheadline)
                     }
-                    .foregroundColor(.white.opacity(0.95))
+                    .foregroundColor(.secondary)
                 }
                 .padding(.bottom, 40)
             }
@@ -401,9 +404,9 @@ struct ProfileView: View {
                         ShareLink(item: shareURL, subject: Text("Check out \(user.fullName)'s profile"), message: Text("See \(user.fullName) on Celestia!")) {
                             Image(systemName: "square.and.arrow.up")
                                 .font(.title3)
-                                .foregroundColor(.white)
+                                .foregroundColor(.primary)
                                 .frame(width: 44, height: 44)
-                                .background(Color.white.opacity(0.2))
+                                .background(Color(.systemGray5))
                                 .clipShape(Circle())
                         }
                         .simultaneousGesture(TapGesture().onEnded {
@@ -421,9 +424,9 @@ struct ProfileView: View {
                     } label: {
                         Image(systemName: "gearshape.fill")
                             .font(.title3)
-                            .foregroundColor(.white)
+                            .foregroundColor(.primary)
                             .frame(width: 44, height: 44)
-                            .background(Color.white.opacity(0.2))
+                            .background(Color(.systemGray5))
                             .clipShape(Circle())
                     }
                     .accessibilityLabel("Settings")
@@ -449,23 +452,17 @@ struct ProfileView: View {
         }
         .overlay(
             Circle()
-                .stroke(
-                    LinearGradient(
-                        colors: [Color.white, Color.yellow.opacity(0.8)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 4
-                )
+                .stroke(Color(.systemBackground), lineWidth: 4)
         )
-        .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
+        .shadow(color: .black.opacity(0.15), radius: 16, y: 8)
         .overlay(alignment: .bottomTrailing) {
             // Edit icon
             ZStack {
                 Circle()
-                    .fill(Color.white)
+                    .fill(Color(.systemBackground))
                     .frame(width: 44, height: 44)
-                
+                    .shadow(color: .black.opacity(0.1), radius: 4)
+
                 Circle()
                     .fill(
                         LinearGradient(
@@ -475,7 +472,7 @@ struct ProfileView: View {
                         )
                     )
                     .frame(width: 40, height: 40)
-                
+
                 Image(systemName: "camera.fill")
                     .font(.callout)
                     .foregroundColor(.white)
@@ -677,76 +674,35 @@ struct ProfileView: View {
             HStack(spacing: 16) {
                 ZStack {
                     Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [.green.opacity(0.2), .mint.opacity(0.2)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .fill(Color.green.opacity(0.12))
                         .frame(width: 60, height: 60)
 
                     Image(systemName: "gift.fill")
                         .font(.title)
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.green, .mint],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .foregroundColor(.green)
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
-                        Text("Invite Friends")
-                            .font(.headline)
-                            .foregroundColor(.primary)
+                    Text("Invite Friends")
+                        .font(.headline)
+                        .foregroundColor(.primary)
 
-                        Image(systemName: "sparkles")
-                            .font(.caption)
-                            .foregroundColor(.green)
-                    }
-
-                    Text("Earn free premium days for each friend you refer")
+                    Text("Earn free premium days")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                        .lineLimit(2)
+                        .lineLimit(1)
                 }
 
                 Spacer()
 
-                Image(systemName: "arrow.right.circle.fill")
-                    .font(.title2)
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.green, .mint],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                Image(systemName: "chevron.right")
+                    .font(.body.weight(.semibold))
+                    .foregroundColor(.secondary)
             }
             .padding(20)
-            .background(
-                LinearGradient(
-                    colors: [Color.green.opacity(0.08), Color.mint.opacity(0.06)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
+            .background(Color(.systemBackground))
             .cornerRadius(16)
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(
-                        LinearGradient(
-                            colors: [Color.green.opacity(0.3), Color.mint.opacity(0.2)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 2
-                    )
-            )
-            .shadow(color: .green.opacity(0.15), radius: 15, y: 8)
+            .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
         }
         .accessibilityLabel("Invite Friends")
         .accessibilityHint("Open referral dashboard to invite friends and earn free premium days")
@@ -800,78 +756,43 @@ struct ProfileView: View {
             HStack(spacing: 16) {
                 ZStack {
                     Circle()
-                        .fill(Color.blue.opacity(0.2))
+                        .fill(Color.blue.opacity(0.12))
                         .frame(width: 60, height: 60)
 
                     Image(systemName: "checkmark.seal.fill")
                         .font(.title)
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.blue, .cyan],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .foregroundColor(.blue)
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
-                        Text("Get Verified")
-                            .font(.headline)
-                            .foregroundColor(.primary)
+                    Text("Get Verified")
+                        .font(.headline)
+                        .foregroundColor(.primary)
 
-                        Image(systemName: "sparkles")
-                            .font(.caption)
-                            .foregroundColor(.blue)
-                    }
-
-                    Text("Stand out with the blue checkmark • 3x more matches")
+                    Text("Stand out with the blue checkmark")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                        .lineLimit(2)
+                        .lineLimit(1)
                 }
 
                 Spacer()
 
-                Image(systemName: "arrow.right.circle.fill")
-                    .font(.title2)
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.blue, .cyan],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                Image(systemName: "chevron.right")
+                    .font(.body.weight(.semibold))
+                    .foregroundColor(.secondary)
             }
             .padding(20)
-            .background(
-                LinearGradient(
-                    colors: [Color.blue.opacity(0.1), Color.cyan.opacity(0.08)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
+            .background(Color(.systemBackground))
             .cornerRadius(16)
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(
-                        LinearGradient(
-                            colors: [Color.blue.opacity(0.3), Color.cyan.opacity(0.2)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 2
-                    )
-            )
-            .shadow(color: .blue.opacity(0.15), radius: 15, y: 8)
+            .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
         }
         .accessibilityLabel("Get Verified")
-        .accessibilityHint("Complete photo verification to earn the blue checkmark badge and get 3x more matches")
+        .accessibilityHint("Complete photo verification to earn the blue checkmark badge")
         .padding(.horizontal, 20)
     }
 
     // MARK: - Premium Upgrade Card
-    
+
     private var premiumUpgradeCard: some View {
         Button {
             showingPremiumUpgrade = true
@@ -880,70 +801,47 @@ struct ProfileView: View {
             HStack(spacing: 16) {
                 ZStack {
                     Circle()
-                        .fill(Color.yellow.opacity(0.2))
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.purple.opacity(0.15), Color.pink.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                         .frame(width: 60, height: 60)
-                    
+
                     Image(systemName: "crown.fill")
                         .font(.title)
                         .foregroundStyle(
                             LinearGradient(
-                                colors: [.yellow, .orange],
+                                colors: [.purple, .pink],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
                 }
-                
+
                 VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
-                        Text("Upgrade to Premium")
-                            .font(.headline)
-                            .foregroundColor(.primary)
-                        
-                        Image(systemName: "sparkles")
-                            .font(.caption)
-                            .foregroundColor(.yellow)
-                    }
-                    
-                    Text("Unlimited likes & see admirers")
+                    Text("Upgrade to Premium")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+
+                    Text("Unlimited likes & see who likes you")
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .lineLimit(1)
                 }
-                
+
                 Spacer()
-                
-                Image(systemName: "arrow.right.circle.fill")
-                    .font(.title2)
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.purple, .pink],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+
+                Image(systemName: "chevron.right")
+                    .font(.body.weight(.semibold))
+                    .foregroundColor(.secondary)
             }
             .padding(20)
-            .background(
-                LinearGradient(
-                    colors: [Color.yellow.opacity(0.1), Color.orange.opacity(0.08)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
+            .background(Color(.systemBackground))
             .cornerRadius(16)
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(
-                        LinearGradient(
-                            colors: [Color.yellow.opacity(0.3), Color.orange.opacity(0.2)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 2
-                    )
-            )
-            .shadow(color: .yellow.opacity(0.15), radius: 15, y: 8)
+            .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
         }
         .accessibilityLabel("Upgrade to Premium")
         .accessibilityHint("Unlock unlimited likes, see who likes you, and access all premium features")
@@ -962,14 +860,14 @@ struct ProfileView: View {
                     Circle()
                         .fill(
                             LinearGradient(
-                                colors: [Color.purple.opacity(0.2), Color.pink.opacity(0.15)],
+                                colors: [Color.purple.opacity(0.15), Color.pink.opacity(0.1)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
                         .frame(width: 60, height: 60)
 
-                    Image(systemName: "creditcard.fill")
+                    Image(systemName: "crown.fill")
                         .font(.title)
                         .foregroundStyle(
                             LinearGradient(
@@ -981,126 +879,53 @@ struct ProfileView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
-                        Text("Manage Subscription")
-                            .font(.headline)
-                            .foregroundColor(.primary)
+                    Text("Premium Member")
+                        .font(.headline)
+                        .foregroundColor(.primary)
 
-                        Image(systemName: "hand.tap.fill")
-                            .font(.caption)
-                            .foregroundColor(.purple)
-                    }
-
-                    Text("View plans, features & account details")
+                    Text("Manage your subscription")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                        .lineLimit(2)
+                        .lineLimit(1)
                 }
 
                 Spacer()
 
-                Image(systemName: "arrow.right.circle.fill")
-                    .font(.title2)
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.purple, .pink],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                Image(systemName: "chevron.right")
+                    .font(.body.weight(.semibold))
+                    .foregroundColor(.secondary)
             }
             .padding(20)
-            .background(
-                LinearGradient(
-                    colors: [Color.purple.opacity(0.08), Color.pink.opacity(0.06)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
+            .background(Color(.systemBackground))
             .cornerRadius(16)
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(
-                        LinearGradient(
-                            colors: [Color.purple.opacity(0.3), Color.pink.opacity(0.2)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 2
-                    )
-            )
-            .shadow(color: .purple.opacity(0.15), radius: 15, y: 8)
+            .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
         }
         .accessibilityLabel("Manage Subscription")
-        .accessibilityHint("View subscription plans, features, and account details with swipeable tabs")
+        .accessibilityHint("View subscription plans, features, and account details")
         .padding(.horizontal, 20)
     }
 
     // MARK: - Section Headers & Dividers
 
     private func sectionDivider() -> some View {
-        VStack(spacing: 0) {
-            Rectangle()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            .clear,
-                            .purple.opacity(0.15),
-                            .pink.opacity(0.1),
-                            .clear
-                        ],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .frame(height: 1)
-                .padding(.horizontal, 40)
-        }
-        .padding(.vertical, 12)
+        Rectangle()
+            .fill(Color(.separator).opacity(0.5))
+            .frame(height: 1)
+            .padding(.horizontal, 40)
+            .padding(.vertical, 12)
     }
 
     private func sectionHeader(title: String, icon: String) -> some View {
-        HStack(spacing: 12) {
-            // Icon with gradient background
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [.purple.opacity(0.15), .pink.opacity(0.1)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 36, height: 36)
-
-                Image(systemName: icon)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.purple, .pink],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            }
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.body.weight(.semibold))
+                .foregroundColor(.secondary)
 
             Text(title)
-                .font(.title3.weight(.bold))
+                .font(.headline)
                 .foregroundColor(.primary)
 
             Spacer()
-
-            // Decorative line
-            Rectangle()
-                .fill(
-                    LinearGradient(
-                        colors: [.purple.opacity(0.3), .pink.opacity(0.2), .clear],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .frame(height: 2)
-                .frame(maxWidth: 80)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 4)
@@ -1545,7 +1370,7 @@ struct ProfileView: View {
                 Text("Discovery Preferences")
                     .font(.headline)
             }
-            
+
             VStack(spacing: 12) {
                 HStack {
                     Text("Age range")
@@ -1553,6 +1378,18 @@ struct ProfileView: View {
                         .foregroundColor(.secondary)
                     Spacer()
                     Text("\(user.ageRangeMin) - \(user.ageRangeMax)")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                }
+
+                Divider()
+
+                HStack {
+                    Text("Max distance")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(user.maxDistance) km")
                         .font(.subheadline)
                         .fontWeight(.semibold)
                 }
