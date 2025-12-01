@@ -672,6 +672,123 @@ async function sendSuspensionNotification(userId, suspensionData) {
 }
 
 /**
+ * Sends a ban notification to a user
+ * Called by admin when permanently banning an account
+ * @param {string} userId - User to notify
+ * @param {object} banData - Ban information
+ */
+async function sendBanNotification(userId, banData) {
+  const userDoc = await admin.firestore().collection('users').doc(userId).get();
+
+  if (!userDoc.exists) {
+    functions.logger.error('User not found for ban notification', { userId });
+    return;
+  }
+
+  const user = userDoc.data();
+  const fcmToken = user.fcmToken;
+
+  if (!fcmToken) {
+    functions.logger.info('No FCM token for user', { userId });
+    return;
+  }
+
+  const reason = banData.reason || "Serious violation of community guidelines";
+
+  const notification = {
+    title: "⛔ Account Banned",
+    body: `Your account has been permanently banned. Reason: ${reason}`,
+    sound: 'default',
+    badge: 1,
+    category: 'ACCOUNT_BANNED',
+    data: {
+      type: 'account_banned',
+      reason: reason
+    }
+  };
+
+  await sendPushNotification(fcmToken, notification);
+
+  // Log the notification
+  await admin.firestore().collection('notification_logs').add({
+    userId,
+    type: 'account_banned',
+    reason: reason,
+    sentAt: admin.firestore.FieldValue.serverTimestamp(),
+    delivered: true
+  });
+
+  functions.logger.info('Ban notification sent', { userId, reason });
+}
+
+/**
+ * Sends a notification to the reporter when their report is resolved
+ * @param {string} reporterId - User who filed the report
+ * @param {object} resolutionData - Resolution information
+ */
+async function sendReportResolvedNotification(reporterId, resolutionData) {
+  const userDoc = await admin.firestore().collection('users').doc(reporterId).get();
+
+  if (!userDoc.exists) {
+    functions.logger.error('Reporter not found for report resolution notification', { reporterId });
+    return;
+  }
+
+  const user = userDoc.data();
+  const fcmToken = user.fcmToken;
+
+  if (!fcmToken) {
+    functions.logger.info('No FCM token for reporter', { reporterId });
+    return;
+  }
+
+  const action = resolutionData.action || 'reviewed';
+  let title = "📋 Report Update";
+  let body = "Your report has been reviewed by our moderation team.";
+
+  // Customize message based on action taken
+  if (action === 'ban' || action === 'banned') {
+    title = "✅ Report Action Taken";
+    body = "Thank you for your report. The user has been removed from Celestia.";
+  } else if (action === 'suspend' || action === 'suspended') {
+    title = "✅ Report Action Taken";
+    body = "Thank you for your report. The user has been suspended.";
+  } else if (action === 'warn' || action === 'warned') {
+    title = "✅ Report Action Taken";
+    body = "Thank you for your report. A warning has been issued to the user.";
+  } else if (action === 'dismiss' || action === 'dismissed') {
+    title = "📋 Report Reviewed";
+    body = "Your report has been reviewed. No violation was found, but we appreciate your help keeping Celestia safe.";
+  }
+
+  const notification = {
+    title: title,
+    body: body,
+    sound: 'default',
+    badge: 1,
+    category: 'REPORT_RESOLVED',
+    data: {
+      type: 'report_resolved',
+      action: action,
+      reportId: resolutionData.reportId || ''
+    }
+  };
+
+  await sendPushNotification(fcmToken, notification);
+
+  // Log the notification
+  await admin.firestore().collection('notification_logs').add({
+    userId: reporterId,
+    type: 'report_resolved',
+    action: action,
+    sentAt: admin.firestore.FieldValue.serverTimestamp(),
+    delivered: true
+  });
+
+  functions.logger.info('Report resolution notification sent to reporter', { reporterId, action });
+}
+
+/**
  * Sends an ID verification rejection notification to a user
  * @param {string} userId - User to notify
  * @param {object} rejectionData - Rejection information
@@ -731,5 +848,7 @@ module.exports = {
   sendNewAccountNotification,
   sendWarningNotification,
   sendSuspensionNotification,
+  sendBanNotification,
+  sendReportResolvedNotification,
   sendIDVerificationRejectionNotification
 };

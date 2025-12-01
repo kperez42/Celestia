@@ -1467,6 +1467,9 @@ class ModerationViewModel: ObservableObject {
             throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Report not found"])
         }
 
+        // Get reporter ID for notification
+        let reporterId = data["reporterId"] as? String
+
         // Update report status
         try await reportRef.updateData([
             "status": "resolved",
@@ -1484,8 +1487,28 @@ class ModerationViewModel: ObservableObject {
             try await warnUserInFirestore(userId: reportedUserId, reason: reason ?? "Warning issued")
         }
 
+        // Send notification to reporter about the resolution
+        if let reporterId = reporterId {
+            await sendReportResolvedNotification(reporterId: reporterId, action: action.rawValue, reportId: reportId)
+        }
+
         // Refresh queue
         await loadQueue()
+    }
+
+    /// Send report resolved notification to reporter via Cloud Function
+    private func sendReportResolvedNotification(reporterId: String, action: String, reportId: String) async {
+        do {
+            let callable = functions.httpsCallable("sendReportResolvedNotification")
+            _ = try await callable.call([
+                "reporterId": reporterId,
+                "action": action,
+                "reportId": reportId
+            ])
+            Logger.shared.info("Report resolution notification sent to reporter: \(reporterId)", category: .moderation)
+        } catch {
+            Logger.shared.error("Failed to send report resolution notification", category: .moderation, error: error)
+        }
     }
 
     /// Ban user directly (without needing a report)
@@ -1517,7 +1540,24 @@ class ModerationViewModel: ObservableObject {
             "showMeInSearch": false
         ])
 
+        // Send push notification to user about ban
+        await sendBanNotification(userId: userId, reason: reason)
+
         Logger.shared.info("User banned: \(userId)", category: .moderation)
+    }
+
+    /// Send ban notification via Cloud Function
+    private func sendBanNotification(userId: String, reason: String) async {
+        do {
+            let callable = functions.httpsCallable("sendBanNotification")
+            _ = try await callable.call([
+                "userId": userId,
+                "reason": reason
+            ])
+            Logger.shared.info("Ban notification sent to \(userId)", category: .moderation)
+        } catch {
+            Logger.shared.error("Failed to send ban notification", category: .moderation, error: error)
+        }
     }
 
     /// Suspend user in Firestore

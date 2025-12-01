@@ -928,6 +928,46 @@ exports.sendSuspensionNotification = functions.https.onCall(async (data, context
 });
 
 /**
+ * Sends a ban notification to a user
+ * Called by admin when permanently banning an account
+ */
+exports.sendBanNotification = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { userId, reason } = data;
+
+  try {
+    await notifications.sendBanNotification(userId, { reason });
+    return { success: true };
+  } catch (error) {
+    functions.logger.error('Send ban notification error', { error: error.message });
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
+ * Sends a notification to the reporter when their report is resolved
+ * Called by admin after reviewing a report
+ */
+exports.sendReportResolvedNotification = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { reporterId, action, reportId } = data;
+
+  try {
+    await notifications.sendReportResolvedNotification(reporterId, { action, reportId });
+    return { success: true };
+  } catch (error) {
+    functions.logger.error('Send report resolved notification error', { error: error.message });
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
  * Sends a profile status notification to a user
  * Called when profile is approved or rejected
  */
