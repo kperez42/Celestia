@@ -1727,6 +1727,65 @@ exports.onReportCreated = functions.firestore
   });
 
 /**
+ * Trigger: Notify admins when user submits an appeal
+ * Sends PUSH notification to admins for review
+ */
+exports.onAppealSubmitted = functions.firestore
+  .document('appeals/{appealId}')
+  .onCreate(async (snap, context) => {
+    const appealData = snap.data();
+    const appealId = context.params.appealId;
+
+    functions.logger.info('New appeal submitted', {
+      appealId,
+      userId: appealData.userId,
+      type: appealData.type
+    });
+
+    try {
+      const userName = appealData.userName || 'A user';
+      const appealType = appealData.type || 'account';
+
+      let title = '📩 New Appeal Submitted';
+      let body = `${userName} has appealed their ${appealType} decision`;
+
+      if (appealType === 'suspension') {
+        title = '📩 Suspension Appeal';
+        body = `${userName} is appealing their account suspension`;
+      } else if (appealType === 'ban') {
+        title = '📩 Ban Appeal';
+        body = `${userName} is appealing their permanent ban`;
+      } else if (appealType === 'rejection') {
+        title = '📩 Profile Rejection Appeal';
+        body = `${userName} is appealing their profile rejection`;
+      }
+
+      // Send PUSH notification to all admins
+      await notifications.sendAdminNotification({
+        title: title,
+        body: body,
+        alertType: 'new_appeal',
+        badge: 1,
+        data: {
+          appealId: appealId,
+          userId: appealData.userId || '',
+          userName: userName,
+          type: appealType,
+          appealMessage: (appealData.appealMessage || '').substring(0, 100)
+        }
+      });
+
+      functions.logger.info('Admin notified of new appeal', { appealId });
+
+    } catch (error) {
+      functions.logger.error('Error notifying admins of appeal', {
+        appealId,
+        error: error.message
+      });
+    }
+  });
+
+/**
  * Trigger: Notify admins when suspicious profile is detected
  * Sends PUSH notification when content moderation flags a profile
  */
