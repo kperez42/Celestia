@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct ProfileEnhancementView: View {
     @EnvironmentObject var authService: AuthService
