@@ -56,6 +56,11 @@ struct User: Identifiable, Codable, Equatable {
     var premiumTier: String?
     var subscriptionExpiryDate: Date?
 
+    // ID Verification Rejection (when ID verification is rejected)
+    var idVerificationRejected: Bool = false
+    var idVerificationRejectedAt: Date?
+    var idVerificationRejectionReason: String?
+
     // Admin Access (for moderation dashboard)
     var isAdmin: Bool = false
 
@@ -176,6 +181,9 @@ struct User: Identifiable, Codable, Equatable {
         try container.encode(isAdmin, forKey: .isAdmin)
         try container.encodeIfPresent(premiumTier, forKey: .premiumTier)
         try container.encodeIfPresent(subscriptionExpiryDate, forKey: .subscriptionExpiryDate)
+        try container.encode(idVerificationRejected, forKey: .idVerificationRejected)
+        try container.encodeIfPresent(idVerificationRejectedAt, forKey: .idVerificationRejectedAt)
+        try container.encodeIfPresent(idVerificationRejectionReason, forKey: .idVerificationRejectionReason)
         try container.encode(profileStatus, forKey: .profileStatus)
         try container.encodeIfPresent(profileStatusReason, forKey: .profileStatusReason)
         try container.encodeIfPresent(profileStatusReasonCode, forKey: .profileStatusReasonCode)
@@ -224,6 +232,7 @@ struct User: Identifiable, Codable, Equatable {
         case languages, interests, photos, profileImageURL
         case timestamp, lastActive, isOnline
         case isPremium, isVerified, isAdmin, premiumTier, subscriptionExpiryDate
+        case idVerificationRejected, idVerificationRejectedAt, idVerificationRejectionReason
         case profileStatus, profileStatusReason, profileStatusReasonCode, profileStatusFixInstructions, profileStatusUpdatedAt
         case isSuspended, suspendedAt, suspendedUntil, suspendReason
         case warningCount, hasUnreadWarning, lastWarningReason
@@ -279,6 +288,13 @@ struct User: Identifiable, Codable, Equatable {
         if let expiryDate = dictionary["subscriptionExpiryDate"] as? Timestamp {
             self.subscriptionExpiryDate = expiryDate.dateValue()
         }
+
+        // ID Verification rejection info
+        self.idVerificationRejected = dictionary["idVerificationRejected"] as? Bool ?? false
+        if let rejectedAt = dictionary["idVerificationRejectedAt"] as? Timestamp {
+            self.idVerificationRejectedAt = rejectedAt.dateValue()
+        }
+        self.idVerificationRejectionReason = dictionary["idVerificationRejectionReason"] as? String
 
         // Profile Status (for moderation quarantine)
         self.profileStatus = dictionary["profileStatus"] as? String ?? "pending"

@@ -948,6 +948,26 @@ exports.sendProfileStatusNotification = functions.https.onCall(async (data, cont
 });
 
 /**
+ * Sends an ID verification rejection notification to a user
+ * Called by admin when rejecting ID verification
+ */
+exports.sendIDVerificationRejectionNotification = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { userId, reason } = data;
+
+  try {
+    await notifications.sendIDVerificationRejectionNotification(userId, { reason });
+    return { success: true };
+  } catch (error) {
+    functions.logger.error('Send ID verification rejection notification error', { error: error.message });
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
  * Scheduled function to send daily engagement reminders
  * Runs daily at 9 AM and 7 PM
  */

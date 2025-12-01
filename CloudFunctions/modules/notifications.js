@@ -624,6 +624,55 @@ async function sendSuspensionNotification(userId, suspensionData) {
   functions.logger.info('Suspension notification sent', { userId, days, reason });
 }
 
+/**
+ * Sends an ID verification rejection notification to a user
+ * @param {string} userId - User to notify
+ * @param {object} rejectionData - Rejection information
+ */
+async function sendIDVerificationRejectionNotification(userId, rejectionData) {
+  const userDoc = await admin.firestore().collection('users').doc(userId).get();
+
+  if (!userDoc.exists) {
+    functions.logger.error('User not found for ID verification rejection notification', { userId });
+    return;
+  }
+
+  const user = userDoc.data();
+  const fcmToken = user.fcmToken;
+
+  if (!fcmToken) {
+    functions.logger.info('No FCM token for user', { userId });
+    return;
+  }
+
+  const reason = rejectionData.reason || "Your ID verification could not be completed";
+
+  const notification = {
+    title: "ID Verification Update",
+    body: reason,
+    sound: 'default',
+    badge: 1,
+    category: 'ID_VERIFICATION',
+    data: {
+      type: 'id_verification_rejected',
+      reason: reason
+    }
+  };
+
+  await sendPushNotification(fcmToken, notification);
+
+  // Log the notification
+  await admin.firestore().collection('notification_logs').add({
+    userId,
+    type: 'id_verification_rejected',
+    reason: reason,
+    sentAt: admin.firestore.FieldValue.serverTimestamp(),
+    delivered: true
+  });
+
+  functions.logger.info('ID verification rejection notification sent', { userId, reason });
+}
+
 module.exports = {
   sendPushNotification,
   sendMatchNotification,
@@ -634,5 +683,6 @@ module.exports = {
   sendAdminNotification,
   sendNewAccountNotification,
   sendWarningNotification,
-  sendSuspensionNotification
+  sendSuspensionNotification,
+  sendIDVerificationRejectionNotification
 };

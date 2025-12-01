@@ -10,6 +10,7 @@ import SwiftUI
 import FirebaseFirestore
 import FirebaseAuth
 import FirebaseStorage
+import FirebaseFunctions
 
 // MARK: - Pending Verification Model
 
@@ -812,6 +813,7 @@ class AdminVerificationReviewViewModel: ObservableObject {
     @Published var errorMessage = ""
 
     private let db = Firestore.firestore()
+    private let functions = Functions.functions()
 
     // MARK: - Load Pending Verifications
 
@@ -896,6 +898,9 @@ class AdminVerificationReviewViewModel: ObservableObject {
                 "idVerificationRejectionReason": reason
             ])
 
+            // Send push notification to user about rejection
+            await sendIDVerificationRejectionNotification(userId: verification.userId, reason: reason)
+
             // Remove from local list
             pendingVerifications.removeAll { $0.id == verification.id }
 
@@ -905,6 +910,20 @@ class AdminVerificationReviewViewModel: ObservableObject {
             Logger.shared.error("Failed to reject verification", category: .general, error: error)
             errorMessage = "Failed to reject: \(error.localizedDescription)"
             showingError = true
+        }
+    }
+
+    /// Send ID verification rejection notification via Cloud Function
+    private func sendIDVerificationRejectionNotification(userId: String, reason: String) async {
+        do {
+            let callable = functions.httpsCallable("sendIDVerificationRejectionNotification")
+            _ = try await callable.call([
+                "userId": userId,
+                "reason": reason
+            ])
+            Logger.shared.info("ID verification rejection notification sent to \(userId)", category: .general)
+        } catch {
+            Logger.shared.error("Failed to send ID verification rejection notification", category: .general, error: error)
         }
     }
 
