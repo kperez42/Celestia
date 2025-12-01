@@ -36,10 +36,7 @@ struct AdminModerationDashboard: View {
                             badgeCount: getBadgeCount(for: index),
                             namespace: tabAnimation
                         ) {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
-                                selectedTab = index
-                            }
-                            HapticManager.shared.impact(.light)
+                            selectedTab = index
                         }
                     }
                 }
@@ -60,7 +57,7 @@ struct AdminModerationDashboard: View {
                     .frame(height: 0.5)
             }
 
-            // Content with smooth transitions
+            // Content - no extra animation modifiers for smooth native swiping
             TabView(selection: $selectedTab) {
                 pendingProfilesView
                     .tag(0)
@@ -78,7 +75,6 @@ struct AdminModerationDashboard: View {
                     .tag(4)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
-            .animation(.easeInOut(duration: 0.25), value: selectedTab)
         }
         .task {
             await viewModel.loadQueue()
