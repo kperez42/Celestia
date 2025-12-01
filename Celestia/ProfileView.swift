@@ -1399,11 +1399,12 @@ struct ProfileView: View {
                             CachedAsyncImage(url: URL(string: photos[index])) { image in
                                 image
                                     .resizable()
-                                    .scaledToFill()
+                                    .interpolation(.high)
+                                    .antialiased(true)
+                                    .aspectRatio(contentMode: .fill)
                             }
-                            .frame(width: 140, height: 200)
-                            .cornerRadius(16)
-                            .clipped()
+                            .frame(width: 150, height: 200)  // 3:4 aspect ratio matches optimized images
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 16)
                                     .stroke(

@@ -2515,33 +2515,69 @@ struct EditProfileView: View {
 
     // MARK: - Image Optimization
 
+    /// Optimizes an image for upload: crops to 3:4 portrait ratio, resizes to max 2000px
+    /// This ensures images display perfectly in cards without distortion or unexpected cropping
     private func optimizeImageForUpload(_ image: UIImage) -> UIImage {
-        // PERFORMANCE: Higher quality for sharper photos on cards
-        let maxDimension: CGFloat = 2000  // Higher resolution for crisp display on all devices
-        let compressionQuality: CGFloat = 0.92  // Higher quality to prevent blurriness
+        // QUALITY: Higher settings for crisp photos on all card sizes
+        let maxDimension: CGFloat = 2000  // High resolution for crisp display on all devices
+        let targetAspectRatio: CGFloat = 3.0 / 4.0  // Portrait ratio (0.75) - perfect for profile cards
 
-        // Calculate new size maintaining aspect ratio
-        let size = image.size
-        let ratio = min(maxDimension / size.width, maxDimension / size.height)
+        let originalSize = image.size
+        let originalAspectRatio = originalSize.width / originalSize.height
 
-        if ratio >= 1.0 {
-            // Image is already smaller than max, just compress
-            return image
+        var croppedImage = image
+
+        // STEP 1: Crop to target aspect ratio (3:4 portrait) for consistent card display
+        // This ensures images always fill cards without unexpected cropping
+        if abs(originalAspectRatio - targetAspectRatio) > 0.01 {
+            let cropRect: CGRect
+
+            if originalAspectRatio > targetAspectRatio {
+                // Image is wider than target - crop sides (center horizontally)
+                let targetWidth = originalSize.height * targetAspectRatio
+                let xOffset = (originalSize.width - targetWidth) / 2
+                cropRect = CGRect(x: xOffset, y: 0, width: targetWidth, height: originalSize.height)
+            } else {
+                // Image is taller than target - crop top/bottom (center vertically, favor upper portion for faces)
+                let targetHeight = originalSize.width / targetAspectRatio
+                // Favor upper 40% of image to capture faces better
+                let yOffset = max(0, (originalSize.height - targetHeight) * 0.4)
+                cropRect = CGRect(x: 0, y: yOffset, width: originalSize.width, height: targetHeight)
+            }
+
+            // Perform the crop using CGImage for best quality
+            if let cgImage = image.cgImage,
+               let croppedCGImage = cgImage.cropping(to: cropRect) {
+                croppedImage = UIImage(cgImage: croppedCGImage, scale: image.scale, orientation: image.imageOrientation)
+            }
         }
 
-        let newSize = CGSize(width: size.width * ratio, height: size.height * ratio)
+        // STEP 2: Resize if needed (maintain high quality)
+        let croppedSize = croppedImage.size
+        let ratio = min(maxDimension / croppedSize.width, maxDimension / croppedSize.height)
 
-        // PERFORMANCE: Use format optimized for faster rendering
+        if ratio >= 1.0 {
+            // Image is already smaller than max - return cropped version
+            return croppedImage
+        }
+
+        let newSize = CGSize(width: croppedSize.width * ratio, height: croppedSize.height * ratio)
+
+        // QUALITY: Use high-fidelity rendering format
         let format = UIGraphicsImageRendererFormat()
-        format.scale = 1.0  // Force 1x scale for smaller file sizes
-        format.opaque = true  // Faster rendering for non-transparent images
+        format.scale = 1.0  // 1x scale for optimal file size
+        format.opaque = true  // Opaque for better JPEG compression
+        format.preferredRange = .standard  // Standard color range for compatibility
 
         let renderer = UIGraphicsImageRenderer(size: newSize, format: format)
         let resizedImage = renderer.image { context in
-            // Fill background with white for JPEG optimization
+            // Fill background with white for clean JPEG edges
             UIColor.white.setFill()
             context.fill(CGRect(origin: .zero, size: newSize))
-            image.draw(in: CGRect(origin: .zero, size: newSize))
+
+            // Draw with high-quality interpolation
+            context.cgContext.interpolationQuality = .high
+            croppedImage.draw(in: CGRect(origin: .zero, size: newSize))
         }
 
         return resizedImage
