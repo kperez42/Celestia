@@ -11,6 +11,7 @@ struct ProfileRejectionFeedbackView: View {
     @EnvironmentObject var authService: AuthService
     @State private var showEditProfile = false
     @State private var isUpdating = false
+    @State private var animateIcon = false
 
     private var user: User? {
         authService.currentUser
@@ -19,84 +20,190 @@ struct ProfileRejectionFeedbackView: View {
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(spacing: 24) {
-                    // Header icon
+                VStack(spacing: 20) {
+                    // Animated Header
                     ZStack {
+                        // Outer pulse ring
+                        Circle()
+                            .stroke(Color.orange.opacity(0.3), lineWidth: 2)
+                            .frame(width: 130, height: 130)
+                            .scaleEffect(animateIcon ? 1.2 : 1.0)
+                            .opacity(animateIcon ? 0 : 0.8)
+
+                        // Background circles
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.orange.opacity(0.2), Color.orange.opacity(0.05)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 110, height: 110)
+
                         Circle()
                             .fill(Color.orange.opacity(0.15))
-                            .frame(width: 100, height: 100)
+                            .frame(width: 85, height: 85)
 
                         Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 50))
-                            .foregroundColor(.orange)
+                            .font(.system(size: 40, weight: .medium))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.orange, .red.opacity(0.8)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .symbolEffect(.pulse, options: .repeating)
                     }
-                    .padding(.top, 40)
+                    .padding(.top, 30)
+                    .onAppear {
+                        withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: false)) {
+                            animateIcon = true
+                        }
+                    }
 
-                    // Title
-                    Text("Profile Needs Updates")
-                        .font(.title.bold())
-                        .multilineTextAlignment(.center)
+                    // Title and subtitle
+                    VStack(spacing: 8) {
+                        Text("Profile Needs Updates")
+                            .font(.title2.bold())
+                            .multilineTextAlignment(.center)
+
+                        Text("Don't worry - just a few quick fixes!")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+
+                    // Steps to fix card
+                    VStack(spacing: 0) {
+                        // Step 1: Review Reason
+                        StepRow(
+                            number: 1,
+                            title: "Review the Reason",
+                            subtitle: "See why your profile needs changes",
+                            color: .orange,
+                            isLast: false
+                        )
+
+                        // Step 2: Make Changes
+                        StepRow(
+                            number: 2,
+                            title: "Edit Your Profile",
+                            subtitle: "Update photos or bio as needed",
+                            color: .blue,
+                            isLast: false
+                        )
+
+                        // Step 3: Request Review
+                        StepRow(
+                            number: 3,
+                            title: "Request Re-Review",
+                            subtitle: "We'll check your profile again",
+                            color: .green,
+                            isLast: true
+                        )
+                    }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color(.systemBackground))
+                            .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .strokeBorder(Color(.separator).opacity(0.2), lineWidth: 1)
+                    )
+                    .padding(.horizontal)
 
                     // Reason card
-                    VStack(alignment: .leading, spacing: 16) {
-                        Label("What happened", systemImage: "info.circle.fill")
-                            .font(.headline)
-                            .foregroundColor(.orange)
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.orange.opacity(0.15))
+                                    .frame(width: 36, height: 36)
+                                Image(systemName: "info.circle.fill")
+                                    .font(.system(size: 18))
+                                    .foregroundColor(.orange)
+                            }
+
+                            Text("Why This Happened")
+                                .font(.headline)
+                        }
 
                         Text(user?.profileStatusReason ?? "Your profile was reviewed and needs some updates before it can be approved.")
                             .font(.body)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.primary.opacity(0.85))
+                            .lineSpacing(4)
                     }
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.orange.opacity(0.1))
-                    .cornerRadius(16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color.orange.opacity(0.08))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .strokeBorder(Color.orange.opacity(0.2), lineWidth: 1)
+                    )
                     .padding(.horizontal)
 
                     // Fix instructions card
                     if let instructions = user?.profileStatusFixInstructions, !instructions.isEmpty {
-                        VStack(alignment: .leading, spacing: 16) {
-                            Label("How to fix", systemImage: "wrench.and.screwdriver.fill")
-                                .font(.headline)
-                                .foregroundColor(.blue)
+                        VStack(alignment: .leading, spacing: 14) {
+                            HStack {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.blue.opacity(0.15))
+                                        .frame(width: 36, height: 36)
+                                    Image(systemName: "lightbulb.fill")
+                                        .font(.system(size: 18))
+                                        .foregroundColor(.blue)
+                                }
+
+                                Text("How to Fix It")
+                                    .font(.headline)
+                            }
 
                             Text(instructions)
                                 .font(.body)
-                                .foregroundColor(.primary)
+                                .foregroundColor(.primary.opacity(0.85))
+                                .lineSpacing(4)
                         }
                         .padding()
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.blue.opacity(0.1))
-                        .cornerRadius(16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color.blue.opacity(0.08))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .strokeBorder(Color.blue.opacity(0.2), lineWidth: 1)
+                        )
                         .padding(.horizontal)
                     }
 
                     // Common issues section
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Common Issues")
-                            .font(.headline)
-                            .padding(.horizontal)
-
-                        ForEach(getIssuesList(), id: \.self) { issue in
-                            HStack(alignment: .top, spacing: 12) {
-                                Image(systemName: issue.icon)
-                                    .foregroundColor(issue.color)
-                                    .frame(width: 24)
-
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(issue.title)
-                                        .font(.subheadline.weight(.semibold))
-                                    Text(issue.description)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                            .padding(.horizontal)
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack {
+                            Image(systemName: "checklist")
+                                .font(.headline)
+                                .foregroundColor(.purple)
+                            Text("Common Issues to Check")
+                                .font(.headline)
                         }
-                    }
-                    .padding(.top, 8)
+                        .padding(.horizontal)
 
-                    Spacer(minLength: 40)
+                        VStack(spacing: 10) {
+                            ForEach(getIssuesList(), id: \.self) { issue in
+                                IssueRow(issue: issue)
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                    .padding(.top, 4)
+
+                    Spacer(minLength: 20)
 
                     // Action buttons
                     VStack(spacing: 12) {
@@ -104,14 +211,16 @@ struct ProfileRejectionFeedbackView: View {
                             showEditProfile = true
                             HapticManager.shared.impact(.medium)
                         }) {
-                            HStack {
+                            HStack(spacing: 10) {
                                 Image(systemName: "pencil.circle.fill")
+                                    .font(.title3)
                                 Text("Edit My Profile")
+                                    .fontWeight(.semibold)
                             }
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
-                            .padding()
+                            .padding(.vertical, 16)
                             .background(
                                 LinearGradient(
                                     colors: [.blue, .purple],
@@ -120,6 +229,7 @@ struct ProfileRejectionFeedbackView: View {
                                 )
                             )
                             .cornerRadius(16)
+                            .shadow(color: .blue.opacity(0.3), radius: 8, y: 4)
                         }
 
                         Button(action: {
@@ -127,20 +237,26 @@ struct ProfileRejectionFeedbackView: View {
                                 await requestReReview()
                             }
                         }) {
-                            HStack {
+                            HStack(spacing: 10) {
                                 if isUpdating {
                                     ProgressView()
-                                        .tint(.blue)
+                                        .tint(.green)
                                 } else {
                                     Image(systemName: "arrow.clockwise.circle.fill")
+                                        .font(.title3)
                                     Text("Request Re-Review")
+                                        .fontWeight(.semibold)
                                 }
                             }
                             .font(.headline)
-                            .foregroundColor(.blue)
+                            .foregroundColor(.green)
                             .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.blue.opacity(0.15))
+                            .padding(.vertical, 16)
+                            .background(Color.green.opacity(0.12))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .strokeBorder(Color.green.opacity(0.3), lineWidth: 1.5)
+                            )
                             .cornerRadius(16)
                         }
                         .disabled(isUpdating)
@@ -155,9 +271,10 @@ struct ProfileRejectionFeedbackView: View {
                         .padding(.top, 8)
                     }
                     .padding(.horizontal)
-                    .padding(.bottom, 40)
+                    .padding(.bottom, 30)
                 }
             }
+            .background(Color(.systemGroupedBackground))
             .navigationTitle("Profile Review")
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showEditProfile) {
@@ -174,31 +291,96 @@ struct ProfileRejectionFeedbackView: View {
 
         var issues: [IssueItem] = []
 
-        // Add specific issues based on reason code
-        if reasonCode.contains("photo") || reasonCode.contains("image") {
+        // Photo-related issues
+        if reasonCode.contains("no_face") || reasonCode.contains("face_photo") {
             issues.append(IssueItem(
-                icon: "photo.fill",
-                color: .red,
-                title: "Photo Issues",
-                description: "Photos must clearly show your face. No filters, sunglasses, or group photos as your main picture."
+                icon: "person.crop.circle.badge.exclamationmark",
+                color: .orange,
+                title: "Face Photo Required",
+                description: "Your main photo must clearly show your face. No sunglasses, masks, or group shots."
             ))
         }
 
-        if reasonCode.contains("bio") || reasonCode.contains("text") {
+        if reasonCode.contains("low_quality") || reasonCode.contains("blurry") {
+            issues.append(IssueItem(
+                icon: "camera.metering.unknown",
+                color: .purple,
+                title: "Photo Quality",
+                description: "Use clear, well-lit photos. Avoid blurry or pixelated images."
+            ))
+        }
+
+        if reasonCode.contains("inappropriate") || reasonCode.contains("adult") {
+            issues.append(IssueItem(
+                icon: "exclamationmark.triangle.fill",
+                color: .red,
+                title: "Content Guidelines",
+                description: "Remove any inappropriate, explicit, or suggestive content from your profile."
+            ))
+        }
+
+        if reasonCode.contains("fake") || reasonCode.contains("stock") {
+            issues.append(IssueItem(
+                icon: "person.fill.questionmark",
+                color: .red,
+                title: "Authentic Photos Only",
+                description: "Use real photos of yourself. No celebrity, stock, or borrowed images."
+            ))
+        }
+
+        // Bio-related issues
+        if reasonCode.contains("bio") || reasonCode.contains("incomplete") {
             issues.append(IssueItem(
                 icon: "text.bubble.fill",
-                color: .orange,
-                title: "Bio Content",
-                description: "Your bio should describe yourself authentically. Avoid promotional content or contact info."
+                color: .blue,
+                title: "Complete Your Bio",
+                description: "Write at least a few sentences about yourself, your interests, and what you're looking for."
             ))
         }
 
-        if reasonCode.contains("spam") || reasonCode.contains("fake") {
+        if reasonCode.contains("contact") {
             issues.append(IssueItem(
-                icon: "exclamationmark.shield.fill",
+                icon: "phone.badge.xmark",
+                color: .orange,
+                title: "No Contact Info",
+                description: "Don't include phone numbers, emails, or social handles in your bio."
+            ))
+        }
+
+        // Account issues
+        if reasonCode.contains("spam") || reasonCode.contains("promotional") {
+            issues.append(IssueItem(
+                icon: "megaphone.fill",
+                color: .orange,
+                title: "No Self-Promotion",
+                description: "This platform is for genuine connections, not advertising or business."
+            ))
+        }
+
+        if reasonCode.contains("offensive") {
+            issues.append(IssueItem(
+                icon: "hand.raised.fill",
                 color: .red,
-                title: "Authenticity",
-                description: "Your profile should represent the real you. Use genuine photos and information."
+                title: "Community Guidelines",
+                description: "Remove any hateful, discriminatory, or offensive content."
+            ))
+        }
+
+        if reasonCode.contains("underage") {
+            issues.append(IssueItem(
+                icon: "person.badge.shield.checkmark.fill",
+                color: .purple,
+                title: "Age Verification",
+                description: "All users must be 18 or older. Contact support if this is an error."
+            ))
+        }
+
+        if reasonCode.contains("multiple") {
+            issues.append(IssueItem(
+                icon: "person.2.slash.fill",
+                color: .red,
+                title: "One Account Only",
+                description: "Please use only one account. Delete any duplicate accounts."
             ))
         }
 
@@ -263,6 +445,102 @@ private struct IssueItem: Hashable {
     let color: Color
     let title: String
     let description: String
+}
+
+// MARK: - Step Row Component
+
+private struct StepRow: View {
+    let number: Int
+    let title: String
+    let subtitle: String
+    let color: Color
+    let isLast: Bool
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
+            // Step number with connector line
+            VStack(spacing: 0) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [color, color.opacity(0.7)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .frame(width: 32, height: 32)
+
+                    Text("\(number)")
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                }
+
+                if !isLast {
+                    Rectangle()
+                        .fill(color.opacity(0.3))
+                        .frame(width: 2)
+                        .frame(height: 30)
+                }
+            }
+
+            // Step content
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.primary)
+
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.top, 4)
+
+            Spacer()
+        }
+    }
+}
+
+// MARK: - Issue Row Component
+
+private struct IssueRow: View {
+    let issue: IssueItem
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(issue.color.opacity(0.12))
+                    .frame(width: 38, height: 38)
+
+                Image(systemName: issue.icon)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(issue.color)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(issue.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.primary)
+
+                Text(issue.description)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineSpacing(2)
+            }
+
+            Spacer()
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.systemBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(issue.color.opacity(0.15), lineWidth: 1)
+        )
+    }
 }
 
 // MARK: - Firestore Import

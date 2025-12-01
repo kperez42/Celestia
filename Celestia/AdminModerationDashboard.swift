@@ -1985,30 +1985,42 @@ struct PendingProfileCard: View {
         .cornerRadius(20)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
         .confirmationDialog("Reject Profile", isPresented: $showRejectAlert, titleVisibility: .visible) {
-            Button("No Clear Face Photo", role: .destructive) {
+            // Photo Issues
+            Button("📸 No Clear Face Photo", role: .destructive) {
                 rejectWithReason(ProfileRejectionReason.noFacePhoto)
             }
-            Button("Inappropriate/Adult Content", role: .destructive) {
-                rejectWithReason(ProfileRejectionReason.inappropriatePhotos)
+            Button("📷 Low Quality Photos", role: .destructive) {
+                rejectWithReason(ProfileRejectionReason.lowQualityPhotos)
             }
-            Button("Fake/Stock Photos", role: .destructive) {
+            Button("🔍 Fake/Stock Photos", role: .destructive) {
                 rejectWithReason(ProfileRejectionReason.fakePhotos)
             }
-            Button("Empty/Incomplete Bio", role: .destructive) {
+            Button("🚫 Inappropriate Content", role: .destructive) {
+                rejectWithReason(ProfileRejectionReason.inappropriatePhotos)
+            }
+            // Bio Issues
+            Button("✏️ Incomplete Bio", role: .destructive) {
                 rejectWithReason(ProfileRejectionReason.incompleteBio)
             }
-            Button("Suspected Underage", role: .destructive) {
+            Button("📵 Contact Info in Bio", role: .destructive) {
+                rejectWithReason(ProfileRejectionReason.contactInfoInBio)
+            }
+            // Account Issues
+            Button("🔞 Suspected Underage", role: .destructive) {
                 rejectWithReason(ProfileRejectionReason.underage)
             }
-            Button("Spam/Promotional", role: .destructive) {
+            Button("📢 Spam/Promotional", role: .destructive) {
                 rejectWithReason(ProfileRejectionReason.spam)
             }
-            Button("Offensive Content", role: .destructive) {
+            Button("⚠️ Offensive Content", role: .destructive) {
                 rejectWithReason(ProfileRejectionReason.offensiveContent)
+            }
+            Button("👥 Multiple Accounts", role: .destructive) {
+                rejectWithReason(ProfileRejectionReason.multipleAccounts)
             }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Select a reason for rejecting \(profile.name)'s profile")
+            Text("Select why \(profile.name)'s profile needs changes")
         }
     }
 
@@ -2037,6 +2049,9 @@ enum ProfileRejectionReason {
     case underage
     case spam
     case offensiveContent
+    case lowQualityPhotos
+    case contactInfoInBio
+    case multipleAccounts
 
     var code: String {
         switch self {
@@ -2047,44 +2062,145 @@ enum ProfileRejectionReason {
         case .underage: return "underage"
         case .spam: return "spam"
         case .offensiveContent: return "offensive_content"
+        case .lowQualityPhotos: return "low_quality_photos"
+        case .contactInfoInBio: return "contact_info_bio"
+        case .multipleAccounts: return "multiple_accounts"
         }
     }
 
     var userMessage: String {
         switch self {
         case .noFacePhoto:
-            return "Your profile needs a clear photo showing your face"
+            return "We need a clear photo showing your face"
         case .inappropriatePhotos:
-            return "One or more of your photos contains inappropriate content"
+            return "Some photos contain content that isn't allowed"
         case .fakePhotos:
-            return "Your photos appear to be stock images or from another person"
+            return "We detected photos that may not be authentic"
         case .incompleteBio:
-            return "Your profile bio is empty or too short"
+            return "Your bio needs more detail about yourself"
         case .underage:
-            return "We couldn't verify that you meet our minimum age requirement"
+            return "Age verification is required"
         case .spam:
-            return "Your profile appears to be promotional or spam"
+            return "Your profile contains promotional content"
         case .offensiveContent:
-            return "Your profile contains offensive or hateful content"
+            return "Some content violates our community guidelines"
+        case .lowQualityPhotos:
+            return "Your photos are too blurry or low quality"
+        case .contactInfoInBio:
+            return "Contact information isn't allowed in bios"
+        case .multipleAccounts:
+            return "Multiple accounts aren't permitted"
         }
     }
 
     var fixInstructions: String {
         switch self {
         case .noFacePhoto:
-            return "Please upload at least one photo that clearly shows your face. Group photos, photos with sunglasses, or photos taken from far away won't be accepted."
+            return """
+            📸 Upload a clear, well-lit photo where your face is fully visible
+
+            ✅ Good photos:
+            • Face clearly visible and in focus
+            • Good lighting (natural light works great!)
+            • Just you in the photo
+
+            ❌ Avoid:
+            • Sunglasses or hats covering your face
+            • Group photos as your main picture
+            • Photos from far away
+            """
         case .inappropriatePhotos:
-            return "Please remove any photos containing nudity, explicit content, or suggestive material. Your photos should be appropriate for all audiences."
+            return """
+            🚫 Please remove photos that contain:
+            • Nudity or sexually suggestive content
+            • Violent or graphic imagery
+            • Drug or alcohol use
+
+            ✅ Keep it classy! Show your personality through photos of your hobbies, travel, or daily life.
+            """
         case .fakePhotos:
-            return "Please upload real photos of yourself. Using someone else's photos or stock images violates our community guidelines."
+            return """
+            🔍 We want to see the real you!
+
+            Please upload genuine photos of yourself. Using:
+            • Celebrity photos
+            • Stock images
+            • Someone else's pictures
+
+            ...violates our guidelines and may result in a permanent ban.
+            """
         case .incompleteBio:
-            return "Please write a bio that's at least 20 characters long. Tell others about your interests, hobbies, or what you're looking for."
+            return """
+            ✏️ Tell people about yourself!
+
+            A good bio includes:
+            • Your interests and hobbies
+            • What you're looking for
+            • Something unique about you
+
+            Aim for at least 2-3 sentences. This helps you get better matches!
+            """
         case .underage:
-            return "If you believe this is a mistake, please contact support with a valid ID to verify your age. Users must be 18 or older."
+            return """
+            🔞 All users must be 18 or older.
+
+            If you believe this is a mistake, please contact support with a valid government-issued ID to verify your age.
+
+            We take age verification seriously to keep our community safe.
+            """
         case .spam:
-            return "Please remove any promotional content, links, or business advertisements from your profile. This platform is for genuine connections only."
+            return """
+            🚫 Please remove any:
+            • Business promotions or advertisements
+            • Links to other websites
+            • Social media handles
+            • Phone numbers or email addresses
+
+            This app is for genuine connections, not marketing!
+            """
         case .offensiveContent:
-            return "Please remove any content that could be considered hateful, discriminatory, or offensive. Our community is built on respect."
+            return """
+            🤝 Our community is built on respect.
+
+            Please remove any content that is:
+            • Hateful or discriminatory
+            • Threatening or harassing
+            • Politically extreme
+
+            Everyone deserves to feel welcome here.
+            """
+        case .lowQualityPhotos:
+            return """
+            📷 Your photos need better quality!
+
+            Tips for better photos:
+            • Use good lighting (natural daylight is best)
+            • Keep the camera steady or use a tripod
+            • Clean your camera lens
+            • Take photos at a reasonable distance
+
+            Clear photos help you get more matches!
+            """
+        case .contactInfoInBio:
+            return """
+            📵 Please remove contact information from your bio
+
+            This includes:
+            • Phone numbers
+            • Email addresses
+            • Social media handles (Instagram, Snapchat, etc.)
+            • External links
+
+            For your safety, share contact info through our messaging system after matching!
+            """
+        case .multipleAccounts:
+            return """
+            ⚠️ Each person can only have one account.
+
+            If you have another account, please delete it and use only this one.
+
+            If you believe this is a mistake, please contact support to resolve the issue.
+            """
         }
     }
 }
