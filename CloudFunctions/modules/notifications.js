@@ -523,6 +523,107 @@ async function sendNewAccountNotification(userData) {
   });
 }
 
+/**
+ * Sends a warning notification to a user
+ * @param {string} userId - User to notify
+ * @param {object} warningData - Warning information
+ */
+async function sendWarningNotification(userId, warningData) {
+  const userDoc = await admin.firestore().collection('users').doc(userId).get();
+
+  if (!userDoc.exists) {
+    functions.logger.error('User not found for warning notification', { userId });
+    return;
+  }
+
+  const user = userDoc.data();
+  const fcmToken = user.fcmToken;
+
+  if (!fcmToken) {
+    functions.logger.info('No FCM token for user', { userId });
+    return;
+  }
+
+  const notification = {
+    title: "⚠️ Account Warning",
+    body: warningData.reason || "Your account has received a warning. Please review our guidelines.",
+    sound: 'default',
+    badge: 1,
+    category: 'ACCOUNT_WARNING',
+    data: {
+      type: 'account_warning',
+      reason: warningData.reason || '',
+      warningCount: (warningData.warningCount || 1).toString()
+    }
+  };
+
+  await sendPushNotification(fcmToken, notification);
+
+  // Log the notification
+  await admin.firestore().collection('notification_logs').add({
+    userId,
+    type: 'account_warning',
+    reason: warningData.reason,
+    sentAt: admin.firestore.FieldValue.serverTimestamp(),
+    delivered: true
+  });
+
+  functions.logger.info('Warning notification sent', { userId, reason: warningData.reason });
+}
+
+/**
+ * Sends a suspension notification to a user
+ * @param {string} userId - User to notify
+ * @param {object} suspensionData - Suspension information
+ */
+async function sendSuspensionNotification(userId, suspensionData) {
+  const userDoc = await admin.firestore().collection('users').doc(userId).get();
+
+  if (!userDoc.exists) {
+    functions.logger.error('User not found for suspension notification', { userId });
+    return;
+  }
+
+  const user = userDoc.data();
+  const fcmToken = user.fcmToken;
+
+  if (!fcmToken) {
+    functions.logger.info('No FCM token for user', { userId });
+    return;
+  }
+
+  const days = suspensionData.days || 7;
+  const reason = suspensionData.reason || "Violation of community guidelines";
+
+  const notification = {
+    title: "🚫 Account Suspended",
+    body: `Your account has been suspended for ${days} days. Reason: ${reason}`,
+    sound: 'default',
+    badge: 1,
+    category: 'ACCOUNT_SUSPENDED',
+    data: {
+      type: 'account_suspended',
+      reason: reason,
+      days: days.toString(),
+      suspendedUntil: suspensionData.suspendedUntil || ''
+    }
+  };
+
+  await sendPushNotification(fcmToken, notification);
+
+  // Log the notification
+  await admin.firestore().collection('notification_logs').add({
+    userId,
+    type: 'account_suspended',
+    reason: reason,
+    days: days,
+    sentAt: admin.firestore.FieldValue.serverTimestamp(),
+    delivered: true
+  });
+
+  functions.logger.info('Suspension notification sent', { userId, days, reason });
+}
+
 module.exports = {
   sendPushNotification,
   sendMatchNotification,
@@ -531,5 +632,7 @@ module.exports = {
   sendDailyEngagementReminders,
   sendProfileStatusNotification,
   sendAdminNotification,
-  sendNewAccountNotification
+  sendNewAccountNotification,
+  sendWarningNotification,
+  sendSuspensionNotification
 };

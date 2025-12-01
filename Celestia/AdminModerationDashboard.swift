@@ -1056,6 +1056,9 @@ class ModerationViewModel: ObservableObject {
             "showMeInSearch": true  // Make user visible to others
         ])
 
+        // Send push notification to user about approval
+        await sendProfileStatusNotification(userId: userId, status: "approved", reason: nil, reasonCode: nil)
+
         // Refresh to update list
         await loadQueue()
         Logger.shared.info("Profile approved: \(userId)", category: .moderation)
@@ -1072,9 +1075,28 @@ class ModerationViewModel: ObservableObject {
             "showMeInSearch": false
         ])
 
+        // Send push notification to user about rejection
+        await sendProfileStatusNotification(userId: userId, status: "rejected", reason: reasonMessage, reasonCode: reasonCode)
+
         // Refresh to update list
         await loadQueue()
         Logger.shared.info("Profile rejected: \(userId) - Reason: \(reasonCode)", category: .moderation)
+    }
+
+    /// Send profile status notification via Cloud Function
+    private func sendProfileStatusNotification(userId: String, status: String, reason: String?, reasonCode: String?) async {
+        do {
+            let callable = functions.httpsCallable("sendProfileStatusNotification")
+            _ = try await callable.call([
+                "userId": userId,
+                "status": status,
+                "reason": reason ?? "",
+                "reasonCode": reasonCode ?? ""
+            ])
+            Logger.shared.info("Profile status notification sent to \(userId)", category: .moderation)
+        } catch {
+            Logger.shared.error("Failed to send profile status notification", category: .moderation, error: error)
+        }
     }
 
     /// Load reports from Firestore
@@ -1317,11 +1339,35 @@ class ModerationViewModel: ObservableObject {
             "showMeInSearch": false
         ])
 
+        // Send push notification to user about suspension
+        await sendSuspensionNotification(userId: userId, reason: reason, days: days, suspendedUntil: suspendedUntil)
+
         Logger.shared.info("User suspended for \(days) days: \(userId)", category: .moderation)
+    }
+
+    /// Send suspension notification via Cloud Function
+    private func sendSuspensionNotification(userId: String, reason: String, days: Int, suspendedUntil: Date) async {
+        do {
+            let callable = functions.httpsCallable("sendSuspensionNotification")
+            let formatter = ISO8601DateFormatter()
+            _ = try await callable.call([
+                "userId": userId,
+                "reason": reason,
+                "days": days,
+                "suspendedUntil": formatter.string(from: suspendedUntil)
+            ])
+            Logger.shared.info("Suspension notification sent to \(userId)", category: .moderation)
+        } catch {
+            Logger.shared.error("Failed to send suspension notification", category: .moderation, error: error)
+        }
     }
 
     /// Warn user in Firestore
     private func warnUserInFirestore(userId: String, reason: String) async throws {
+        // Get current warning count first
+        let userDoc = try await db.collection("users").document(userId).getDocument()
+        let currentCount = userDoc.data()?["warningCount"] as? Int ?? 0
+
         try await db.collection("users").document(userId).updateData([
             "warnings": FieldValue.arrayUnion([
                 [
@@ -1334,7 +1380,25 @@ class ModerationViewModel: ObservableObject {
             "lastWarningReason": reason
         ])
 
+        // Send push notification to user about warning
+        await sendWarningNotification(userId: userId, reason: reason, warningCount: currentCount + 1)
+
         Logger.shared.info("Warning issued to user: \(userId)", category: .moderation)
+    }
+
+    /// Send warning notification via Cloud Function
+    private func sendWarningNotification(userId: String, reason: String, warningCount: Int) async {
+        do {
+            let callable = functions.httpsCallable("sendWarningNotification")
+            _ = try await callable.call([
+                "userId": userId,
+                "reason": reason,
+                "warningCount": warningCount
+            ])
+            Logger.shared.info("Warning notification sent to \(userId)", category: .moderation)
+        } catch {
+            Logger.shared.error("Failed to send warning notification", category: .moderation, error: error)
+        }
     }
 }
 

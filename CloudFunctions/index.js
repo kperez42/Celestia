@@ -888,6 +888,66 @@ exports.sendLikeNotification = functions.https.onCall(async (data, context) => {
 });
 
 /**
+ * Sends a warning notification to a user
+ * Called by admin when issuing a warning
+ */
+exports.sendWarningNotification = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { userId, reason, warningCount } = data;
+
+  try {
+    await notifications.sendWarningNotification(userId, { reason, warningCount });
+    return { success: true };
+  } catch (error) {
+    functions.logger.error('Send warning notification error', { error: error.message });
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
+ * Sends a suspension notification to a user
+ * Called by admin when suspending an account
+ */
+exports.sendSuspensionNotification = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { userId, reason, days, suspendedUntil } = data;
+
+  try {
+    await notifications.sendSuspensionNotification(userId, { reason, days, suspendedUntil });
+    return { success: true };
+  } catch (error) {
+    functions.logger.error('Send suspension notification error', { error: error.message });
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
+ * Sends a profile status notification to a user
+ * Called when profile is approved or rejected
+ */
+exports.sendProfileStatusNotification = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { userId, status, reason, reasonCode } = data;
+
+  try {
+    await notifications.sendProfileStatusNotification(userId, { status, reason, reasonCode });
+    return { success: true };
+  } catch (error) {
+    functions.logger.error('Send profile status notification error', { error: error.message });
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
  * Scheduled function to send daily engagement reminders
  * Runs daily at 9 AM and 7 PM
  */
