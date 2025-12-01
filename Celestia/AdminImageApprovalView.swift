@@ -70,7 +70,7 @@ struct AdminImageApprovalView: View {
             }
             .fullScreenCover(isPresented: $showingPhotoViewer) {
                 if let user = selectedUser {
-                    FullScreenPhotoViewer(
+                    AdminFullScreenPhotoViewer(
                         photos: user.photos,
                         selectedIndex: $selectedPhotoIndex,
                         userName: user.fullName,
@@ -213,9 +213,9 @@ struct PendingUserCard: View {
     }
 }
 
-// MARK: - Full Screen Photo Viewer
+// MARK: - Admin Full Screen Photo Viewer
 
-struct FullScreenPhotoViewer: View {
+struct AdminFullScreenPhotoViewer: View {
     let photos: [String]
     @Binding var selectedIndex: Int
     let userName: String
@@ -268,7 +268,7 @@ struct FullScreenPhotoViewer: View {
                 // Photo viewer with horizontal scroll
                 TabView(selection: $selectedIndex) {
                     ForEach(Array(photos.enumerated()), id: \.offset) { index, photoURL in
-                        ZoomablePhotoView(photoURL: photoURL)
+                        AdminZoomablePhotoView(photoURL: photoURL)
                             .tag(index)
                     }
                 }
@@ -322,9 +322,9 @@ struct FullScreenPhotoViewer: View {
     }
 }
 
-// MARK: - Zoomable Photo View
+// MARK: - Admin Zoomable Photo View
 
-struct ZoomablePhotoView: View {
+struct AdminZoomablePhotoView: View {
     let photoURL: String
 
     @State private var scale: CGFloat = 1.0
