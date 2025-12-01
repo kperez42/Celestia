@@ -1,16 +1,15 @@
 //
-//  SuspendedAccountView.swift
+//  BannedAccountView.swift
 //  Celestia
 //
-//  Shows suspension feedback to users whose accounts have been suspended
+//  Shows ban feedback to users whose accounts have been permanently banned
 //
 
 import SwiftUI
 import FirebaseFirestore
 
-struct SuspendedAccountView: View {
+struct BannedAccountView: View {
     @EnvironmentObject var authService: AuthService
-    @State private var isRefreshing = false
     @State private var appearAnimation = false
     @State private var animateIcon = false
     @State private var showingAppealSheet = false
@@ -21,22 +20,6 @@ struct SuspendedAccountView: View {
 
     private var user: User? {
         authService.currentUser
-    }
-
-    private var suspendedUntilDate: Date? {
-        user?.suspendedUntil
-    }
-
-    private var daysRemaining: Int {
-        guard let until = suspendedUntilDate else { return 0 }
-        let days = Calendar.current.dateComponents([.day], from: Date(), to: until).day ?? 0
-        return max(0, days)
-    }
-
-    private var hoursRemaining: Int {
-        guard let until = suspendedUntilDate else { return 0 }
-        let hours = Calendar.current.dateComponents([.hour], from: Date(), to: until).hour ?? 0
-        return max(0, hours % 24)
     }
 
     var body: some View {
@@ -56,7 +39,7 @@ struct SuspendedAccountView: View {
                             .fill(Color.red.opacity(0.15))
                             .frame(width: 100, height: 100)
 
-                        Image(systemName: "exclamationmark.octagon.fill")
+                        Image(systemName: "xmark.octagon.fill")
                             .font(.system(size: 50))
                             .foregroundStyle(
                                 LinearGradient(
@@ -80,74 +63,48 @@ struct SuspendedAccountView: View {
                     }
 
                     // Title
-                    Text("Account Suspended")
+                    Text("Account Permanently Banned")
                         .opacity(appearAnimation ? 1 : 0)
                         .offset(y: appearAnimation ? 0 : 20)
                         .font(.title.bold())
                         .multilineTextAlignment(.center)
-
-                    // Time remaining card
-                    if let _ = suspendedUntilDate {
-                        VStack(spacing: 16) {
-                            Label("Suspension Period", systemImage: "clock.fill")
-                                .font(.headline)
-                                .foregroundColor(.orange)
-
-                            HStack(spacing: 20) {
-                                VStack {
-                                    Text("\(daysRemaining)")
-                                        .font(.system(size: 36, weight: .bold))
-                                        .foregroundColor(.primary)
-                                    Text("Days")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-
-                                Text(":")
-                                    .font(.title)
-                                    .foregroundColor(.secondary)
-
-                                VStack {
-                                    Text("\(hoursRemaining)")
-                                        .font(.system(size: 36, weight: .bold))
-                                        .foregroundColor(.primary)
-                                    Text("Hours")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                            .padding()
-
-                            if let until = suspendedUntilDate {
-                                Text("Access will be restored on \(until.formatted(date: .long, time: .shortened))")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                                    .multilineTextAlignment(.center)
-                            }
-                        }
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color.orange.opacity(0.1))
-                        .cornerRadius(16)
-                        .padding(.horizontal)
-                        .opacity(appearAnimation ? 1 : 0)
-                        .offset(y: appearAnimation ? 0 : 30)
-                        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.2), value: appearAnimation)
-                    }
+                        .foregroundColor(.red)
 
                     // Reason card
                     VStack(alignment: .leading, spacing: 16) {
-                        Label("Reason for Suspension", systemImage: "info.circle.fill")
+                        Label("Reason for Ban", systemImage: "info.circle.fill")
                             .font(.headline)
                             .foregroundColor(.red)
 
-                        Text(user?.suspendReason ?? "Your account has been temporarily suspended due to a violation of our community guidelines.")
+                        Text(user?.banReason ?? "Your account has been permanently banned due to serious violations of our community guidelines.")
                             .font(.body)
                             .foregroundColor(.secondary)
                     }
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color.red.opacity(0.1))
+                    .cornerRadius(16)
+                    .padding(.horizontal)
+                    .opacity(appearAnimation ? 1 : 0)
+                    .offset(y: appearAnimation ? 0 : 30)
+                    .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.2), value: appearAnimation)
+
+                    // What this means
+                    VStack(alignment: .leading, spacing: 16) {
+                        Label("What This Means", systemImage: "exclamationmark.triangle.fill")
+                            .font(.headline)
+                            .foregroundColor(.orange)
+
+                        VStack(alignment: .leading, spacing: 12) {
+                            bulletPoint("Your profile is no longer visible to other users")
+                            bulletPoint("You cannot send or receive messages")
+                            bulletPoint("You cannot create matches or interact with profiles")
+                            bulletPoint("This decision is permanent unless successfully appealed")
+                        }
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.orange.opacity(0.1))
                     .cornerRadius(16)
                     .padding(.horizontal)
                     .opacity(appearAnimation ? 1 : 0)
@@ -182,47 +139,18 @@ struct SuspendedAccountView: View {
                     .offset(y: appearAnimation ? 0 : 30)
                     .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.4), value: appearAnimation)
 
-                    // What happens next
-                    VStack(alignment: .leading, spacing: 16) {
-                        Label("What Happens Next", systemImage: "arrow.right.circle.fill")
-                            .font(.headline)
-                            .foregroundColor(.blue)
-
-                        Text("Once your suspension period ends, your account will be automatically restored. Please ensure you follow our community guidelines to avoid future suspensions.")
-                            .font(.body)
-                            .foregroundColor(.secondary)
-
-                        Text("Repeated violations may result in permanent account suspension.")
-                            .font(.caption)
-                            .foregroundColor(.red)
-                    }
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.blue.opacity(0.1))
-                    .cornerRadius(16)
-                    .padding(.horizontal)
-                    .opacity(appearAnimation ? 1 : 0)
-                    .offset(y: appearAnimation ? 0 : 30)
-                    .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.5), value: appearAnimation)
-
                     Spacer(minLength: 40)
 
                     // Action buttons
                     VStack(spacing: 12) {
+                        // Appeal button
                         Button(action: {
                             HapticManager.shared.impact(.medium)
-                            Task {
-                                await checkSuspensionStatus()
-                            }
+                            showingAppealSheet = true
                         }) {
                             HStack {
-                                if isRefreshing {
-                                    ProgressView()
-                                        .tint(.white)
-                                } else {
-                                    Image(systemName: "arrow.clockwise.circle.fill")
-                                    Text("Check Status")
-                                }
+                                Image(systemName: hasExistingAppeal ? "checkmark.circle.fill" : "envelope.fill")
+                                Text(hasExistingAppeal ? "Appeal Submitted" : "Appeal This Decision")
                             }
                             .font(.headline)
                             .foregroundColor(.white)
@@ -230,14 +158,14 @@ struct SuspendedAccountView: View {
                             .padding()
                             .background(
                                 LinearGradient(
-                                    colors: [.blue, .purple],
+                                    colors: hasExistingAppeal ? [.gray, .gray.opacity(0.8)] : [.orange, .red],
                                     startPoint: .leading,
                                     endPoint: .trailing
                                 )
                             )
                             .cornerRadius(16)
                         }
-                        .disabled(isRefreshing)
+                        .disabled(hasExistingAppeal)
 
                         Button(action: {
                             HapticManager.shared.impact(.light)
@@ -248,35 +176,17 @@ struct SuspendedAccountView: View {
                                 .foregroundColor(.secondary)
                         }
                         .padding(.top, 8)
-
-                        // Appeal button
-                        Button(action: {
-                            HapticManager.shared.impact(.light)
-                            showingAppealSheet = true
-                        }) {
-                            HStack {
-                                Image(systemName: "envelope.fill")
-                                Text(hasExistingAppeal ? "Appeal Submitted" : "Appeal Decision")
-                            }
-                            .font(.subheadline)
-                            .foregroundColor(hasExistingAppeal ? .secondary : .orange)
-                        }
-                        .disabled(hasExistingAppeal)
-                        .padding(.top, 4)
                     }
                     .padding(.horizontal)
                     .padding(.bottom, 40)
                     .opacity(appearAnimation ? 1 : 0)
                     .offset(y: appearAnimation ? 0 : 30)
-                    .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.6), value: appearAnimation)
+                    .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.5), value: appearAnimation)
                 }
             }
             .navigationTitle("Account Status")
             .navigationBarTitleDisplayMode(.inline)
             .task {
-                // Auto-check if suspension has expired on view appear
-                await checkSuspensionOnAppear()
-                // Check if user has already submitted an appeal
                 await checkExistingAppeal()
             }
             .sheet(isPresented: $showingAppealSheet) {
@@ -285,8 +195,22 @@ struct SuspendedAccountView: View {
             .alert("Appeal Submitted", isPresented: $showAppealSuccess) {
                 Button("OK") { }
             } message: {
-                Text("Your appeal has been submitted. Our team will review it and get back to you within 24-48 hours.")
+                Text("Your appeal has been submitted. Our team will review it and respond within 24-48 hours. If your appeal is approved, your account will be restored.")
             }
+        }
+    }
+
+    // MARK: - Helper Views
+
+    private func bulletPoint(_ text: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Circle()
+                .fill(Color.secondary)
+                .frame(width: 6, height: 6)
+                .padding(.top, 6)
+            Text(text)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
         }
     }
 
@@ -301,10 +225,10 @@ struct SuspendedAccountView: View {
                         .font(.system(size: 50))
                         .foregroundColor(.orange)
 
-                    Text("Appeal Your Suspension")
+                    Text("Appeal Your Ban")
                         .font(.title2.bold())
 
-                    Text("If you believe this suspension was made in error, please explain why below. Our team will review your appeal.")
+                    Text("If you believe this ban was made in error, please explain why below. Appeals are carefully reviewed by our moderation team.")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
@@ -313,9 +237,9 @@ struct SuspendedAccountView: View {
                 .padding(.top)
 
                 // Current reason display
-                if let reason = user?.suspendReason {
+                if let reason = user?.banReason {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Suspension Reason")
+                        Text("Ban Reason")
                             .font(.caption.weight(.semibold))
                             .foregroundColor(.secondary)
 
@@ -345,7 +269,7 @@ struct SuspendedAccountView: View {
                                 .stroke(Color(.separator), lineWidth: 1)
                         )
 
-                    Text("Please provide specific details about why you believe this decision was an error.")
+                    Text("Please provide specific details about why you believe this ban was an error. Include any relevant context.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -373,17 +297,17 @@ struct SuspendedAccountView: View {
                     .frame(maxWidth: .infinity)
                     .padding()
                     .background(
-                        appealMessage.trimmingCharacters(in: .whitespacesAndNewlines).count >= 20
+                        appealMessage.trimmingCharacters(in: .whitespacesAndNewlines).count >= 30
                             ? Color.orange
                             : Color.gray
                     )
                     .cornerRadius(16)
                 }
-                .disabled(appealMessage.trimmingCharacters(in: .whitespacesAndNewlines).count < 20 || isSubmittingAppeal)
+                .disabled(appealMessage.trimmingCharacters(in: .whitespacesAndNewlines).count < 30 || isSubmittingAppeal)
                 .padding(.horizontal)
                 .padding(.bottom)
 
-                Text("Minimum 20 characters required")
+                Text("Minimum 30 characters required for ban appeals")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .padding(.bottom)
@@ -400,19 +324,7 @@ struct SuspendedAccountView: View {
         }
     }
 
-    // MARK: - Helper Methods
-
-    private func checkSuspensionOnAppear() async {
-        // If suspension period has passed, automatically clear it
-        if let until = suspendedUntilDate, until <= Date() {
-            do {
-                try await clearSuspension()
-                HapticManager.shared.notification(.success)
-            } catch {
-                Logger.shared.error("Failed to auto-clear suspension", category: .database, error: error)
-            }
-        }
-    }
+    // MARK: - Helper Data
 
     private var guidelines: [GuidelineItem] {
         [
@@ -443,45 +355,7 @@ struct SuspendedAccountView: View {
         ]
     }
 
-    private func checkSuspensionStatus() async {
-        isRefreshing = true
-        defer { isRefreshing = false }
-
-        // Refresh user data to check if suspension has been lifted
-        await authService.fetchUser()
-
-        // Check if suspension is over
-        if let user = authService.currentUser {
-            if !user.isSuspended {
-                HapticManager.shared.notification(.success)
-            } else if let until = user.suspendedUntil, until <= Date() {
-                // Suspension period has passed, clear the suspension
-                do {
-                    try await clearSuspension()
-                    HapticManager.shared.notification(.success)
-                } catch {
-                    Logger.shared.error("Failed to clear suspension", category: .database, error: error)
-                    HapticManager.shared.notification(.error)
-                }
-            } else {
-                HapticManager.shared.notification(.warning)
-            }
-        }
-    }
-
-    private func clearSuspension() async throws {
-        guard let userId = user?.id else { return }
-
-        try await Firestore.firestore().collection("users").document(userId).updateData([
-            "isSuspended": false,
-            "suspendedAt": FieldValue.delete(),
-            "suspendedUntil": FieldValue.delete(),
-            "suspendReason": FieldValue.delete(),
-            "profileStatus": "active"
-        ])
-
-        await authService.fetchUser()
-    }
+    // MARK: - Helper Methods
 
     private func checkExistingAppeal() async {
         guard let userId = user?.id else { return }
@@ -513,12 +387,11 @@ struct SuspendedAccountView: View {
                 "userId": userId,
                 "userName": user?.fullName ?? "Unknown",
                 "userEmail": user?.email ?? "",
-                "type": "suspension",
-                "originalReason": user?.suspendReason ?? "",
+                "type": "ban",
+                "originalReason": user?.banReason ?? "",
                 "appealMessage": appealMessage,
                 "status": "pending",
-                "submittedAt": FieldValue.serverTimestamp(),
-                "suspendedUntil": user?.suspendedUntil as Any
+                "submittedAt": FieldValue.serverTimestamp()
             ])
 
             await MainActor.run {
@@ -530,30 +403,19 @@ struct SuspendedAccountView: View {
             }
 
             HapticManager.shared.notification(.success)
-            Logger.shared.info("Appeal submitted for user: \(userId)", category: .moderation)
+            Logger.shared.info("Ban appeal submitted for user: \(userId)", category: .moderation)
 
         } catch {
             await MainActor.run {
                 isSubmittingAppeal = false
             }
             HapticManager.shared.notification(.error)
-            Logger.shared.error("Failed to submit appeal", category: .database, error: error)
+            Logger.shared.error("Failed to submit ban appeal", category: .database, error: error)
         }
     }
 }
 
-// MARK: - Guideline Item Model
-
-private struct GuidelineItem: Hashable {
-    let icon: String
-    let color: Color
-    let title: String
-    let description: String
-}
-
-// MARK: - Preview
-
 #Preview {
-    SuspendedAccountView()
+    BannedAccountView()
         .environmentObject(AuthService.shared)
 }

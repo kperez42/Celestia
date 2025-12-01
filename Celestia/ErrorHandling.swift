@@ -66,6 +66,7 @@ enum CelestiaError: LocalizedError, Identifiable {
     case batchOperationFailed(operationId: String, underlyingError: Error)
     case messageDeliveryFailed(retryable: Bool)
     case messageQueuedForDelivery
+    case editTimeLimitExceeded
 
     // Rate Limiting
     case rateLimitExceeded
@@ -190,6 +191,8 @@ enum CelestiaError: LocalizedError, Identifiable {
             return retryable ? "Message delivery failed. It will be retried automatically." : "Message could not be delivered."
         case .messageQueuedForDelivery:
             return "Message queued. It will be sent when connection is restored."
+        case .editTimeLimitExceeded:
+            return "Messages can only be edited within 15 minutes of sending."
 
         // Rate Limiting
         case .rateLimitExceeded:

@@ -521,32 +521,23 @@ struct MessagesView: View {
         do {
             try await matchService.fetchMatches(userId: userId)
 
-            // Load users for all matches in parallel (performance optimization)
-            // IMPORTANT: Always fetch fresh user data to ensure status is up-to-date
-            await withTaskGroup(of: (String, User?).self) { group in
-                for match in matchService.matches {
-                    let otherUserId = match.user1Id == userId ? match.user2Id : match.user1Id
+            // PERFORMANCE FIX: Batch fetch all users at once instead of N individual fetches
+            // This reduces network calls from N to ceil(N/10) using Firestore's whereIn limit
+            let otherUserIds = matchService.matches.map { match in
+                match.user1Id == userId ? match.user2Id : match.user1Id
+            }
 
-                    group.addTask {
-                        let user = try? await self.userService.fetchUser(userId: otherUserId)
-                        return (otherUserId, user)
-                    }
-                }
-
-                // Collect results and update cache with fresh data
-                for await (userId, user) in group {
-                    if let user = user {
-                        await MainActor.run {
-                            matchedUsers[userId] = user
-                        }
-                    }
+            if !otherUserIds.isEmpty {
+                let fetchedUsers = try await userService.fetchUsersBatched(ids: otherUserIds)
+                await MainActor.run {
+                    matchedUsers = fetchedUsers
                 }
             }
 
             let duration = Date().timeIntervalSince(loadStart) * 1000
             await PerformanceMonitor.shared.trackQuery(duration: duration)
 
-            Logger.shared.info("Loaded \(matchService.matches.count) matches in \(String(format: "%.0f", duration))ms", category: .messaging)
+            Logger.shared.info("Loaded \(matchService.matches.count) matches in \(String(format: "%.0f", duration))ms (batch query)", category: .messaging)
         } catch {
             Logger.shared.error("Error loading messages", category: .messaging, error: error)
         }

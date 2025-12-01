@@ -207,6 +207,27 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Appeals Collection - Users can appeal moderation decisions
+    match /appeals/{appealId} {
+      // Admins can read all appeals
+      allow read: if isAdmin();
+
+      // Users can read their own appeals
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+
+      // Users can create appeals for themselves
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.keys().hasAll(['userId', 'appealMessage', 'type', 'status'])
+        && request.resource.data.status == 'pending';
+
+      // Admins can update appeals (approve/reject)
+      allow update: if isAdmin();
+
+      // No deletes
+      allow delete: if false;
+    }
+
     // Notifications Collection
     match /notifications/{notificationId} {
       // Users can read their own notifications
@@ -827,6 +848,20 @@ service cloud.firestore {
 
       // No updates or deletes (audit trail)
       allow update, delete: if false;
+    }
+
+    // Typing Status Collection (real-time typing indicators)
+    match /typingStatus/{statusId} {
+      // Users can read typing status for matches they're part of
+      allow read: if isAuthenticated();
+
+      // Users can create/update their own typing status
+      allow create, update: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid;
+
+      // Allow delete for cleanup
+      allow delete: if isAuthenticated()
+        && resource.data.userId == request.auth.uid;
     }
 
     // Default: Deny all other access

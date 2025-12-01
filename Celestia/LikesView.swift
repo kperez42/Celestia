@@ -24,10 +24,44 @@ struct LikesView: View {
     // Direct messaging state - using dedicated struct for item-based presentation
     @State private var chatPresentation: ChatPresentation?
 
+    // Filter state
+    @State private var showFilters = false
+    @State private var selectedAgeFilter: AgeFilter = .all
+    @State private var selectedSortOption: SortOption = .recent
+
+    // Match celebration state
+    @State private var showMatchCelebration = false
+    @State private var matchedUser: User?
+
     struct ChatPresentation: Identifiable {
         let id = UUID()
         let match: Match
         let user: User
+    }
+
+    enum AgeFilter: String, CaseIterable {
+        case all = "All Ages"
+        case under25 = "Under 25"
+        case twenties = "25-30"
+        case thirties = "30-40"
+        case over40 = "40+"
+
+        func matches(age: Int) -> Bool {
+            switch self {
+            case .all: return true
+            case .under25: return age < 25
+            case .twenties: return age >= 25 && age <= 30
+            case .thirties: return age > 30 && age <= 40
+            case .over40: return age > 40
+            }
+        }
+    }
+
+    enum SortOption: String, CaseIterable {
+        case recent = "Most Recent"
+        case ageYoungest = "Youngest First"
+        case ageOldest = "Oldest First"
+        case nameAZ = "Name A-Z"
     }
 
     private let tabs = ["Liked Me", "My Likes", "Mutual Likes"]
@@ -116,8 +150,137 @@ struct LikesView: View {
                 PremiumUpgradeView()
                     .environmentObject(authService)
             }
+            .sheet(isPresented: $showFilters) {
+                filterSheet
+            }
+            .overlay {
+                // Match celebration overlay
+                if showMatchCelebration, let user = matchedUser {
+                    MatchCelebrationOverlay(user: user) {
+                        withAnimation(.spring()) {
+                            showMatchCelebration = false
+                            matchedUser = nil
+                        }
+                    } onMessage: {
+                        withAnimation(.spring()) {
+                            showMatchCelebration = false
+                        }
+                        // Slight delay to let animation complete
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            handleMessage(user: user)
+                            matchedUser = nil
+                        }
+                    }
+                    .transition(.opacity.combined(with: .scale))
+                }
+            }
         }
         .networkStatusBanner()
+    }
+
+    // MARK: - Filtered Users
+
+    private var filteredUsersWhoLikedMe: [User] {
+        applyFiltersAndSort(to: viewModel.usersWhoLikedMe)
+    }
+
+    private var filteredUsersILiked: [User] {
+        applyFiltersAndSort(to: viewModel.usersILiked)
+    }
+
+    private var filteredMutualLikes: [User] {
+        applyFiltersAndSort(to: viewModel.mutualLikes)
+    }
+
+    private func applyFiltersAndSort(to users: [User]) -> [User] {
+        var result = users
+
+        // Apply age filter
+        if selectedAgeFilter != .all {
+            result = result.filter { selectedAgeFilter.matches(age: $0.age) }
+        }
+
+        // Apply sort
+        switch selectedSortOption {
+        case .recent:
+            break // Already sorted by most recent from backend
+        case .ageYoungest:
+            result.sort { $0.age < $1.age }
+        case .ageOldest:
+            result.sort { $0.age > $1.age }
+        case .nameAZ:
+            result.sort { $0.fullName.localizedCompare($1.fullName) == .orderedAscending }
+        }
+
+        return result
+    }
+
+    // MARK: - Filter Sheet
+
+    private var filterSheet: some View {
+        NavigationStack {
+            List {
+                Section("Age Range") {
+                    ForEach(AgeFilter.allCases, id: \.self) { filter in
+                        Button {
+                            selectedAgeFilter = filter
+                            HapticManager.shared.selection()
+                        } label: {
+                            HStack {
+                                Text(filter.rawValue)
+                                    .foregroundColor(.primary)
+                                Spacer()
+                                if selectedAgeFilter == filter {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(.pink)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Section("Sort By") {
+                    ForEach(SortOption.allCases, id: \.self) { option in
+                        Button {
+                            selectedSortOption = option
+                            HapticManager.shared.selection()
+                        } label: {
+                            HStack {
+                                Text(option.rawValue)
+                                    .foregroundColor(.primary)
+                                Spacer()
+                                if selectedSortOption == option {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(.pink)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Section {
+                    Button {
+                        selectedAgeFilter = .all
+                        selectedSortOption = .recent
+                        HapticManager.shared.impact(.light)
+                    } label: {
+                        Text("Reset Filters")
+                            .foregroundColor(.red)
+                    }
+                }
+            }
+            .navigationTitle("Filters")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        showFilters = false
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+        }
+        .presentationDetents([.medium])
     }
 
     // MARK: - Message Handling
@@ -226,8 +389,34 @@ struct LikesView: View {
 
                     Spacer()
 
-                    if authService.currentUser?.isPremium == true {
-                        premiumBadge
+                    VStack(alignment: .trailing, spacing: 8) {
+                        if authService.currentUser?.isPremium == true {
+                            premiumBadge
+                        }
+
+                        // Filter button
+                        Button {
+                            showFilters = true
+                            HapticManager.shared.impact(.light)
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "line.3.horizontal.decrease.circle")
+                                    .font(.system(size: 14))
+                                Text("Filter")
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                if selectedAgeFilter != .all || selectedSortOption != .recent {
+                                    Circle()
+                                        .fill(Color.yellow)
+                                        .frame(width: 6, height: 6)
+                                }
+                            }
+                            .foregroundColor(.white.opacity(0.9))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color.white.opacity(0.2))
+                            .cornerRadius(20)
+                        }
                     }
                 }
                 .padding(.top, 50)
@@ -328,11 +517,26 @@ struct LikesView: View {
                     message: "When someone likes you, they'll appear here. Keep swiping!"
                 )
             } else if isPremium {
-                // Premium users see full profiles
-                likesGrid(users: viewModel.usersWhoLikedMe, showLikeBack: true)
+                // Premium users see full profiles with filters applied
+                likesGrid(users: filteredUsersWhoLikedMe, showLikeBack: true)
             } else {
                 // Free users see blurred/locked view with upgrade CTA
                 premiumLockedLikesView
+            }
+        }
+    }
+
+    private func handleLikeBack(user: User) {
+        Task {
+            let isMatch = await viewModel.likeBackUser(user)
+            if isMatch {
+                // Show match celebration
+                await MainActor.run {
+                    matchedUser = user
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                        showMatchCelebration = true
+                    }
+                }
             }
         }
     }
@@ -515,7 +719,7 @@ struct LikesView: View {
                     message: "Start swiping on the Discover page to like profiles!"
                 )
             } else {
-                likesGrid(users: viewModel.usersILiked, showLikeBack: false)
+                likesGrid(users: filteredUsersILiked, showLikeBack: false)
             }
         }
     }
@@ -531,7 +735,7 @@ struct LikesView: View {
                     message: "When you and someone else both like each other, you'll see them here!"
                 )
             } else {
-                likesGrid(users: viewModel.mutualLikes, showMessage: true)
+                likesGrid(users: filteredMutualLikes, showMessage: true)
             }
         }
     }
@@ -540,12 +744,34 @@ struct LikesView: View {
 
     private func likesGrid(users: [User], showLikeBack: Bool = false, showMessage: Bool = false) -> some View {
         ScrollView(showsIndicators: false) {
+            // Show filter indicator if filters are active
+            if selectedAgeFilter != .all || selectedSortOption != .recent {
+                HStack(spacing: 8) {
+                    Image(systemName: "line.3.horizontal.decrease.circle.fill")
+                        .font(.caption)
+                        .foregroundColor(.purple)
+                    Text("Filtered: \(users.count) results")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Button("Clear") {
+                        selectedAgeFilter = .all
+                        selectedSortOption = .recent
+                        HapticManager.shared.impact(.light)
+                    }
+                    .font(.caption)
+                    .foregroundColor(.pink)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+            }
+
             LazyVGrid(columns: [
                 GridItem(.flexible(), spacing: 12),
                 GridItem(.flexible(), spacing: 12)
             ], spacing: 12) {
                 ForEach(users, id: \.effectiveId) { user in
-                    LikeProfileCard(
+                    SwipeableLikeCard(
                         user: user,
                         showLikeBack: showLikeBack,
                         showMessage: showMessage,
@@ -553,9 +779,7 @@ struct LikesView: View {
                             selectedUserForDetail = user
                         },
                         onLikeBack: {
-                            Task {
-                                await viewModel.likeBackUser(user)
-                            }
+                            handleLikeBack(user: user)
                         },
                         onMessage: {
                             handleMessage(user: user)
@@ -1051,9 +1275,10 @@ class LikesViewModel: ObservableObject {
         return matchesCache[userId]
     }
 
-    func likeBackUser(_ user: User) async {
-        guard let targetUserId = user.effectiveId else { return }
-        guard let currentUserId = AuthService.shared.currentUser?.effectiveId else { return }
+    @discardableResult
+    func likeBackUser(_ user: User) async -> Bool {
+        guard let targetUserId = user.effectiveId else { return false }
+        guard let currentUserId = AuthService.shared.currentUser?.effectiveId else { return false }
 
         do {
             let isMatch = try await SwipeService.shared.likeUser(
@@ -1072,17 +1297,289 @@ class LikesViewModel: ObservableObject {
                         usersILiked.append(user)
                     }
                 }
-                HapticManager.shared.notification(.success)
                 Logger.shared.info("Liked back user - now mutual!", category: .matching)
+                return true
             } else {
                 await MainActor.run {
                     if !usersILiked.contains(where: { $0.effectiveId == targetUserId }) {
                         usersILiked.append(user)
                     }
                 }
+                HapticManager.shared.impact(.medium)
+                return false
             }
         } catch {
             Logger.shared.error("Error liking back user", category: .matching, error: error)
+            HapticManager.shared.notification(.error)
+            return false
+        }
+    }
+}
+
+// MARK: - Swipeable Like Card with Gesture
+
+struct SwipeableLikeCard: View {
+    let user: User
+    var showLikeBack: Bool = false
+    var showMessage: Bool = false
+    var onTap: () -> Void
+    var onLikeBack: (() -> Void)? = nil
+    var onMessage: (() -> Void)? = nil
+
+    @State private var offset: CGFloat = 0
+    @State private var showLikeOverlay = false
+    @State private var isLiking = false
+
+    private let swipeThreshold: CGFloat = 80
+    private let imageHeight: CGFloat = 180
+
+    var body: some View {
+        ZStack {
+            // Background action indicator
+            if showLikeBack {
+                HStack {
+                    Spacer()
+                    VStack(spacing: 4) {
+                        Image(systemName: "heart.fill")
+                            .font(.title)
+                            .foregroundColor(.white)
+                        Text("Like")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                    }
+                    .frame(width: 80)
+                    .opacity(min(1, -offset / swipeThreshold))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(
+                    LinearGradient(
+                        colors: [.pink, .red],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(16)
+            }
+
+            // Main card content
+            LikeProfileCard(
+                user: user,
+                showLikeBack: showLikeBack,
+                showMessage: showMessage,
+                onTap: onTap,
+                onLikeBack: onLikeBack,
+                onMessage: onMessage
+            )
+            .offset(x: offset)
+            .gesture(
+                showLikeBack ?
+                DragGesture()
+                    .onChanged { gesture in
+                        // Only allow left swipe (negative offset)
+                        if gesture.translation.width < 0 {
+                            offset = gesture.translation.width
+                            showLikeOverlay = -offset > swipeThreshold / 2
+                        }
+                    }
+                    .onEnded { gesture in
+                        if -offset > swipeThreshold {
+                            // Trigger like action
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                offset = -UIScreen.main.bounds.width
+                            }
+                            HapticManager.shared.notification(.success)
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                onLikeBack?()
+                                withAnimation {
+                                    offset = 0
+                                }
+                            }
+                        } else {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                offset = 0
+                                showLikeOverlay = false
+                            }
+                        }
+                    }
+                : nil
+            )
+
+            // Like overlay on card
+            if showLikeOverlay && showLikeBack {
+                VStack {
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 50))
+                        .foregroundColor(.pink)
+                        .shadow(color: .pink.opacity(0.5), radius: 10)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.black.opacity(0.3))
+                .cornerRadius(16)
+                .allowsHitTesting(false)
+            }
+        }
+    }
+}
+
+// MARK: - Match Celebration Overlay
+
+struct MatchCelebrationOverlay: View {
+    let user: User
+    let onDismiss: () -> Void
+    let onMessage: () -> Void
+
+    @State private var showConfetti = false
+    @State private var heartScale: CGFloat = 0.5
+    @State private var textOpacity: Double = 0
+
+    var body: some View {
+        ZStack {
+            // Background blur
+            Color.black.opacity(0.8)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    onDismiss()
+                }
+
+            VStack(spacing: 24) {
+                // Animated hearts
+                ZStack {
+                    // Outer glow
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [Color.pink.opacity(0.4), Color.clear],
+                                center: .center,
+                                startRadius: 40,
+                                endRadius: 120
+                            )
+                        )
+                        .frame(width: 240, height: 240)
+                        .scaleEffect(showConfetti ? 1.2 : 0.8)
+                        .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: showConfetti)
+
+                    // User photos
+                    HStack(spacing: -30) {
+                        // Your photo placeholder
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [.purple, .pink],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 100, height: 100)
+                            .overlay(
+                                Image(systemName: "person.fill")
+                                    .font(.system(size: 40))
+                                    .foregroundColor(.white)
+                            )
+                            .overlay(Circle().stroke(Color.white, lineWidth: 4))
+
+                        // Their photo
+                        if let imageURL = URL(string: user.profileImageURL), !user.profileImageURL.isEmpty {
+                            CachedAsyncImage(url: imageURL) { image in
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 100, height: 100)
+                                    .clipShape(Circle())
+                                    .overlay(Circle().stroke(Color.white, lineWidth: 4))
+                            } placeholder: {
+                                Circle()
+                                    .fill(Color.gray.opacity(0.3))
+                                    .frame(width: 100, height: 100)
+                            }
+                        } else {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [.pink, .orange],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 100, height: 100)
+                                .overlay(
+                                    Text(user.fullName.prefix(1))
+                                        .font(.system(size: 40, weight: .bold))
+                                        .foregroundColor(.white)
+                                )
+                                .overlay(Circle().stroke(Color.white, lineWidth: 4))
+                        }
+                    }
+
+                    // Heart in center
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 30))
+                        .foregroundColor(.pink)
+                        .offset(y: 40)
+                        .scaleEffect(heartScale)
+                }
+                .scaleEffect(heartScale)
+
+                // Text
+                VStack(spacing: 12) {
+                    Text("It's a Match!")
+                        .font(.system(size: 36, weight: .bold))
+                        .foregroundColor(.white)
+
+                    Text("You and \(user.fullName) liked each other")
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.8))
+                }
+                .opacity(textOpacity)
+
+                // Action buttons
+                VStack(spacing: 12) {
+                    Button {
+                        onMessage()
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "message.fill")
+                            Text("Send a Message")
+                                .fontWeight(.semibold)
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            LinearGradient(
+                                colors: [.pink, .purple],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .cornerRadius(30)
+                    }
+
+                    Button {
+                        onDismiss()
+                    } label: {
+                        Text("Keep Browsing")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.white.opacity(0.8))
+                            .padding(.vertical, 12)
+                    }
+                }
+                .padding(.horizontal, 40)
+                .opacity(textOpacity)
+            }
+        }
+        .onAppear {
+            // Animate in
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.6)) {
+                heartScale = 1.0
+            }
+            withAnimation(.easeOut(duration: 0.5).delay(0.2)) {
+                textOpacity = 1.0
+            }
+            withAnimation(.easeInOut(duration: 0.3).delay(0.1)) {
+                showConfetti = true
+            }
         }
     }
 }

@@ -13,6 +13,7 @@ import FirebaseFirestore
 struct ChatView: View {
     @EnvironmentObject var authService: AuthService
     @StateObject private var messageService = MessageService.shared
+    @StateObject private var typingService = TypingStatusService.shared
     @StateObject private var safetyManager = SafetyManager.shared
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
@@ -26,7 +27,6 @@ struct ChatView: View {
 
     @State private var messageText = ""
     @FocusState private var isInputFocused: Bool
-    @State private var isOtherUserTyping = false
     @State private var showingUnmatchConfirmation = false
     @State private var showingUserProfile = false
     @State private var showingReportSheet = false
@@ -60,6 +60,15 @@ struct ChatView: View {
 
     // PERFORMANCE: Debounce message count changes to prevent excessive updates
     @State private var pendingScrollTask: Task<Void, Never>?
+
+    // Reply state
+    @State private var replyingToMessage: Message?
+    @State private var showReplyBar = false
+
+    // Edit state
+    @State private var editingMessage: Message?
+    @State private var showEditSheet = false
+    @State private var editText = ""
 
     // Reusable date formatter for performance
     private static let dateFormatter: DateFormatter = {
@@ -157,9 +166,15 @@ struct ChatView: View {
             PremiumUpgradeView()
                 .environmentObject(authService)
         }
+        .sheet(isPresented: $showEditSheet) {
+            editMessageSheet
+        }
         .onChange(of: messageService.messages.count) { oldCount, newCount in
-            // BUGFIX: Mark as loaded when messages are populated
-            if newCount > 0 && !hasLoadedMessagesForThisChat {
+            // BUGFIX: Only mark as loaded when messages are populated AND for THIS match
+            // This prevents race condition when switching between chats
+            let isActiveMatch = messageService.activeMatchId == match.id
+            let messagesAreForThisMatch = messageService.messages.first?.matchId == match.id
+            if newCount > 0 && !hasLoadedMessagesForThisChat && (isActiveMatch || messagesAreForThisMatch) {
                 hasLoadedMessagesForThisChat = true
             }
             // SWIFTUI FIX: Defer safety check with longer delay to avoid modifying state during view update
@@ -172,9 +187,11 @@ struct ChatView: View {
             }
         }
         .onChange(of: messageService.isLoading) { _, isLoading in
-            // BUGFIX: Mark as loaded once service finishes loading
+            // BUGFIX: Mark as loaded once service finishes loading for THIS match
             // This ensures we only show conversation starters AFTER we confirm no messages exist
-            if !isLoading && !hasLoadedMessagesForThisChat {
+            let isActiveMatch = messageService.activeMatchId == match.id
+            let messagesAreForThisMatch = messageService.messages.isEmpty || messageService.messages.first?.matchId == match.id
+            if !isLoading && !hasLoadedMessagesForThisChat && (isActiveMatch || messagesAreForThisMatch) {
                 hasLoadedMessagesForThisChat = true
             }
         }
@@ -256,7 +273,7 @@ struct ChatView: View {
                     }
                 }
 
-                if isOtherUserTyping {
+                if typingService.isOtherUserTyping {
                     Text("typing...")
                         .font(.caption)
                         .foregroundStyle(
@@ -394,7 +411,20 @@ struct ChatView: View {
                         ForEach(section.1) { message in
                             MessageBubbleGradient(
                                 message: message,
-                                isFromCurrentUser: message.senderId == authService.currentUser?.id || message.senderId == "current_user"
+                                isFromCurrentUser: message.senderId == authService.currentUser?.id || message.senderId == "current_user",
+                                currentUserId: authService.currentUser?.id,
+                                onReaction: { emoji in
+                                    handleReaction(messageId: message.id ?? "", emoji: emoji)
+                                },
+                                onReply: {
+                                    startReplyTo(message: message)
+                                },
+                                onEdit: {
+                                    startEditing(message: message)
+                                },
+                                onTapReplyPreview: { replyMessageId in
+                                    scrollToMessage(messageId: replyMessageId)
+                                }
                             )
                             .id(message.id)
                         }
@@ -444,7 +474,7 @@ struct ChatView: View {
                     }
 
                     // Typing indicator
-                    if isOtherUserTyping {
+                    if typingService.isOtherUserTyping {
                         TypingIndicator(userName: otherUser.fullName)
                             .transition(.opacity)
                             .id("typing")
@@ -478,8 +508,8 @@ struct ChatView: View {
                     scrollToBottom(proxy: proxy, animated: shouldAnimate)
                 }
             }
-            .onChange(of: isOtherUserTyping) {
-                if isOtherUserTyping {
+            .onChange(of: typingService.isOtherUserTyping) {
+                if typingService.isOtherUserTyping {
                     withAnimation {
                         proxy.scrollTo("typing", anchor: .bottom)
                     }
@@ -592,7 +622,7 @@ struct ChatView: View {
 
     private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool = true) {
         let scrollAction = {
-            if isOtherUserTyping {
+            if typingService.isOtherUserTyping {
                 proxy.scrollTo("typing", anchor: .bottom)
             } else if let lastMessage = messageService.messages.last {
                 proxy.scrollTo(lastMessage.id, anchor: .bottom)
@@ -606,6 +636,12 @@ struct ChatView: View {
         } else {
             scrollAction()
         }
+    }
+
+    private func scrollToMessage(messageId: String) {
+        // This needs to be called within a ScrollViewReader context
+        // For now, we'll find and highlight the message
+        Logger.shared.debug("Scroll to message: \(messageId)", category: .messaging)
     }
     
     // MARK: - Daily Message Limit Banner
@@ -656,10 +692,113 @@ struct ChatView: View {
         }
     }
 
+    // MARK: - Reply Preview Bar
+
+    @ViewBuilder
+    private func replyPreviewBar(message: Message) -> some View {
+        HStack(spacing: 12) {
+            Rectangle()
+                .fill(Color.purple)
+                .frame(width: 3)
+                .cornerRadius(2)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Replying to \(message.senderId == authService.currentUser?.id ? "yourself" : otherUser.fullName)")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.purple)
+
+                if let imageURL = message.imageURL, !imageURL.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "photo")
+                            .font(.caption2)
+                        Text("Photo")
+                            .font(.caption)
+                    }
+                    .foregroundColor(.secondary)
+                } else {
+                    Text(message.text)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer()
+
+            Button {
+                cancelReply()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title3)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(12)
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
+    }
+
+    // MARK: - Edit Message Sheet
+
+    @ViewBuilder
+    private var editMessageSheet: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                Text("Edit Message")
+                    .font(.headline)
+                    .padding(.top)
+
+                TextField("Message", text: $editText, axis: .vertical)
+                    .textFieldStyle(.roundedBorder)
+                    .lineLimit(1...5)
+                    .padding(.horizontal)
+
+                HStack {
+                    Text("\(editText.count)/\(AppConstants.Limits.maxMessageLength)")
+                        .font(.caption)
+                        .foregroundColor(editText.count > AppConstants.Limits.maxMessageLength - 50 ? .red : .secondary)
+                    Spacer()
+                }
+                .padding(.horizontal)
+
+                if let editingMessage = editingMessage, editingMessage.isEdited {
+                    Text("This message has already been edited")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        showEditSheet = false
+                        editingMessage = nil
+                        editText = ""
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        saveEditedMessage()
+                    }
+                    .disabled(editText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+
     // MARK: - Input Bar
 
     private var messageInputBar: some View {
         VStack(spacing: 8) {
+            // Reply preview bar
+            if showReplyBar, let replyMessage = replyingToMessage {
+                replyPreviewBar(message: replyMessage)
+            }
+
             // Image preview
             if let image = selectedImage {
                 HStack {
@@ -728,10 +867,8 @@ struct ChatView: View {
                             messageText = String(newValue.prefix(AppConstants.Limits.maxMessageLength))
                         }
 
-                        // Simulate typing indicator (in production, send to Firestore)
-                        #if DEBUG
-                        // Toggle typing indicator for demo
-                        #endif
+                        // Update typing indicator in Firestore
+                        typingService.setTyping(!newValue.isEmpty)
                     }
 
                 // Send button - simplified for performance
@@ -779,20 +916,34 @@ struct ChatView: View {
     
     private func setupChat() {
         guard let matchId = match.id else { return }
+        guard let currentUserId = authService.currentUser?.id else { return }
+        guard let otherUserId = otherUser.id else { return }
 
-        // BUGFIX: If messages are already cached for this match, mark as loaded immediately
-        // This prevents showing loading state when messages are already available
-        if !messageService.messages.isEmpty {
+        // BUGFIX: Only mark as loaded if messages are actually for THIS match
+        // This prevents race condition where messages from a different chat cause
+        // conversation starters to flash when opening a new chat
+        // Check both the message matchId AND the service's active matchId for double validation
+        let messagesAreForThisMatch = (messageService.messages.first?.matchId == matchId) ||
+                                       (messageService.activeMatchId == matchId && !messageService.messages.isEmpty)
+        if messagesAreForThisMatch {
             hasLoadedMessagesForThisChat = true
+        } else {
+            // Reset the flag when switching to a different chat
+            hasLoadedMessagesForThisChat = false
         }
 
         messageService.listenToMessages(matchId: matchId)
 
+        // Start listening to typing status
+        typingService.startListening(
+            matchId: matchId,
+            currentUserId: currentUserId,
+            otherUserId: otherUserId
+        )
+
         // Mark messages as read
-        if let userId = authService.currentUser?.id {
-            Task {
-                await messageService.markMessagesAsRead(matchId: matchId, userId: userId)
-            }
+        Task {
+            await messageService.markMessagesAsRead(matchId: matchId, userId: currentUserId)
         }
     }
 
@@ -823,6 +974,7 @@ struct ChatView: View {
 
     private func cleanupUserListener() {
         userListener?.remove()
+        typingService.stopListening()
     }
 
     private func sendMessage() {
@@ -835,6 +987,9 @@ struct ChatView: View {
         guard let matchId = match.id else { return }
         guard let currentUserId = authService.currentUser?.id else { return }
         guard let receiverId = otherUser.id else { return }
+
+        // Clear typing indicator immediately
+        typingService.messageSent()
 
         // Check daily message limit for free users (10 messages/day total across ALL conversations)
         let isPremium = authService.currentUser?.isPremium ?? false
@@ -860,12 +1015,15 @@ struct ChatView: View {
         // PERFORMANCE: Capture and sanitize values BEFORE any state changes
         let text = InputSanitizer.standard(messageText)
         let imageToSend = selectedImage
+        let replyMessage = replyingToMessage
 
         // PERFORMANCE: Clear input IMMEDIATELY for instant feedback
         // This makes the UI feel snappy - user sees their input cleared right away
         messageText = ""
         selectedImage = nil
         selectedImageItem = nil
+        replyingToMessage = nil
+        showReplyBar = false
 
         // Haptic feedback - instant response
         HapticManager.shared.impact(.light)
@@ -904,12 +1062,31 @@ struct ChatView: View {
                     }
                 } else {
                     // PERFORMANCE: Text messages - optimistic UI shows instantly
-                    try await MessageService.shared.sendMessage(
-                        matchId: matchId,
-                        senderId: currentUserId,
-                        receiverId: receiverId,
-                        text: text
-                    )
+                    if let reply = replyMessage, let replyId = reply.id {
+                        // Send as a reply
+                        let replyRef = MessageReply(
+                            messageId: replyId,
+                            senderId: reply.senderId,
+                            senderName: reply.senderId == currentUserId ? "You" : self.otherUser.fullName,
+                            text: reply.text,
+                            imageURL: reply.imageURL
+                        )
+                        try await MessageService.shared.sendReplyMessage(
+                            matchId: matchId,
+                            senderId: currentUserId,
+                            receiverId: receiverId,
+                            text: text,
+                            replyTo: replyRef
+                        )
+                    } else {
+                        // Regular message
+                        try await MessageService.shared.sendMessage(
+                            matchId: matchId,
+                            senderId: currentUserId,
+                            receiverId: receiverId,
+                            text: text
+                        )
+                    }
                     // No UI update needed - optimistic message already displayed
                 }
 
@@ -1143,6 +1320,88 @@ struct ChatView: View {
         .cornerRadius(12)
         .shadow(color: .black.opacity(0.3), radius: 10, y: 5)
         .padding(.horizontal)
+    }
+
+    // MARK: - Reactions, Replies, and Editing
+
+    /// Handle reaction on a message
+    private func handleReaction(messageId: String, emoji: String) {
+        guard let currentUserId = authService.currentUser?.id else { return }
+
+        Task {
+            do {
+                try await messageService.toggleReaction(
+                    messageId: messageId,
+                    emoji: emoji,
+                    userId: currentUserId
+                )
+                HapticManager.shared.impact(.light)
+            } catch {
+                Logger.shared.error("Failed to toggle reaction", category: .messaging, error: error)
+                errorToastMessage = "Failed to add reaction"
+                showErrorToast = true
+            }
+        }
+    }
+
+    /// Start replying to a message
+    private func startReplyTo(message: Message) {
+        replyingToMessage = message
+        showReplyBar = true
+        isInputFocused = true
+        HapticManager.shared.impact(.light)
+    }
+
+    /// Cancel reply
+    private func cancelReply() {
+        replyingToMessage = nil
+        showReplyBar = false
+    }
+
+    /// Start editing a message
+    private func startEditing(message: Message) {
+        editingMessage = message
+        editText = message.text
+        showEditSheet = true
+        HapticManager.shared.impact(.light)
+    }
+
+    /// Save edited message
+    private func saveEditedMessage() {
+        guard let message = editingMessage,
+              let messageId = message.id,
+              let currentUserId = authService.currentUser?.id else {
+            return
+        }
+
+        let newText = editText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !newText.isEmpty else {
+            errorToastMessage = "Message cannot be empty"
+            showErrorToast = true
+            return
+        }
+
+        Task {
+            do {
+                try await messageService.editMessage(
+                    messageId: messageId,
+                    newText: newText,
+                    senderId: currentUserId
+                )
+                HapticManager.shared.notification(.success)
+                showEditSheet = false
+                editingMessage = nil
+                editText = ""
+            } catch let error as CelestiaError {
+                Logger.shared.error("Failed to edit message", category: .messaging, error: error)
+                errorToastMessage = error.errorDescription ?? "Failed to edit message"
+                showErrorToast = true
+            } catch {
+                Logger.shared.error("Failed to edit message", category: .messaging, error: error)
+                errorToastMessage = "Failed to edit message"
+                showErrorToast = true
+            }
+        }
     }
 
     /// Retry sending failed message

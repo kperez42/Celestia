@@ -172,6 +172,18 @@ struct MainTabView: View {
                 Logger.shared.info("Navigating to messages for match: \(matchedUserId)", category: .ui)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToAdminDashboard)) { notification in
+            // Navigate to Admin tab when admin notification is tapped
+            guard isAdminUser else { return }
+
+            selectedTab = 5
+            HapticManager.shared.notification(.warning)
+
+            // Log the admin alert type
+            if let alertType = notification.userInfo?["alertType"] as? String {
+                Logger.shared.info("Navigating to admin dashboard for alert: \(alertType)", category: .ui)
+            }
+        }
     }
     
     // MARK: - Custom Tab Bar

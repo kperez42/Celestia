@@ -18,6 +18,7 @@ struct PendingApprovalView: View {
     @State private var stepAnimations: [Bool] = [false, false, false]
     @State private var showStillPendingToast = false
     @State private var showEditProfile = false
+    @State private var showOnboarding = false
 
     private var user: User? {
         authService.currentUser
@@ -329,15 +330,15 @@ struct PendingApprovalView: View {
 
                     // Action buttons
                     VStack(spacing: 12) {
-                        // Edit Profile button
+                        // Edit Profile button - Goes to Onboarding to update signup info
                         Button(action: {
                             HapticManager.shared.impact(.medium)
-                            showEditProfile = true
+                            showOnboarding = true
                         }) {
                             HStack(spacing: 10) {
-                                Image(systemName: "pencil.circle.fill")
+                                Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
                                     .font(.title3)
-                                Text("Edit My Profile")
+                                Text("Update My Info")
                                     .fontWeight(.semibold)
                             }
                             .font(.headline)
@@ -403,6 +404,10 @@ struct PendingApprovalView: View {
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showEditProfile) {
                 EditProfileView()
+                    .environmentObject(authService)
+            }
+            .fullScreenCover(isPresented: $showOnboarding) {
+                OnboardingView()
                     .environmentObject(authService)
             }
             .task {

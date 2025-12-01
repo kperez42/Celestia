@@ -8,49 +8,85 @@ const functions = require('firebase-functions');
 
 /**
  * Sends a push notification via FCM
+ * Configured for reliable delivery like Instagram - works when app is closed
  * @param {string} token - FCM token
  * @param {object} notification - Notification data
  * @returns {object} Result
  */
 async function sendPushNotification(token, notification) {
   try {
+    // Convert data values to strings (FCM requirement)
+    const stringData = {};
+    if (notification.data) {
+      for (const [key, value] of Object.entries(notification.data)) {
+        stringData[key] = String(value);
+      }
+    }
+
     const message = {
       token,
+      // Notification payload - this shows the notification to user
       notification: {
         title: notification.title,
         body: notification.body,
         imageUrl: notification.imageUrl
       },
-      data: notification.data || {},
+      // Data payload - for app handling
+      data: stringData,
+      // iOS (APNs) configuration - CRITICAL for background delivery
       apns: {
+        headers: {
+          'apns-priority': '10', // HIGH priority - delivers immediately
+          'apns-push-type': 'alert', // Alert type shows notification
+          'apns-expiration': String(Math.floor(Date.now() / 1000) + 86400) // 24hr expiry
+        },
         payload: {
           aps: {
+            alert: {
+              title: notification.title,
+              body: notification.body
+            },
             sound: notification.sound || 'default',
-            badge: notification.badge || 0,
+            badge: notification.badge || 1,
             category: notification.category || 'DEFAULT',
-            'mutable-content': 1 // Enable rich notifications
+            'mutable-content': 1, // Enable rich notifications
+            'content-available': 1 // CRITICAL: Wake app in background
           }
         },
         fcm_options: {
           image: notification.imageUrl
         }
       },
+      // Android configuration
       android: {
+        priority: 'high', // HIGH priority for immediate delivery
+        ttl: 86400000, // 24 hour time-to-live
         notification: {
           sound: notification.sound || 'default',
-          channelId: notification.channel || 'default',
-          priority: 'high',
+          channelId: notification.channel || 'high_priority',
+          priority: 'max', // Maximum priority
           defaultSound: true,
           defaultVibrateTimings: true,
           defaultLightSettings: true,
-          imageUrl: notification.imageUrl
+          imageUrl: notification.imageUrl,
+          notificationCount: notification.badge || 1
+        }
+      },
+      // Web push (optional)
+      webpush: {
+        headers: {
+          Urgency: 'high'
         }
       }
     };
 
     const response = await admin.messaging().send(message);
 
-    functions.logger.info('Push notification sent', { token, messageId: response });
+    functions.logger.info('Push notification sent successfully', {
+      token: token.substring(0, 20) + '...',
+      messageId: response,
+      title: notification.title
+    });
 
     return {
       success: true,
@@ -58,7 +94,18 @@ async function sendPushNotification(token, notification) {
     };
 
   } catch (error) {
-    functions.logger.error('Push notification failed', { error: error.message, token });
+    functions.logger.error('Push notification failed', {
+      error: error.message,
+      errorCode: error.code,
+      token: token.substring(0, 20) + '...'
+    });
+
+    // If token is invalid, we should clean it up
+    if (error.code === 'messaging/registration-token-not-registered' ||
+        error.code === 'messaging/invalid-registration-token') {
+      functions.logger.warn('Invalid FCM token detected - should be cleaned up');
+    }
+
     throw error;
   }
 }
@@ -625,6 +672,123 @@ async function sendSuspensionNotification(userId, suspensionData) {
 }
 
 /**
+ * Sends a ban notification to a user
+ * Called by admin when permanently banning an account
+ * @param {string} userId - User to notify
+ * @param {object} banData - Ban information
+ */
+async function sendBanNotification(userId, banData) {
+  const userDoc = await admin.firestore().collection('users').doc(userId).get();
+
+  if (!userDoc.exists) {
+    functions.logger.error('User not found for ban notification', { userId });
+    return;
+  }
+
+  const user = userDoc.data();
+  const fcmToken = user.fcmToken;
+
+  if (!fcmToken) {
+    functions.logger.info('No FCM token for user', { userId });
+    return;
+  }
+
+  const reason = banData.reason || "Serious violation of community guidelines";
+
+  const notification = {
+    title: "⛔ Account Banned",
+    body: `Your account has been permanently banned. Reason: ${reason}`,
+    sound: 'default',
+    badge: 1,
+    category: 'ACCOUNT_BANNED',
+    data: {
+      type: 'account_banned',
+      reason: reason
+    }
+  };
+
+  await sendPushNotification(fcmToken, notification);
+
+  // Log the notification
+  await admin.firestore().collection('notification_logs').add({
+    userId,
+    type: 'account_banned',
+    reason: reason,
+    sentAt: admin.firestore.FieldValue.serverTimestamp(),
+    delivered: true
+  });
+
+  functions.logger.info('Ban notification sent', { userId, reason });
+}
+
+/**
+ * Sends a notification to the reporter when their report is resolved
+ * @param {string} reporterId - User who filed the report
+ * @param {object} resolutionData - Resolution information
+ */
+async function sendReportResolvedNotification(reporterId, resolutionData) {
+  const userDoc = await admin.firestore().collection('users').doc(reporterId).get();
+
+  if (!userDoc.exists) {
+    functions.logger.error('Reporter not found for report resolution notification', { reporterId });
+    return;
+  }
+
+  const user = userDoc.data();
+  const fcmToken = user.fcmToken;
+
+  if (!fcmToken) {
+    functions.logger.info('No FCM token for reporter', { reporterId });
+    return;
+  }
+
+  const action = resolutionData.action || 'reviewed';
+  let title = "📋 Report Update";
+  let body = "Your report has been reviewed by our moderation team.";
+
+  // Customize message based on action taken
+  if (action === 'ban' || action === 'banned') {
+    title = "✅ Report Action Taken";
+    body = "Thank you for your report. The user has been removed from Celestia.";
+  } else if (action === 'suspend' || action === 'suspended') {
+    title = "✅ Report Action Taken";
+    body = "Thank you for your report. The user has been suspended.";
+  } else if (action === 'warn' || action === 'warned') {
+    title = "✅ Report Action Taken";
+    body = "Thank you for your report. A warning has been issued to the user.";
+  } else if (action === 'dismiss' || action === 'dismissed') {
+    title = "📋 Report Reviewed";
+    body = "Your report has been reviewed. No violation was found, but we appreciate your help keeping Celestia safe.";
+  }
+
+  const notification = {
+    title: title,
+    body: body,
+    sound: 'default',
+    badge: 1,
+    category: 'REPORT_RESOLVED',
+    data: {
+      type: 'report_resolved',
+      action: action,
+      reportId: resolutionData.reportId || ''
+    }
+  };
+
+  await sendPushNotification(fcmToken, notification);
+
+  // Log the notification
+  await admin.firestore().collection('notification_logs').add({
+    userId: reporterId,
+    type: 'report_resolved',
+    action: action,
+    sentAt: admin.firestore.FieldValue.serverTimestamp(),
+    delivered: true
+  });
+
+  functions.logger.info('Report resolution notification sent to reporter', { reporterId, action });
+}
+
+/**
  * Sends an ID verification rejection notification to a user
  * @param {string} userId - User to notify
  * @param {object} rejectionData - Rejection information
@@ -673,6 +837,61 @@ async function sendIDVerificationRejectionNotification(userId, rejectionData) {
   functions.logger.info('ID verification rejection notification sent', { userId, reason });
 }
 
+/**
+ * Sends an appeal resolution notification to a user
+ * @param {string} userId - User to notify
+ * @param {boolean} approved - Whether the appeal was approved
+ * @param {string} response - Admin response message
+ */
+async function sendAppealResolvedNotification(userId, approved, response) {
+  const userDoc = await admin.firestore().collection('users').doc(userId).get();
+
+  if (!userDoc.exists) {
+    functions.logger.error('User not found for appeal resolution notification', { userId });
+    return;
+  }
+
+  const user = userDoc.data();
+  const fcmToken = user.fcmToken;
+
+  if (!fcmToken) {
+    functions.logger.info('No FCM token for user', { userId });
+    return;
+  }
+
+  const title = approved ? "✅ Appeal Approved" : "❌ Appeal Denied";
+  const body = approved
+    ? "Your appeal has been approved. Your account access has been restored."
+    : response || "Your appeal has been reviewed and denied.";
+
+  const notification = {
+    title: title,
+    body: body,
+    sound: 'default',
+    badge: 1,
+    category: 'APPEAL_RESULT',
+    data: {
+      type: 'appeal_resolved',
+      approved: approved,
+      response: response
+    }
+  };
+
+  await sendPushNotification(fcmToken, notification);
+
+  // Log the notification
+  await admin.firestore().collection('notification_logs').add({
+    userId,
+    type: 'appeal_resolved',
+    approved: approved,
+    response: response,
+    sentAt: admin.firestore.FieldValue.serverTimestamp(),
+    delivered: true
+  });
+
+  functions.logger.info('Appeal resolution notification sent', { userId, approved });
+}
+
 module.exports = {
   sendPushNotification,
   sendMatchNotification,
@@ -684,5 +903,8 @@ module.exports = {
   sendNewAccountNotification,
   sendWarningNotification,
   sendSuspensionNotification,
-  sendIDVerificationRejectionNotification
+  sendBanNotification,
+  sendReportResolvedNotification,
+  sendIDVerificationRejectionNotification,
+  sendAppealResolvedNotification
 };

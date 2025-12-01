@@ -329,32 +329,117 @@ struct LikeCardView: View {
 class SeeWhoLikesYouViewModel: ObservableObject {
     @Published var usersWhoLiked: [User] = []
     @Published var isLoading = false
+    @Published var errorMessage: String?
 
     private let db = Firestore.firestore()
 
-    func loadUsersWhoLiked() async {
+    // Cache management
+    private var lastFetchTime: Date?
+    private let cacheDuration: TimeInterval = 120 // 2 minutes
+
+    func loadUsersWhoLiked(forceRefresh: Bool = false) async {
+        // Check cache first
+        if !forceRefresh,
+           let lastFetch = lastFetchTime,
+           !usersWhoLiked.isEmpty,
+           Date().timeIntervalSince(lastFetch) < cacheDuration {
+            Logger.shared.debug("SeeWhoLikesYou cache HIT - using cached data", category: .performance)
+            return
+        }
+
         guard let currentUserId = AuthService.shared.currentUser?.id else { return }
 
-        isLoading = true
-        defer { isLoading = false }
+        // Only show loading if we have no cached data
+        let shouldShowLoading = usersWhoLiked.isEmpty
+        if shouldShowLoading {
+            isLoading = true
+        }
+        defer {
+            if shouldShowLoading {
+                isLoading = false
+            }
+        }
 
         do {
             // Get user IDs who liked current user
             let likerIds = try await SwipeService.shared.getLikesReceived(userId: currentUserId)
 
-            // Fetch user details
-            var users: [User] = []
-            for likerId in likerIds {
-                let document = try await db.collection("users").document(likerId).getDocument()
-                if let user = try? document.data(as: User.self) {
-                    users.append(user)
+            // PERFORMANCE FIX: Use batch queries instead of N+1 sequential queries
+            // This reduces network calls from N to ceil(N/10)
+            let users = try await fetchUsersBatched(ids: likerIds)
+
+            usersWhoLiked = users
+            lastFetchTime = Date()
+            errorMessage = nil
+
+            Logger.shared.info("Loaded \(users.count) users who liked you (batch query)", category: .matching)
+
+            // Prefetch images for smooth scrolling
+            Task {
+                for user in users {
+                    ImageCache.shared.prefetchUserPhotosHighPriority(user: user)
+                }
+            }
+        } catch {
+            Logger.shared.error("Error loading likes", category: .matching, error: error)
+            errorMessage = "Failed to load likes. Pull to refresh."
+        }
+    }
+
+    /// Fetch users in batches of 10 (Firestore whereIn limit)
+    private func fetchUsersBatched(ids: [String]) async throws -> [User] {
+        guard !ids.isEmpty else { return [] }
+
+        var users: [User] = []
+        let chunks = ids.chunked(into: 10)
+
+        // Run batch queries in parallel for better performance
+        try await withThrowingTaskGroup(of: [User].self) { group in
+            for chunk in chunks {
+                group.addTask {
+                    let snapshot = try await self.db.collection("users")
+                        .whereField(FieldPath.documentID(), in: chunk)
+                        .getDocuments()
+
+                    return snapshot.documents.compactMap { try? $0.data(as: User.self) }
                 }
             }
 
-            usersWhoLiked = users
-            Logger.shared.info("Loaded \(users.count) users who liked you", category: .matching)
+            for try await chunkUsers in group {
+                users.append(contentsOf: chunkUsers)
+            }
+        }
+
+        // Maintain original order (by like timestamp) by reordering based on input IDs
+        let idOrder = Dictionary(uniqueKeysWithValues: ids.enumerated().map { ($1, $0) })
+        users.sort { (idOrder[$0.id ?? ""] ?? Int.max) < (idOrder[$1.id ?? ""] ?? Int.max) }
+
+        return users
+    }
+
+    func likeBack(user: User) async -> Bool {
+        guard let targetUserId = user.effectiveId else { return false }
+        guard let currentUserId = AuthService.shared.currentUser?.effectiveId else { return false }
+
+        do {
+            let isMatch = try await SwipeService.shared.likeUser(
+                fromUserId: currentUserId,
+                toUserId: targetUserId,
+                isSuperLike: false
+            )
+
+            if isMatch {
+                HapticManager.shared.notification(.success)
+                Logger.shared.info("Liked back user - it's a match!", category: .matching)
+            } else {
+                HapticManager.shared.impact(.medium)
+            }
+
+            return isMatch
         } catch {
-            Logger.shared.error("Error loading likes", category: .matching, error: error)
+            Logger.shared.error("Error liking back user", category: .matching, error: error)
+            HapticManager.shared.notification(.error)
+            return false
         }
     }
 }

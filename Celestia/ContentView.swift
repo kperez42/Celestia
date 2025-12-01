@@ -14,6 +14,7 @@ struct ContentView: View {
     @State private var isProfilePending = false
     @State private var isProfileRejected = false
     @State private var isSuspended = false
+    @State private var isBanned = false
     @State private var isLoading = true  // Start with splash screen
     @State private var showApprovalCelebration = false
     @State private var previousProfileStatus: String?
@@ -28,6 +29,11 @@ struct ContentView: View {
                 } else if isAuthenticated {
                     if needsEmailVerification {
                         EmailVerificationView()
+                            .transition(.opacity)
+                    } else if isBanned {
+                        // Show banned account view for permanently banned users
+                        BannedAccountView()
+                            .environmentObject(authService)
                             .transition(.opacity)
                     } else if isSuspended {
                         // Show suspended account view for suspended users
@@ -72,6 +78,7 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.3), value: isProfilePending)
         .animation(.easeInOut(duration: 0.3), value: isProfileRejected)
         .animation(.easeInOut(duration: 0.3), value: isSuspended)
+        .animation(.easeInOut(duration: 0.3), value: isBanned)
         .animation(.spring(response: 0.5, dampingFraction: 0.8), value: showApprovalCelebration)
         .onChange(of: authService.userSession?.uid) { newValue in
             Logger.shared.debug("ContentView: userSession changed to: \(newValue ?? "nil")", category: .general)
@@ -87,6 +94,10 @@ struct ContentView: View {
         }
         .onChange(of: authService.currentUser?.isSuspended) { newValue in
             Logger.shared.debug("ContentView: isSuspended changed to: \(String(describing: newValue))", category: .general)
+            updateAuthenticationState()
+        }
+        .onChange(of: authService.currentUser?.isBanned) { newValue in
+            Logger.shared.debug("ContentView: isBanned changed to: \(String(describing: newValue))", category: .general)
             updateAuthenticationState()
         }
         .onAppear {
@@ -112,12 +123,14 @@ struct ContentView: View {
 
         let profileStatus = authService.currentUser?.profileStatus.lowercased()
 
-        // Check if account is suspended
-        isSuspended = isAuthenticated && (authService.currentUser?.isSuspended == true || profileStatus == "suspended")
+        // Check if account is banned (permanent)
+        isBanned = isAuthenticated && (authService.currentUser?.isBanned == true || profileStatus == "banned")
+        // Check if account is suspended (temporary)
+        isSuspended = isAuthenticated && !isBanned && (authService.currentUser?.isSuspended == true || profileStatus == "suspended")
         // Check if profile is rejected and needs user action
-        isProfileRejected = isAuthenticated && profileStatus == "rejected"
+        isProfileRejected = isAuthenticated && !isBanned && !isSuspended && profileStatus == "rejected"
         // Check if profile is pending approval
-        isProfilePending = isAuthenticated && profileStatus == "pending"
+        isProfilePending = isAuthenticated && !isBanned && !isSuspended && !isProfileRejected && profileStatus == "pending"
 
         // Detect approval transition: was pending/rejected, now approved/active
         let wasWaitingForApproval = previousProfileStatus == "pending" || previousProfileStatus == "rejected"
@@ -135,7 +148,7 @@ struct ContentView: View {
         // Update previous status for next comparison
         previousProfileStatus = profileStatus
 
-        Logger.shared.debug("ContentView: isAuthenticated=\(isAuthenticated), needsEmailVerification=\(needsEmailVerification), isSuspended=\(isSuspended), isProfileRejected=\(isProfileRejected), isProfilePending=\(isProfilePending)", category: .general)
+        Logger.shared.debug("ContentView: isAuthenticated=\(isAuthenticated), needsEmailVerification=\(needsEmailVerification), isBanned=\(isBanned), isSuspended=\(isSuspended), isProfileRejected=\(isProfileRejected), isProfilePending=\(isProfilePending)", category: .general)
     }
 }
 

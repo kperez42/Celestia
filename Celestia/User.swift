@@ -82,6 +82,11 @@ struct User: Identifiable, Codable, Equatable {
     var suspendedUntil: Date?
     var suspendReason: String?
 
+    // Ban Info (permanent ban set by admin)
+    var isBanned: Bool = false
+    var bannedAt: Date?
+    var banReason: String?
+
     // Warnings (accumulated from reports)
     var warningCount: Int = 0
     var hasUnreadWarning: Bool = false         // Show warning notice to user
@@ -193,6 +198,9 @@ struct User: Identifiable, Codable, Equatable {
         try container.encodeIfPresent(suspendedAt, forKey: .suspendedAt)
         try container.encodeIfPresent(suspendedUntil, forKey: .suspendedUntil)
         try container.encodeIfPresent(suspendReason, forKey: .suspendReason)
+        try container.encode(isBanned, forKey: .isBanned)
+        try container.encodeIfPresent(bannedAt, forKey: .bannedAt)
+        try container.encodeIfPresent(banReason, forKey: .banReason)
         try container.encode(warningCount, forKey: .warningCount)
         try container.encode(hasUnreadWarning, forKey: .hasUnreadWarning)
         try container.encodeIfPresent(lastWarningReason, forKey: .lastWarningReason)
@@ -235,6 +243,7 @@ struct User: Identifiable, Codable, Equatable {
         case idVerificationRejected, idVerificationRejectedAt, idVerificationRejectionReason
         case profileStatus, profileStatusReason, profileStatusReasonCode, profileStatusFixInstructions, profileStatusUpdatedAt
         case isSuspended, suspendedAt, suspendedUntil, suspendReason
+        case isBanned, bannedAt, banReason
         case warningCount, hasUnreadWarning, lastWarningReason
         case ageRangeMin, ageRangeMax, maxDistance, showMeInSearch
         case likesGiven, likesReceived, matchCount, profileViews
@@ -314,6 +323,12 @@ struct User: Identifiable, Codable, Equatable {
             self.suspendedUntil = suspendedUntilTs.dateValue()
         }
         self.suspendReason = dictionary["suspendReason"] as? String
+
+        self.isBanned = dictionary["isBanned"] as? Bool ?? false
+        if let bannedAtTs = dictionary["bannedAt"] as? Timestamp {
+            self.bannedAt = bannedAtTs.dateValue()
+        }
+        self.banReason = dictionary["banReason"] as? String
 
         // Warnings
         self.warningCount = dictionary["warningCount"] as? Int ?? 0
