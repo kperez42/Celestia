@@ -874,6 +874,40 @@ service cloud.firestore {
         && resource.data.userId == request.auth.uid;
     }
 
+    // Segment Assignments Collection (A/B testing)
+    match /segmentAssignments/{assignmentId} {
+      // Users can read their own assignments
+      allow read: if isAuthenticated()
+        && assignmentId == request.auth.uid;
+
+      // System creates assignments
+      allow create: if isAuthenticated()
+        && assignmentId == request.auth.uid;
+
+      // Allow delete for account cleanup
+      allow delete: if isAuthenticated()
+        && assignmentId == request.auth.uid;
+    }
+
+    // Emergency Contacts Collection (safety feature)
+    match /emergencyContacts/{contactId} {
+      // Users can read their own emergency contacts
+      allow read: if isAuthenticated()
+        && resource.data.userId == request.auth.uid;
+
+      // Users can create their own emergency contacts
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid;
+
+      // Users can update their own emergency contacts
+      allow update: if isAuthenticated()
+        && resource.data.userId == request.auth.uid;
+
+      // Users can delete their own emergency contacts (for account cleanup)
+      allow delete: if isAuthenticated()
+        && resource.data.userId == request.auth.uid;
+    }
+
     // Default: Deny all other access
     match /{document=**} {
       allow read, write: if false;
