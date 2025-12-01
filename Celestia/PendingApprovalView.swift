@@ -17,6 +17,7 @@ struct PendingApprovalView: View {
     @State private var progressAnimation = false
     @State private var stepAnimations: [Bool] = [false, false, false]
     @State private var showStillPendingToast = false
+    @State private var showEditProfile = false
 
     private var user: User? {
         authService.currentUser
@@ -328,6 +329,32 @@ struct PendingApprovalView: View {
 
                     // Action buttons
                     VStack(spacing: 12) {
+                        // Edit Profile button
+                        Button(action: {
+                            HapticManager.shared.impact(.medium)
+                            showEditProfile = true
+                        }) {
+                            HStack(spacing: 10) {
+                                Image(systemName: "pencil.circle.fill")
+                                    .font(.title3)
+                                Text("Edit My Profile")
+                                    .fontWeight(.semibold)
+                            }
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(
+                                LinearGradient(
+                                    colors: [.purple, .pink],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(16)
+                            .shadow(color: .purple.opacity(0.3), radius: 8, y: 4)
+                        }
+
                         Button(action: {
                             HapticManager.shared.impact(.medium)
                             Task {
@@ -337,7 +364,7 @@ struct PendingApprovalView: View {
                             HStack(spacing: 10) {
                                 if isRefreshing {
                                     ProgressView()
-                                        .tint(.white)
+                                        .tint(.blue)
                                 } else {
                                     Image(systemName: "arrow.clockwise.circle.fill")
                                         .font(.title3)
@@ -346,18 +373,11 @@ struct PendingApprovalView: View {
                                 }
                             }
                             .font(.headline)
-                            .foregroundColor(.white)
+                            .foregroundColor(.blue)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
-                            .background(
-                                LinearGradient(
-                                    colors: [.blue, .purple],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
+                            .background(Color.blue.opacity(0.1))
                             .cornerRadius(16)
-                            .shadow(color: .blue.opacity(0.3), radius: 8, y: 4)
                         }
                         .disabled(isRefreshing)
 
@@ -381,6 +401,10 @@ struct PendingApprovalView: View {
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Profile Status")
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showEditProfile) {
+                EditProfileView()
+                    .environmentObject(authService)
+            }
             .task {
                 // Auto-refresh status after a short delay when view appears
                 try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds

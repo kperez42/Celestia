@@ -78,7 +78,7 @@ struct MainTabView: View {
                 // Admin - Only for admin users
                 if isAdminUser {
                     LazyTabContent(tabIndex: 5, currentTab: selectedTab) {
-                        AdminImageApprovalView()
+                        AdminModerationDashboard()
                     }
                     .tag(5)
                 }
