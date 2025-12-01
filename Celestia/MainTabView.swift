@@ -113,7 +113,7 @@ struct MainTabView: View {
         }
         .onChange(of: selectedTab) { oldValue, newValue in
             previousTab = oldValue
-            HapticManager.shared.tabSwitch()
+            // Removed haptic for faster feel
         }
         .onChange(of: matchService.matches) { _, newMatches in
             // AUDIT FIX: Calculate both counts from authoritative Match data
@@ -342,8 +342,6 @@ struct TabBarButton: View {
     let badgeCount: Int
     let action: () -> Void
 
-    @State private var isPressed = false
-
     private var accessibilityHint: String {
         switch title {
         case "Discover":
@@ -362,27 +360,16 @@ struct TabBarButton: View {
     }
 
     var body: some View {
-        Button(action: {
-            isPressed = true
-            action()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                isPressed = false
-            }
-        }) {
+        Button(action: action) {
             VStack(spacing: 4) {
                 ZStack(alignment: .topTrailing) {
-                    // Icon (clean, no glow)
+                    // Icon - simple solid colors for performance
                     Image(systemName: icon)
                         .font(.title3)
-                        .foregroundStyle(
-                            isSelected ?
-                            LinearGradient.brandPrimaryDiagonal :
-                            LinearGradient(colors: [Color.gray.opacity(0.5)], startPoint: .leading, endPoint: .trailing)
-                        )
+                        .foregroundColor(isSelected ? .purple : .gray.opacity(0.5))
                         .frame(height: 24)
-                        .scaleEffect(isPressed ? 0.85 : 1.0)
 
-                    // Clean badge - no pulse
+                    // Badge - simple solid color
                     if badgeCount > 0 {
                         Text("\(badgeCount)")
                             .font(.caption2.weight(.bold))
@@ -391,45 +378,22 @@ struct TabBarButton: View {
                             .padding(.vertical, 2)
                             .background(
                                 Capsule()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [Color.red, Color.pink],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                    )
+                                    .fill(Color.red)
                             )
                             .offset(x: 12, y: -6)
                     }
                 }
 
-                // Title with smooth color transition
+                // Title - simple solid colors
                 Text(title)
                     .font(.caption2.weight(isSelected ? .semibold : .regular))
-                    .foregroundStyle(
-                        isSelected ?
-                        LinearGradient(
-                            colors: [.purple, .pink],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ) :
-                        LinearGradient(colors: [Color.gray], startPoint: .leading, endPoint: .trailing)
-                    )
+                    .foregroundColor(isSelected ? .purple : .gray)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 15)
             .background(
-                // Clean background - no shadow, no glow
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(
-                        isSelected ?
-                        LinearGradient(
-                            colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.05)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ) :
-                        LinearGradient(colors: [Color.clear], startPoint: .leading, endPoint: .trailing)
-                    )
+                    .fill(isSelected ? Color.purple.opacity(0.1) : Color.clear)
             )
             // Accessibility
             .accessibilityLabel("\(title) tab")
@@ -438,9 +402,6 @@ struct TabBarButton: View {
             .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
         }
         .buttonStyle(PlainButtonStyle())
-        .animation(.microSpring, value: isPressed)
-        .animation(.tabSwitch, value: isSelected)
-        .animation(.butterSmooth, value: badgeCount)
     }
 }
 
@@ -449,22 +410,15 @@ struct TabBarButton: View {
 struct AnimatedTabIndicator: View {
     let selectedTab: Int
     let totalTabs: Int
-    
+
     var body: some View {
         GeometryReader { geometry in
             let tabWidth = geometry.size.width / CGFloat(totalTabs)
-            
+
             RoundedRectangle(cornerRadius: 2)
-                .fill(
-                    LinearGradient(
-                        colors: [Color.purple, Color.pink],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
+                .fill(Color.purple)
                 .frame(width: tabWidth * 0.5, height: 3)
                 .offset(x: tabWidth * CGFloat(selectedTab) + tabWidth * 0.25)
-                .animation(.tabSwitch, value: selectedTab)
         }
         .frame(height: 3)
     }
