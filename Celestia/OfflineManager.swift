@@ -464,9 +464,10 @@ class SyncEngine {
         }
 
         // Upload photo via ImageUploadService
+        // uploadImage expects a directory path and will append its own UUID filename
         let imageURL = try await ImageUploadService.shared.uploadImage(
             image,
-            path: "profile_photos/\(photoData.userId)/\(UUID().uuidString).jpg"
+            path: "profile_photos/\(photoData.userId)"
         )
 
         Logger.shared.info("Successfully synced photo upload: \(imageURL)", category: .storage)

@@ -208,9 +208,11 @@ class ImageUploadService {
 
         var uploadedURLs: [String] = []
 
-        for (index, image) in images.enumerated() {
+        // uploadImage expects a directory path and will append its own UUID filename
+        // Each upload will get a unique filename automatically
+        for image in images {
             do {
-                let url = try await uploadImage(image, path: "\(path)/photo\(index)")
+                let url = try await uploadImage(image, path: path)
                 uploadedURLs.append(url)
             } catch {
                 // If upload fails, delete already uploaded images
