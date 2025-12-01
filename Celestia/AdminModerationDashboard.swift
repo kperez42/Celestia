@@ -1922,7 +1922,10 @@ struct PendingProfileCard: View {
                 // Action Buttons
                 HStack(spacing: 16) {
                     // Reject Button
-                    Button(action: { showRejectAlert = true }) {
+                    Button(action: {
+                        HapticManager.shared.impact(.light)
+                        showRejectAlert = true
+                    }) {
                         HStack(spacing: 8) {
                             if isRejecting {
                                 ProgressView()
@@ -1951,9 +1954,11 @@ struct PendingProfileCard: View {
 
                     // Approve Button
                     Button(action: {
+                        HapticManager.shared.impact(.medium)
                         Task {
                             isApproving = true
                             try? await viewModel.approveProfile(userId: profile.id)
+                            HapticManager.shared.notification(.success)
                             isApproving = false
                         }
                     }) {
@@ -2055,6 +2060,7 @@ struct PendingProfileCard: View {
     /// Submit the rejection with optional admin comment
     private func submitRejection() {
         guard let reason = selectedRejectionReason else { return }
+        HapticManager.shared.impact(.medium)
         Task {
             isRejecting = true
 
@@ -2071,6 +2077,7 @@ struct PendingProfileCard: View {
                 fixInstructions: finalInstructions
             )
 
+            HapticManager.shared.notification(.warning)
             isRejecting = false
             adminComment = ""
             selectedRejectionReason = nil

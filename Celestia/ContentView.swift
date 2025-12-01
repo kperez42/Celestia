@@ -11,6 +11,7 @@ struct ContentView: View {
     @EnvironmentObject var authService: AuthService
     @State private var isAuthenticated = false
     @State private var needsEmailVerification = false
+    @State private var isProfilePending = false
     @State private var isProfileRejected = false
     @State private var isSuspended = false
     @State private var isLoading = true  // Start with splash screen
@@ -35,6 +36,11 @@ struct ContentView: View {
                     ProfileRejectionFeedbackView()
                         .environmentObject(authService)
                         .transition(.opacity)
+                } else if isProfilePending {
+                    // Show pending approval view while profile is under review
+                    PendingApprovalView()
+                        .environmentObject(authService)
+                        .transition(.opacity)
                 } else {
                     MainTabView()
                         .transition(.opacity)
@@ -47,6 +53,7 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.5), value: isLoading)
         .animation(.easeInOut(duration: 0.3), value: isAuthenticated)
         .animation(.easeInOut(duration: 0.3), value: needsEmailVerification)
+        .animation(.easeInOut(duration: 0.3), value: isProfilePending)
         .animation(.easeInOut(duration: 0.3), value: isProfileRejected)
         .animation(.easeInOut(duration: 0.3), value: isSuspended)
         .onChange(of: authService.userSession?.uid) { newValue in
@@ -85,11 +92,17 @@ struct ContentView: View {
     private func updateAuthenticationState() {
         isAuthenticated = (authService.userSession != nil)
         needsEmailVerification = isAuthenticated && !authService.isEmailVerified
+
+        let profileStatus = authService.currentUser?.profileStatus?.lowercased()
+
         // Check if account is suspended
-        isSuspended = isAuthenticated && (authService.currentUser?.isSuspended == true || authService.currentUser?.profileStatus == "suspended")
+        isSuspended = isAuthenticated && (authService.currentUser?.isSuspended == true || profileStatus == "suspended")
         // Check if profile is rejected and needs user action
-        isProfileRejected = isAuthenticated && authService.currentUser?.profileStatus == "rejected"
-        Logger.shared.debug("ContentView: isAuthenticated=\(isAuthenticated), needsEmailVerification=\(needsEmailVerification), isSuspended=\(isSuspended), isProfileRejected=\(isProfileRejected)", category: .general)
+        isProfileRejected = isAuthenticated && profileStatus == "rejected"
+        // Check if profile is pending approval
+        isProfilePending = isAuthenticated && profileStatus == "pending"
+
+        Logger.shared.debug("ContentView: isAuthenticated=\(isAuthenticated), needsEmailVerification=\(needsEmailVerification), isSuspended=\(isSuspended), isProfileRejected=\(isProfileRejected), isProfilePending=\(isProfilePending)", category: .general)
     }
 }
 
