@@ -50,6 +50,16 @@ struct OnboardingView: View {
     @State private var ageRangeMin: Int = 18
     @State private var ageRangeMax: Int = 50
 
+    // Step 7: Lifestyle (NEW)
+    @State private var educationLevel: String = ""
+    @State private var smoking: String = ""
+    @State private var drinking: String = ""
+
+    // Step 8: More About You (NEW)
+    @State private var exercise: String = ""
+    @State private var pets: String = ""
+    @State private var diet: String = ""
+
     @State private var isLoading = false
     @State private var showError = false
     @State private var errorMessage = ""
@@ -58,11 +68,19 @@ struct OnboardingView: View {
     
     let genderOptions = ["Male", "Female", "Non-binary", "Other"]
     let lookingForOptions = ["Men", "Women", "Everyone"]
-    let totalSteps = 6
+    let totalSteps = 8
 
     // Step 6 options
     let relationshipGoalOptions = ["Prefer not to say", "Casual Dating", "Long-term Relationship", "Marriage", "Friendship", "Not Sure Yet"]
     let heightOptions: [Int] = Array(140...220) // cm range
+
+    // Step 7 & 8 options (Lifestyle)
+    let educationOptions = ["", "High School", "Some College", "Associate's Degree", "Bachelor's Degree", "Master's Degree", "Doctorate", "Trade School", "Other"]
+    let smokingOptions = ["", "Never", "Sometimes", "Regularly", "Trying to quit", "Prefer not to say"]
+    let drinkingOptions = ["", "Never", "Socially", "Occasionally", "Regularly", "Prefer not to say"]
+    let exerciseOptions = ["", "Daily", "Often (3-4x/week)", "Sometimes (1-2x/week)", "Rarely", "Never"]
+    let petsOptions = ["", "Dog", "Cat", "Both", "Other pets", "No pets", "Want pets", "Allergic"]
+    let dietOptions = ["", "Omnivore", "Vegetarian", "Vegan", "Pescatarian", "Keto", "Halal", "Kosher", "Other"]
     
     let availableInterests = [
         "Travel", "Music", "Movies", "Sports", "Food",
@@ -110,6 +128,8 @@ struct OnboardingView: View {
                         step4View.tag(3)
                         step5View.tag(4)
                         step6View.tag(5)
+                        step7View.tag(6)
+                        step8View.tag(7)
                     }
                     .tabViewStyle(.page(indexDisplayMode: .never))
                     .accessibleAnimation(.easeInOut, value: currentStep)
@@ -285,6 +305,8 @@ struct OnboardingView: View {
         case 3: return "Preferences"
         case 4: return "Interests"
         case 5: return "Better Matches"
+        case 6: return "Your Lifestyle"
+        case 7: return "Final Details"
         default: return ""
         }
     }
@@ -297,6 +319,8 @@ struct OnboardingView: View {
         case 3: return "What you're looking for"
         case 4: return "What makes you unique"
         case 5: return "Optional • Skip anytime"
+        case 6: return "Your habits & preferences"
+        case 7: return "Almost done!"
         default: return ""
         }
     }
@@ -1538,6 +1562,260 @@ struct OnboardingView: View {
         return "\(feet)'\(inches)\""
     }
 
+    // MARK: - Step 7: Lifestyle
+
+    private var step7View: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 24) {
+                // Icon
+                ZStack {
+                    Circle()
+                        .fill(Color.teal.opacity(0.15))
+                        .frame(width: 100, height: 100)
+
+                    Image(systemName: "leaf.fill")
+                        .font(.system(size: 50))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.teal, .green],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+
+                VStack(spacing: 8) {
+                    Text("Your Lifestyle")
+                        .font(.title)
+                        .fontWeight(.bold)
+
+                    Text("Help us find compatible matches")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+
+                    // Optional badge
+                    HStack(spacing: 6) {
+                        Image(systemName: "hand.tap.fill")
+                            .font(.caption)
+                        Text("Optional - Skip anytime")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                    }
+                    .foregroundColor(.teal)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.teal.opacity(0.1))
+                    .cornerRadius(20)
+                    .padding(.top, 4)
+                }
+
+                VStack(spacing: 20) {
+                    // Education
+                    lifestyleOptionSelector(
+                        title: "Education",
+                        icon: "graduationcap.fill",
+                        color: .blue,
+                        options: educationOptions,
+                        selection: $educationLevel
+                    )
+
+                    // Smoking
+                    lifestyleOptionSelector(
+                        title: "Smoking",
+                        icon: "smoke.fill",
+                        color: .gray,
+                        options: smokingOptions,
+                        selection: $smoking
+                    )
+
+                    // Drinking
+                    lifestyleOptionSelector(
+                        title: "Drinking",
+                        icon: "wineglass.fill",
+                        color: .purple,
+                        options: drinkingOptions,
+                        selection: $drinking
+                    )
+                }
+
+                // Info card
+                HStack(spacing: 12) {
+                    Image(systemName: "lightbulb.fill")
+                        .font(.title3)
+                        .foregroundColor(.yellow)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Lifestyle Matching")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+
+                        Text("Users with similar lifestyles are 60% more likely to match")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
+                }
+                .padding()
+                .background(Color.yellow.opacity(0.1))
+                .cornerRadius(12)
+            }
+            .padding(20)
+            .padding(.top, 20)
+        }
+    }
+
+    // MARK: - Step 8: Final Details
+
+    private var step8View: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 24) {
+                // Icon
+                ZStack {
+                    Circle()
+                        .fill(Color.orange.opacity(0.15))
+                        .frame(width: 100, height: 100)
+
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 50))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.orange, .red],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+
+                VStack(spacing: 8) {
+                    Text("Final Touches")
+                        .font(.title)
+                        .fontWeight(.bold)
+
+                    Text("Just a few more details to complete your profile")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+
+                VStack(spacing: 20) {
+                    // Exercise
+                    lifestyleOptionSelector(
+                        title: "Exercise",
+                        icon: "figure.run",
+                        color: .orange,
+                        options: exerciseOptions,
+                        selection: $exercise
+                    )
+
+                    // Pets
+                    lifestyleOptionSelector(
+                        title: "Pets",
+                        icon: "pawprint.fill",
+                        color: .brown,
+                        options: petsOptions,
+                        selection: $pets
+                    )
+
+                    // Diet
+                    lifestyleOptionSelector(
+                        title: "Diet",
+                        icon: "fork.knife",
+                        color: .green,
+                        options: dietOptions,
+                        selection: $diet
+                    )
+                }
+
+                // Completion stats
+                VStack(spacing: 16) {
+                    HStack(spacing: 16) {
+                        statBadge(icon: "chart.line.uptrend.xyaxis", value: "3x", label: "More Matches", color: .green)
+                        statBadge(icon: "heart.fill", value: "85%", label: "Better Compatibility", color: .pink)
+                    }
+
+                    Text("Complete profiles get significantly more attention!")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .padding()
+                .background(
+                    LinearGradient(
+                        colors: [Color.green.opacity(0.1), Color.pink.opacity(0.05)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(16)
+            }
+            .padding(20)
+            .padding(.top, 20)
+        }
+    }
+
+    // MARK: - Lifestyle Helper Views
+
+    private func lifestyleOptionSelector(title: String, icon: String, color: Color, options: [String], selection: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .foregroundColor(color)
+                Text(title)
+                    .font(.headline)
+            }
+
+            Menu {
+                ForEach(options, id: \.self) { option in
+                    Button(option.isEmpty ? "Prefer not to say" : option) {
+                        selection.wrappedValue = option
+                        HapticManager.shared.selection()
+                    }
+                }
+            } label: {
+                HStack {
+                    Text(selection.wrappedValue.isEmpty ? "Select \(title.lowercased())..." : selection.wrappedValue)
+                        .foregroundColor(selection.wrappedValue.isEmpty ? .gray : .primary)
+
+                    Spacer()
+
+                    Image(systemName: "chevron.down")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+                .padding()
+                .background(Color.white)
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(color.opacity(0.3), lineWidth: 1)
+                )
+            }
+        }
+    }
+
+    private func statBadge(icon: String, value: String, label: String, color: Color) -> some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.caption)
+                    .foregroundColor(color)
+                Text(value)
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundColor(color)
+            }
+            Text(label)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .background(color.opacity(0.1))
+        .cornerRadius(12)
+    }
+
     // MARK: - Navigation Buttons
 
     private var navigationButtons: some View {
@@ -1635,6 +1913,10 @@ struct OnboardingView: View {
             return true
         case 5:
             return true // Step 6 is optional, always allow proceeding
+        case 6:
+            return true // Step 7 (Lifestyle) is optional
+        case 7:
+            return true // Step 8 (Final Details) is optional
         default:
             return false
         }
@@ -1706,6 +1988,14 @@ struct OnboardingView: View {
                 user.relationshipGoal = (relationshipGoal == "Prefer not to say") ? nil : relationshipGoal
                 user.ageRangeMin = ageRangeMin
                 user.ageRangeMax = ageRangeMax
+
+                // Step 7 & 8 lifestyle fields
+                if !educationLevel.isEmpty { user.educationLevel = educationLevel }
+                if !smoking.isEmpty { user.smoking = smoking }
+                if !drinking.isEmpty { user.drinking = drinking }
+                if !exercise.isEmpty { user.exercise = exercise }
+                if !pets.isEmpty { user.pets = pets }
+                if !diet.isEmpty { user.diet = diet }
 
                 try await authService.updateUser(user)
 
