@@ -6,8 +6,7 @@
 //
 
 import SwiftUI
-// AUDIT FIX: Removed FirebaseFirestore import - no longer needed
-// Unread counts now come from matchService.matches (Match.unreadCount)
+import FirebaseFirestore
 
 struct MainTabView: View {
     @EnvironmentObject var authService: AuthService
@@ -18,6 +17,8 @@ struct MainTabView: View {
     @State private var previousTab = 0
     @State private var unreadCount = 0
     @State private var newMatchesCount = 0
+    @State private var showWarningBanner = false
+    @State private var showWarningAlert = false
 
     // AUDIT FIX: Removed separate unreadListener
     // Now using Match.unreadCount from matchService which:
@@ -28,8 +29,14 @@ struct MainTabView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            // Main content - PERFORMANCE: Use page style for smoother transitions
-            TabView(selection: $selectedTab) {
+            VStack(spacing: 0) {
+                // Warning banner for users who have received a warning
+                if showWarningBanner {
+                    warningBanner
+                }
+
+                // Main content - PERFORMANCE: Use page style for smoother transitions
+                TabView(selection: $selectedTab) {
                 // Discover - Load immediately (tab 0)
                 FeedDiscoverView(selectedTab: $selectedTab)
                     .tag(0)
@@ -64,11 +71,28 @@ struct MainTabView: View {
             .transaction { transaction in
                 transaction.animation = nil
             }
-            
+            } // End VStack
+
             // Custom Tab Bar
             customTabBar
         }
         .ignoresSafeArea(.keyboard)
+        .alert("Account Warning", isPresented: $showWarningAlert) {
+            Button("I Understand", role: .cancel) {
+                dismissWarning()
+            }
+        } message: {
+            Text(authService.currentUser?.lastWarningReason ?? "Your account has received a warning. Please review our community guidelines to avoid future warnings.")
+        }
+        .onAppear {
+            // Check if user has an unread warning
+            checkForUnreadWarning()
+        }
+        .onChange(of: authService.currentUser?.hasUnreadWarning) { _, newValue in
+            if newValue == true {
+                checkForUnreadWarning()
+            }
+        }
         .onChange(of: selectedTab) { oldValue, newValue in
             previousTab = oldValue
             HapticManager.shared.tabSwitch()
@@ -201,7 +225,75 @@ struct MainTabView: View {
         .background(Color(.systemBackground))
     }
     
+    // MARK: - Warning Banner
+
+    private var warningBanner: some View {
+        Button(action: {
+            showWarningAlert = true
+        }) {
+            HStack(spacing: 12) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(.white)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Account Warning")
+                        .font(.subheadline.bold())
+                        .foregroundColor(.white)
+                    Text("Tap to view details")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.8))
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.7))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(
+                LinearGradient(
+                    colors: [.orange, .red],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+        }
+        .transition(.move(edge: .top).combined(with: .opacity))
+    }
+
     // MARK: - Helper Functions
+
+    private func checkForUnreadWarning() {
+        if authService.currentUser?.hasUnreadWarning == true {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                showWarningBanner = true
+            }
+        }
+    }
+
+    private func dismissWarning() {
+        guard let userId = authService.currentUser?.id else { return }
+
+        // Hide banner with animation
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            showWarningBanner = false
+        }
+
+        // Mark warning as read in Firestore
+        Task {
+            do {
+                try await Firestore.firestore().collection("users").document(userId).updateData([
+                    "hasUnreadWarning": false
+                ])
+                await authService.fetchUser()
+            } catch {
+                Logger.shared.error("Failed to dismiss warning", category: .database, error: error)
+            }
+        }
+    }
 
     // AUDIT FIX: Removed setupUnreadMessagesListener()
     // Now using Match.unreadCount from matchService.matches which is:

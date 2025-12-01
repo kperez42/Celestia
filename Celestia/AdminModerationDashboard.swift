@@ -1329,7 +1329,9 @@ class ModerationViewModel: ObservableObject {
                     "timestamp": Timestamp(date: Date())
                 ]
             ]),
-            "warningCount": FieldValue.increment(Int64(1))
+            "warningCount": FieldValue.increment(Int64(1)),
+            "hasUnreadWarning": true,
+            "lastWarningReason": reason
         ])
 
         Logger.shared.info("Warning issued to user: \(userId)", category: .moderation)

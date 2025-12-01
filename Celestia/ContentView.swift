@@ -12,6 +12,7 @@ struct ContentView: View {
     @State private var isAuthenticated = false
     @State private var needsEmailVerification = false
     @State private var isProfileRejected = false
+    @State private var isSuspended = false
     @State private var isLoading = true  // Start with splash screen
 
     var body: some View {
@@ -23,6 +24,11 @@ struct ContentView: View {
             } else if isAuthenticated {
                 if needsEmailVerification {
                     EmailVerificationView()
+                        .transition(.opacity)
+                } else if isSuspended {
+                    // Show suspended account view for suspended users
+                    SuspendedAccountView()
+                        .environmentObject(authService)
                         .transition(.opacity)
                 } else if isProfileRejected {
                     // Show rejection feedback view for rejected profiles
@@ -42,6 +48,7 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.3), value: isAuthenticated)
         .animation(.easeInOut(duration: 0.3), value: needsEmailVerification)
         .animation(.easeInOut(duration: 0.3), value: isProfileRejected)
+        .animation(.easeInOut(duration: 0.3), value: isSuspended)
         .onChange(of: authService.userSession?.uid) { newValue in
             Logger.shared.debug("ContentView: userSession changed to: \(newValue ?? "nil")", category: .general)
             updateAuthenticationState()
@@ -52,6 +59,10 @@ struct ContentView: View {
         }
         .onChange(of: authService.currentUser?.profileStatus) { newValue in
             Logger.shared.debug("ContentView: profileStatus changed to: \(newValue ?? "nil")", category: .general)
+            updateAuthenticationState()
+        }
+        .onChange(of: authService.currentUser?.isSuspended) { newValue in
+            Logger.shared.debug("ContentView: isSuspended changed to: \(String(describing: newValue))", category: .general)
             updateAuthenticationState()
         }
         .onAppear {
@@ -74,9 +85,11 @@ struct ContentView: View {
     private func updateAuthenticationState() {
         isAuthenticated = (authService.userSession != nil)
         needsEmailVerification = isAuthenticated && !authService.isEmailVerified
+        // Check if account is suspended
+        isSuspended = isAuthenticated && (authService.currentUser?.isSuspended == true || authService.currentUser?.profileStatus == "suspended")
         // Check if profile is rejected and needs user action
         isProfileRejected = isAuthenticated && authService.currentUser?.profileStatus == "rejected"
-        Logger.shared.debug("ContentView: isAuthenticated=\(isAuthenticated), needsEmailVerification=\(needsEmailVerification), isProfileRejected=\(isProfileRejected)", category: .general)
+        Logger.shared.debug("ContentView: isAuthenticated=\(isAuthenticated), needsEmailVerification=\(needsEmailVerification), isSuspended=\(isSuspended), isProfileRejected=\(isProfileRejected)", category: .general)
     }
 }
 
