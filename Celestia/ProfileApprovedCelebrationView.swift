@@ -13,7 +13,7 @@ struct ProfileApprovedCelebrationView: View {
     @State private var appearAnimation = false
     @State private var scaleAnimation = false
     @State private var glowAnimation = false
-    @State private var confettiPieces: [ConfettiPiece] = []
+    @State private var confettiPieces: [CelebrationConfettiPiece] = []
     @State private var dismissing = false
 
     let onDismiss: () -> Void
@@ -34,7 +34,7 @@ struct ProfileApprovedCelebrationView: View {
 
             // Confetti layer
             ForEach(confettiPieces) { piece in
-                ConfettiView(piece: piece)
+                CelebrationConfettiView(piece: piece)
             }
 
             // Main content
@@ -218,7 +218,7 @@ struct ProfileApprovedCelebrationView: View {
 
         // Generate more confetti for a bigger celebration
         for i in 0..<80 {
-            let piece = ConfettiPiece(
+            let piece = CelebrationConfettiPiece(
                 id: i,
                 color: colors.randomElement()!,
                 shape: shapes.randomElement()!,
@@ -247,7 +247,7 @@ struct ProfileApprovedCelebrationView: View {
 
 // MARK: - Confetti Piece Model
 
-struct ConfettiPiece: Identifiable {
+struct CelebrationConfettiPiece: Identifiable {
     let id: Int
     let color: Color
     let shape: String
@@ -273,8 +273,8 @@ struct ConfettiPiece: Identifiable {
 
 // MARK: - Confetti View
 
-struct ConfettiView: View {
-    let piece: ConfettiPiece
+struct CelebrationConfettiView: View {
+    let piece: CelebrationConfettiPiece
     @State private var falling = false
     @State private var rotating = false
     @State private var swaying = false
