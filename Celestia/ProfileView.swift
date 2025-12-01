@@ -1545,7 +1545,7 @@ struct ProfileView: View {
                 Text("Discovery Preferences")
                     .font(.headline)
             }
-            
+
             VStack(spacing: 12) {
                 HStack {
                     Text("Age range")
@@ -1553,6 +1553,18 @@ struct ProfileView: View {
                         .foregroundColor(.secondary)
                     Spacer()
                     Text("\(user.ageRangeMin) - \(user.ageRangeMax)")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                }
+
+                Divider()
+
+                HStack {
+                    Text("Max distance")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(user.maxDistance) km")
                         .font(.subheadline)
                         .fontWeight(.semibold)
                 }
