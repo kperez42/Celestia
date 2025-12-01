@@ -1288,6 +1288,13 @@ class LikesViewModel: ObservableObject {
             users.append(contentsOf: chunkUsers)
         }
 
+        // Filter out users who are not active (pending, suspended, flagged, banned)
+        // Only show users with active profileStatus
+        users = users.filter { user in
+            let status = user.profileStatus.lowercased()
+            return status == "active" || status.isEmpty
+        }
+
         return users
     }
 

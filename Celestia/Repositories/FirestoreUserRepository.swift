@@ -77,7 +77,12 @@ class FirestoreUserRepository: UserRepository {
             let nameSnapshot = try await nameQuery.getDocuments()
             let nameResults = nameSnapshot.documents
                 .compactMap { try? $0.data(as: User.self) }
-                .filter { $0.id != currentUserId }
+                .filter { user in
+                    // Exclude current user and non-active profiles
+                    guard user.id != currentUserId else { return false }
+                    let status = user.profileStatus.lowercased()
+                    return status == "active" || status.isEmpty
+                }
 
             results.append(contentsOf: nameResults)
 
@@ -103,8 +108,11 @@ class FirestoreUserRepository: UserRepository {
                 let countryResults = countrySnapshot.documents
                     .compactMap { try? $0.data(as: User.self) }
                     .filter { user in
-                        user.id != currentUserId &&
-                        !results.contains(where: { $0.id == user.id })
+                        // Exclude current user, duplicates, and non-active profiles
+                        guard user.id != currentUserId else { return false }
+                        guard !results.contains(where: { $0.id == user.id }) else { return false }
+                        let status = user.profileStatus.lowercased()
+                        return status == "active" || status.isEmpty
                     }
 
                 results.append(contentsOf: countryResults)
