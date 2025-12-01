@@ -517,6 +517,19 @@ class NotificationPreferences: ObservableObject {
         didSet { save() }
     }
 
+    // Account & Safety notifications
+    @Published var accountStatusEnabled: Bool {
+        didSet { save() }
+    }
+
+    @Published var accountWarningsEnabled: Bool {
+        didSet { save() }
+    }
+
+    @Published var verificationUpdatesEnabled: Bool {
+        didSet { save() }
+    }
+
     @Published var quietHoursEnabled: Bool {
         didSet { save() }
     }
@@ -552,6 +565,9 @@ class NotificationPreferences: ObservableObject {
         static let generalUpdatesEnabled = "notif_general_updates"
         static let matchRemindersEnabled = "notif_match_reminders"
         static let messageRemindersEnabled = "notif_message_reminders"
+        static let accountStatusEnabled = "notif_account_status"
+        static let accountWarningsEnabled = "notif_account_warnings"
+        static let verificationUpdatesEnabled = "notif_verification_updates"
         static let quietHoursEnabled = "notif_quiet_hours_enabled"
         static let quietHoursStart = "notif_quiet_hours_start"
         static let quietHoursEnd = "notif_quiet_hours_end"
@@ -572,6 +588,9 @@ class NotificationPreferences: ObservableObject {
         self.generalUpdatesEnabled = UserDefaults.standard.bool(forKey: Keys.generalUpdatesEnabled, default: true)
         self.matchRemindersEnabled = UserDefaults.standard.bool(forKey: Keys.matchRemindersEnabled, default: true)
         self.messageRemindersEnabled = UserDefaults.standard.bool(forKey: Keys.messageRemindersEnabled, default: true)
+        self.accountStatusEnabled = UserDefaults.standard.bool(forKey: Keys.accountStatusEnabled, default: true)
+        self.accountWarningsEnabled = UserDefaults.standard.bool(forKey: Keys.accountWarningsEnabled, default: true)
+        self.verificationUpdatesEnabled = UserDefaults.standard.bool(forKey: Keys.verificationUpdatesEnabled, default: true)
         self.quietHoursEnabled = UserDefaults.standard.bool(forKey: Keys.quietHoursEnabled, default: false)
         self.soundEnabled = UserDefaults.standard.bool(forKey: Keys.soundEnabled, default: true)
         self.vibrationEnabled = UserDefaults.standard.bool(forKey: Keys.vibrationEnabled, default: true)
@@ -656,6 +675,9 @@ class NotificationPreferences: ObservableObject {
         generalUpdatesEnabled = true
         matchRemindersEnabled = true
         messageRemindersEnabled = true
+        accountStatusEnabled = true
+        accountWarningsEnabled = true
+        verificationUpdatesEnabled = true
     }
 
     func disableAll() {
@@ -667,6 +689,8 @@ class NotificationPreferences: ObservableObject {
         generalUpdatesEnabled = false
         matchRemindersEnabled = false
         messageRemindersEnabled = false
+        // Note: Account safety notifications remain enabled for user protection
+        // accountStatusEnabled, accountWarningsEnabled, verificationUpdatesEnabled stay on
     }
 
     func resetToDefaults() {
@@ -678,6 +702,9 @@ class NotificationPreferences: ObservableObject {
         generalUpdatesEnabled = true
         matchRemindersEnabled = true
         messageRemindersEnabled = true
+        accountStatusEnabled = true
+        accountWarningsEnabled = true
+        verificationUpdatesEnabled = true
         quietHoursEnabled = false
         soundEnabled = true
         vibrationEnabled = true
@@ -695,6 +722,9 @@ class NotificationPreferences: ObservableObject {
         UserDefaults.standard.set(generalUpdatesEnabled, forKey: Keys.generalUpdatesEnabled)
         UserDefaults.standard.set(matchRemindersEnabled, forKey: Keys.matchRemindersEnabled)
         UserDefaults.standard.set(messageRemindersEnabled, forKey: Keys.messageRemindersEnabled)
+        UserDefaults.standard.set(accountStatusEnabled, forKey: Keys.accountStatusEnabled)
+        UserDefaults.standard.set(accountWarningsEnabled, forKey: Keys.accountWarningsEnabled)
+        UserDefaults.standard.set(verificationUpdatesEnabled, forKey: Keys.verificationUpdatesEnabled)
         UserDefaults.standard.set(quietHoursEnabled, forKey: Keys.quietHoursEnabled)
         UserDefaults.standard.set(soundEnabled, forKey: Keys.soundEnabled)
         UserDefaults.standard.set(vibrationEnabled, forKey: Keys.vibrationEnabled)

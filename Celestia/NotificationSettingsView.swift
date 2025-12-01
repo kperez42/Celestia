@@ -116,6 +116,34 @@ struct NotificationSettingsView: View {
                 )
             }
 
+            // Account & Safety
+            Section {
+                NotificationToggle(
+                    icon: "person.badge.shield.checkmark.fill",
+                    title: "Profile Status Updates",
+                    description: "Approval, rejection, and review notifications",
+                    isOn: $preferences.accountStatusEnabled
+                )
+
+                NotificationToggle(
+                    icon: "exclamationmark.triangle.fill",
+                    title: "Account Warnings",
+                    description: "Important warnings about your account",
+                    isOn: $preferences.accountWarningsEnabled
+                )
+
+                NotificationToggle(
+                    icon: "checkmark.seal.fill",
+                    title: "Verification Updates",
+                    description: "ID verification status changes",
+                    isOn: $preferences.verificationUpdatesEnabled
+                )
+            } header: {
+                Text("Account & Safety")
+            } footer: {
+                Text("These notifications help keep your account secure and inform you about important status changes.")
+            }
+
             // Sound & Badge
             Section("Preferences") {
                 Toggle(isOn: $preferences.soundEnabled) {
