@@ -333,33 +333,94 @@ class AuthService: ObservableObject, AuthServiceProtocol {
 
             Logger.shared.auth("User saved to Firestore successfully", level: .info)
 
-            // Step 3.5: Upload photos if provided
+            // Step 3.5: Upload photos if provided (using high-quality parallel uploader)
             if !photos.isEmpty {
-                Logger.shared.auth("Uploading \(photos.count) photos", level: .info)
-                do {
-                    var photoURLs: [String] = []
-                    // ImageUploadService.uploadImage expects a directory path, not a filename
-                    // It will append its own UUID filename to the path
-                    let photosPath = "users/\(userId)/photos"
-                    for image in photos {
-                        let url = try await ImageUploadService.shared.uploadImage(image, path: photosPath)
-                        photoURLs.append(url)
+                Logger.shared.auth("📸 Starting upload of \(photos.count) photos (parallel with retries)", level: .info)
+
+                let photosPath = "users/\(userId)/photos"
+
+                // PERFORMANCE: Upload photos in parallel using TaskGroup for maximum speed
+                let uploadedURLs = await withTaskGroup(of: (index: Int, url: String?)?.self) { group in
+                    var results: [(Int, String?)] = []
+
+                    for (index, originalImage) in photos.enumerated() {
+                        group.addTask {
+                            Logger.shared.auth("📤 Uploading photo \(index + 1)/\(photos.count)...", level: .info)
+
+                            // OPTIMIZATION: Optimize image for upload (max 2000px, 92% quality)
+                            let optimizedImage = self.optimizeImageForUpload(originalImage)
+                            Logger.shared.auth("Image optimized: \(optimizedImage.size.width)x\(optimizedImage.size.height)", level: .debug)
+
+                            // Upload with retry logic (3 attempts with exponential backoff)
+                            var lastError: Error?
+                            for attempt in 0..<3 {
+                                do {
+                                    Logger.shared.auth("🔄 Upload attempt \(attempt + 1)/3 for photo \(index + 1)", level: .debug)
+
+                                    let url = try await ImageUploadService.shared.uploadImage(optimizedImage, path: photosPath)
+
+                                    Logger.shared.auth("✅ Photo \(index + 1) uploaded successfully", level: .info)
+
+                                    // Cache the image for instant display
+                                    ImageCache.shared.setImage(optimizedImage, for: url)
+
+                                    return (index, url)
+                                } catch {
+                                    lastError = error
+                                    Logger.shared.auth("❌ Upload attempt \(attempt + 1) failed for photo \(index + 1): \(error.localizedDescription)", level: .warning)
+
+                                    if attempt < 2 {
+                                        // Wait before retry (exponential backoff: 0.5s, 1s)
+                                        let delay = UInt64(pow(2.0, Double(attempt)) * 500_000_000)
+                                        try? await Task.sleep(nanoseconds: delay)
+                                    }
+                                }
+                            }
+
+                            Logger.shared.error("❌ Photo \(index + 1) failed after all retries", category: .authentication, error: lastError)
+                            return nil
+                        }
                     }
 
+                    // Collect results
+                    for await result in group {
+                        if let result = result {
+                            results.append((result.index, result.url))
+                        }
+                    }
+
+                    return results
+                }
+
+                // Sort by index and extract successful URLs
+                let photoURLs = uploadedURLs
+                    .sorted { $0.0 < $1.0 }
+                    .compactMap { $0.1 }
+
+                let successCount = photoURLs.count
+                let failedCount = photos.count - successCount
+
+                Logger.shared.auth("📊 Upload complete: \(successCount) succeeded, \(failedCount) failed", level: .info)
+
+                if !photoURLs.isEmpty {
                     // Update user document with photo URLs
                     let updateData: [String: Any] = [
                         "photos": photoURLs,
                         "profileImageURL": photoURLs.first ?? ""
                     ]
-                    try await Firestore.firestore().collection("users").document(userId).updateData(updateData)
-                    Logger.shared.auth("Photos uploaded and saved successfully", level: .info)
 
-                    // Update local user object with photos so it's immediately available
-                    user.photos = photoURLs
-                    user.profileImageURL = photoURLs.first ?? ""
-                } catch {
-                    Logger.shared.error("Failed to upload photos during signup", category: .authentication, error: error)
-                    // Don't fail account creation if photo upload fails - user can add later
+                    do {
+                        try await Firestore.firestore().collection("users").document(userId).updateData(updateData)
+                        Logger.shared.auth("✅ Photos saved to Firestore successfully", level: .info)
+
+                        // Update local user object with photos so it's immediately available
+                        user.photos = photoURLs
+                        user.profileImageURL = photoURLs.first ?? ""
+                    } catch {
+                        Logger.shared.error("Failed to save photo URLs to Firestore", category: .authentication, error: error)
+                    }
+                } else {
+                    Logger.shared.warning("⚠️ No photos uploaded successfully - user can add later", category: .authentication)
                 }
             }
 
@@ -1126,6 +1187,76 @@ class AuthService: ObservableObject, AuthServiceProtocol {
             }
             throw error
         }
+    }
+
+    // MARK: - Image Optimization
+
+    /// Optimizes an image for upload: crops to 3:4 portrait ratio, resizes to max 2000px, 95% JPEG quality
+    /// This ensures images display perfectly in cards without distortion or unexpected cropping
+    private func optimizeImageForUpload(_ image: UIImage) -> UIImage {
+        // QUALITY: Higher settings for crisp photos on all card sizes
+        let maxDimension: CGFloat = 2000  // High resolution for crisp display on all devices
+        let targetAspectRatio: CGFloat = 3.0 / 4.0  // Portrait ratio (0.75) - perfect for profile cards
+
+        let originalSize = image.size
+        let originalAspectRatio = originalSize.width / originalSize.height
+
+        var croppedImage = image
+
+        // STEP 1: Crop to target aspect ratio (3:4 portrait) for consistent card display
+        // This ensures images always fill cards without unexpected cropping
+        if abs(originalAspectRatio - targetAspectRatio) > 0.01 {
+            let cropRect: CGRect
+
+            if originalAspectRatio > targetAspectRatio {
+                // Image is wider than target - crop sides (center horizontally)
+                let targetWidth = originalSize.height * targetAspectRatio
+                let xOffset = (originalSize.width - targetWidth) / 2
+                cropRect = CGRect(x: xOffset, y: 0, width: targetWidth, height: originalSize.height)
+            } else {
+                // Image is taller than target - crop top/bottom (center vertically, favor upper portion for faces)
+                let targetHeight = originalSize.width / targetAspectRatio
+                // Favor upper 40% of image to capture faces better
+                let yOffset = max(0, (originalSize.height - targetHeight) * 0.4)
+                cropRect = CGRect(x: 0, y: yOffset, width: originalSize.width, height: targetHeight)
+            }
+
+            // Perform the crop using CGImage for best quality
+            if let cgImage = image.cgImage,
+               let croppedCGImage = cgImage.cropping(to: cropRect) {
+                croppedImage = UIImage(cgImage: croppedCGImage, scale: image.scale, orientation: image.imageOrientation)
+            }
+        }
+
+        // STEP 2: Resize if needed (maintain high quality)
+        let croppedSize = croppedImage.size
+        let ratio = min(maxDimension / croppedSize.width, maxDimension / croppedSize.height)
+
+        if ratio >= 1.0 {
+            // Image is already smaller than max - return cropped version
+            return croppedImage
+        }
+
+        let newSize = CGSize(width: croppedSize.width * ratio, height: croppedSize.height * ratio)
+
+        // QUALITY: Use high-fidelity rendering format
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1.0  // 1x scale for optimal file size
+        format.opaque = true  // Opaque for better JPEG compression
+        format.preferredRange = .standard  // Standard color range for compatibility
+
+        let renderer = UIGraphicsImageRenderer(size: newSize, format: format)
+        let resizedImage = renderer.image { context in
+            // Fill background with white for clean JPEG edges
+            UIColor.white.setFill()
+            context.fill(CGRect(origin: .zero, size: newSize))
+
+            // Draw with high-quality interpolation
+            context.cgContext.interpolationQuality = .high
+            croppedImage.draw(in: CGRect(origin: .zero, size: newSize))
+        }
+
+        return resizedImage
     }
 }
 

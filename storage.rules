@@ -38,6 +38,27 @@ service firebase.storage {
       allow delete: if isAuthenticated() && isOwner(userId);
     }
 
+    // Signup photos - users can upload during account creation (before email verification)
+    // This path is used by AuthService.createUser for initial profile photos
+    match /users/{userId}/photos/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated()
+                   && isOwner(userId)
+                   && isValidImageSize()
+                   && isValidImage();
+      allow delete: if isAuthenticated() && isOwner(userId);
+    }
+
+    // Gallery photos - users can upload to their own gallery (for profile editing)
+    match /gallery_photos/{userId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated()
+                   && isOwner(userId)
+                   && isValidImageSize()
+                   && isValidImage();
+      allow delete: if isAuthenticated() && isOwner(userId);
+    }
+
     // Chat images - users can upload to match folders they're part of
     match /chat_images/{matchId}/{fileName} {
       allow read: if isAuthenticated()
