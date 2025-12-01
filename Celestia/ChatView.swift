@@ -734,7 +734,7 @@ struct ChatView: View {
                         #endif
                     }
 
-                // Send button
+                // Send button - simplified for performance
                 Button {
                     sendMessage()
                 } label: {
@@ -745,11 +745,7 @@ struct ChatView: View {
                         } else {
                             Image(systemName: (messageText.isEmpty && selectedImage == nil) ? "arrow.up.circle" : "arrow.up.circle.fill")
                                 .font(.largeTitle)
-                                .foregroundStyle(
-                                    (messageText.isEmpty && selectedImage == nil) ?
-                                    LinearGradient(colors: [.gray.opacity(0.5)], startPoint: .leading, endPoint: .trailing) :
-                                    LinearGradient.brandPrimary
-                                )
+                                .foregroundColor((messageText.isEmpty && selectedImage == nil) ? .gray.opacity(0.5) : .purple)
                         }
                     }
                     .frame(width: 44, height: 44)

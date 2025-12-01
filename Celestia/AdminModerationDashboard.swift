@@ -82,35 +82,8 @@ struct AdminModerationDashboard: View {
                 .animation(.easeInOut(duration: 0.25), value: selectedTab)
             }
             .navigationTitle("Moderation")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    // Alerts bell button
-                    Button(action: { showingAlerts = true }) {
-                        ZStack(alignment: .topTrailing) {
-                            Image(systemName: "bell.fill")
-                                .font(.title3)
-                            if viewModel.unreadAlertCount > 0 {
-                                Text("\(viewModel.unreadAlertCount)")
-                                    .font(.caption2.bold())
-                                    .foregroundColor(.white)
-                                    .padding(4)
-                                    .background(Color.red)
-                                    .clipShape(Circle())
-                                    .offset(x: 8, y: -8)
-                            }
-                        }
-                    }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        Task {
-                            await viewModel.refresh()
-                        }
-                    }) {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                }
-            }
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarHidden(true)
             .task {
                 await viewModel.loadQueue()
             }
