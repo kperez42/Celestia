@@ -77,6 +77,9 @@ class SubscriptionManager: ObservableObject {
         isSubscribed = false
         expirationDate = nil
         saveSubscriptionStatus()
+
+        // CRITICAL: Sync expired subscription status with User model
+        await syncUserPremiumStatus(tier: .none, expirationDate: nil)
     }
 
     private func updateTier(from transaction: StoreKit.Transaction) async {
@@ -103,6 +106,10 @@ class SubscriptionManager: ObservableObject {
 
         saveSubscriptionStatus()
 
+        // CRITICAL: Sync subscription status with User model in Firestore
+        // This ensures isPremium is always accurate even for background transactions
+        await syncUserPremiumStatus(tier: tier, expirationDate: transaction.expirationDate)
+
         // Track analytics
         AnalyticsManager.shared.logEvent(.subscriptionActive, parameters: [
             "tier": tier.rawValue,
@@ -110,6 +117,34 @@ class SubscriptionManager: ObservableObject {
         ])
 
         Logger.shared.info("Subscription active: \(tier.rawValue)", category: .general)
+    }
+
+    /// Syncs the subscription status with the User model in Firestore
+    /// This ensures the isPremium flag is always accurate across all parts of the app
+    private func syncUserPremiumStatus(tier: SubscriptionTier, expirationDate: Date?) async {
+        guard var user = AuthService.shared.currentUser else {
+            Logger.shared.warning("Cannot sync premium status: No user logged in", category: .general)
+            return
+        }
+
+        let isPremium = tier != .none
+
+        // Only update if status has changed
+        guard user.isPremium != isPremium || user.premiumTier != tier.rawValue else {
+            Logger.shared.debug("Premium status unchanged, skipping sync", category: .general)
+            return
+        }
+
+        user.isPremium = isPremium
+        user.premiumTier = isPremium ? tier.rawValue : nil
+        user.subscriptionExpiryDate = expirationDate
+
+        do {
+            try await AuthService.shared.updateUser(user)
+            Logger.shared.info("✅ User premium status synced: isPremium=\(isPremium), tier=\(tier.rawValue)", category: .general)
+        } catch {
+            Logger.shared.error("Failed to sync user premium status: \(error.localizedDescription)", category: .general)
+        }
     }
 
     // MARK: - Feature Access

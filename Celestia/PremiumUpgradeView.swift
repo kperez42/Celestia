@@ -1279,13 +1279,26 @@ struct PremiumUpgradeView: View {
             do {
                 try await storeManager.restorePurchases()
 
-                await MainActor.run {
-                    isProcessing = false
+                if storeManager.hasActiveSubscription {
+                    // CRITICAL: Update user's isPremium flag in Firestore after successful restore
+                    if var user = authService.currentUser {
+                        user.isPremium = true
+                        // Get tier from SubscriptionManager
+                        let tier = await SubscriptionManager.shared.currentTier
+                        user.premiumTier = tier.rawValue
+                        user.subscriptionExpiryDate = await SubscriptionManager.shared.expirationDate
+                        try await authService.updateUser(user)
+                        Logger.shared.info("✅ User premium status updated after restore", category: .general)
+                    }
 
-                    if storeManager.hasActiveSubscription {
+                    await MainActor.run {
+                        isProcessing = false
                         showPurchaseSuccess = true
                         HapticManager.shared.notification(.success)
-                    } else {
+                    }
+                } else {
+                    await MainActor.run {
+                        isProcessing = false
                         errorMessage = "No active subscriptions found"
                         showError = true
                     }
