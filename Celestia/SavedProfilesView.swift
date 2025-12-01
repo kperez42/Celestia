@@ -21,10 +21,90 @@ struct SavedProfilesView: View {
     // PERFORMANCE: Track if initial load completed to prevent loading flash on tab switches
     @State private var hasCompletedInitialLoad = false
 
+    // Filter and sort state
+    @State private var showFilters = false
+    @State private var selectedAgeFilter: SavedAgeFilter = .all
+    @State private var selectedSortOption: SavedSortOption = .recent
+
+    // Note editing state
+    @State private var editingNoteForProfile: SavedProfile?
+    @State private var noteText = ""
+    @State private var showNoteSheet = false
+
+    // Chat presentation
+    @State private var chatPresentation: SavedChatPresentation?
+
+    struct SavedChatPresentation: Identifiable {
+        let id = UUID()
+        let match: Match
+        let user: User
+    }
+
+    enum SavedAgeFilter: String, CaseIterable {
+        case all = "All Ages"
+        case under25 = "Under 25"
+        case twenties = "25-30"
+        case thirties = "30-40"
+        case over40 = "40+"
+
+        func matches(age: Int) -> Bool {
+            switch self {
+            case .all: return true
+            case .under25: return age < 25
+            case .twenties: return age >= 25 && age <= 30
+            case .thirties: return age > 30 && age <= 40
+            case .over40: return age > 40
+            }
+        }
+    }
+
+    enum SavedSortOption: String, CaseIterable {
+        case recent = "Recently Saved"
+        case oldest = "Oldest First"
+        case ageYoungest = "Youngest First"
+        case ageOldest = "Oldest First"
+        case nameAZ = "Name A-Z"
+    }
+
     private let tabs = ["My Saves", "Viewed", "Saved"]
 
     private var isPremium: Bool {
         authService.currentUser?.isPremium ?? false
+    }
+
+    // MARK: - Filtered Profiles
+
+    private var filteredSavedProfiles: [SavedProfile] {
+        applyFiltersAndSort(to: viewModel.savedProfiles)
+    }
+
+    private func applyFiltersAndSort(to profiles: [SavedProfile]) -> [SavedProfile] {
+        var result = profiles
+
+        // Apply age filter
+        if selectedAgeFilter != .all {
+            result = result.filter { selectedAgeFilter.matches(age: $0.user.age) }
+        }
+
+        // Apply sort
+        switch selectedSortOption {
+        case .recent:
+            result.sort { $0.savedAt > $1.savedAt }
+        case .oldest:
+            result.sort { $0.savedAt < $1.savedAt }
+        case .ageYoungest:
+            result.sort { $0.user.age < $1.user.age }
+        case .ageOldest:
+            result.sort { $0.user.age > $1.user.age }
+        case .nameAZ:
+            result.sort { $0.user.fullName.localizedCompare($1.user.fullName) == .orderedAscending }
+        }
+
+        return result
+    }
+
+    private var hasActiveFilters: Bool {
+        selectedAgeFilter != .all || selectedSortOption != .recent
     }
 
     var body: some View {
@@ -87,6 +167,18 @@ struct SavedProfilesView: View {
         .sheet(isPresented: $showPremiumUpgrade) {
             PremiumUpgradeView()
                 .environmentObject(authService)
+        }
+        .sheet(isPresented: $showFilters) {
+            filterSheet
+        }
+        .sheet(isPresented: $showNoteSheet) {
+            noteEditSheet
+        }
+        .sheet(item: $chatPresentation) { presentation in
+            NavigationStack {
+                ChatView(match: presentation.match, otherUser: presentation.user)
+                    .environmentObject(authService)
+            }
         }
         .confirmationDialog(
             "Clear All Saved Profiles?",
@@ -169,8 +261,47 @@ struct SavedProfilesView: View {
         Group {
             if viewModel.savedProfiles.isEmpty {
                 emptyStateView(message: "No saved profiles yet", hint: "Tap the bookmark icon on any profile to save it")
+            } else if filteredSavedProfiles.isEmpty && hasActiveFilters {
+                // Filters active but no results
+                VStack(spacing: 24) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 60))
+                        .foregroundColor(.gray.opacity(0.5))
+
+                    VStack(spacing: 8) {
+                        Text("No matches found")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+
+                        Text("Try adjusting your filters")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Button {
+                        selectedAgeFilter = .all
+                        selectedSortOption = .recent
+                        HapticManager.shared.impact(.light)
+                    } label: {
+                        Text("Clear Filters")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 12)
+                            .background(
+                                LinearGradient(
+                                    colors: [.orange, .pink],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(20)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                profilesGrid(profiles: viewModel.savedProfiles)
+                profilesGrid(profiles: filteredSavedProfiles)
             }
         }
     }
@@ -286,18 +417,50 @@ struct SavedProfilesView: View {
 
                     Spacer()
 
-                    // Clear all button
-                    if !viewModel.savedProfiles.isEmpty {
+                    VStack(alignment: .trailing, spacing: 8) {
+                        // Filter button
                         Button {
-                            showClearAllConfirmation = true
+                            showFilters = true
                             HapticManager.shared.impact(.light)
                         } label: {
-                            Image(systemName: "trash.circle.fill")
-                                .font(.title3)
-                                .foregroundColor(.white)
-                                .frame(width: 44, height: 44)
-                                .background(Color.white.opacity(0.15))
-                                .clipShape(Circle())
+                            HStack(spacing: 6) {
+                                Image(systemName: "line.3.horizontal.decrease.circle")
+                                    .font(.system(size: 14))
+                                Text("Filter")
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                if hasActiveFilters {
+                                    Circle()
+                                        .fill(Color.yellow)
+                                        .frame(width: 6, height: 6)
+                                }
+                            }
+                            .foregroundColor(.white.opacity(0.9))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color.white.opacity(0.2))
+                            .cornerRadius(20)
+                        }
+
+                        // Clear all button
+                        if !viewModel.savedProfiles.isEmpty {
+                            Button {
+                                showClearAllConfirmation = true
+                                HapticManager.shared.impact(.light)
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "trash")
+                                        .font(.caption)
+                                    Text("Clear")
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                }
+                                .foregroundColor(.white.opacity(0.8))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color.red.opacity(0.3))
+                                .cornerRadius(20)
+                            }
                         }
                     }
                 }
@@ -314,11 +477,33 @@ struct SavedProfilesView: View {
 
     private func profilesGrid(profiles: [SavedProfile]) -> some View {
         ScrollView(showsIndicators: false) {
-            VStack(spacing: 20) {
+            VStack(spacing: 16) {
+                // Filter indicator if filters are active
+                if hasActiveFilters {
+                    HStack(spacing: 8) {
+                        Image(systemName: "line.3.horizontal.decrease.circle.fill")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                        Text("Filtered: \(profiles.count) of \(viewModel.savedProfiles.count) profiles")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Button("Clear") {
+                            selectedAgeFilter = .all
+                            selectedSortOption = .recent
+                            HapticManager.shared.impact(.light)
+                        }
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                }
+
                 // Saved profiles grid
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
                     ForEach(profiles) { saved in
-                        SavedProfileCard(
+                        SwipeableSavedCard(
                             savedProfile: saved,
                             isUnsaving: viewModel.unsavingProfileId == saved.id,
                             onTap: {
@@ -330,6 +515,15 @@ struct SavedProfilesView: View {
                                     viewModel.unsaveProfile(saved)
                                 }
                                 HapticManager.shared.impact(.medium)
+                            },
+                            onEditNote: {
+                                startEditingNote(for: saved)
+                            },
+                            onLike: {
+                                handleLike(user: saved.user)
+                            },
+                            onMessage: {
+                                handleMessage(user: saved.user)
                             }
                         )
                         .onAppear {
@@ -341,7 +535,7 @@ struct SavedProfilesView: View {
                 .padding(.horizontal)
             }
             .padding(.top)
-            .padding(.bottom, 20)
+            .padding(.bottom, 100)
         }
         .refreshable {
             HapticManager.shared.impact(.light)
@@ -552,6 +746,252 @@ struct SavedProfilesView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+
+    // MARK: - Filter Sheet
+
+    private var filterSheet: some View {
+        NavigationStack {
+            List {
+                Section("Age Range") {
+                    ForEach(SavedAgeFilter.allCases, id: \.self) { filter in
+                        Button {
+                            selectedAgeFilter = filter
+                            HapticManager.shared.selection()
+                        } label: {
+                            HStack {
+                                Text(filter.rawValue)
+                                    .foregroundColor(.primary)
+                                Spacer()
+                                if selectedAgeFilter == filter {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(.orange)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Section("Sort By") {
+                    ForEach(SavedSortOption.allCases, id: \.self) { option in
+                        Button {
+                            selectedSortOption = option
+                            HapticManager.shared.selection()
+                        } label: {
+                            HStack {
+                                Text(option.rawValue)
+                                    .foregroundColor(.primary)
+                                Spacer()
+                                if selectedSortOption == option {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(.orange)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Section {
+                    Button {
+                        selectedAgeFilter = .all
+                        selectedSortOption = .recent
+                        HapticManager.shared.impact(.light)
+                    } label: {
+                        Text("Reset Filters")
+                            .foregroundColor(.red)
+                    }
+                }
+            }
+            .navigationTitle("Filters")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        showFilters = false
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+
+    // MARK: - Note Edit Sheet
+
+    private var noteEditSheet: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                if let profile = editingNoteForProfile {
+                    // Profile preview
+                    HStack(spacing: 12) {
+                        if let imageURL = profile.user.photos.first, let url = URL(string: imageURL) {
+                            CachedAsyncImage(url: url) { image in
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 50, height: 50)
+                                    .clipShape(Circle())
+                            } placeholder: {
+                                Circle()
+                                    .fill(Color.gray.opacity(0.2))
+                                    .frame(width: 50, height: 50)
+                            }
+                        } else {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [.purple, .pink],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 50, height: 50)
+                                .overlay(
+                                    Text(profile.user.fullName.prefix(1))
+                                        .font(.title2.weight(.bold))
+                                        .foregroundColor(.white)
+                                )
+                        }
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(profile.user.fullName)
+                                .font(.headline)
+                            Text("Saved \(profile.savedAt.timeAgoDisplay())")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+
+                        Spacer()
+                    }
+                    .padding(.horizontal)
+                    .padding(.top)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Personal Note")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.secondary)
+
+                    TextEditor(text: $noteText)
+                        .frame(minHeight: 100)
+                        .padding(8)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        )
+
+                    Text("Add a personal note to remember why you saved this profile")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal)
+
+                Spacer()
+            }
+            .navigationTitle("Edit Note")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        showNoteSheet = false
+                        editingNoteForProfile = nil
+                        noteText = ""
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        saveNote()
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+
+    // MARK: - Helper Functions
+
+    private func saveNote() {
+        guard let profile = editingNoteForProfile else { return }
+
+        Task {
+            await viewModel.updateNote(for: profile, note: noteText.isEmpty ? nil : noteText)
+            HapticManager.shared.notification(.success)
+        }
+
+        showNoteSheet = false
+        editingNoteForProfile = nil
+        noteText = ""
+    }
+
+    private func startEditingNote(for profile: SavedProfile) {
+        editingNoteForProfile = profile
+        noteText = profile.note ?? ""
+        showNoteSheet = true
+        HapticManager.shared.impact(.light)
+    }
+
+    private func handleMessage(user: User) {
+        guard let currentUserId = authService.currentUser?.effectiveId,
+              let userId = user.effectiveId else {
+            return
+        }
+
+        HapticManager.shared.impact(.medium)
+
+        Task {
+            do {
+                // Check if a match already exists
+                var existingMatch = try await MatchService.shared.fetchMatch(user1Id: currentUserId, user2Id: userId)
+
+                if existingMatch == nil {
+                    // No match exists - create one to enable messaging
+                    Logger.shared.info("Creating conversation with \(user.fullName) from SavedProfilesView", category: .messaging)
+                    await MatchService.shared.createMatch(user1Id: currentUserId, user2Id: userId)
+                    existingMatch = try await MatchService.shared.fetchMatch(user1Id: currentUserId, user2Id: userId)
+                }
+
+                await MainActor.run {
+                    if let match = existingMatch {
+                        chatPresentation = SavedChatPresentation(match: match, user: user)
+                        Logger.shared.info("Opening chat with \(user.fullName)", category: .messaging)
+                    }
+                }
+            } catch {
+                Logger.shared.error("Error starting conversation from SavedProfilesView", category: .messaging, error: error)
+            }
+        }
+    }
+
+    private func handleLike(user: User) {
+        guard let currentUserId = authService.currentUser?.effectiveId,
+              let targetUserId = user.effectiveId else {
+            return
+        }
+
+        Task {
+            do {
+                let isMatch = try await SwipeService.shared.likeUser(
+                    fromUserId: currentUserId,
+                    toUserId: targetUserId,
+                    isSuperLike: false
+                )
+
+                if isMatch {
+                    HapticManager.shared.notification(.success)
+                    Logger.shared.info("Liked saved profile - it's a match!", category: .matching)
+                } else {
+                    HapticManager.shared.impact(.medium)
+                    Logger.shared.info("Liked saved profile", category: .matching)
+                }
+            } catch {
+                Logger.shared.error("Error liking saved profile", category: .matching, error: error)
+                HapticManager.shared.notification(.error)
+            }
+        }
+    }
 }
 
 // MARK: - Saved Profile Card
@@ -654,6 +1094,319 @@ struct SavedProfileCard: View {
         }
         .buttonStyle(ScaleButtonStyle())
         .disabled(isUnsaving)
+    }
+}
+
+// MARK: - Swipeable Saved Card with Enhanced Features
+
+struct SwipeableSavedCard: View {
+    let savedProfile: SavedProfile
+    let isUnsaving: Bool
+    let onTap: () -> Void
+    let onUnsave: () -> Void
+    var onEditNote: (() -> Void)? = nil
+    var onLike: (() -> Void)? = nil
+    var onMessage: (() -> Void)? = nil
+
+    @State private var offset: CGFloat = 0
+    @State private var showDeleteOverlay = false
+
+    private let swipeThreshold: CGFloat = 80
+    private let imageHeight: CGFloat = 180
+
+    var body: some View {
+        ZStack {
+            // Background action indicator (delete/unsave)
+            HStack {
+                Spacer()
+                VStack(spacing: 4) {
+                    Image(systemName: "bookmark.slash.fill")
+                        .font(.title)
+                        .foregroundColor(.white)
+                    Text("Unsave")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                }
+                .frame(width: 80)
+                .opacity(min(1, -offset / swipeThreshold))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(
+                LinearGradient(
+                    colors: [.red.opacity(0.8), .orange.opacity(0.8)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            .cornerRadius(16)
+
+            // Main card content
+            EnhancedSavedProfileCard(
+                savedProfile: savedProfile,
+                isUnsaving: isUnsaving,
+                onTap: onTap,
+                onEditNote: onEditNote,
+                onLike: onLike,
+                onMessage: onMessage
+            )
+            .offset(x: offset)
+            .gesture(
+                DragGesture()
+                    .onChanged { gesture in
+                        // Only allow left swipe (negative offset)
+                        if gesture.translation.width < 0 {
+                            offset = gesture.translation.width
+                            showDeleteOverlay = -offset > swipeThreshold / 2
+                        }
+                    }
+                    .onEnded { gesture in
+                        if -offset > swipeThreshold {
+                            // Trigger unsave action
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                offset = -UIScreen.main.bounds.width
+                            }
+                            HapticManager.shared.notification(.warning)
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                onUnsave()
+                                withAnimation {
+                                    offset = 0
+                                }
+                            }
+                        } else {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                offset = 0
+                                showDeleteOverlay = false
+                            }
+                        }
+                    }
+            )
+
+            // Delete overlay on card
+            if showDeleteOverlay {
+                VStack {
+                    Image(systemName: "bookmark.slash.fill")
+                        .font(.system(size: 40))
+                        .foregroundColor(.red)
+                        .shadow(color: .red.opacity(0.5), radius: 10)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.black.opacity(0.3))
+                .cornerRadius(16)
+                .allowsHitTesting(false)
+            }
+        }
+    }
+}
+
+// MARK: - Enhanced Saved Profile Card
+
+struct EnhancedSavedProfileCard: View {
+    let savedProfile: SavedProfile
+    let isUnsaving: Bool
+    let onTap: () -> Void
+    var onEditNote: (() -> Void)? = nil
+    var onLike: (() -> Void)? = nil
+    var onMessage: (() -> Void)? = nil
+
+    private let imageHeight: CGFloat = 180
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 0) {
+                // Profile image section
+                ZStack(alignment: .topTrailing) {
+                    Group {
+                        if let imageURL = savedProfile.user.photos.first, let url = URL(string: imageURL) {
+                            CachedCardImage(url: url)
+                                .frame(height: imageHeight)
+                        } else {
+                            LinearGradient(
+                                colors: [.purple.opacity(0.7), .pink.opacity(0.6)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                            .overlay {
+                                Text(savedProfile.user.fullName.prefix(1))
+                                    .font(.system(size: 48, weight: .bold))
+                                    .foregroundColor(.white)
+                            }
+                        }
+                    }
+
+                    // Verified badge
+                    if savedProfile.user.isVerified {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(.blue)
+                            .background(Circle().fill(.white).padding(-2))
+                            .padding(8)
+                    }
+
+                    // Loading overlay when unsaving
+                    if isUnsaving {
+                        ZStack {
+                            Color.black.opacity(0.6)
+                            VStack(spacing: 12) {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(1.3)
+                                Text("Removing...")
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        .transition(.opacity)
+                    }
+                }
+                .frame(height: imageHeight)
+                .frame(maxWidth: .infinity)
+                .clipped()
+                .contentShape(Rectangle())
+                .cornerRadius(16, corners: [.topLeft, .topRight])
+
+                // User info section
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text(savedProfile.user.fullName)
+                            .font(.system(size: 16, weight: .semibold))
+                            .lineLimit(1)
+
+                        Text("\(savedProfile.user.age)")
+                            .font(.system(size: 16))
+                            .foregroundColor(.secondary)
+
+                        Spacer()
+                    }
+
+                    // Location
+                    HStack(spacing: 4) {
+                        Image(systemName: "mappin.circle.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(.purple)
+                        Text(savedProfile.user.location)
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+
+                    // Saved timestamp
+                    HStack(spacing: 4) {
+                        Image(systemName: "bookmark.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(.orange)
+                        Text("Saved \(savedProfile.savedAt.timeAgoDisplay())")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+
+                    // Note preview (if exists)
+                    if let note = savedProfile.note, !note.isEmpty {
+                        HStack(spacing: 4) {
+                            Image(systemName: "note.text")
+                                .font(.system(size: 10))
+                                .foregroundColor(.blue)
+                            Text(note)
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
+                        .padding(.top, 2)
+                    }
+
+                    // Action buttons
+                    HStack(spacing: 6) {
+                        // Like button
+                        if let onLike = onLike {
+                            SavedActionButton(
+                                icon: "heart.fill",
+                                colors: [.pink, .red]
+                            ) {
+                                onLike()
+                            }
+                        }
+
+                        // Message button
+                        if let onMessage = onMessage {
+                            SavedActionButton(
+                                icon: "message.fill",
+                                colors: [.purple, .blue]
+                            ) {
+                                onMessage()
+                            }
+                        }
+
+                        // Note button
+                        if let onEditNote = onEditNote {
+                            SavedActionButton(
+                                icon: savedProfile.note?.isEmpty == false ? "note.text" : "note.text.badge.plus",
+                                colors: [.orange, .yellow]
+                            ) {
+                                onEditNote()
+                            }
+                        }
+                    }
+                    .padding(.top, 4)
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(.systemBackground))
+                .opacity(isUnsaving ? 0.5 : 1.0)
+            }
+            .background(Color(.systemBackground))
+            .cornerRadius(16)
+            .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .disabled(isUnsaving)
+    }
+}
+
+// MARK: - Saved Action Button
+
+struct SavedActionButton: View {
+    let icon: String
+    let colors: [Color]
+    let action: () -> Void
+
+    @State private var isPressed = false
+
+    var body: some View {
+        Button {
+            HapticManager.shared.impact(.light)
+            action()
+        } label: {
+            Image(systemName: icon)
+                .font(.system(size: 12))
+                .foregroundColor(.white)
+                .frame(width: 32, height: 28)
+                .background(
+                    LinearGradient(
+                        colors: colors,
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .cornerRadius(8)
+                .scaleEffect(isPressed ? 0.9 : 1.0)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    if !isPressed {
+                        withAnimation(.easeOut(duration: 0.1)) {
+                            isPressed = true
+                        }
+                    }
+                }
+                .onEnded { _ in
+                    withAnimation(.easeOut(duration: 0.1)) {
+                        isPressed = false
+                    }
+                }
+        )
     }
 }
 
@@ -1326,6 +2079,34 @@ class SavedProfilesViewModel: ObservableObject {
             )
         } catch {
             Logger.shared.error("Error saving profile to Firestore", category: .general, error: error)
+        }
+    }
+
+    /// Update the note for a saved profile
+    func updateNote(for profile: SavedProfile, note: String?) async {
+        do {
+            // Update in Firestore
+            try await db.collection("saved_profiles").document(profile.id).updateData([
+                "note": note ?? ""
+            ])
+
+            // Update local state
+            await MainActor.run {
+                if let index = savedProfiles.firstIndex(where: { $0.id == profile.id }) {
+                    // Create new SavedProfile with updated note
+                    let updatedProfile = SavedProfile(
+                        id: profile.id,
+                        user: profile.user,
+                        savedAt: profile.savedAt,
+                        note: note
+                    )
+                    savedProfiles[index] = updatedProfile
+                }
+            }
+
+            Logger.shared.info("Updated note for saved profile: \(profile.user.fullName)", category: .general)
+        } catch {
+            Logger.shared.error("Error updating note for saved profile", category: .general, error: error)
         }
     }
 }
