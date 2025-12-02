@@ -12,6 +12,9 @@
 	<array>
 		<string>applinks:celestia.app</string>
 		<string>applinks:www.celestia.app</string>
+		<!-- Password AutoFill - enables strong password generation during signup -->
+		<string>webcredentials:celestia.app</string>
+		<string>webcredentials:www.celestia.app</string>
 	</array>
 
 	<!-- App Groups (for sharing data between app and extensions) -->
