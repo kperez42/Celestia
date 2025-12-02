@@ -72,6 +72,21 @@ struct EditProfileView: View {
     let smokingOptions = ["Prefer not to say", "Never", "Socially", "Regularly", "Trying to Quit"]
     let drinkingOptions = ["Prefer not to say", "Never", "Rarely", "Socially", "Regularly"]
     let petsOptions = ["Prefer not to say", "No Pets", "Dog", "Cat", "Both", "Other Pets", "Want Pets"]
+
+    // Height options from 4'8" to 7'0" with cm values
+    var heightOptionsForPicker: [(cm: Int, display: String)] {
+        var options: [(cm: Int, display: String)] = []
+        for feet in 4...7 {
+            let maxInches = feet == 7 ? 0 : 11
+            let minInches = feet == 4 ? 8 : 0
+            for inches in minInches...maxInches {
+                let totalInches = feet * 12 + inches
+                let cm = Int(Double(totalInches) * 2.54)
+                options.append((cm: cm, display: "\(feet)'\(inches)\""))
+            }
+        }
+        return options
+    }
     let exerciseOptions = ["Prefer not to say", "Never", "Rarely", "Sometimes", "Often", "Daily"]
     let dietOptions = ["Prefer not to say", "No Restrictions", "Vegan", "Vegetarian", "Pescatarian", "Kosher", "Halal"]
     let availableCountries = [
@@ -1327,37 +1342,46 @@ struct EditProfileView: View {
             .padding(.bottom, 16)
 
             VStack(spacing: 16) {
-                // Height with visual display
+                // Height with picker
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("Height")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.secondary)
-                        Spacer()
-                        if let h = height {
-                            Text(heightToFeetInches(h))
-                                .font(.caption)
-                                .foregroundColor(.blue)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.blue.opacity(0.1))
-                                .cornerRadius(8)
+                    Label("Height", systemImage: "ruler")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+
+                    Menu {
+                        Button("Not specified") {
+                            height = nil
                         }
-                    }
-
-                    HStack(spacing: 8) {
-                        TextField("e.g., 170", value: $height, format: .number)
-                            .keyboardType(.numberPad)
-                            .padding()
-                            .background(Color(.systemGray6))
-                            .cornerRadius(12)
-
-                        Text("cm")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundColor(.secondary)
-                            .frame(width: 30)
+                        ForEach(heightOptionsForPicker, id: \.cm) { option in
+                            Button(option.display) {
+                                height = option.cm
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            if let h = height {
+                                Text(heightToFeetInches(h))
+                                    .font(.subheadline)
+                                    .foregroundColor(.primary)
+                            } else {
+                                Text("Select height")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                            }
+                            Spacer()
+                            if let h = height {
+                                Text("\(h) cm")
+                                    .font(.caption)
+                                    .foregroundColor(.blue)
+                            }
+                            Image(systemName: "chevron.down")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -1761,30 +1785,41 @@ struct EditProfileView: View {
         VStack(spacing: 20) {
             SectionHeader(icon: "person.crop.circle.fill", title: "Lifestyle & More", color: .orange)
 
-            // Height
+            // Height with picker
             VStack(alignment: .leading, spacing: 8) {
                 Text("Height")
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(.secondary)
 
-                HStack {
-                    TextField("e.g., 170", value: $height, format: .number)
-                        .keyboardType(.numberPad)
-                        .padding()
-                        .background(Color(.systemGray6))
-                        .cornerRadius(12)
-
-                    Text("cm")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 8)
-                }
-
-                if let h = height {
-                    Text("≈ \(heightToFeetInches(h))")
-                        .font(.caption)
-                        .foregroundColor(.gray)
+                Menu {
+                    Button("Not specified") {
+                        height = nil
+                    }
+                    ForEach(heightOptionsForPicker, id: \.cm) { option in
+                        Button(option.display) {
+                            height = option.cm
+                        }
+                    }
+                } label: {
+                    HStack {
+                        if let h = height {
+                            Text("\(heightToFeetInches(h)) (\(h) cm)")
+                                .font(.subheadline)
+                                .foregroundColor(.primary)
+                        } else {
+                            Text("Select height")
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.down")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
                 }
             }
 
