@@ -265,43 +265,67 @@ class NetworkMonitor: ObservableObject {
     // MARK: - Connectivity Verification
 
     /// Verify actual internet connectivity by making a quick request
-    /// ALWAYS tests network regardless of NWPathMonitor state
+    /// For WiFi/Ethernet: Trust NWPathMonitor (stable connections)
+    /// For Cellular: Verify to prevent accidental data usage surprises
     func verifyConnectivity() async -> Bool {
-        Logger.shared.debug("📶 Verifying connectivity (NWPathMonitor says: \(isConnected ? "connected" : "disconnected"))", category: .networking)
+        Logger.shared.debug("📶 Verifying connectivity (NWPathMonitor: \(isConnected ? "connected" : "disconnected"), type: \(connectionType.description))", category: .networking)
 
-        // ALWAYS test actual connectivity - don't trust NWPathMonitor alone
-        // This catches cases where NWPathMonitor is wrong about connection state
+        // If NWPathMonitor says we're not connected, we're definitely offline
+        guard isConnected else {
+            Logger.shared.warning("📶 NWPathMonitor reports disconnected", category: .networking)
+            return false
+        }
+
+        // WIFI/ETHERNET FIX: Trust NWPathMonitor for stable connections
+        // These connections are reliable - if NWPathMonitor says connected, trust it
+        // Don't block uploads just because Google is unreachable (firewall, DNS, etc.)
+        switch connectionType {
+        case .wifi, .wiredEthernet:
+            Logger.shared.info("📶 WiFi/Ethernet detected - trusting NWPathMonitor (connected)", category: .networking)
+            return true
+
+        case .cellular:
+            // For cellular, do a quick verification to help users avoid data surprises
+            Logger.shared.debug("📶 Cellular detected - verifying connectivity", category: .networking)
+            return await performConnectivityTest()
+
+        case .other:
+            // Unknown connection type - try to verify but don't block if it fails
+            let verified = await performConnectivityTest()
+            if !verified {
+                Logger.shared.warning("📶 Verification failed but NWPathMonitor says connected - allowing upload", category: .networking)
+                return true // Trust NWPathMonitor, let upload try
+            }
+            return true
+        }
+    }
+
+    /// Perform actual connectivity test
+    private func performConnectivityTest() async -> Bool {
         do {
             guard let url = URL(string: "https://www.google.com/generate_204") else {
-                Logger.shared.warning("📶 Invalid verification URL", category: .networking)
-                return isConnected
+                return true // Can't test, assume connected
             }
 
             var request = URLRequest(url: url)
             request.httpMethod = "GET"
-            request.timeoutInterval = 10.0 // Give it more time
+            request.timeoutInterval = 5.0 // Quick check
             request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
 
             let (_, response) = try await URLSession.shared.data(for: request)
 
             if let httpResponse = response as? HTTPURLResponse {
-                // Google's generate_204 returns 204 on success
                 let success = httpResponse.statusCode == 204 || (200...299).contains(httpResponse.statusCode)
-                Logger.shared.info("📶 Connectivity test result: \(success ? "CONNECTED" : "FAILED") (status: \(httpResponse.statusCode))", category: .networking)
-
-                // Update isConnected if verification disagrees with NWPathMonitor
-                if success && !isConnected {
-                    Logger.shared.warning("📶 NWPathMonitor was wrong - we ARE connected!", category: .networking)
-                }
-
+                Logger.shared.info("📶 Connectivity test: \(success ? "PASS" : "FAIL") (status: \(httpResponse.statusCode))", category: .networking)
                 return success
             }
 
             return true
         } catch {
-            Logger.shared.warning("📶 Connectivity verification error: \(error.localizedDescription)", category: .networking)
-            // Network request failed - we're probably offline
-            return false
+            Logger.shared.warning("📶 Connectivity test error: \(error.localizedDescription)", category: .networking)
+            // If test fails but NWPathMonitor says connected, still return true
+            // Let the actual upload attempt - it will fail with proper error if really offline
+            return isConnected
         }
     }
 

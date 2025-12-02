@@ -2336,8 +2336,32 @@ struct EditProfileView: View {
             } catch {
                 await MainActor.run {
                     isLoading = false
-                    errorMessage = "Failed to save changes. Please try again."
+                    // Provide specific error messages based on error type
+                    if let photoError = error as? PhotoUploadError {
+                        switch photoError {
+                        case .noNetwork:
+                            errorMessage = "No internet connection. Please check your WiFi or cellular data and try again."
+                        case .poorConnection:
+                            errorMessage = "Your connection is too weak. Please move to a stronger signal and try again."
+                        case .uploadFailed(let reason):
+                            errorMessage = "Photo upload failed: \(reason)"
+                        }
+                    } else if let celestiaError = error as? CelestiaError {
+                        switch celestiaError {
+                        case .networkError:
+                            errorMessage = "Network error. Please check your connection and try again."
+                        case .imageUploadFailed:
+                            errorMessage = "Failed to upload photo. Please try again."
+                        case .imageTooBig:
+                            errorMessage = "Photo is too large. Please choose a smaller image."
+                        default:
+                            errorMessage = "Failed to save changes. Please try again."
+                        }
+                    } else {
+                        errorMessage = "Failed to save changes. Please try again."
+                    }
                     showErrorAlert = true
+                    HapticManager.shared.notification(.error)
                 }
             }
         }
