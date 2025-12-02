@@ -506,139 +506,174 @@ struct AdminModerationDashboard: View {
     private var statsContentView: some View {
         ScrollView {
             VStack(spacing: 16) {
-                // Stats Header Card
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Overview")
-                            .font(.system(size: 20, weight: .bold))
-                        Text("Real-time moderation stats")
-                            .font(.system(size: 13))
-                            .foregroundColor(.secondary)
-                    }
-                    Spacer()
-
-                    // Live indicator
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(.green)
-                            .frame(width: 8, height: 8)
-                        Text("Live")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color(.tertiarySystemBackground))
-                    .cornerRadius(8)
-                }
-                .padding(16)
-                .background(Color(.systemBackground))
-                .cornerRadius(12)
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-
-                // Summary cards in grid
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                    AdminStatCard(
-                        title: "Total Reports",
-                        value: "\(viewModel.stats.totalReports)",
-                        icon: "exclamationmark.triangle.fill",
-                        color: .blue
-                    )
-
-                    AdminStatCard(
-                        title: "Pending",
-                        value: "\(viewModel.stats.pendingReports)",
-                        icon: "clock.fill",
-                        color: .orange
-                    )
-
-                    AdminStatCard(
-                        title: "Resolved",
-                        value: "\(viewModel.stats.resolvedReports)",
-                        icon: "checkmark.circle.fill",
-                        color: .green
-                    )
-
-                    AdminStatCard(
-                        title: "Suspicious",
-                        value: "\(viewModel.stats.suspiciousProfiles)",
-                        icon: "eye.trianglebadge.exclamationmark.fill",
-                        color: .red
-                    )
-                }
-                .padding(.horizontal, 16)
-
-                // Recent activity section
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "clock.arrow.circlepath")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.purple)
-                        Text("Recent Activity")
-                            .font(.system(size: 15, weight: .semibold))
-                        Spacer()
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
-
-                    if viewModel.reports.isEmpty && viewModel.suspiciousProfiles.isEmpty {
-                        VStack(spacing: 8) {
-                            Image(systemName: "tray")
-                                .font(.system(size: 24))
-                                .foregroundColor(.secondary)
-                            Text("No recent activity")
-                                .font(.system(size: 14))
-                                .foregroundColor(.secondary)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 24)
-                    } else {
-                        VStack(spacing: 0) {
-                            ForEach(Array(viewModel.reports.prefix(5).enumerated()), id: \.element.id) { index, report in
-                                HStack(spacing: 12) {
-                                    ZStack {
-                                        Circle()
-                                            .fill(Color.orange.opacity(0.12))
-                                            .frame(width: 36, height: 36)
-                                        Image(systemName: "exclamationmark.circle.fill")
-                                            .font(.system(size: 16))
-                                            .foregroundColor(.orange)
-                                    }
-
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(report.reason)
-                                            .font(.system(size: 14, weight: .medium))
-                                            .foregroundColor(.primary)
-                                        Text(report.timestamp)
-                                            .font(.system(size: 12))
-                                            .foregroundColor(.secondary)
-                                    }
-
-                                    Spacer()
-
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundColor(.quaternary)
-                                }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 12)
-
-                                if index < min(viewModel.reports.count - 1, 4) {
-                                    Divider()
-                                        .padding(.leading, 64)
-                                }
-                            }
-                        }
-                    }
-                }
-                .background(Color(.systemBackground))
-                .cornerRadius(12)
-                .padding(.horizontal, 16)
+                statsHeaderCard
+                statsSummaryGrid
+                recentActivitySection
             }
             .padding(.bottom, 100) // Account for tab bar
         }
         .background(Color(.systemGroupedBackground))
+    }
+
+    // MARK: - Stats Sub-Views
+
+    private var statsHeaderCard: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Overview")
+                    .font(.system(size: 20, weight: .bold))
+                Text("Real-time moderation stats")
+                    .font(.system(size: 13))
+                    .foregroundColor(.secondary)
+            }
+            Spacer()
+
+            // Live indicator
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(.green)
+                    .frame(width: 8, height: 8)
+                Text("Live")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color(.tertiarySystemBackground))
+            .cornerRadius(8)
+        }
+        .padding(16)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+    }
+
+    private var statsSummaryGrid: some View {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+            AdminStatCard(
+                title: "Total Reports",
+                value: "\(viewModel.stats.totalReports)",
+                icon: "exclamationmark.triangle.fill",
+                color: .blue
+            )
+
+            AdminStatCard(
+                title: "Pending",
+                value: "\(viewModel.stats.pendingReports)",
+                icon: "clock.fill",
+                color: .orange
+            )
+
+            AdminStatCard(
+                title: "Resolved",
+                value: "\(viewModel.stats.resolvedReports)",
+                icon: "checkmark.circle.fill",
+                color: .green
+            )
+
+            AdminStatCard(
+                title: "Suspicious",
+                value: "\(viewModel.stats.suspiciousProfiles)",
+                icon: "eye.trianglebadge.exclamationmark.fill",
+                color: .red
+            )
+        }
+        .padding(.horizontal, 16)
+    }
+
+    private var recentActivitySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            recentActivityHeader
+            recentActivityContent
+        }
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .padding(.horizontal, 16)
+    }
+
+    private var recentActivityHeader: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "clock.arrow.circlepath")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.purple)
+            Text("Recent Activity")
+                .font(.system(size: 15, weight: .semibold))
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+    }
+
+    @ViewBuilder
+    private var recentActivityContent: some View {
+        if viewModel.reports.isEmpty && viewModel.suspiciousProfiles.isEmpty {
+            recentActivityEmptyState
+        } else {
+            recentActivityList
+        }
+    }
+
+    private var recentActivityEmptyState: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "tray")
+                .font(.system(size: 24))
+                .foregroundColor(.secondary)
+            Text("No recent activity")
+                .font(.system(size: 14))
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
+    }
+
+    private var recentActivityList: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(viewModel.reports.prefix(5).enumerated()), id: \.element.id) { index, report in
+                RecentActivityRowView(report: report)
+
+                if index < min(viewModel.reports.count - 1, 4) {
+                    Divider()
+                        .padding(.leading, 64)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Recent Activity Row
+
+private struct RecentActivityRowView: View {
+    let report: ModerationReport
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(Color.orange.opacity(0.12))
+                    .frame(width: 36, height: 36)
+                Image(systemName: "exclamationmark.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(.orange)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(report.reason)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.primary)
+                Text(report.timestamp)
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(Color(.quaternaryLabel))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 }
 
@@ -701,7 +736,7 @@ struct ReportRowView: View {
             // Chevron
             Image(systemName: "chevron.right")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(.quaternary)
+                .foregroundColor(Color(.quaternaryLabel))
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -1016,7 +1051,7 @@ struct AppealRowView: View {
             // Chevron
             Image(systemName: "chevron.right")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(.quaternary)
+                .foregroundColor(Color(.quaternaryLabel))
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -1273,7 +1308,7 @@ struct SuspiciousProfileRowView: View {
         HStack(spacing: 12) {
             // User photo with severity ring
             ZStack {
-                if let user = item.user, let photoURL = user.photos?.first {
+                if let user = item.user, let photoURL = user.photoURL {
                     CachedAsyncImage(url: URL(string: photoURL)) { image in
                         image.resizable().scaledToFill()
                     } placeholder: {
@@ -1331,7 +1366,7 @@ struct SuspiciousProfileRowView: View {
             // Chevron
             Image(systemName: "chevron.right")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(.quaternary)
+                .foregroundColor(Color(.quaternaryLabel))
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
