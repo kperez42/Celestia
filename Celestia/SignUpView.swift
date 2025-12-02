@@ -1562,30 +1562,44 @@ struct SignUpView: View {
                     )
 
                     // Update profile with additional data (bio, interests, lifestyle)
-                    if var user = authService.currentUser {
-                        user.bio = InputSanitizer.standard(bio)
-                        user.interests = Array(selectedInterests)
+                    // Wait briefly to ensure currentUser is set after createUser
+                    try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 second
 
-                        // Parse height if provided
-                        if !height.isEmpty {
-                            user.height = parseHeight(height)
-                        }
+                    guard var user = authService.currentUser else {
+                        Logger.shared.error("currentUser is nil after createUser - profile data not saved", category: .authentication)
+                        return
+                    }
 
-                        // Set optional lifestyle details
-                        if !relationshipGoal.isEmpty {
-                            user.relationshipGoal = relationshipGoal
-                        }
-                        if !educationLevel.isEmpty {
-                            user.educationLevel = educationLevel
-                        }
-                        if !smoking.isEmpty {
-                            user.smoking = smoking
-                        }
-                        if !drinking.isEmpty {
-                            user.drinking = drinking
-                        }
+                    // Set bio and interests
+                    user.bio = InputSanitizer.standard(bio)
+                    user.interests = Array(selectedInterests)
 
+                    // Parse height if provided
+                    if !height.isEmpty {
+                        user.height = parseHeight(height)
+                        Logger.shared.info("Setting height: \(height) -> \(user.height ?? 0) cm", category: .authentication)
+                    }
+
+                    // Set optional lifestyle details
+                    if !relationshipGoal.isEmpty {
+                        user.relationshipGoal = relationshipGoal
+                    }
+                    if !educationLevel.isEmpty {
+                        user.educationLevel = educationLevel
+                    }
+                    if !smoking.isEmpty {
+                        user.smoking = smoking
+                    }
+                    if !drinking.isEmpty {
+                        user.drinking = drinking
+                    }
+
+                    // Save updated profile data
+                    do {
                         try await authService.updateUser(user)
+                        Logger.shared.info("Profile data saved successfully - bio: \(bio.count) chars, interests: \(selectedInterests.count)", category: .authentication)
+                    } catch {
+                        Logger.shared.error("Failed to save profile data", category: .authentication, error: error)
                     }
                 } catch {
                     Logger.shared.error("Error creating account", category: .authentication, error: error)
