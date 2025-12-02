@@ -317,7 +317,8 @@ struct AdminModerationDashboard: View {
                     icon: "checkmark.shield.fill",
                     title: "No Pending Reports",
                     message: "All reports have been reviewed",
-                    color: .green
+                    color: .green,
+                    onRefresh: { Task { await viewModel.refresh() } }
                 )
             } else {
                 ScrollView {
@@ -362,7 +363,8 @@ struct AdminModerationDashboard: View {
                     icon: "checkmark.seal.fill",
                     title: "No Pending Appeals",
                     message: "All user appeals have been reviewed",
-                    color: .cyan
+                    color: .cyan,
+                    onRefresh: { Task { await viewModel.refresh() } }
                 )
             } else {
                 ScrollView {
@@ -407,7 +409,8 @@ struct AdminModerationDashboard: View {
                     icon: "person.crop.circle.badge.checkmark",
                     title: "All Caught Up!",
                     message: "No new accounts waiting for review",
-                    color: .blue
+                    color: .blue,
+                    onRefresh: { Task { await viewModel.refresh() } }
                 )
             } else {
                 ScrollView {
@@ -444,7 +447,8 @@ struct AdminModerationDashboard: View {
                     icon: "checkmark.circle.fill",
                     title: "No Suspicious Profiles",
                     message: "Auto-detection found no concerns",
-                    color: .green
+                    color: .green,
+                    onRefresh: { Task { await viewModel.refresh() } }
                 )
             } else {
                 ScrollView {
@@ -4273,9 +4277,11 @@ struct AdminEmptyStateView: View {
     let title: String
     let message: String
     let color: Color
+    var onRefresh: (() -> Void)? = nil
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 24) {
+            // Animated icon
             ZStack {
                 Circle()
                     .fill(color.opacity(0.1))
@@ -4288,9 +4294,9 @@ struct AdminEmptyStateView: View {
                     .foregroundColor(color)
             }
 
-            VStack(spacing: 6) {
+            VStack(spacing: 8) {
                 Text(title)
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: 20, weight: .bold))
                     .foregroundColor(.primary)
 
                 Text(message)
@@ -4298,6 +4304,26 @@ struct AdminEmptyStateView: View {
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 50)
+            }
+
+            // Refresh button
+            if let onRefresh = onRefresh {
+                Button {
+                    HapticManager.shared.impact(.light)
+                    onRefresh()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text("Refresh")
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    .foregroundColor(color)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(color.opacity(0.1))
+                    .cornerRadius(20)
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
