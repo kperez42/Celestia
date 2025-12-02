@@ -1150,195 +1150,208 @@ struct SignUpView: View {
     }()
 
     var step7LifestyleContent: some View {
-        VStack(spacing: 24) {
-            // Optional badge
-            Text("All fields are optional")
-                .font(.caption)
-                .foregroundColor(.purple)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(
-                    Capsule()
-                        .fill(Color.purple.opacity(0.1))
-                )
+        VStack(spacing: 20) {
+            // About You Card - matching photos page style
+            HStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(Color.purple.opacity(0.12))
+                        .frame(width: 56, height: 56)
 
-            // About You Section
-            VStack(alignment: .leading, spacing: 16) {
-                Label("About You", systemImage: "person.fill")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.purple)
-
-                // Height and Relationship Goal side by side
-                HStack(spacing: 12) {
-                    // Height Picker
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Height")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-
-                        Picker("Height", selection: $height) {
-                            Text("Select").tag("")
-                            ForEach(heightOptions.dropFirst(), id: \.self) { h in
-                                Text(h).tag(h)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(10)
-                        .background(Color(.systemBackground))
-                        .cornerRadius(10)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                        )
-                    }
-
-                    // Relationship Goal
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Looking for")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-
-                        Picker("Goal", selection: $relationshipGoal) {
-                            Text("Select").tag("")
-                            ForEach(relationshipGoalOptions, id: \.self) { option in
-                                Text(option).tag(option)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(10)
-                        .background(Color(.systemBackground))
-                        .cornerRadius(10)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                        )
-                    }
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(.purple)
                 }
-            }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(Color(.systemBackground))
-                    .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 2)
-            )
 
-            // Education Section
-            VStack(alignment: .leading, spacing: 16) {
-                Label("Education", systemImage: "graduationcap.fill")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.purple)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("About You")
+                        .font(.headline)
+                        .foregroundColor(.primary)
 
-                Picker("Education Level", selection: $educationLevel) {
-                    Text("Select education level").tag("")
-                    ForEach(educationLevelOptions, id: \.self) { option in
-                        Text(option).tag(option)
-                    }
-                }
-                .pickerStyle(.menu)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(10)
-                .background(Color(.systemBackground))
-                .cornerRadius(10)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                )
-            }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(Color(.systemBackground))
-                    .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 2)
-            )
-
-            // Lifestyle Section
-            VStack(alignment: .leading, spacing: 16) {
-                Label("Lifestyle", systemImage: "leaf.fill")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.purple)
-
-                HStack(spacing: 12) {
-                    // Smoking
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Smoking")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-
-                        Picker("Smoking", selection: $smoking) {
-                            Text("Select").tag("")
-                            ForEach(smokingOptions, id: \.self) { option in
-                                Text(option).tag(option)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(10)
-                        .background(Color(.systemBackground))
-                        .cornerRadius(10)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                        )
-                    }
-
-                    // Drinking
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Drinking")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-
-                        Picker("Drinking", selection: $drinking) {
-                            Text("Select").tag("")
-                            ForEach(drinkingOptions, id: \.self) { option in
-                                Text(option).tag(option)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(10)
-                        .background(Color(.systemBackground))
-                        .cornerRadius(10)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                        )
-                    }
-                }
-            }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(Color(.systemBackground))
-                    .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 2)
-            )
-
-            // Completion message
-            HStack(spacing: 12) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.title2)
-                    .foregroundColor(.purple)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("You're all set!")
+                    Text("Optional details")
                         .font(.subheadline)
-                        .fontWeight(.semibold)
-
-                    Text("Tap 'Create Account' to get started")
-                        .font(.caption)
                         .foregroundColor(.secondary)
                 }
 
                 Spacer()
             }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+            )
+
+            // Height and Relationship dropdowns - stacked vertically
+            VStack(spacing: 12) {
+                detailsDropdown(
+                    label: "Height",
+                    selection: height.isEmpty ? "Select" : height,
+                    options: heightOptions.dropFirst().map { $0 },
+                    onSelect: { height = $0 }
+                )
+
+                detailsDropdown(
+                    label: "Looking for",
+                    selection: relationshipGoal.isEmpty ? "Select" : relationshipGoal,
+                    options: relationshipGoalOptions,
+                    onSelect: { relationshipGoal = $0 }
+                )
+            }
+
+            // Education Card
+            HStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(Color.blue.opacity(0.12))
+                        .frame(width: 56, height: 56)
+
+                    Image(systemName: "graduationcap.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(.blue)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Education")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+
+                    Text("Your background")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+            )
+
+            detailsDropdown(
+                label: "Education level",
+                selection: educationLevel.isEmpty ? "Select" : educationLevel,
+                options: educationLevelOptions,
+                onSelect: { educationLevel = $0 }
+            )
+
+            // Lifestyle Card
+            HStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(Color.green.opacity(0.12))
+                        .frame(width: 56, height: 56)
+
+                    Image(systemName: "leaf.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(.green)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Lifestyle")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+
+                    Text("Your habits")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+            )
+
+            // Smoking and Drinking - stacked vertically
+            VStack(spacing: 12) {
+                detailsDropdown(
+                    label: "Smoking",
+                    selection: smoking.isEmpty ? "Select" : smoking,
+                    options: smokingOptions,
+                    onSelect: { smoking = $0 }
+                )
+
+                detailsDropdown(
+                    label: "Drinking",
+                    selection: drinking.isEmpty ? "Select" : drinking,
+                    options: drinkingOptions,
+                    onSelect: { drinking = $0 }
+                )
+            }
+
+            // Completion card - matching style
+            HStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(Color.purple.opacity(0.12))
+                        .frame(width: 56, height: 56)
+
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(.purple)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("You're all set!")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+
+                    Text("Tap 'Create Account' to get started")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+            )
+        }
+    }
+
+    // Reusable dropdown for details page
+    private func detailsDropdown(label: String, selection: String, options: [String], onSelect: @escaping (String) -> Void) -> some View {
+        Menu {
+            ForEach(options, id: \.self) { option in
+                Button(option) {
+                    onSelect(option)
+                    HapticManager.shared.impact(.light)
+                }
+            }
+        } label: {
+            HStack {
+                Text(label)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+
+                Spacer()
+
+                Text(selection)
+                    .font(.subheadline)
+                    .foregroundColor(selection == "Select" ? .gray : .primary)
+                    .lineLimit(1)
+
+                Image(systemName: "chevron.down")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
             .padding(14)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.purple.opacity(0.08))
+                    .fill(Color(.systemBackground))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
             )
         }
     }
