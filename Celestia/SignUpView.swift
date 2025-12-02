@@ -271,7 +271,8 @@ struct SignUpView: View {
                         
                         // Navigation buttons
                         HStack(spacing: 15) {
-                            if currentStep > 1 {
+                            // Show Back button on steps 1+ (not on step 0 where X button is shown)
+                            if currentStep >= 1 {
                                 Button {
                                     withAnimation {
                                         currentStep -= 1
@@ -341,10 +342,10 @@ struct SignUpView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                // Show X button on step 0 and 1 (when there's no Back button)
-                // On steps 2-4, the Back button serves as navigation
+                // Show X button only on step 0 (guidelines)
+                // On steps 1+, the Back button at the bottom serves as navigation
                 ToolbarItem(placement: .navigationBarLeading) {
-                    if currentStep <= 1 {
+                    if currentStep == 0 {
                         Button {
                             dismiss()
                         } label: {
