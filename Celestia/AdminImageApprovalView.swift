@@ -630,7 +630,7 @@ struct AdminPendingUserDetailView: View {
                         lookingForSection
                     }
                     .padding(20)
-                    .padding(.bottom, 100)
+                    .padding(.bottom, 80)
                 }
             }
             .background(Color(.systemGroupedBackground))

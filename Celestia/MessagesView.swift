@@ -374,7 +374,7 @@ struct MessagesView: View {
                 }
             }
             .padding(20)
-            .padding(.bottom, 100)
+            .padding(.bottom, 80)
         }
     }
 
@@ -388,7 +388,7 @@ struct MessagesView: View {
                 }
             }
             .padding(20)
-            .padding(.bottom, 100)
+            .padding(.bottom, 80)
         }
     }
     

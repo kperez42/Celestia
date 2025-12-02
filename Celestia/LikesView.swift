@@ -585,7 +585,7 @@ struct LikesView: View {
                 premiumFeaturesPreview
             }
             .padding(16)
-            .padding(.bottom, 100)
+            .padding(.bottom, 80)
         }
     }
 
@@ -821,7 +821,7 @@ struct LikesView: View {
                 }
             }
             .padding(16)
-            .padding(.bottom, 100)
+            .padding(.bottom, 80)
         }
     }
 

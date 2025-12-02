@@ -475,7 +475,7 @@ struct MatchesView: View {
                 }
             }
             .padding(16)
-            .padding(.bottom, 100)
+            .padding(.bottom, 80)
         }
     }
 
@@ -492,7 +492,7 @@ struct MatchesView: View {
                 }
             }
             .padding(16)
-            .padding(.bottom, 100)
+            .padding(.bottom, 80)
         }
     }
     

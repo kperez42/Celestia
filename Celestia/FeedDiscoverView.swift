@@ -291,7 +291,7 @@ struct FeedDiscoverView: View {
             }
             .padding(.horizontal)
             .padding(.top, 8)
-            .padding(.bottom, 100) // Account for tab bar height
+            .padding(.bottom, 80) // Account for tab bar height
         }
         .scrollDismissesKeyboard(.interactively)
         .scrollIndicators(.hidden)

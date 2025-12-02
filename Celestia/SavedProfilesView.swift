@@ -371,7 +371,7 @@ struct SavedProfilesView: View {
                 .padding(.horizontal)
             }
             .padding(.top)
-            .padding(.bottom, 100)
+            .padding(.bottom, 80)
         }
         .refreshable {
             HapticManager.shared.impact(.light)
@@ -407,7 +407,7 @@ struct SavedProfilesView: View {
                 .padding(.horizontal)
             }
             .padding(.top)
-            .padding(.bottom, 100) // Account for tab bar height
+            .padding(.bottom, 80) // Account for tab bar height
         }
         .refreshable {
             HapticManager.shared.impact(.light)
@@ -443,7 +443,7 @@ struct SavedProfilesView: View {
                 .padding(.horizontal)
             }
             .padding(.top)
-            .padding(.bottom, 100) // Account for tab bar height
+            .padding(.bottom, 80) // Account for tab bar height
         }
         .refreshable {
             HapticManager.shared.impact(.light)

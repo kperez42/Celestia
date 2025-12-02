@@ -364,7 +364,7 @@ struct InterestsViewEnhanced: View {
             .cornerRadius(12)
             .shadow(color: .black.opacity(0.2), radius: 10, y: 5)
             .padding(.horizontal)
-            .padding(.bottom, 100)
+            .padding(.bottom, 80)
         }
         .transition(.opacity)
     }
