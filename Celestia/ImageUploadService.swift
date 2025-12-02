@@ -9,6 +9,7 @@
 import Foundation
 import UIKit
 import Firebase
+import FirebaseAuth
 import FirebaseStorage
 
 class ImageUploadService {
@@ -26,8 +27,10 @@ class ImageUploadService {
     // Content moderation
     private let moderationService = ContentModerationService.shared
 
-    // Whether to pre-check content before upload (can be disabled for performance)
-    var enablePreModeration = true
+    // Whether to pre-check content before upload
+    // DISABLED BY DEFAULT: Content moderation was causing upload failures on some networks
+    // Server-side moderation still runs, this just skips the pre-check
+    var enablePreModeration = false
 
     private init() {}
 
@@ -358,5 +361,62 @@ class ImageUploadService {
         }
 
         return uploadedURLs
+    }
+
+    // MARK: - Diagnostic Functions
+
+    /// Test Firebase Storage connectivity by uploading a tiny test image
+    /// Use this to diagnose upload issues
+    func testFirebaseStorageConnectivity() async -> (success: Bool, message: String, duration: TimeInterval) {
+        Logger.shared.info("🧪 DIAGNOSTIC: Testing Firebase Storage connectivity...", category: .networking)
+        let startTime = Date()
+
+        // Check Firebase Auth first
+        guard let user = Auth.auth().currentUser else {
+            let message = "Firebase Auth: No user signed in"
+            Logger.shared.error("🧪 DIAGNOSTIC FAILED: \(message)", category: .networking)
+            return (false, message, Date().timeIntervalSince(startTime))
+        }
+        Logger.shared.info("🧪 DIAGNOSTIC: Firebase Auth OK - uid: \(user.uid.prefix(8))...", category: .networking)
+
+        // Create a tiny 1x1 pixel test image
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 1, height: 1))
+        let testImage = renderer.image { context in
+            UIColor.red.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 1, height: 1))
+        }
+
+        guard let imageData = testImage.jpegData(compressionQuality: 0.1) else {
+            let message = "Failed to create test image"
+            Logger.shared.error("🧪 DIAGNOSTIC FAILED: \(message)", category: .networking)
+            return (false, message, Date().timeIntervalSince(startTime))
+        }
+
+        Logger.shared.info("🧪 DIAGNOSTIC: Test image created (\(imageData.count) bytes)", category: .networking)
+
+        // Try to upload to a test path
+        let testPath = "diagnostic_tests/\(user.uid)/test_\(UUID().uuidString).jpg"
+        let ref = Storage.storage().reference(withPath: testPath)
+
+        do {
+            Logger.shared.info("🧪 DIAGNOSTIC: Uploading to \(testPath)...", category: .networking)
+
+            _ = try await ref.putDataAsync(imageData, metadata: nil)
+            let duration = Date().timeIntervalSince(startTime)
+
+            Logger.shared.info("🧪 DIAGNOSTIC: Upload succeeded in \(String(format: "%.2f", duration))s", category: .networking)
+
+            // Clean up test file
+            try? await ref.delete()
+            Logger.shared.info("🧪 DIAGNOSTIC: Test file cleaned up", category: .networking)
+
+            return (true, "Firebase Storage working! Upload took \(String(format: "%.1f", duration))s", duration)
+
+        } catch let error as NSError {
+            let duration = Date().timeIntervalSince(startTime)
+            let message = "Upload failed: domain=\(error.domain), code=\(error.code), desc=\(error.localizedDescription)"
+            Logger.shared.error("🧪 DIAGNOSTIC FAILED: \(message)", category: .networking)
+            return (false, message, duration)
+        }
     }
 }

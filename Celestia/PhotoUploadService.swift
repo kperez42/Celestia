@@ -8,6 +8,7 @@
 
 import Foundation
 import UIKit
+import FirebaseAuth
 
 enum ImageType {
     case profile
@@ -48,6 +49,15 @@ class PhotoUploadService {
     /// - Returns: URL string of the uploaded image
     func uploadPhoto(_ image: UIImage, userId: String, imageType: ImageType) async throws -> String {
         Logger.shared.info("📸 PhotoUploadService.uploadPhoto() called - imageType: \(imageType), userId: \(userId.prefix(8))...", category: .networking)
+
+        // CRITICAL: Check Firebase Auth state
+        let firebaseUser = Auth.auth().currentUser
+        if let user = firebaseUser {
+            Logger.shared.info("🔐 Firebase Auth: User authenticated - uid: \(user.uid.prefix(8))...", category: .networking)
+        } else {
+            Logger.shared.error("🔐 Firebase Auth: NO USER AUTHENTICATED - uploads will fail!", category: .networking)
+            // Don't throw here, let Firebase return proper error
+        }
 
         guard !userId.isEmpty else {
             Logger.shared.error("📸 Upload failed: Empty userId", category: .networking)
