@@ -1124,71 +1124,135 @@ struct SignUpView: View {
     }
 
     // MARK: - Step 7: Lifestyle Details
+    private let heightOptions: [String] = {
+        var heights: [String] = [""]
+        // Generate heights from 4'8" to 7'0"
+        for feet in 4...7 {
+            let maxInches = feet == 7 ? 0 : 11
+            let minInches = feet == 4 ? 8 : 0
+            for inches in minInches...maxInches {
+                heights.append("\(feet)'\(inches)\"")
+            }
+        }
+        return heights
+    }()
+
     var step7LifestyleContent: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 24) {
+            // Optional badge
             Text("All fields are optional")
                 .font(.caption)
-                .foregroundColor(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .foregroundColor(.purple)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(Color.purple.opacity(0.1))
+                )
 
-            // Height
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Height")
+            // About You Section
+            VStack(alignment: .leading, spacing: 16) {
+                Label("About You", systemImage: "person.fill")
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.purple)
 
-                TextField("e.g., 5'10\" or 178cm", text: $height)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .accessibilityLabel("Height")
-            }
+                // Height and Relationship Goal side by side
+                HStack(spacing: 12) {
+                    // Height Picker
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Height")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
 
-            // Relationship Goal
-            VStack(alignment: .leading, spacing: 8) {
-                Text("What are you looking for?")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+                        Picker("Height", selection: $height) {
+                            Text("Select").tag("")
+                            ForEach(heightOptions.dropFirst(), id: \.self) { h in
+                                Text(h).tag(h)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(10)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        )
+                    }
 
-                Picker("Relationship Goal", selection: $relationshipGoal) {
-                    Text("Select...").tag("")
-                    ForEach(relationshipGoalOptions, id: \.self) { option in
-                        Text(option).tag(option)
+                    // Relationship Goal
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Looking for")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        Picker("Goal", selection: $relationshipGoal) {
+                            Text("Select").tag("")
+                            ForEach(relationshipGoalOptions, id: \.self) { option in
+                                Text(option).tag(option)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(10)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        )
                     }
                 }
-                .pickerStyle(.menu)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(12)
-                .background(Color(.systemGray6))
-                .cornerRadius(10)
             }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 2)
+            )
 
-            // Education
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Education")
+            // Education Section
+            VStack(alignment: .leading, spacing: 16) {
+                Label("Education", systemImage: "graduationcap.fill")
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.purple)
 
                 Picker("Education Level", selection: $educationLevel) {
-                    Text("Select...").tag("")
+                    Text("Select education level").tag("")
                     ForEach(educationLevelOptions, id: \.self) { option in
                         Text(option).tag(option)
                     }
                 }
                 .pickerStyle(.menu)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(12)
-                .background(Color(.systemGray6))
+                .padding(10)
+                .background(Color(.systemBackground))
                 .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                )
             }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 2)
+            )
 
-            // Lifestyle section
+            // Lifestyle Section
             VStack(alignment: .leading, spacing: 16) {
-                Text("Lifestyle")
-                    .font(.headline)
-                    .padding(.top, 8)
+                Label("Lifestyle", systemImage: "leaf.fill")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.purple)
 
-                HStack(spacing: 16) {
+                HStack(spacing: 12) {
                     // Smoking
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 6) {
                         Text("Smoking")
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -1202,12 +1266,16 @@ struct SignUpView: View {
                         .pickerStyle(.menu)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(10)
-                        .background(Color(.systemGray6))
-                        .cornerRadius(8)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        )
                     }
 
                     // Drinking
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 6) {
                         Text("Drinking")
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -1221,30 +1289,43 @@ struct SignUpView: View {
                         .pickerStyle(.menu)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(10)
-                        .background(Color(.systemGray6))
-                        .cornerRadius(8)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        )
                     }
                 }
             }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 2)
+            )
 
             // Completion message
-            VStack(spacing: 8) {
-                Image(systemName: "party.popper.fill")
-                    .font(.title)
+            HStack(spacing: 12) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.title2)
                     .foregroundColor(.purple)
 
-                Text("You're almost done!")
-                    .font(.headline)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("You're all set!")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
 
-                Text("Tap 'Create Account' to finish setting up your profile")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
+                    Text("Tap 'Create Account' to get started")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
             }
-            .padding()
-            .frame(maxWidth: .infinity)
+            .padding(14)
             .background(
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: 12)
                     .fill(Color.purple.opacity(0.08))
             )
         }
