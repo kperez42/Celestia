@@ -187,6 +187,14 @@ struct SignInView: View {
         } message: {
             Text("Password reset link has been sent to your email.")
         }
+        .onAppear {
+            // Clear any error messages from other screens
+            authService.errorMessage = nil
+        }
+        .onDisappear {
+            // Clear error messages when leaving
+            authService.errorMessage = nil
+        }
     }
 }
 
