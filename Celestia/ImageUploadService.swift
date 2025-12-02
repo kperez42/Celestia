@@ -34,23 +34,33 @@ class ImageUploadService {
     // MARK: - Upload with Validation, Moderation, and Retry
 
     func uploadImage(_ image: UIImage, path: String, skipModeration: Bool = false) async throws -> String {
+        Logger.shared.info("📷 uploadImage() - path: \(path), skipModeration: \(skipModeration)", category: .networking)
+
         // NOTE: Network check is done by PhotoUploadService before calling this
         // Removing duplicate check here to prevent race conditions
 
         // Validate image on current thread (fast check)
+        Logger.shared.info("📷 Validating image...", category: .networking)
         try validateImage(image)
+        Logger.shared.info("📷 Image validation passed", category: .networking)
 
         // Pre-check content for inappropriate material (if enabled)
         if enablePreModeration && !skipModeration {
+            Logger.shared.info("📷 Running content moderation (enablePreModeration=\(enablePreModeration))...", category: .networking)
             let moderationResult = await moderationService.preCheckPhoto(image)
             if !moderationResult.approved {
-                Logger.shared.warning("Image rejected by content moderation: \(moderationResult.message)", category: .general)
+                Logger.shared.warning("📷 Image rejected by content moderation: \(moderationResult.message)", category: .networking)
                 throw CelestiaError.contentNotAllowed(moderationResult.message)
             }
+            Logger.shared.info("📷 Content moderation passed", category: .networking)
+        } else {
+            Logger.shared.info("📷 Skipping content moderation", category: .networking)
         }
 
         // Optimize image on background thread (CPU-intensive)
+        Logger.shared.info("📷 Optimizing image...", category: .networking)
         let imageData = try await optimizeImageAsync(image)
+        Logger.shared.info("📷 Image optimized - size: \(imageData.count / 1024) KB", category: .networking)
 
         // Validate size
         if imageData.count > maxImageSize {

@@ -142,6 +142,42 @@ class PhotoUploadService {
         return try await uploadPhoto(image, userId: userId, imageType: imageType)
     }
 
+    // MARK: - Resilient Upload with Offline Queueing
+
+    /// Upload with automatic offline queueing if it fails
+    /// Returns immediately with queued status if network is down
+    /// - Parameters:
+    ///   - image: The UIImage to upload
+    ///   - userId: User ID for the upload path
+    ///   - imageType: Type of image (profile, gallery, chat)
+    /// - Returns: Result with URL on success, or queued status on failure
+    func uploadPhotoWithOfflineSupport(_ image: UIImage, userId: String, imageType: ImageType) async -> Result<String, PhotoUploadError> {
+        Logger.shared.info("📸 uploadPhotoWithOfflineSupport() called", category: .networking)
+
+        do {
+            let url = try await uploadPhoto(image, userId: userId, imageType: imageType)
+            return .success(url)
+        } catch {
+            Logger.shared.warning("📸 Upload failed, attempting to queue for offline sync...", category: .networking)
+
+            // Try to queue for offline upload
+            let queued = await MainActor.run {
+                OfflineOperationQueue.shared.queuePhotoUpload(image, userId: userId, imageType: imageType)
+            }
+
+            if queued {
+                Logger.shared.info("📸 Photo queued for upload when network is restored", category: .networking)
+                return .failure(.uploadFailed("Photo queued for upload when connection improves"))
+            } else {
+                Logger.shared.error("📸 Failed to queue photo for offline upload", category: .networking)
+                if let photoError = error as? PhotoUploadError {
+                    return .failure(photoError)
+                }
+                return .failure(.uploadFailed(error.localizedDescription))
+            }
+        }
+    }
+
     // MARK: - Network Helpers
 
     /// Check network quality for large uploads
