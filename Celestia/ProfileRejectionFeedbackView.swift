@@ -9,7 +9,8 @@ import SwiftUI
 
 struct ProfileRejectionFeedbackView: View {
     @EnvironmentObject var authService: AuthService
-    @State private var showEditProfile = false
+    @EnvironmentObject var deepLinkManager: DeepLinkManager
+    @State private var showSignUpEdit = false
     @State private var isUpdating = false
     @State private var animateIcon = false
     @State private var showSuccessAlert = false
@@ -230,13 +231,13 @@ struct ProfileRejectionFeedbackView: View {
                     // Action buttons
                     VStack(spacing: 12) {
                         Button(action: {
-                            showEditProfile = true
+                            showSignUpEdit = true
                             HapticManager.shared.impact(.medium)
                         }) {
                             HStack(spacing: 10) {
-                                Image(systemName: "pencil.circle.fill")
+                                Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
                                     .font(.title3)
-                                Text("Edit My Profile")
+                                Text("Update My Info")
                                     .fontWeight(.semibold)
                             }
                             .font(.headline)
@@ -304,9 +305,10 @@ struct ProfileRejectionFeedbackView: View {
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Profile Review")
             .navigationBarTitleDisplayMode(.inline)
-            .sheet(isPresented: $showEditProfile) {
-                EditProfileView()
+            .fullScreenCover(isPresented: $showSignUpEdit) {
+                SignUpView(isEditingProfile: true)
                     .environmentObject(authService)
+                    .environmentObject(deepLinkManager)
             }
             .alert("Re-Review Requested!", isPresented: $showSuccessAlert) {
                 Button("OK", role: .cancel) { }
@@ -589,4 +591,5 @@ import FirebaseFirestore
 #Preview {
     ProfileRejectionFeedbackView()
         .environmentObject(AuthService.shared)
+        .environmentObject(DeepLinkManager())
 }
