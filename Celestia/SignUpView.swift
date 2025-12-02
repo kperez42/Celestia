@@ -271,26 +271,28 @@ struct SignUpView: View {
                         
                         // Navigation buttons
                         HStack(spacing: 15) {
-                            // Show Back button on steps 1+ (not on step 0 where X button is shown)
-                            if currentStep >= 1 {
-                                Button {
+                            // Back button on all steps - dismisses on step 0, goes back on steps 1+
+                            Button {
+                                if currentStep == 0 {
+                                    dismiss()
+                                } else {
                                     withAnimation {
                                         currentStep -= 1
                                     }
-                                } label: {
-                                    Text("Back")
-                                        .font(.headline)
-                                        .foregroundColor(.purple)
-                                        .frame(maxWidth: .infinity)
-                                        .padding()
-                                        .background(Color.white)
-                                        .cornerRadius(15)
                                 }
-                                .accessibilityLabel("Back")
-                                .accessibilityHint("Go back to previous step")
-                                .accessibilityIdentifier(AccessibilityIdentifier.backButton)
-                                .scaleButton()
+                            } label: {
+                                Text("Back")
+                                    .font(.headline)
+                                    .foregroundColor(.purple)
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color.white)
+                                    .cornerRadius(15)
                             }
+                            .accessibilityLabel("Back")
+                            .accessibilityHint(currentStep == 0 ? "Cancel sign up and return" : "Go back to previous step")
+                            .accessibilityIdentifier(AccessibilityIdentifier.backButton)
+                            .scaleButton()
 
                             Button {
                                 handleNext()
@@ -341,23 +343,7 @@ struct SignUpView: View {
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                // Show X button only on step 0 (guidelines)
-                // On steps 1+, the Back button at the bottom serves as navigation
-                ToolbarItem(placement: .navigationBarLeading) {
-                    if currentStep == 0 {
-                        Button {
-                            dismiss()
-                        } label: {
-                            Image(systemName: "xmark")
-                                .foregroundColor(.primary)
-                        }
-                        .accessibilityLabel("Close")
-                        .accessibilityHint("Cancel sign up and return")
-                        .accessibilityIdentifier(AccessibilityIdentifier.closeButton)
-                    }
-                }
-            }
+            // No toolbar X button - Back button at bottom handles navigation
         }
         .onChange(of: authService.userSession) { session in
             if session != nil {
