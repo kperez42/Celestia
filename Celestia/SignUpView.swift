@@ -946,8 +946,55 @@ struct SignUpView: View {
     }
 
     // MARK: - Step 5: Bio
+    private let bioPrompts = [
+        "I'm happiest when...",
+        "On weekends you'll find me...",
+        "Looking for someone who...",
+        "My friends describe me as...",
+        "I can't live without...",
+        "Let's talk about..."
+    ]
+
     var step5BioContent: some View {
         VStack(spacing: 20) {
+            // Bio prompts - tappable suggestions
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Need inspiration? Tap a prompt:")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(bioPrompts, id: \.self) { prompt in
+                            Button {
+                                if bio.isEmpty {
+                                    bio = prompt + " "
+                                } else if !bio.contains(prompt) {
+                                    bio += (bio.hasSuffix(" ") || bio.hasSuffix("\n") ? "" : " ") + prompt + " "
+                                }
+                                HapticManager.shared.impact(.light)
+                            } label: {
+                                Text(prompt)
+                                    .font(.caption)
+                                    .foregroundColor(.purple)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(
+                                        Capsule()
+                                            .fill(Color.purple.opacity(0.1))
+                                    )
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(Color.purple.opacity(0.3), lineWidth: 1)
+                                    )
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 2)
+                }
+            }
+
+            // Bio text editor
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text("About You")
@@ -962,11 +1009,11 @@ struct SignUpView: View {
                 TextEditor(text: $bio)
                     .frame(minHeight: 150)
                     .padding(12)
-                    .background(Color(.systemGray6))
+                    .background(Color(.systemBackground))
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(bio.count >= 20 ? Color.green.opacity(0.5) : Color.clear, lineWidth: 2)
+                            .stroke(bio.count >= 20 ? Color.green.opacity(0.5) : Color.gray.opacity(0.2), lineWidth: 1)
                     )
                     .onChange(of: bio) { _, newValue in
                         if newValue.count > 500 {
@@ -981,35 +1028,39 @@ struct SignUpView: View {
                 }
             }
 
-            // Bio tips
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Tips for a great bio")
-                    .font(.subheadline.bold())
+            // Bio tips - cleaner card
+            HStack(alignment: .top, spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(Color.purple.opacity(0.12))
+                        .frame(width: 44, height: 44)
+                    Image(systemName: "lightbulb.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(.purple)
+                }
 
                 VStack(alignment: .leading, spacing: 8) {
-                    bioTipRow(icon: "sparkles", text: "Share what makes you unique")
-                    bioTipRow(icon: "heart.fill", text: "Mention what you're looking for")
-                    bioTipRow(icon: "face.smiling", text: "Keep it positive and authentic")
-                    bioTipRow(icon: "questionmark.bubble", text: "Add conversation starters")
-                }
-            }
-            .padding()
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.purple.opacity(0.08))
-            )
-        }
-    }
+                    Text("Tips for a great bio")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
 
-    private func bioTipRow(icon: String, text: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.caption)
-                .foregroundColor(.purple)
-                .frame(width: 20)
-            Text(text)
-                .font(.caption)
-                .foregroundColor(.secondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("• Be yourself and stay authentic")
+                        Text("• Share your passions and hobbies")
+                        Text("• Add a fun fact or conversation starter")
+                    }
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                }
+
+                Spacer()
+            }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 2)
+            )
         }
     }
 
