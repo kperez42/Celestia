@@ -152,18 +152,6 @@ struct SignInView: View {
                 .scrollDismissesKeyboard(.interactively)
             }
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .foregroundColor(.primary)
-                    }
-                    .accessibilityLabel("Close")
-                    .accessibilityHint("Dismiss sign in screen")
-                }
-            }
         }
         .onChange(of: authService.userSession) { session in
             if session != nil {

@@ -15,13 +15,9 @@ struct SignUpView: View {
 
     private let imageUploadService = ImageUploadService.shared
 
-    @State private var currentStep = 0  // Start at guidelines step
+    @State private var currentStep = 0  // Start at email/password step
 
-    // Step 0: Guidelines animation state
-    @State private var guidelinesAppearAnimation = false
-    @State private var checklistAnimations: [Bool] = [false, false, false]
-
-    // Step 1: Basic info
+    // Step 0: Basic info (email/password)
     @State private var email = ""
     @State private var password = ""
     @State private var confirmPassword = ""
@@ -104,151 +100,77 @@ struct SignUpView: View {
                                 .frame(height: 1)
                                 .id("top")
 
-                            // Progress indicator (only show for steps 1-7, not guidelines)
-                            if currentStep >= 1 {
-                                HStack(spacing: 8) {
-                                    ForEach(1...7, id: \.self) { step in
-                                        Circle()
-                                            .fill(currentStep >= step ? Color.purple : Color.gray.opacity(0.3))
-                                            .frame(width: 10, height: 10)
-                                            .scaleEffect(currentStep == step ? 1.2 : 1.0)
-                                            .accessibleAnimation(.spring(response: 0.3, dampingFraction: 0.6), value: currentStep)
-                                    }
+                            // Progress indicator for steps 0-6 (7 steps total)
+                            HStack(spacing: 8) {
+                                ForEach(0..<7, id: \.self) { step in
+                                    Circle()
+                                        .fill(currentStep >= step ? Color.purple : Color.gray.opacity(0.3))
+                                        .frame(width: 10, height: 10)
+                                        .scaleEffect(currentStep == step ? 1.2 : 1.0)
+                                        .accessibleAnimation(.spring(response: 0.3, dampingFraction: 0.6), value: currentStep)
                                 }
-                                .accessibilityElement(children: .ignore)
-                                .accessibilityLabel("Sign up progress")
-                                .accessibilityValue("Step \(currentStep) of 7")
-                                .padding(.top, 10)
                             }
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("Sign up progress")
+                            .accessibilityValue("Step \(currentStep + 1) of 7")
+                            .padding(.top, 10)
                         
-                        // Header (different for guidelines vs regular steps)
-                        if currentStep == 0 {
-                            // Guidelines header with animated icon
-                            VStack(spacing: 16) {
-                                ZStack {
-                                    Circle()
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [.purple.opacity(0.2), .blue.opacity(0.15)],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                        )
-                                        .frame(width: 90, height: 90)
-                                        .scaleEffect(guidelinesAppearAnimation ? 1.0 : 0.8)
+                        // Header
+                        VStack(spacing: 10) {
+                            Image(systemName: "star.circle.fill")
+                                .font(.system(size: 50))
+                                .foregroundColor(.purple)
 
-                                    Circle()
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [.purple.opacity(0.3), .blue.opacity(0.2)],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                        )
-                                        .frame(width: 70, height: 70)
+                            Text(stepTitle)
+                                .font(.title2.bold())
 
-                                    Image(systemName: "checkmark.shield.fill")
-                                        .font(.system(size: 36))
-                                        .foregroundStyle(
-                                            LinearGradient(
-                                                colors: [.purple, .blue],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                        )
-                                }
-                                .opacity(guidelinesAppearAnimation ? 1 : 0)
-
-                                VStack(spacing: 8) {
-                                    Text("Before You Begin")
-                                        .font(.title2.bold())
-
-                                    Text("Here's what makes a great profile")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                        .multilineTextAlignment(.center)
-                                }
-                                .opacity(guidelinesAppearAnimation ? 1 : 0)
-                                .offset(y: guidelinesAppearAnimation ? 0 : 20)
-                            }
-                            .padding(.horizontal)
-                            .padding(.top, 20)
-                            .onAppear {
-                                withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                                    guidelinesAppearAnimation = true
-                                }
-                                // Animate checklist items sequentially
-                                for i in 0..<3 {
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3 + Double(i) * 0.15) {
-                                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                                            checklistAnimations[i] = true
-                                        }
-                                    }
-                                }
-                            }
-                        } else {
-                            VStack(spacing: 10) {
-                                Image(systemName: "star.circle.fill")
-                                    .font(.system(size: 50))
-                                    .foregroundColor(.purple)
-
-                                Text(stepTitle)
-                                    .font(.title2.bold())
-
-                                Text(stepSubtitle)
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                                    .multilineTextAlignment(.center)
-                            }
-                            .padding(.horizontal)
+                            Text(stepSubtitle)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
                         }
+                        .padding(.horizontal)
                         
                         // Step content
                         Group {
                             switch currentStep {
                             case 0:
-                                step0GuidelinesContent
-                                    .transition(.asymmetric(
-                                        insertion: .move(edge: .trailing).combined(with: .opacity),
-                                        removal: .move(edge: .leading).combined(with: .opacity)
-                                    ))
-                            case 1:
                                 step1Content
                                     .transition(.asymmetric(
                                         insertion: .move(edge: .trailing).combined(with: .opacity),
                                         removal: .move(edge: .leading).combined(with: .opacity)
                                     ))
-                            case 2:
+                            case 1:
                                 step2Content
                                     .transition(.asymmetric(
                                         insertion: .move(edge: .trailing).combined(with: .opacity),
                                         removal: .move(edge: .leading).combined(with: .opacity)
                                     ))
-                            case 3:
+                            case 2:
                                 step3Content
                                     .transition(.asymmetric(
                                         insertion: .move(edge: .trailing).combined(with: .opacity),
                                         removal: .move(edge: .leading).combined(with: .opacity)
                                     ))
-                            case 4:
+                            case 3:
                                 step4Content
                                     .transition(.asymmetric(
                                         insertion: .move(edge: .trailing).combined(with: .opacity),
                                         removal: .move(edge: .leading).combined(with: .opacity)
                                     ))
-                            case 5:
+                            case 4:
                                 step5BioContent
                                     .transition(.asymmetric(
                                         insertion: .move(edge: .trailing).combined(with: .opacity),
                                         removal: .move(edge: .leading).combined(with: .opacity)
                                     ))
-                            case 6:
+                            case 5:
                                 step6InterestsContent
                                     .transition(.asymmetric(
                                         insertion: .move(edge: .trailing).combined(with: .opacity),
                                         removal: .move(edge: .leading).combined(with: .opacity)
                                     ))
-                            case 7:
+                            case 6:
                                 step7LifestyleContent
                                     .transition(.asymmetric(
                                         insertion: .move(edge: .trailing).combined(with: .opacity),
@@ -271,26 +193,28 @@ struct SignUpView: View {
                         
                         // Navigation buttons
                         HStack(spacing: 15) {
-                            // Show Back button on steps 1+ (not on step 0 where X button is shown)
-                            if currentStep >= 1 {
-                                Button {
+                            // Back button on all steps - dismisses on step 0, goes back on steps 1+
+                            Button {
+                                if currentStep == 0 {
+                                    dismiss()
+                                } else {
                                     withAnimation {
                                         currentStep -= 1
                                     }
-                                } label: {
-                                    Text("Back")
-                                        .font(.headline)
-                                        .foregroundColor(.purple)
-                                        .frame(maxWidth: .infinity)
-                                        .padding()
-                                        .background(Color.white)
-                                        .cornerRadius(15)
                                 }
-                                .accessibilityLabel("Back")
-                                .accessibilityHint("Go back to previous step")
-                                .accessibilityIdentifier(AccessibilityIdentifier.backButton)
-                                .scaleButton()
+                            } label: {
+                                Text("Back")
+                                    .font(.headline)
+                                    .foregroundColor(.purple)
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color.white)
+                                    .cornerRadius(15)
                             }
+                            .accessibilityLabel("Back")
+                            .accessibilityHint(currentStep == 0 ? "Cancel sign up and return" : "Go back to previous step")
+                            .accessibilityIdentifier(AccessibilityIdentifier.backButton)
+                            .scaleButton()
 
                             Button {
                                 handleNext()
@@ -299,15 +223,9 @@ struct SignUpView: View {
                                     ProgressView()
                                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                 } else {
-                                    HStack(spacing: 8) {
-                                        Text(currentStep == 0 ? "Let's Go" : (currentStep == 7 ? "Create Account" : "Next"))
-                                            .font(.headline)
-                                        if currentStep == 0 {
-                                            Image(systemName: "arrow.right")
-                                                .font(.headline)
-                                        }
-                                    }
-                                    .foregroundColor(.white)
+                                    Text(currentStep == 6 ? "Create Account" : "Next")
+                                        .font(.headline)
+                                        .foregroundColor(.white)
                                 }
                             }
                             .frame(maxWidth: .infinity)
@@ -322,9 +240,9 @@ struct SignUpView: View {
                             .cornerRadius(15)
                             .opacity(canProceed ? 1.0 : 0.5)
                             .disabled(!canProceed || authService.isLoading || isLoadingPhotos)
-                            .accessibilityLabel(currentStep == 0 ? "Let's Go" : (currentStep == 7 ? "Create Account" : "Next"))
-                            .accessibilityHint(currentStep == 0 ? "Start the signup process" : (currentStep == 7 ? "Create your account and sign up" : "Continue to next step"))
-                            .accessibilityIdentifier(currentStep == 7 ? AccessibilityIdentifier.createAccountButton : AccessibilityIdentifier.nextButton)
+                            .accessibilityLabel(currentStep == 6 ? "Create Account" : "Next")
+                            .accessibilityHint(currentStep == 6 ? "Create your account and sign up" : "Continue to next step")
+                            .accessibilityIdentifier(currentStep == 6 ? AccessibilityIdentifier.createAccountButton : AccessibilityIdentifier.nextButton)
                             .scaleButton()
                         }
                         .padding(.horizontal, 30)
@@ -341,23 +259,7 @@ struct SignUpView: View {
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                // Show X button only on step 0 (guidelines)
-                // On steps 1+, the Back button at the bottom serves as navigation
-                ToolbarItem(placement: .navigationBarLeading) {
-                    if currentStep == 0 {
-                        Button {
-                            dismiss()
-                        } label: {
-                            Image(systemName: "xmark")
-                                .foregroundColor(.primary)
-                        }
-                        .accessibilityLabel("Close")
-                        .accessibilityHint("Cancel sign up and return")
-                        .accessibilityIdentifier(AccessibilityIdentifier.closeButton)
-                    }
-                }
-            }
+            // No toolbar X button - Back button at bottom handles navigation
         }
         .onChange(of: authService.userSession) { session in
             if session != nil {
@@ -722,78 +624,44 @@ struct SignUpView: View {
     // MARK: - Step 4: Photos
     var step4Content: some View {
         VStack(spacing: 24) {
-            // Engaging header card
-            VStack(spacing: 16) {
-                // Animated camera icon with gradient background
+            // Clean header card
+            HStack(spacing: 16) {
+                // Camera icon
                 ZStack {
                     Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.purple.opacity(0.2), Color.pink.opacity(0.15), Color.orange.opacity(0.1)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 80, height: 80)
-
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.purple.opacity(0.3), Color.pink.opacity(0.2)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 60, height: 60)
+                        .fill(Color.purple.opacity(0.12))
+                        .frame(width: 56, height: 56)
 
                     Image(systemName: "camera.fill")
-                        .font(.system(size: 28))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.purple, .pink],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .font(.system(size: 24))
+                        .foregroundColor(.purple)
                 }
 
-                VStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text("Time to shine!")
-                        .font(.title3)
-                        .fontWeight(.bold)
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.purple, .pink],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
+                        .font(.headline)
+                        .foregroundColor(.primary)
 
                     Text("Great photos get 10x more matches")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
+
+                Spacer()
             }
-            .padding(.vertical, 20)
-            .frame(maxWidth: .infinity)
+            .padding(16)
             .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.purple.opacity(0.05), Color.pink.opacity(0.03)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
             )
 
             // Quick tips in a horizontal scroll
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     photoTipChip(icon: "face.smiling.fill", text: "Clear face shot", color: .purple)
-                    photoTipChip(icon: "figure.stand", text: "Full body pic", color: .pink)
-                    photoTipChip(icon: "heart.fill", text: "Show personality", color: .orange)
-                    photoTipChip(icon: "sun.max.fill", text: "Good lighting", color: .yellow)
+                    photoTipChip(icon: "heart.fill", text: "Show personality", color: .pink)
+                    photoTipChip(icon: "sun.max.fill", text: "Good lighting", color: .orange)
                 }
                 .padding(.horizontal, 4)
             }
@@ -801,52 +669,40 @@ struct SignUpView: View {
             // Main profile photo (larger, more prominent)
             if !photoImages.isEmpty {
                 ZStack(alignment: .topTrailing) {
-                    Image(uiImage: photoImages[0])
-                        .resizable()
-                        .scaledToFill()
-                        .frame(height: 220)
-                        .frame(maxWidth: .infinity)
-                        .clipped()
-                        .cornerRadius(20)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 20)
-                                .stroke(
-                                    LinearGradient(
-                                        colors: [.purple, .pink, .orange],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 3
-                                )
-                        )
-                        .overlay(
-                            VStack {
-                                Spacer()
-                                HStack(spacing: 6) {
-                                    Image(systemName: "star.fill")
-                                        .font(.caption)
-                                    Text("Main Photo")
-                                        .font(.caption)
-                                        .fontWeight(.bold)
-                                }
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
-                                .background(
-                                    Capsule()
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [.purple, .pink],
-                                                startPoint: .leading,
-                                                endPoint: .trailing
-                                            )
-                                        )
-                                )
-                                .padding(12)
+                    GeometryReader { geometry in
+                        Image(uiImage: photoImages[0])
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: geometry.size.width, height: 220)
+                            .clipped()
+                    }
+                    .frame(height: 220)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.purple.opacity(0.3), lineWidth: 2)
+                    )
+                    .overlay(
+                        VStack {
+                            Spacer()
+                            HStack(spacing: 6) {
+                                Image(systemName: "star.fill")
+                                    .font(.caption)
+                                Text("Main Photo")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
                             }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        )
-                        .shadow(color: .purple.opacity(0.3), radius: 10, x: 0, y: 5)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(
+                                Capsule()
+                                    .fill(Color.purple)
+                            )
+                            .padding(10)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    )
 
                     Button {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
@@ -942,16 +798,19 @@ struct SignUpView: View {
                     ForEach(1..<6, id: \.self) { index in
                         if index < photoImages.count {
                             ZStack(alignment: .topTrailing) {
-                                Image(uiImage: photoImages[index])
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(height: 100)
-                                    .clipped()
-                                    .cornerRadius(14)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 14)
-                                            .stroke(Color.purple.opacity(0.3), lineWidth: 1)
-                                    )
+                                GeometryReader { geometry in
+                                    Image(uiImage: photoImages[index])
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: geometry.size.width, height: 100)
+                                        .clipped()
+                                }
+                                .frame(height: 100)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.purple.opacity(0.2), lineWidth: 1)
+                                )
 
                                 Button {
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
@@ -1087,8 +946,55 @@ struct SignUpView: View {
     }
 
     // MARK: - Step 5: Bio
+    private let bioPrompts = [
+        "I'm happiest when...",
+        "On weekends you'll find me...",
+        "Looking for someone who...",
+        "My friends describe me as...",
+        "I can't live without...",
+        "Let's talk about..."
+    ]
+
     var step5BioContent: some View {
         VStack(spacing: 20) {
+            // Bio prompts - tappable suggestions
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Need inspiration? Tap a prompt:")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(bioPrompts, id: \.self) { prompt in
+                            Button {
+                                if bio.isEmpty {
+                                    bio = prompt + " "
+                                } else if !bio.contains(prompt) {
+                                    bio += (bio.hasSuffix(" ") || bio.hasSuffix("\n") ? "" : " ") + prompt + " "
+                                }
+                                HapticManager.shared.impact(.light)
+                            } label: {
+                                Text(prompt)
+                                    .font(.caption)
+                                    .foregroundColor(.purple)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(
+                                        Capsule()
+                                            .fill(Color.purple.opacity(0.1))
+                                    )
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(Color.purple.opacity(0.3), lineWidth: 1)
+                                    )
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 2)
+                }
+            }
+
+            // Bio text editor
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text("About You")
@@ -1103,11 +1009,11 @@ struct SignUpView: View {
                 TextEditor(text: $bio)
                     .frame(minHeight: 150)
                     .padding(12)
-                    .background(Color(.systemGray6))
+                    .background(Color(.systemBackground))
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(bio.count >= 20 ? Color.green.opacity(0.5) : Color.clear, lineWidth: 2)
+                            .stroke(bio.count >= 20 ? Color.green.opacity(0.5) : Color.gray.opacity(0.2), lineWidth: 1)
                     )
                     .onChange(of: bio) { _, newValue in
                         if newValue.count > 500 {
@@ -1122,35 +1028,39 @@ struct SignUpView: View {
                 }
             }
 
-            // Bio tips
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Tips for a great bio")
-                    .font(.subheadline.bold())
+            // Bio tips - cleaner card
+            HStack(alignment: .top, spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(Color.purple.opacity(0.12))
+                        .frame(width: 44, height: 44)
+                    Image(systemName: "lightbulb.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(.purple)
+                }
 
                 VStack(alignment: .leading, spacing: 8) {
-                    bioTipRow(icon: "sparkles", text: "Share what makes you unique")
-                    bioTipRow(icon: "heart.fill", text: "Mention what you're looking for")
-                    bioTipRow(icon: "face.smiling", text: "Keep it positive and authentic")
-                    bioTipRow(icon: "questionmark.bubble", text: "Add conversation starters")
-                }
-            }
-            .padding()
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.purple.opacity(0.08))
-            )
-        }
-    }
+                    Text("Tips for a great bio")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
 
-    private func bioTipRow(icon: String, text: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.caption)
-                .foregroundColor(.purple)
-                .frame(width: 20)
-            Text(text)
-                .font(.caption)
-                .foregroundColor(.secondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("• Be yourself and stay authentic")
+                        Text("• Share your passions and hobbies")
+                        Text("• Add a fun fact or conversation starter")
+                    }
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                }
+
+                Spacer()
+            }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 2)
+            )
         }
     }
 
@@ -1165,13 +1075,13 @@ struct SignUpView: View {
                     Spacer()
                     Text("\(selectedInterests.count) selected")
                         .font(.caption)
-                        .foregroundColor(selectedInterests.count >= 3 ? .green : .orange)
+                        .foregroundColor(selectedInterests.count >= 3 ? .purple : .purple.opacity(0.6))
                 }
 
                 if selectedInterests.count < 3 {
                     Text("Pick at least 3 interests to continue")
                         .font(.caption)
-                        .foregroundColor(.orange)
+                        .foregroundColor(.purple)
                 }
             }
 
@@ -1199,7 +1109,7 @@ struct SignUpView: View {
             if selectedInterests.count >= 3 {
                 HStack {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
+                        .foregroundColor(.purple)
                     Text("Great choices! You can select more if you'd like.")
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -1207,78 +1117,142 @@ struct SignUpView: View {
                 .padding()
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.green.opacity(0.1))
+                        .fill(Color.purple.opacity(0.1))
                 )
             }
         }
     }
 
     // MARK: - Step 7: Lifestyle Details
+    private let heightOptions: [String] = {
+        var heights: [String] = [""]
+        // Generate heights from 4'8" to 7'0"
+        for feet in 4...7 {
+            let maxInches = feet == 7 ? 0 : 11
+            let minInches = feet == 4 ? 8 : 0
+            for inches in minInches...maxInches {
+                heights.append("\(feet)'\(inches)\"")
+            }
+        }
+        return heights
+    }()
+
     var step7LifestyleContent: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 24) {
+            // Optional badge
             Text("All fields are optional")
                 .font(.caption)
-                .foregroundColor(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .foregroundColor(.purple)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(Color.purple.opacity(0.1))
+                )
 
-            // Height
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Height")
+            // About You Section
+            VStack(alignment: .leading, spacing: 16) {
+                Label("About You", systemImage: "person.fill")
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.purple)
 
-                TextField("e.g., 5'10\" or 178cm", text: $height)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .accessibilityLabel("Height")
-            }
+                // Height and Relationship Goal side by side
+                HStack(spacing: 12) {
+                    // Height Picker
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Height")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
 
-            // Relationship Goal
-            VStack(alignment: .leading, spacing: 8) {
-                Text("What are you looking for?")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+                        Picker("Height", selection: $height) {
+                            Text("Select").tag("")
+                            ForEach(heightOptions.dropFirst(), id: \.self) { h in
+                                Text(h).tag(h)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(10)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        )
+                    }
 
-                Picker("Relationship Goal", selection: $relationshipGoal) {
-                    Text("Select...").tag("")
-                    ForEach(relationshipGoalOptions, id: \.self) { option in
-                        Text(option).tag(option)
+                    // Relationship Goal
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Looking for")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        Picker("Goal", selection: $relationshipGoal) {
+                            Text("Select").tag("")
+                            ForEach(relationshipGoalOptions, id: \.self) { option in
+                                Text(option).tag(option)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(10)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        )
                     }
                 }
-                .pickerStyle(.menu)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(12)
-                .background(Color(.systemGray6))
-                .cornerRadius(10)
             }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 2)
+            )
 
-            // Education
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Education")
+            // Education Section
+            VStack(alignment: .leading, spacing: 16) {
+                Label("Education", systemImage: "graduationcap.fill")
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.purple)
 
                 Picker("Education Level", selection: $educationLevel) {
-                    Text("Select...").tag("")
+                    Text("Select education level").tag("")
                     ForEach(educationLevelOptions, id: \.self) { option in
                         Text(option).tag(option)
                     }
                 }
                 .pickerStyle(.menu)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(12)
-                .background(Color(.systemGray6))
+                .padding(10)
+                .background(Color(.systemBackground))
                 .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                )
             }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 2)
+            )
 
-            // Lifestyle section
+            // Lifestyle Section
             VStack(alignment: .leading, spacing: 16) {
-                Text("Lifestyle")
-                    .font(.headline)
-                    .padding(.top, 8)
+                Label("Lifestyle", systemImage: "leaf.fill")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.purple)
 
-                HStack(spacing: 16) {
+                HStack(spacing: 12) {
                     // Smoking
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 6) {
                         Text("Smoking")
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -1292,12 +1266,16 @@ struct SignUpView: View {
                         .pickerStyle(.menu)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(10)
-                        .background(Color(.systemGray6))
-                        .cornerRadius(8)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        )
                     }
 
                     // Drinking
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 6) {
                         Text("Drinking")
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -1311,158 +1289,46 @@ struct SignUpView: View {
                         .pickerStyle(.menu)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(10)
-                        .background(Color(.systemGray6))
-                        .cornerRadius(8)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        )
                     }
                 }
             }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 2)
+            )
 
             // Completion message
-            VStack(spacing: 8) {
-                Image(systemName: "party.popper.fill")
-                    .font(.title)
+            HStack(spacing: 12) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.title2)
                     .foregroundColor(.purple)
 
-                Text("You're almost done!")
-                    .font(.headline)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("You're all set!")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
 
-                Text("Tap 'Create Account' to finish setting up your profile")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
+                    Text("Tap 'Create Account' to get started")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
             }
-            .padding()
-            .frame(maxWidth: .infinity)
+            .padding(14)
             .background(
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: 12)
                     .fill(Color.purple.opacity(0.08))
             )
         }
-    }
-
-    // MARK: - Step 0: Guidelines (Before Signup)
-    var step0GuidelinesContent: some View {
-        VStack(spacing: 20) {
-            // What We're Looking For section
-            VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    Image(systemName: "checklist")
-                        .font(.headline)
-                        .foregroundColor(.purple)
-                    Text("What We're Looking For")
-                        .font(.headline)
-                }
-
-                VStack(spacing: 12) {
-                    guidelinesRowAnimated(
-                        icon: "person.crop.circle.fill",
-                        title: "Great Photos",
-                        description: "Clear photos that show your face - no blurry or group pics",
-                        color: .blue,
-                        isAnimated: checklistAnimations[0]
-                    )
-
-                    guidelinesRowAnimated(
-                        icon: "text.alignleft",
-                        title: "Complete Profile",
-                        description: "Fill out your bio and details authentically",
-                        color: .purple,
-                        isAnimated: checklistAnimations[1]
-                    )
-
-                    guidelinesRowAnimated(
-                        icon: "shield.checkered",
-                        title: "Community Guidelines",
-                        description: "Be respectful - no inappropriate content",
-                        color: .green,
-                        isAnimated: checklistAnimations[2]
-                    )
-                }
-            }
-            .padding()
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(.systemBackground))
-                    .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(Color(.separator).opacity(0.2), lineWidth: 1)
-            )
-
-            // Why this matters card
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    ZStack {
-                        Circle()
-                            .fill(Color.orange.opacity(0.15))
-                            .frame(width: 36, height: 36)
-                        Image(systemName: "lightbulb.fill")
-                            .font(.system(size: 18))
-                            .foregroundColor(.orange)
-                    }
-
-                    Text("Why This Matters")
-                        .font(.headline)
-                }
-
-                Text("We review all profiles to keep Celestia safe and authentic. Profiles that follow these guidelines get approved faster and get more matches!")
-                    .font(.body)
-                    .foregroundColor(.primary.opacity(0.85))
-                    .lineSpacing(4)
-            }
-            .padding()
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.orange.opacity(0.08))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(Color.orange.opacity(0.2), lineWidth: 1)
-            )
-            .opacity(guidelinesAppearAnimation ? 1 : 0)
-            .offset(y: guidelinesAppearAnimation ? 0 : 30)
-            .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.5), value: guidelinesAppearAnimation)
-        }
-    }
-
-    private func guidelinesRowAnimated(icon: String, title: String, description: String, color: Color, isAnimated: Bool) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(color.opacity(0.12))
-                    .frame(width: 38, height: 38)
-
-                Image(systemName: icon)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(color)
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundColor(.primary)
-
-                Text(description)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .lineSpacing(2)
-            }
-
-            Spacer()
-
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundColor(.green.opacity(0.7))
-                .font(.body)
-        }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemGray6))
-        )
-        .scaleEffect(isAnimated ? 1.0 : 0.95)
-        .opacity(isAnimated ? 1.0 : 0)
     }
 
     private func photoTipChip(icon: String, text: String, color: Color) -> some View {
@@ -1519,26 +1385,26 @@ struct SignUpView: View {
     // MARK: - Computed Properties
     var stepTitle: String {
         switch currentStep {
-        case 1: return "Create Account"
-        case 2: return "Tell us about yourself"
-        case 3: return "Where are you from?"
-        case 4: return "Show Your Best Self"
-        case 5: return "Write Your Bio"
-        case 6: return "Your Interests"
-        case 7: return "A Few More Details"
+        case 0: return "Create Account"
+        case 1: return "Tell us about yourself"
+        case 2: return "Where are you from?"
+        case 3: return "Show Your Best Self"
+        case 4: return "Write Your Bio"
+        case 5: return "Your Interests"
+        case 6: return "A Few More Details"
         default: return ""
         }
     }
 
     var stepSubtitle: String {
         switch currentStep {
-        case 1: return "Let's get started with your account"
-        case 2: return "This helps us find your perfect match"
-        case 3: return "Connect with people near and far"
-        case 4: return "Photos help you make meaningful connections"
-        case 5: return "Let others know what makes you unique"
-        case 6: return "Help us find people with similar vibes"
-        case 7: return "Optional info to complete your profile"
+        case 0: return "Let's get started with your account"
+        case 1: return "This helps us find your perfect match"
+        case 2: return "Connect with people near and far"
+        case 3: return "Photos help you make meaningful connections"
+        case 4: return "Let others know what makes you unique"
+        case 5: return "Help us find people with similar vibes"
+        case 6: return "Optional info to complete your profile"
         default: return ""
         }
     }
@@ -1546,21 +1412,19 @@ struct SignUpView: View {
     var canProceed: Bool {
         switch currentStep {
         case 0:
-            return true  // Guidelines step - always can proceed
-        case 1:
             return !email.isEmpty && password.count >= 6 && password == confirmPassword
-        case 2:
+        case 1:
             guard let ageInt = Int(age) else { return false }
             return !name.isEmpty && ageInt >= 18
-        case 3:
+        case 2:
             return !location.isEmpty && !country.isEmpty
-        case 4:
+        case 3:
             return photoImages.count >= 2
-        case 5:
+        case 4:
             return bio.count >= 20  // Require at least 20 characters for bio
-        case 6:
+        case 5:
             return selectedInterests.count >= 3  // Require at least 3 interests
-        case 7:
+        case 6:
             return true  // Lifestyle details are optional
         default:
             return false
@@ -1593,7 +1457,7 @@ struct SignUpView: View {
 
     // MARK: - Actions
     func handleNext() {
-        if currentStep < 7 {
+        if currentStep < 6 {
             withAnimation {
                 currentStep += 1
             }
