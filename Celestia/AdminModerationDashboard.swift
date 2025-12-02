@@ -85,121 +85,160 @@ struct AdminModerationDashboard: View {
 
     private var adminHeader: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                // Admin badge and title
-                HStack(spacing: 10) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(
-                                LinearGradient(
-                                    colors: [.purple, .indigo],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
+            // Main header row
+            HStack(spacing: 14) {
+                // Admin badge with glow effect
+                ZStack {
+                    // Glow effect
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(
+                            LinearGradient(
+                                colors: [.purple.opacity(0.6), .indigo.opacity(0.6)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
                             )
-                            .frame(width: 40, height: 40)
+                        )
+                        .frame(width: 44, height: 44)
+                        .blur(radius: 8)
 
-                        Image(systemName: "shield.checkered")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(.white)
-                    }
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(
+                            LinearGradient(
+                                colors: [.purple, .indigo],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 44, height: 44)
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Admin Panel")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(.primary)
+                    Image(systemName: "shield.checkered")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(.white)
+                }
 
-                        Text(lastRefreshed.formatted(.relative(presentation: .named)))
-                            .font(.system(size: 11))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Admin Panel")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(.primary)
+
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 6, height: 6)
+                        Text("Updated \(lastRefreshed.formatted(.relative(presentation: .named)))")
+                            .font(.system(size: 11, weight: .medium))
                             .foregroundColor(.secondary)
                     }
                 }
 
                 Spacer()
 
-                // Alerts button
-                Button {
-                    showingAlerts = true
-                    HapticManager.shared.impact(.light)
-                } label: {
-                    ZStack(alignment: .topTrailing) {
-                        Circle()
-                            .fill(Color(.tertiarySystemBackground))
-                            .frame(width: 38, height: 38)
-
-                        Image(systemName: "bell.fill")
-                            .font(.system(size: 15))
-                            .foregroundColor(.primary)
-
-                        if viewModel.unreadAlertCount > 0 {
-                            Text("\(min(viewModel.unreadAlertCount, 99))")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(.white)
-                                .frame(minWidth: 16, minHeight: 16)
-                                .background(Circle().fill(Color.red))
-                                .offset(x: 6, y: -6)
-                        }
-                    }
-                }
-
-                // Refresh button
-                Button {
-                    Task {
-                        isRefreshing = true
+                // Action buttons
+                HStack(spacing: 10) {
+                    // Alerts button
+                    Button {
+                        showingAlerts = true
                         HapticManager.shared.impact(.light)
-                        await viewModel.refresh()
-                        lastRefreshed = Date()
-                        isRefreshing = false
-                        HapticManager.shared.notification(.success)
-                    }
-                } label: {
-                    ZStack {
-                        Circle()
-                            .fill(Color(.tertiarySystemBackground))
-                            .frame(width: 38, height: 38)
+                    } label: {
+                        ZStack(alignment: .topTrailing) {
+                            Circle()
+                                .fill(Color(.secondarySystemBackground))
+                                .frame(width: 40, height: 40)
+                                .overlay(
+                                    Circle()
+                                        .strokeBorder(Color(.separator).opacity(0.3), lineWidth: 1)
+                                )
 
-                        if isRefreshing {
-                            ProgressView()
-                                .scaleEffect(0.7)
-                        } else {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 14, weight: .semibold))
+                            Image(systemName: "bell.fill")
+                                .font(.system(size: 16))
                                 .foregroundColor(.primary)
+
+                            if viewModel.unreadAlertCount > 0 {
+                                Text("\(min(viewModel.unreadAlertCount, 99))")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .frame(minWidth: 18, minHeight: 18)
+                                    .background(
+                                        Circle()
+                                            .fill(Color.red)
+                                            .shadow(color: .red.opacity(0.4), radius: 4, y: 2)
+                                    )
+                                    .offset(x: 8, y: -8)
+                            }
                         }
                     }
+
+                    // Refresh button
+                    Button {
+                        Task {
+                            isRefreshing = true
+                            HapticManager.shared.impact(.light)
+                            await viewModel.refresh()
+                            lastRefreshed = Date()
+                            isRefreshing = false
+                            HapticManager.shared.notification(.success)
+                        }
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(Color(.secondarySystemBackground))
+                                .frame(width: 40, height: 40)
+                                .overlay(
+                                    Circle()
+                                        .strokeBorder(Color(.separator).opacity(0.3), lineWidth: 1)
+                                )
+
+                            if isRefreshing {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundColor(.primary)
+                            }
+                        }
+                    }
+                    .disabled(isRefreshing)
                 }
-                .disabled(isRefreshing)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.top, 12)
+            .padding(.bottom, 14)
 
-            // Quick stats bar
-            HStack(spacing: 0) {
-                AdminQuickStat(
+            // Quick stats cards
+            HStack(spacing: 8) {
+                AdminQuickStatCard(
                     value: viewModel.pendingProfiles.count,
                     label: "New",
+                    icon: "person.badge.plus",
                     color: .blue
                 )
-                AdminQuickStat(
+                AdminQuickStatCard(
                     value: viewModel.reports.count,
                     label: "Reports",
+                    icon: "exclamationmark.triangle.fill",
                     color: .orange
                 )
-                AdminQuickStat(
+                AdminQuickStatCard(
                     value: viewModel.appeals.count,
                     label: "Appeals",
+                    icon: "envelope.open.fill",
                     color: .cyan
                 )
-                AdminQuickStat(
+                AdminQuickStatCard(
                     value: viewModel.suspiciousProfiles.count,
                     label: "Suspicious",
+                    icon: "eye.trianglebadge.exclamationmark",
                     color: .red
                 )
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, 10)
+            .padding(.bottom, 12)
         }
-        .background(Color(.systemBackground))
+        .background(
+            Color(.systemBackground)
+                .shadow(color: .black.opacity(0.04), radius: 8, y: 4)
+        )
     }
 
     // MARK: - Admin Tab Bar
@@ -207,7 +246,7 @@ struct AdminModerationDashboard: View {
     private var adminTabBar: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
                         AdminTabItem(
                             name: tab.name,
@@ -225,14 +264,21 @@ struct AdminModerationDashboard: View {
                         }
                     }
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
             }
-            .frame(height: 56)
-            .background(Color(.systemBackground))
-            .overlay(alignment: .bottom) {
-                Divider()
-            }
+            .frame(height: 62)
+            .background(
+                Color(.systemBackground)
+                    .overlay(alignment: .bottom) {
+                        LinearGradient(
+                            colors: [Color(.separator).opacity(0.2), Color.clear],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 1)
+                    }
+            )
             .onChange(of: selectedTab) { _, newValue in
                 withAnimation(.easeInOut(duration: 0.2)) {
                     proxy.scrollTo(newValue, anchor: .center)
@@ -4070,23 +4116,42 @@ struct AdminZoomablePhotoView: View {
     }
 }
 
-// MARK: - Admin Quick Stat (Header Bar)
+// MARK: - Admin Quick Stat Card (Header Bar)
 
-struct AdminQuickStat: View {
+struct AdminQuickStatCard: View {
     let value: Int
     let label: String
+    let icon: String
     let color: Color
 
     var body: some View {
-        VStack(spacing: 2) {
+        VStack(spacing: 6) {
+            // Icon with background
+            ZStack {
+                Circle()
+                    .fill(color.opacity(value > 0 ? 0.15 : 0.08))
+                    .frame(width: 32, height: 32)
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(value > 0 ? color : .secondary)
+            }
+
+            // Value
             Text("\(value)")
-                .font(.system(size: 18, weight: .bold, design: .rounded))
-                .foregroundColor(value > 0 ? color : .secondary)
+                .font(.system(size: 17, weight: .bold, design: .rounded))
+                .foregroundColor(value > 0 ? .primary : .secondary)
+
+            // Label
             Text(label)
                 .font(.system(size: 10, weight: .medium))
                 .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.secondarySystemBackground))
+        )
     }
 }
 
@@ -4287,10 +4352,10 @@ struct AdminTabItem: View {
     let isSelected: Bool
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 7) {
             // Icon
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(isSelected ? .white : color)
 
             // Label
@@ -4298,24 +4363,29 @@ struct AdminTabItem: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(isSelected ? .white : .primary)
 
-            // Inline badge (no overlay offset)
+            // Inline badge
             if badgeCount > 0 {
                 Text(badgeCount > 99 ? "99+" : "\(badgeCount)")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundColor(isSelected ? color : .white)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
                     .background(
                         Capsule()
                             .fill(isSelected ? Color.white : Color.red)
                     )
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 11)
         .background(
             Capsule()
-                .fill(isSelected ? color : Color(.tertiarySystemBackground))
+                .fill(isSelected ? color : Color(.secondarySystemBackground))
+                .shadow(color: isSelected ? color.opacity(0.3) : .clear, radius: 6, y: 3)
+        )
+        .overlay(
+            Capsule()
+                .strokeBorder(isSelected ? Color.white.opacity(0.2) : Color(.separator).opacity(0.2), lineWidth: 1)
         )
         .contentShape(Capsule())
     }
