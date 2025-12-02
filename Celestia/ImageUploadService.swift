@@ -90,7 +90,12 @@ class ImageUploadService {
 
     private func performUpload(imageData: Data, path: String) async throws -> String {
         let filename = UUID().uuidString
-        let ref = Storage.storage().reference(withPath: "\(path)/\(filename).jpg")
+        let fullPath = "\(path)/\(filename).jpg"
+
+        Logger.shared.info("🔥 Firebase Storage: Starting upload to path: \(fullPath)", category: .networking)
+        Logger.shared.info("🔥 Firebase Storage: Data size: \(imageData.count) bytes (\(imageData.count / 1024) KB)", category: .networking)
+
+        let ref = Storage.storage().reference(withPath: fullPath)
 
         let metadata = StorageMetadata()
         metadata.contentType = "image/jpeg"
@@ -101,13 +106,24 @@ class ImageUploadService {
 
         do {
             // Upload with progress tracking capability
+            Logger.shared.info("🔥 Firebase Storage: Calling putDataAsync()...", category: .networking)
+            let uploadStartTime = Date()
+
             _ = try await ref.putDataAsync(imageData, metadata: metadata)
 
+            let uploadDuration = Date().timeIntervalSince(uploadStartTime)
+            Logger.shared.info("🔥 Firebase Storage: putDataAsync() completed in \(String(format: "%.1f", uploadDuration))s", category: .networking)
+
             // Get download URL
+            Logger.shared.info("🔥 Firebase Storage: Getting download URL...", category: .networking)
             let url = try await ref.downloadURL()
-            Logger.shared.info("Image uploaded successfully: \(url.absoluteString)", category: .general)
+
+            Logger.shared.info("🔥 Firebase Storage: SUCCESS - URL: \(url.absoluteString.prefix(60))...", category: .networking)
             return url.absoluteString
         } catch let error as NSError {
+            Logger.shared.error("🔥 Firebase Storage: FAILED - domain: \(error.domain), code: \(error.code)", category: .networking)
+            Logger.shared.error("🔥 Firebase Storage: Error description: \(error.localizedDescription)", category: .networking)
+
             // REFACTORED: Use FirebaseErrorMapper for consistent error handling
             FirebaseErrorMapper.logError(error, context: "Image Upload")
 
@@ -193,7 +209,10 @@ class ImageUploadService {
     // MARK: - Convenience Methods
 
     func uploadProfileImage(_ image: UIImage, userId: String) async throws -> String {
+        Logger.shared.info("📷 ImageUploadService.uploadProfileImage() called - userId: \(userId.prefix(8))...", category: .networking)
+
         guard !userId.isEmpty else {
+            Logger.shared.error("📷 uploadProfileImage failed: Empty userId", category: .networking)
             throw CelestiaError.invalidData
         }
         // Use high-quality upload for profile images (these appear on cards)
@@ -205,30 +224,40 @@ class ImageUploadService {
     /// Upload image with maximum quality settings for profile photos
     /// These images appear on cards and need to look crisp and sharp
     private func uploadHighQualityImage(_ image: UIImage, path: String, skipModeration: Bool = false) async throws -> String {
+        Logger.shared.info("📷 uploadHighQualityImage() - path: \(path)", category: .networking)
+
         // NOTE: Network check is done by PhotoUploadService before calling this
         // Removing duplicate check here to prevent race conditions
 
         // Validate image on current thread (fast check)
+        Logger.shared.info("📷 Validating image...", category: .networking)
         try validateImage(image)
+        Logger.shared.info("📷 Image validation passed", category: .networking)
 
         // Pre-check content for inappropriate material (if enabled)
         if enablePreModeration && !skipModeration {
+            Logger.shared.info("📷 Running content moderation...", category: .networking)
             let moderationResult = await moderationService.preCheckPhoto(image)
             if !moderationResult.approved {
-                Logger.shared.warning("Image rejected by content moderation: \(moderationResult.message)", category: .general)
+                Logger.shared.warning("📷 Image rejected by content moderation: \(moderationResult.message)", category: .networking)
                 throw CelestiaError.contentNotAllowed(moderationResult.message)
             }
+            Logger.shared.info("📷 Content moderation passed", category: .networking)
         }
 
         // Optimize image with HIGH QUALITY settings on background thread
+        Logger.shared.info("📷 Optimizing image for upload...", category: .networking)
         let imageData = try await optimizeProfileImageAsync(image)
+        Logger.shared.info("📷 Image optimized - size: \(imageData.count) bytes (\(imageData.count / 1024) KB)", category: .networking)
 
         // Validate size
         if imageData.count > maxImageSize {
+            Logger.shared.error("📷 Image too large: \(imageData.count) > \(maxImageSize)", category: .networking)
             throw CelestiaError.imageTooBig
         }
 
         // Upload with retry logic (network operation)
+        Logger.shared.info("📷 Starting upload with retry logic...", category: .networking)
         return try await RetryManager.shared.retryUploadOperation {
             try await self.performUpload(imageData: imageData, path: path)
         }
@@ -285,7 +314,10 @@ class ImageUploadService {
     }
 
     func uploadChatImage(_ image: UIImage, matchId: String) async throws -> String {
+        Logger.shared.info("📷 ImageUploadService.uploadChatImage() called - matchId: \(matchId.prefix(8))...", category: .networking)
+
         guard !matchId.isEmpty else {
+            Logger.shared.error("📷 uploadChatImage failed: Empty matchId", category: .networking)
             throw CelestiaError.invalidData
         }
         return try await uploadImage(image, path: "chat_images/\(matchId)")

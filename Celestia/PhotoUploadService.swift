@@ -47,48 +47,67 @@ class PhotoUploadService {
     ///   - imageType: Type of image (profile, gallery, chat)
     /// - Returns: URL string of the uploaded image
     func uploadPhoto(_ image: UIImage, userId: String, imageType: ImageType) async throws -> String {
+        Logger.shared.info("📸 PhotoUploadService.uploadPhoto() called - imageType: \(imageType), userId: \(userId.prefix(8))...", category: .networking)
+
         guard !userId.isEmpty else {
+            Logger.shared.error("📸 Upload failed: Empty userId", category: .networking)
             throw CelestiaError.invalidData
         }
 
-        // NETWORK CHECK: Always verify actual connectivity before upload
-        // Don't trust NWPathMonitor alone - it can be wrong
+        // Log image details
+        Logger.shared.info("📸 Image size: \(image.size.width)x\(image.size.height), scale: \(image.scale)", category: .networking)
+
+        // Get network status from main actor
         let networkStatus = await MainActor.run {
             (connected: networkMonitor.isConnected,
-             type: networkMonitor.connectionType.description,
-             quality: networkMonitor.quality.description)
+             type: networkMonitor.connectionType,
+             quality: networkMonitor.quality)
         }
 
-        Logger.shared.info("📶 Network status - NWPathMonitor: \(networkStatus.connected ? "connected" : "disconnected"), Type: \(networkStatus.type)", category: .networking)
+        Logger.shared.info("📶 Network check - connected: \(networkStatus.connected), type: \(networkStatus.type.description), quality: \(networkStatus.quality.description)", category: .networking)
 
-        // ALWAYS verify actual connectivity with a real network request
+        // Verify connectivity (trusts WiFi/Ethernet, verifies cellular)
         let actuallyConnected = await networkMonitor.verifyConnectivity()
+        Logger.shared.info("📶 verifyConnectivity() returned: \(actuallyConnected)", category: .networking)
 
         if !actuallyConnected {
             Logger.shared.warning("❌ Photo upload blocked: Network verification failed", category: .networking)
             throw PhotoUploadError.noNetwork
         }
 
-        Logger.shared.info("✅ Network verified - Starting \(imageType) photo upload for user: \(userId.prefix(8))...", category: .networking)
+        Logger.shared.info("✅ Network OK - Proceeding with \(imageType) upload...", category: .networking)
 
         // Use high-quality upload for profile and gallery photos (these appear on cards)
         do {
             let url: String
+            let startTime = Date()
+
             switch imageType {
             case .profile:
-                // Profile photos use maximum quality settings
+                Logger.shared.info("📸 Calling ImageUploadService.uploadProfileImage()...", category: .networking)
                 url = try await ImageUploadService.shared.uploadProfileImage(image, userId: userId)
             case .gallery:
-                // Gallery photos also use high quality (they appear in photo viewers)
+                Logger.shared.info("📸 Calling ImageUploadService.uploadProfileImage() for gallery...", category: .networking)
                 url = try await ImageUploadService.shared.uploadProfileImage(image, userId: userId)
             case .chat:
-                // Chat images use standard quality (they're smaller and temporary)
+                Logger.shared.info("📸 Calling ImageUploadService.uploadChatImage()...", category: .networking)
                 url = try await ImageUploadService.shared.uploadChatImage(image, matchId: userId)
             }
-            Logger.shared.info("✅ Photo upload successful: \(url.prefix(50))...", category: .networking)
+
+            let duration = Date().timeIntervalSince(startTime)
+            Logger.shared.info("✅ Photo upload SUCCESS in \(String(format: "%.1f", duration))s - URL: \(url.prefix(60))...", category: .networking)
             return url
         } catch {
-            Logger.shared.error("❌ Photo upload failed", category: .networking, error: error)
+            Logger.shared.error("❌ Photo upload FAILED - Error: \(error.localizedDescription)", category: .networking, error: error)
+
+            // Provide more context about the failure
+            if let celestiaError = error as? CelestiaError {
+                Logger.shared.error("❌ CelestiaError type: \(celestiaError)", category: .networking)
+            }
+            if let nsError = error as NSError? {
+                Logger.shared.error("❌ NSError domain: \(nsError.domain), code: \(nsError.code)", category: .networking)
+            }
+
             throw error
         }
     }
