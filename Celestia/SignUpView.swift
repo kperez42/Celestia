@@ -1678,7 +1678,9 @@ struct SignUpView: View {
             do {
                 // Upload new photos if they've changed
                 if !photoImages.isEmpty {
-                    let uploadedURLs = try await imageUploadService.uploadPhotos(photoImages, userId: user.effectiveId ?? "")
+                    let userId = user.effectiveId ?? ""
+                    let photosPath = "users/\(userId)/photos"
+                    let uploadedURLs = try await imageUploadService.uploadMultipleImages(photoImages, path: photosPath)
                     user.photos = uploadedURLs
                     user.profileImageURL = uploadedURLs.first ?? user.profileImageURL
                 }
