@@ -46,6 +46,30 @@ struct SignUpView: View {
     @State private var isValidatingReferral = false
     @State private var referralCodeValid: Bool? = nil
 
+    // Step 5: Bio
+    @State private var bio = ""
+
+    // Step 6: Interests
+    @State private var selectedInterests: Set<String> = []
+    let availableInterests = [
+        "Travel", "Music", "Movies", "Fitness", "Reading", "Gaming",
+        "Cooking", "Photography", "Art", "Dancing", "Hiking", "Yoga",
+        "Sports", "Fashion", "Food", "Nature", "Pets", "Tech",
+        "Coffee", "Wine", "Beach", "Mountains", "Nightlife", "Concerts"
+    ]
+
+    // Step 7: Lifestyle & Details
+    @State private var height = ""
+    @State private var relationshipGoal = ""
+    @State private var educationLevel = ""
+    @State private var smoking = ""
+    @State private var drinking = ""
+
+    let relationshipGoalOptions = ["Long-term relationship", "Casual dating", "New friends", "Not sure yet"]
+    let educationLevelOptions = ["High school", "Some college", "Bachelor's degree", "Master's degree", "Doctorate", "Trade school", "Prefer not to say"]
+    let smokingOptions = ["Never", "Sometimes", "Regularly", "Prefer not to say"]
+    let drinkingOptions = ["Never", "Socially", "Regularly", "Prefer not to say"]
+
     let genderOptions = ["Male", "Female", "Non-binary", "Other"]
     let lookingForOptions = ["Men", "Women", "Everyone"]
     let availableCountries = [
@@ -80,20 +104,20 @@ struct SignUpView: View {
                                 .frame(height: 1)
                                 .id("top")
 
-                            // Progress indicator (only show for steps 1-4, not guidelines)
+                            // Progress indicator (only show for steps 1-7, not guidelines)
                             if currentStep >= 1 {
-                                HStack(spacing: 10) {
-                                    ForEach(1...4, id: \.self) { step in
+                                HStack(spacing: 8) {
+                                    ForEach(1...7, id: \.self) { step in
                                         Circle()
                                             .fill(currentStep >= step ? Color.purple : Color.gray.opacity(0.3))
-                                            .frame(width: 12, height: 12)
+                                            .frame(width: 10, height: 10)
                                             .scaleEffect(currentStep == step ? 1.2 : 1.0)
                                             .accessibleAnimation(.spring(response: 0.3, dampingFraction: 0.6), value: currentStep)
                                     }
                                 }
                                 .accessibilityElement(children: .ignore)
                                 .accessibilityLabel("Sign up progress")
-                                .accessibilityValue("Step \(currentStep) of 4")
+                                .accessibilityValue("Step \(currentStep) of 7")
                                 .padding(.top, 10)
                             }
                         
@@ -212,6 +236,24 @@ struct SignUpView: View {
                                         insertion: .move(edge: .trailing).combined(with: .opacity),
                                         removal: .move(edge: .leading).combined(with: .opacity)
                                     ))
+                            case 5:
+                                step5BioContent
+                                    .transition(.asymmetric(
+                                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                                        removal: .move(edge: .leading).combined(with: .opacity)
+                                    ))
+                            case 6:
+                                step6InterestsContent
+                                    .transition(.asymmetric(
+                                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                                        removal: .move(edge: .leading).combined(with: .opacity)
+                                    ))
+                            case 7:
+                                step7LifestyleContent
+                                    .transition(.asymmetric(
+                                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                                        removal: .move(edge: .leading).combined(with: .opacity)
+                                    ))
                             default:
                                 EmptyView()
                             }
@@ -257,7 +299,7 @@ struct SignUpView: View {
                                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                 } else {
                                     HStack(spacing: 8) {
-                                        Text(currentStep == 0 ? "Let's Go" : (currentStep == 4 ? "Create Account" : "Next"))
+                                        Text(currentStep == 0 ? "Let's Go" : (currentStep == 7 ? "Create Account" : "Next"))
                                             .font(.headline)
                                         if currentStep == 0 {
                                             Image(systemName: "arrow.right")
@@ -279,9 +321,9 @@ struct SignUpView: View {
                             .cornerRadius(15)
                             .opacity(canProceed ? 1.0 : 0.5)
                             .disabled(!canProceed || authService.isLoading || isLoadingPhotos)
-                            .accessibilityLabel(currentStep == 0 ? "Let's Go" : (currentStep == 4 ? "Create Account" : "Next"))
-                            .accessibilityHint(currentStep == 0 ? "Start the signup process" : (currentStep == 4 ? "Create your account and sign up" : "Continue to next step"))
-                            .accessibilityIdentifier(currentStep == 4 ? AccessibilityIdentifier.createAccountButton : AccessibilityIdentifier.nextButton)
+                            .accessibilityLabel(currentStep == 0 ? "Let's Go" : (currentStep == 7 ? "Create Account" : "Next"))
+                            .accessibilityHint(currentStep == 0 ? "Start the signup process" : (currentStep == 7 ? "Create your account and sign up" : "Continue to next step"))
+                            .accessibilityIdentifier(currentStep == 7 ? AccessibilityIdentifier.createAccountButton : AccessibilityIdentifier.nextButton)
                             .scaleButton()
                         }
                         .padding(.horizontal, 30)
@@ -1040,6 +1082,259 @@ struct SignUpView: View {
         }
     }
 
+    // MARK: - Step 5: Bio
+    var step5BioContent: some View {
+        VStack(spacing: 20) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("About You")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(bio.count)/500")
+                        .font(.caption)
+                        .foregroundColor(bio.count >= 20 ? .green : .secondary)
+                }
+
+                TextEditor(text: $bio)
+                    .frame(minHeight: 150)
+                    .padding(12)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(bio.count >= 20 ? Color.green.opacity(0.5) : Color.clear, lineWidth: 2)
+                    )
+                    .onChange(of: bio) { _, newValue in
+                        if newValue.count > 500 {
+                            bio = String(newValue.prefix(500))
+                        }
+                    }
+
+                if bio.count < 20 {
+                    Text("Write at least 20 characters to continue")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                }
+            }
+
+            // Bio tips
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Tips for a great bio")
+                    .font(.subheadline.bold())
+
+                VStack(alignment: .leading, spacing: 8) {
+                    bioTipRow(icon: "sparkles", text: "Share what makes you unique")
+                    bioTipRow(icon: "heart.fill", text: "Mention what you're looking for")
+                    bioTipRow(icon: "face.smiling", text: "Keep it positive and authentic")
+                    bioTipRow(icon: "questionmark.bubble", text: "Add conversation starters")
+                }
+            }
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.purple.opacity(0.08))
+            )
+        }
+    }
+
+    private func bioTipRow(icon: String, text: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundColor(.purple)
+                .frame(width: 20)
+            Text(text)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+    }
+
+    // MARK: - Step 6: Interests
+    var step6InterestsContent: some View {
+        VStack(spacing: 20) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Select your interests")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(selectedInterests.count) selected")
+                        .font(.caption)
+                        .foregroundColor(selectedInterests.count >= 3 ? .green : .orange)
+                }
+
+                if selectedInterests.count < 3 {
+                    Text("Pick at least 3 interests to continue")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                }
+            }
+
+            // Interests grid
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], spacing: 10) {
+                ForEach(availableInterests, id: \.self) { interest in
+                    InterestChip(
+                        title: interest,
+                        isSelected: selectedInterests.contains(interest)
+                    ) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            if selectedInterests.contains(interest) {
+                                selectedInterests.remove(interest)
+                            } else {
+                                selectedInterests.insert(interest)
+                            }
+                        }
+                        HapticManager.shared.impact(.light)
+                    }
+                }
+            }
+
+            // Selected count indicator
+            if selectedInterests.count >= 3 {
+                HStack {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                    Text("Great choices! You can select more if you'd like.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.green.opacity(0.1))
+                )
+            }
+        }
+    }
+
+    // MARK: - Step 7: Lifestyle Details
+    var step7LifestyleContent: some View {
+        VStack(spacing: 20) {
+            Text("All fields are optional")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            // Height
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Height")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+
+                TextField("e.g., 5'10\" or 178cm", text: $height)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .accessibilityLabel("Height")
+            }
+
+            // Relationship Goal
+            VStack(alignment: .leading, spacing: 8) {
+                Text("What are you looking for?")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+
+                Picker("Relationship Goal", selection: $relationshipGoal) {
+                    Text("Select...").tag("")
+                    ForEach(relationshipGoalOptions, id: \.self) { option in
+                        Text(option).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+                .background(Color(.systemGray6))
+                .cornerRadius(10)
+            }
+
+            // Education
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Education")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+
+                Picker("Education Level", selection: $educationLevel) {
+                    Text("Select...").tag("")
+                    ForEach(educationLevelOptions, id: \.self) { option in
+                        Text(option).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+                .background(Color(.systemGray6))
+                .cornerRadius(10)
+            }
+
+            // Lifestyle section
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Lifestyle")
+                    .font(.headline)
+                    .padding(.top, 8)
+
+                HStack(spacing: 16) {
+                    // Smoking
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Smoking")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        Picker("Smoking", selection: $smoking) {
+                            Text("Select").tag("")
+                            ForEach(smokingOptions, id: \.self) { option in
+                                Text(option).tag(option)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(10)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(8)
+                    }
+
+                    // Drinking
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Drinking")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        Picker("Drinking", selection: $drinking) {
+                            Text("Select").tag("")
+                            ForEach(drinkingOptions, id: \.self) { option in
+                                Text(option).tag(option)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(10)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(8)
+                    }
+                }
+            }
+
+            // Completion message
+            VStack(spacing: 8) {
+                Image(systemName: "party.popper.fill")
+                    .font(.title)
+                    .foregroundColor(.purple)
+
+                Text("You're almost done!")
+                    .font(.headline)
+
+                Text("Tap 'Create Account' to finish setting up your profile")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding()
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.purple.opacity(0.08))
+            )
+        }
+    }
+
     // MARK: - Step 0: Guidelines (Before Signup)
     var step0GuidelinesContent: some View {
         VStack(spacing: 20) {
@@ -1223,7 +1518,9 @@ struct SignUpView: View {
         case 2: return "Tell us about yourself"
         case 3: return "Where are you from?"
         case 4: return "Show Your Best Self"
-        case 5: return "Review Guidelines"
+        case 5: return "Write Your Bio"
+        case 6: return "Your Interests"
+        case 7: return "A Few More Details"
         default: return ""
         }
     }
@@ -1234,7 +1531,9 @@ struct SignUpView: View {
         case 2: return "This helps us find your perfect match"
         case 3: return "Connect with people near and far"
         case 4: return "Photos help you make meaningful connections"
-        case 5: return "Here's what happens next"
+        case 5: return "Let others know what makes you unique"
+        case 6: return "Help us find people with similar vibes"
+        case 7: return "Optional info to complete your profile"
         default: return ""
         }
     }
@@ -1252,19 +1551,49 @@ struct SignUpView: View {
             return !location.isEmpty && !country.isEmpty
         case 4:
             return photoImages.count >= 2
+        case 5:
+            return bio.count >= 20  // Require at least 20 characters for bio
+        case 6:
+            return selectedInterests.count >= 3  // Require at least 3 interests
+        case 7:
+            return true  // Lifestyle details are optional
         default:
             return false
         }
     }
 
+    // MARK: - Helper Functions
+
+    /// Parse height string to cm (handles formats like "5'10" or "178cm" or "178")
+    private func parseHeight(_ heightString: String) -> Int? {
+        let trimmed = heightString.trimmingCharacters(in: .whitespaces).lowercased()
+
+        // Try feet/inches format (e.g., "5'10" or "5'10\"")
+        if trimmed.contains("'") {
+            let parts = trimmed.replacingOccurrences(of: "\"", with: "").split(separator: "'")
+            if parts.count >= 1, let feet = Int(parts[0]) {
+                let inches = parts.count > 1 ? Int(parts[1]) ?? 0 : 0
+                return Int(Double(feet * 12 + inches) * 2.54)
+            }
+        }
+
+        // Try cm format (e.g., "178cm" or "178")
+        let numericString = trimmed.replacingOccurrences(of: "cm", with: "")
+        if let cm = Int(numericString) {
+            return cm
+        }
+
+        return nil
+    }
+
     // MARK: - Actions
     func handleNext() {
-        if currentStep < 4 {
+        if currentStep < 7 {
             withAnimation {
                 currentStep += 1
             }
         } else {
-            // Final step - create account with photos
+            // Final step - create account with photos and additional profile data
             guard let ageInt = Int(age) else { return }
             Task {
                 do {
@@ -1280,6 +1609,33 @@ struct SignUpView: View {
                         referralCode: InputSanitizer.referralCode(referralCode),
                         photos: photoImages
                     )
+
+                    // Update profile with additional data (bio, interests, lifestyle)
+                    if var user = authService.currentUser {
+                        user.bio = InputSanitizer.standard(bio)
+                        user.interests = Array(selectedInterests)
+
+                        // Parse height if provided
+                        if !height.isEmpty {
+                            user.height = parseHeight(height)
+                        }
+
+                        // Set optional lifestyle details
+                        if !relationshipGoal.isEmpty {
+                            user.relationshipGoal = relationshipGoal
+                        }
+                        if !educationLevel.isEmpty {
+                            user.educationLevel = educationLevel
+                        }
+                        if !smoking.isEmpty {
+                            user.smoking = smoking
+                        }
+                        if !drinking.isEmpty {
+                            user.drinking = drinking
+                        }
+
+                        try await authService.updateUser(user)
+                    }
                 } catch {
                     Logger.shared.error("Error creating account", category: .authentication, error: error)
                     // Error is handled by AuthService setting errorMessage
@@ -1317,6 +1673,35 @@ struct SignUpView: View {
                 HapticManager.shared.notification(isValid ? .success : .error)
             }
         }
+    }
+}
+
+// MARK: - Interest Chip Component
+
+private struct InterestChip: View {
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.subheadline)
+                .fontWeight(isSelected ? .semibold : .regular)
+                .foregroundColor(isSelected ? .white : .primary)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(
+                    Capsule()
+                        .fill(isSelected ? Color.purple : Color(.systemGray6))
+                )
+                .overlay(
+                    Capsule()
+                        .strokeBorder(isSelected ? Color.purple : Color.clear, lineWidth: 2)
+                )
+        }
+        .buttonStyle(.plain)
+        .scaleEffect(isSelected ? 1.05 : 1.0)
     }
 }
 
