@@ -84,93 +84,121 @@ struct AdminModerationDashboard: View {
     // MARK: - Admin Header
 
     private var adminHeader: some View {
-        HStack(spacing: 12) {
-            // Admin badge and title
-            HStack(spacing: 10) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(
-                            LinearGradient(
-                                colors: [.purple, .indigo],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                // Admin badge and title
+                HStack(spacing: 10) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(
+                                LinearGradient(
+                                    colors: [.purple, .indigo],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
                             )
-                        )
-                        .frame(width: 38, height: 38)
+                            .frame(width: 40, height: 40)
 
-                    Image(systemName: "shield.checkered")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(.white)
-                }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Admin Panel")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(.primary)
-
-                    Text(lastRefreshed.formatted(.relative(presentation: .named)))
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
-                }
-            }
-
-            Spacer()
-
-            // Alerts button
-            Button {
-                showingAlerts = true
-                HapticManager.shared.impact(.light)
-            } label: {
-                ZStack(alignment: .topTrailing) {
-                    Circle()
-                        .fill(Color(.secondarySystemBackground))
-                        .frame(width: 38, height: 38)
-
-                    Image(systemName: "bell.fill")
-                        .font(.system(size: 15))
-                        .foregroundColor(.primary)
-
-                    if viewModel.unreadAlertCount > 0 {
-                        Text("\(min(viewModel.unreadAlertCount, 99))")
-                            .font(.system(size: 10, weight: .bold))
+                        Image(systemName: "shield.checkered")
+                            .font(.system(size: 18, weight: .semibold))
                             .foregroundColor(.white)
-                            .frame(minWidth: 16, minHeight: 16)
-                            .background(Circle().fill(Color.red))
-                            .offset(x: 6, y: -6)
                     }
-                }
-            }
 
-            // Refresh button
-            Button {
-                Task {
-                    isRefreshing = true
-                    HapticManager.shared.impact(.light)
-                    await viewModel.refresh()
-                    lastRefreshed = Date()
-                    isRefreshing = false
-                    HapticManager.shared.notification(.success)
-                }
-            } label: {
-                ZStack {
-                    Circle()
-                        .fill(Color(.secondarySystemBackground))
-                        .frame(width: 38, height: 38)
-
-                    if isRefreshing {
-                        ProgressView()
-                            .scaleEffect(0.7)
-                    } else {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 14, weight: .semibold))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Admin Panel")
+                            .font(.system(size: 18, weight: .bold))
                             .foregroundColor(.primary)
+
+                        Text(lastRefreshed.formatted(.relative(presentation: .named)))
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
                     }
                 }
+
+                Spacer()
+
+                // Alerts button
+                Button {
+                    showingAlerts = true
+                    HapticManager.shared.impact(.light)
+                } label: {
+                    ZStack(alignment: .topTrailing) {
+                        Circle()
+                            .fill(Color(.tertiarySystemBackground))
+                            .frame(width: 38, height: 38)
+
+                        Image(systemName: "bell.fill")
+                            .font(.system(size: 15))
+                            .foregroundColor(.primary)
+
+                        if viewModel.unreadAlertCount > 0 {
+                            Text("\(min(viewModel.unreadAlertCount, 99))")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.white)
+                                .frame(minWidth: 16, minHeight: 16)
+                                .background(Circle().fill(Color.red))
+                                .offset(x: 6, y: -6)
+                        }
+                    }
+                }
+
+                // Refresh button
+                Button {
+                    Task {
+                        isRefreshing = true
+                        HapticManager.shared.impact(.light)
+                        await viewModel.refresh()
+                        lastRefreshed = Date()
+                        isRefreshing = false
+                        HapticManager.shared.notification(.success)
+                    }
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(Color(.tertiarySystemBackground))
+                            .frame(width: 38, height: 38)
+
+                        if isRefreshing {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.primary)
+                        }
+                    }
+                }
+                .disabled(isRefreshing)
             }
-            .disabled(isRefreshing)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+
+            // Quick stats bar
+            HStack(spacing: 0) {
+                AdminQuickStat(
+                    value: viewModel.pendingProfiles.count,
+                    label: "New",
+                    color: .blue
+                )
+                AdminQuickStat(
+                    value: viewModel.reports.count,
+                    label: "Reports",
+                    color: .orange
+                )
+                AdminQuickStat(
+                    value: viewModel.appeals.count,
+                    label: "Appeals",
+                    color: .cyan
+                )
+                AdminQuickStat(
+                    value: viewModel.suspiciousProfiles.count,
+                    label: "Suspicious",
+                    color: .red
+                )
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 10)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
         .background(Color(.systemBackground))
     }
 
@@ -2485,12 +2513,13 @@ struct PendingProfileCard: View {
     @State private var adminComment = ""
 
     // Fixed height for consistent card sizing
-    private let photoHeight: CGFloat = 280
+    private let photoHeight: CGFloat = 300
 
     var body: some View {
         VStack(spacing: 0) {
-            // Photo Gallery - Tap to view full screen (fixed height container)
+            // Photo Gallery with overlay info
             ZStack(alignment: .bottom) {
+                // Photos
                 TabView(selection: $currentPhotoIndex) {
                     ForEach(Array(profile.photos.enumerated()), id: \.offset) { index, photoURL in
                         if let url = URL(string: photoURL) {
@@ -2505,16 +2534,20 @@ struct PendingProfileCard: View {
                                             .clipped()
                                     case .failure:
                                         Rectangle()
-                                            .fill(Color.gray.opacity(0.2))
+                                            .fill(Color(.systemGray5))
                                             .frame(width: geo.size.width, height: photoHeight)
                                             .overlay(
-                                                Image(systemName: "photo")
-                                                    .font(.largeTitle)
-                                                    .foregroundColor(.gray)
+                                                VStack(spacing: 8) {
+                                                    Image(systemName: "photo")
+                                                        .font(.system(size: 32))
+                                                    Text("Failed to load")
+                                                        .font(.caption)
+                                                }
+                                                .foregroundColor(.secondary)
                                             )
                                     case .empty:
                                         Rectangle()
-                                            .fill(Color.gray.opacity(0.1))
+                                            .fill(Color(.systemGray6))
                                             .frame(width: geo.size.width, height: photoHeight)
                                             .overlay(ProgressView())
                                     @unknown default:
@@ -2536,43 +2569,87 @@ struct PendingProfileCard: View {
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .frame(height: photoHeight)
 
-                // Photo indicators
-                if profile.photos.count > 1 {
-                    HStack(spacing: 6) {
-                        ForEach(0..<profile.photos.count, id: \.self) { index in
-                            Circle()
-                                .fill(index == currentPhotoIndex ? Color.white : Color.white.opacity(0.5))
-                                .frame(width: 8, height: 8)
-                        }
-                    }
-                    .padding(.bottom, 12)
-                }
+                // Gradient overlay for text readability
+                LinearGradient(
+                    colors: [.clear, .clear, .black.opacity(0.6)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 120)
+                .allowsHitTesting(false)
 
-                // Photo count badge + tap hint
+                // Bottom overlay with name, age, and info
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(profile.name)
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(.white)
+                        Text("\(profile.age)")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundColor(.white.opacity(0.85))
+                        Spacer()
+                    }
+
+                    HStack(spacing: 12) {
+                        Label(profile.location, systemImage: "mappin.circle.fill")
+                            .font(.system(size: 13, weight: .medium))
+                        Label(profile.gender, systemImage: "person.fill")
+                            .font(.system(size: 13, weight: .medium))
+                    }
+                    .foregroundColor(.white.opacity(0.9))
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                // Top badges
                 HStack {
-                    // Tap to view hint
-                    Label("Tap to view", systemImage: "hand.tap")
-                        .font(.caption2.bold())
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(.ultraThinMaterial)
-                        .cornerRadius(12)
-                        .padding(12)
+                    // Time badge
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock.fill")
+                            .font(.system(size: 10))
+                        Text(profile.createdAt)
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.ultraThinMaterial)
+                    .cornerRadius(16)
 
                     Spacer()
 
-                    Label("\(profile.photos.count)", systemImage: "photo.stack")
-                        .font(.caption.bold())
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(.ultraThinMaterial)
-                        .cornerRadius(20)
-                        .padding(12)
+                    // Photo count
+                    HStack(spacing: 4) {
+                        Image(systemName: "photo.stack.fill")
+                            .font(.system(size: 10))
+                        Text("\(profile.photos.count)")
+                            .font(.system(size: 11, weight: .bold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.ultraThinMaterial)
+                    .cornerRadius(16)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                .padding(12)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+
+                // Photo indicators
+                if profile.photos.count > 1 {
+                    HStack(spacing: 4) {
+                        ForEach(0..<profile.photos.count, id: \.self) { index in
+                            Capsule()
+                                .fill(index == currentPhotoIndex ? Color.white : Color.white.opacity(0.4))
+                                .frame(width: index == currentPhotoIndex ? 20 : 6, height: 4)
+                                .animation(.easeInOut(duration: 0.2), value: currentPhotoIndex)
+                        }
+                    }
+                    .padding(.bottom, 70)
+                }
             }
+            .frame(height: photoHeight)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .fullScreenCover(isPresented: $showPhotoGallery) {
                 AdminPhotoGalleryView(
                     photos: profile.photos,
@@ -2581,92 +2658,77 @@ struct PendingProfileCard: View {
                 )
             }
 
-            // Profile Info
-            VStack(alignment: .leading, spacing: 12) {
-                // Name and Age + View Profile button
-                HStack(alignment: .firstTextBaseline) {
-                    Text(profile.name)
-                        .font(.title2.bold())
-                    Text("\(profile.age)")
-                        .font(.title3)
+            // Profile Details Section
+            VStack(alignment: .leading, spacing: 14) {
+                // Email row
+                HStack(spacing: 8) {
+                    Image(systemName: "envelope.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(.blue)
+                    Text(profile.email)
+                        .font(.system(size: 13))
                         .foregroundColor(.secondary)
                     Spacer()
 
-                    // View Profile button
+                    // View full profile button
                     Button {
                         showProfileDetail = true
                         HapticManager.shared.impact(.light)
                     } label: {
                         HStack(spacing: 4) {
-                            Image(systemName: "person.circle")
-                            Text("View")
+                            Text("Full Profile")
+                                .font(.system(size: 12, weight: .semibold))
+                            Image(systemName: "arrow.up.right")
+                                .font(.system(size: 10, weight: .bold))
                         }
-                        .font(.caption.bold())
                         .foregroundColor(.purple)
                         .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
+                        .padding(.vertical, 6)
                         .background(Color.purple.opacity(0.1))
                         .cornerRadius(8)
                     }
-
-                    // Time badge
-                    Text(profile.createdAt)
-                        .font(.caption)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(Color.orange)
-                        .cornerRadius(12)
                 }
 
-                // Location and Gender
-                HStack(spacing: 16) {
-                    Label(profile.location, systemImage: "mappin.circle.fill")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-
-                    Label(profile.gender, systemImage: "person.fill")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-
-                    if !profile.lookingFor.isEmpty {
-                        Label(profile.lookingFor, systemImage: "heart.fill")
-                            .font(.subheadline)
-                            .foregroundColor(.pink)
-                    }
-                }
-
-                // Email
-                Label(profile.email, systemImage: "envelope.fill")
-                    .font(.caption)
-                    .foregroundColor(.blue)
-
-                // Quick info tags
+                // Tags section
                 if !profile.interests.isEmpty || !profile.languages.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 6) {
+                            if !profile.lookingFor.isEmpty {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "heart.fill")
+                                        .font(.system(size: 9))
+                                    Text(profile.lookingFor)
+                                }
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(.pink)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 5)
+                                .background(Color.pink.opacity(0.1))
+                                .cornerRadius(6)
+                            }
+
                             ForEach(profile.interests.prefix(3), id: \.self) { interest in
                                 Text(interest)
-                                    .font(.caption2)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundColor(.blue)
                                     .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(Color.pink.opacity(0.1))
-                                    .foregroundColor(.pink)
-                                    .cornerRadius(8)
+                                    .padding(.vertical, 5)
+                                    .background(Color.blue.opacity(0.1))
+                                    .cornerRadius(6)
                             }
+
                             ForEach(profile.languages.prefix(2), id: \.self) { language in
-                                Text(language)
-                                    .font(.caption2)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(Color.green.opacity(0.1))
-                                    .foregroundColor(.green)
-                                    .cornerRadius(8)
-                            }
-                            if profile.interests.count > 3 || profile.languages.count > 2 {
-                                Text("+\(max(0, profile.interests.count - 3) + max(0, profile.languages.count - 2)) more")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
+                                HStack(spacing: 3) {
+                                    Image(systemName: "globe")
+                                        .font(.system(size: 9))
+                                    Text(language)
+                                }
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(.green)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 5)
+                                .background(Color.green.opacity(0.1))
+                                .cornerRadius(6)
                             }
                         }
                     }
@@ -2675,81 +2737,65 @@ struct PendingProfileCard: View {
                 // Bio
                 if !profile.bio.isEmpty {
                     Text(profile.bio)
-                        .font(.subheadline)
+                        .font(.system(size: 14))
                         .foregroundColor(.secondary)
-                        .lineLimit(3)
-                        .padding(.top, 4)
+                        .lineLimit(2)
                 }
 
-                Divider()
-                    .padding(.vertical, 8)
-
                 // Action Buttons
-                HStack(spacing: 16) {
+                HStack(spacing: 10) {
                     // Reject Button
-                    Button(action: {
+                    Button {
                         HapticManager.shared.impact(.light)
                         showRejectAlert = true
-                    }) {
-                        HStack(spacing: 8) {
+                    } label: {
+                        HStack(spacing: 6) {
                             if isRejecting {
                                 ProgressView()
-                                    .scaleEffect(0.8)
+                                    .scaleEffect(0.7)
                                     .tint(.white)
                             } else {
                                 Image(systemName: "xmark")
-                                    .font(.title3.bold())
+                                    .font(.system(size: 14, weight: .bold))
                             }
                             Text("Reject")
-                                .fontWeight(.semibold)
+                                .font(.system(size: 14, weight: .semibold))
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(
-                            LinearGradient(
-                                colors: [Color.red.opacity(0.8), Color.red],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .padding(.vertical, 12)
+                        .background(Color.red)
                         .foregroundColor(.white)
-                        .cornerRadius(12)
+                        .cornerRadius(10)
                     }
                     .disabled(isApproving || isRejecting || isFlagging)
 
-                    // Flag for Review Button (orange)
-                    Button(action: {
+                    // Flag Button
+                    Button {
                         HapticManager.shared.impact(.light)
                         showFlagAlert = true
-                    }) {
-                        HStack(spacing: 8) {
+                    } label: {
+                        HStack(spacing: 6) {
                             if isFlagging {
                                 ProgressView()
-                                    .scaleEffect(0.8)
+                                    .scaleEffect(0.7)
                                     .tint(.white)
                             } else {
                                 Image(systemName: "flag.fill")
-                                    .font(.title3.bold())
+                                    .font(.system(size: 14, weight: .bold))
                             }
                             Text("Flag")
-                                .fontWeight(.semibold)
+                                .font(.system(size: 14, weight: .semibold))
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(
-                            LinearGradient(
-                                colors: [Color.orange, Color.orange.opacity(0.8)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .padding(.vertical, 12)
+                        .background(Color.orange)
                         .foregroundColor(.white)
-                        .cornerRadius(12)
+                        .cornerRadius(10)
                     }
                     .disabled(isApproving || isRejecting || isFlagging)
 
                     // Approve Button
-                    Button(action: {
+                    Button {
                         HapticManager.shared.impact(.medium)
                         Task {
                             isApproving = true
@@ -2762,39 +2808,34 @@ struct PendingProfileCard: View {
                             }
                             isApproving = false
                         }
-                    }) {
-                        HStack(spacing: 8) {
+                    } label: {
+                        HStack(spacing: 6) {
                             if isApproving {
                                 ProgressView()
-                                    .scaleEffect(0.8)
+                                    .scaleEffect(0.7)
                                     .tint(.white)
                             } else {
                                 Image(systemName: "checkmark")
-                                    .font(.title3.bold())
+                                    .font(.system(size: 14, weight: .bold))
                             }
                             Text("Approve")
-                                .fontWeight(.semibold)
+                                .font(.system(size: 14, weight: .semibold))
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(
-                            LinearGradient(
-                                colors: [Color.green, Color.green.opacity(0.8)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .padding(.vertical, 12)
+                        .background(Color.green)
                         .foregroundColor(.white)
-                        .cornerRadius(12)
+                        .cornerRadius(10)
                     }
                     .disabled(isApproving || isRejecting || isFlagging)
                 }
+                .padding(.top, 4)
             }
             .padding(16)
         }
         .background(Color(.systemBackground))
-        .cornerRadius(20)
-        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.08), radius: 12, x: 0, y: 4)
         .confirmationDialog("Reject Profile", isPresented: $showRejectAlert, titleVisibility: .visible) {
             // Photo Issues
             Button("📸 No Clear Face Photo", role: .destructive) {
@@ -4026,6 +4067,26 @@ struct AdminZoomablePhotoView: View {
                 HapticManager.shared.impact(.light)
             }
         }
+    }
+}
+
+// MARK: - Admin Quick Stat (Header Bar)
+
+struct AdminQuickStat: View {
+    let value: Int
+    let label: String
+    let color: Color
+
+    var body: some View {
+        VStack(spacing: 2) {
+            Text("\(value)")
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .foregroundColor(value > 0 ? color : .secondary)
+            Text(label)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 
