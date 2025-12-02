@@ -346,6 +346,7 @@ struct AdminModerationDashboard: View {
                         }
                         .background(Color(.systemBackground))
                     }
+                    .padding(.bottom, 100) // Account for tab bar
                 }
                 .background(Color(.systemGroupedBackground))
             }
@@ -392,6 +393,7 @@ struct AdminModerationDashboard: View {
                         }
                         .background(Color(.systemBackground))
                     }
+                    .padding(.bottom, 100) // Account for tab bar
                 }
                 .background(Color(.systemGroupedBackground))
             }
@@ -429,7 +431,7 @@ struct AdminModerationDashboard: View {
                                 .padding(.horizontal, 16)
                         }
                     }
-                    .padding(.bottom, 20)
+                    .padding(.bottom, 100) // Account for tab bar
                 }
                 .background(Color(.systemGroupedBackground))
             }
@@ -476,6 +478,7 @@ struct AdminModerationDashboard: View {
                         }
                         .background(Color(.systemBackground))
                     }
+                    .padding(.bottom, 100) // Account for tab bar
                 }
                 .background(Color(.systemGroupedBackground))
             }
@@ -633,7 +636,7 @@ struct AdminModerationDashboard: View {
                 .cornerRadius(12)
                 .padding(.horizontal, 16)
             }
-            .padding(.bottom, 20)
+            .padding(.bottom, 100) // Account for tab bar
         }
         .background(Color(.systemGroupedBackground))
     }
