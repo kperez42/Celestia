@@ -1522,7 +1522,8 @@ struct SignUpView: View {
             }
         } else {
             // Final step - create account with photos and additional profile data
-            guard let ageInt = Int(age) else { return }
+            // Age was validated in step 1, so this should always succeed
+            let ageInt = Int(age) ?? 18
             Task {
                 do {
                     try await authService.createUser(
