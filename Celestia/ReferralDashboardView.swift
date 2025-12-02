@@ -189,10 +189,10 @@ struct ReferralDashboardView: View {
 
                 if isInitializingCode {
                     ProgressView()
-                        .frame(height: 38)
+                        .frame(height: 32)
                 } else if !referralCode.isEmpty {
                     Text(referralCode)
-                        .font(.system(size: 32, weight: .bold, design: .rounded))
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
                         .foregroundStyle(
                             LinearGradient(
                                 colors: [.purple, .pink],
@@ -200,11 +200,14 @@ struct ReferralDashboardView: View {
                                 endPoint: .trailing
                             )
                         )
-                        .tracking(2)
+                        .tracking(1.5)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 } else {
                     Text("CEL-XXXXXX")
-                        .font(.system(size: 32, weight: .bold, design: .rounded))
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
                         .foregroundColor(.gray.opacity(0.3))
+                        .lineLimit(1)
                 }
             }
             .padding(.vertical, 16)

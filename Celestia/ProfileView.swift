@@ -14,6 +14,9 @@ struct ProfileView: View {
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
 
+    // Tab selection binding to detect when profile tab becomes active
+    @Binding var selectedTab: Int
+
     @State private var showingEditProfile = false
     @State private var showingSettings = false
     @State private var showingPremiumUpgrade = false
@@ -257,6 +260,14 @@ struct ProfileView: View {
             }
             .onChange(of: authService.currentUser) { oldValue, newValue in
                 updateProfileCompletion()
+            }
+            .onChange(of: selectedTab) { oldValue, newValue in
+                // Load stats when profile tab (index 4) becomes active
+                if newValue == 4 {
+                    Task {
+                        await loadAccurateStats()
+                    }
+                }
             }
             .detectScreenshots(
                 context: .profile(userId: authService.currentUser?.id ?? ""),
@@ -1873,7 +1884,7 @@ struct FlowLayout3: Layout {
 
 #Preview {
     NavigationStack {
-        ProfileView()
+        ProfileView(selectedTab: .constant(4))
             .environmentObject(AuthService.shared)
     }
 }

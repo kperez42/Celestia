@@ -324,7 +324,7 @@ struct PremiumUpgradeView: View {
                     .zIndex(index == currentShowcaseIndex ? 1 : 0)
                     .opacity(animateCards ? 1 : 0)
                     .offset(y: animateCards ? 0 : 30)
-                    .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(Double(index) * 0.1), value: animateCards)
+                    .animation(.spring(response: 0.4, dampingFraction: 0.7).delay(Double(index) * 0.05), value: animateCards)
             }
         }
     }
@@ -1345,17 +1345,19 @@ struct PremiumPlanCard: View {
 
                 // Plan details
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 6) {
                         Text(plan.name)
                             .font(.subheadline.weight(.semibold))
                             .foregroundColor(.primary)
+                            .lineLimit(1)
+                            .layoutPriority(1)
 
                         if plan == .annual {
-                            Text("BEST VALUE")
-                                .font(.system(size: 9, weight: .bold))
+                            Text("BEST")
+                                .font(.system(size: 8, weight: .bold))
                                 .foregroundColor(.white)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
                                 .background(
                                     LinearGradient(
                                         colors: [.green, .mint],
@@ -1363,23 +1365,24 @@ struct PremiumPlanCard: View {
                                         endPoint: .trailing
                                     )
                                 )
-                                .cornerRadius(6)
+                                .cornerRadius(4)
                         }
 
                         if plan == .sixMonth {
-                            Text("POPULAR")
-                                .font(.system(size: 9, weight: .bold))
+                            Text("HOT")
+                                .font(.system(size: 8, weight: .bold))
                                 .foregroundColor(.white)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
                                 .background(Color.orange)
-                                .cornerRadius(6)
+                                .cornerRadius(4)
                         }
                     }
 
                     Text(plan.totalPrice)
                         .font(.caption)
                         .foregroundColor(.secondary)
+                        .lineLimit(1)
                 }
 
                 Spacer()

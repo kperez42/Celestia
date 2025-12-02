@@ -1233,94 +1233,100 @@ struct EditProfileView: View {
             }
 
             // Age Range Preference
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("Age Range")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.secondary)
+            VStack(spacing: 16) {
+                // Header with icon
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.pink.opacity(0.12))
+                            .frame(width: 40, height: 40)
+                        Image(systemName: "heart.circle.fill")
+                            .font(.title3)
+                            .foregroundColor(.pink)
+                    }
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Age Preference")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                        Text("Who would you like to meet?")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
 
                     Spacer()
 
-                    Text("\(ageRangeMin) - \(ageRangeMax) years")
-                        .font(.subheadline)
-                        .fontWeight(.bold)
-                        .foregroundColor(.pink)
+                    // Age range badge
+                    Text("\(ageRangeMin) - \(ageRangeMax)")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            LinearGradient(
+                                colors: [.pink, .purple],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .cornerRadius(16)
                 }
 
-                HStack(spacing: 16) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Min: \(ageRangeMin)")
+                // Age pickers
+                HStack(spacing: 20) {
+                    // Min age
+                    VStack(spacing: 8) {
+                        Text("From")
                             .font(.caption)
                             .foregroundColor(.secondary)
 
-                        Slider(value: Binding(
-                            get: { Double(ageRangeMin) },
-                            set: {
-                                let newValue = Int($0)
-                                ageRangeMin = min(newValue, ageRangeMax - 1)
+                        Picker("Min Age", selection: $ageRangeMin) {
+                            ForEach(18..<99, id: \.self) { age in
+                                Text("\(age)").tag(age)
                             }
-                        ), in: 18...98, step: 1)
-                        .tint(.pink)
+                        }
+                        .pickerStyle(.wheel)
+                        .frame(width: 80, height: 100)
+                        .clipped()
+                        .onChange(of: ageRangeMin) { _, newValue in
+                            if newValue >= ageRangeMax {
+                                ageRangeMax = newValue + 1
+                            }
+                        }
                     }
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Max: \(ageRangeMax)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-
-                        Slider(value: Binding(
-                            get: { Double(ageRangeMax) },
-                            set: {
-                                let newValue = Int($0)
-                                ageRangeMax = max(newValue, ageRangeMin + 1)
-                            }
-                        ), in: 19...99, step: 1)
-                        .tint(.pink)
-                    }
-                }
-            }
-            .padding()
-            .background(Color.pink.opacity(0.05))
-            .cornerRadius(12)
-
-            // Max Distance Preference
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("Maximum Distance")
+                    // Divider
+                    Text("to")
                         .font(.subheadline)
-                        .fontWeight(.semibold)
                         .foregroundColor(.secondary)
 
-                    Spacer()
-
-                    Text("\(maxDistance) km")
-                        .font(.subheadline)
-                        .fontWeight(.bold)
-                        .foregroundColor(.blue)
-                }
-
-                VStack(spacing: 8) {
-                    Slider(value: Binding(
-                        get: { Double(maxDistance) },
-                        set: { maxDistance = Int($0) }
-                    ), in: 5...200, step: 5)
-                    .tint(.blue)
-
-                    HStack {
-                        Text("5 km")
-                            .font(.caption2)
+                    // Max age
+                    VStack(spacing: 8) {
+                        Text("To")
+                            .font(.caption)
                             .foregroundColor(.secondary)
-                        Spacer()
-                        Text("200 km")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
+
+                        Picker("Max Age", selection: $ageRangeMax) {
+                            ForEach(19..<100, id: \.self) { age in
+                                Text("\(age)").tag(age)
+                            }
+                        }
+                        .pickerStyle(.wheel)
+                        .frame(width: 80, height: 100)
+                        .clipped()
+                        .onChange(of: ageRangeMax) { _, newValue in
+                            if newValue <= ageRangeMin {
+                                ageRangeMin = newValue - 1
+                            }
+                        }
                     }
                 }
+                .frame(maxWidth: .infinity)
             }
             .padding()
-            .background(Color.blue.opacity(0.05))
-            .cornerRadius(12)
+            .background(Color(.systemBackground))
+            .cornerRadius(16)
+            .shadow(color: .black.opacity(0.04), radius: 8, y: 2)
         }
         .padding(20)
         .background(Color.white)
@@ -2251,8 +2257,9 @@ struct EditProfileView: View {
 
     private func heightToFeetInches(_ cm: Int) -> String {
         let totalInches = Double(cm) / 2.54
-        let feet = Int(totalInches / 12)
-        let inches = Int(totalInches.truncatingRemainder(dividingBy: 12))
+        let roundedInches = Int(round(totalInches))
+        let feet = roundedInches / 12
+        let inches = roundedInches % 12
         return "\(feet)'\(inches)\""
     }
     

@@ -68,7 +68,7 @@ struct MainTabView: View {
                         .allowsHitTesting(selectedTab == 3)
 
                     // Profile
-                    ProfileView()
+                    ProfileView(selectedTab: $selectedTab)
                         .opacity(selectedTab == 4 ? 1 : 0)
                         .allowsHitTesting(selectedTab == 4)
 

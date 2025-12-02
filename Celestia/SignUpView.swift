@@ -67,11 +67,29 @@ struct SignUpView: View {
     @State private var educationLevel = ""
     @State private var smoking = ""
     @State private var drinking = ""
+    @State private var religion = ""
+    @State private var exercise = ""
+    @State private var diet = ""
+    @State private var pets = ""
+    @State private var languages: [String] = []
+    @State private var showLanguagePicker = false
+    @State private var ageRangeMin: Int = 18
+    @State private var ageRangeMax: Int = 35
 
     let relationshipGoalOptions = ["Long-term relationship", "Casual dating", "New friends", "Not sure yet"]
     let educationLevelOptions = ["High school", "Some college", "Bachelor's degree", "Master's degree", "Doctorate", "Trade school", "Prefer not to say"]
     let smokingOptions = ["Never", "Sometimes", "Regularly", "Prefer not to say"]
     let drinkingOptions = ["Never", "Socially", "Regularly", "Prefer not to say"]
+    let religionOptions = ["Agnostic", "Atheist", "Buddhist", "Catholic", "Christian", "Hindu", "Jewish", "Muslim", "Spiritual", "Other", "Prefer not to say"]
+    let exerciseOptions = ["Never", "Rarely", "Sometimes", "Often", "Daily", "Prefer not to say"]
+    let dietOptions = ["No Restrictions", "Vegan", "Vegetarian", "Pescatarian", "Kosher", "Halal", "Prefer not to say"]
+    let petsOptions = ["No Pets", "Dog", "Cat", "Both", "Other Pets", "Want Pets", "Prefer not to say"]
+    let availableLanguages = [
+        "English", "Spanish", "French", "German", "Italian", "Portuguese",
+        "Chinese", "Japanese", "Korean", "Arabic", "Hindi", "Russian",
+        "Dutch", "Swedish", "Norwegian", "Danish", "Polish", "Turkish",
+        "Vietnamese", "Thai", "Indonesian", "Tagalog", "Greek", "Hebrew"
+    ]
 
     let genderOptions = ["Male", "Female", "Non-binary", "Other"]
     let lookingForOptions = ["Men", "Women", "Everyone"]
@@ -316,8 +334,49 @@ struct SignUpView: View {
         } message: {
             Text(authService.referralErrorMessage ?? "")
         }
+        .sheet(isPresented: $showLanguagePicker) {
+            languagePickerSheet
+        }
     }
-    
+
+    // MARK: - Language Picker Sheet
+    private var languagePickerSheet: some View {
+        NavigationView {
+            List {
+                ForEach(availableLanguages, id: \.self) { language in
+                    Button {
+                        if languages.contains(language) {
+                            languages.removeAll { $0 == language }
+                        } else {
+                            languages.append(language)
+                        }
+                        HapticManager.shared.impact(.light)
+                    } label: {
+                        HStack {
+                            Text(language)
+                                .foregroundColor(.primary)
+                            Spacer()
+                            if languages.contains(language) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.purple)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Select Languages")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        showLanguagePicker = false
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+        }
+    }
+
     // MARK: - Step 1: Basic Info
     var step1Content: some View {
         VStack(spacing: 20) {
@@ -1312,7 +1371,201 @@ struct SignUpView: View {
                     options: drinkingOptions,
                     onSelect: { drinking = $0 }
                 )
+
+                detailsDropdown(
+                    label: "Exercise",
+                    selection: exercise.isEmpty ? "Select" : exercise,
+                    options: exerciseOptions,
+                    onSelect: { exercise = $0 }
+                )
+
+                detailsDropdown(
+                    label: "Diet",
+                    selection: diet.isEmpty ? "Select" : diet,
+                    options: dietOptions,
+                    onSelect: { diet = $0 }
+                )
             }
+
+            // More About You Card
+            HStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(Color.orange.opacity(0.12))
+                        .frame(width: 56, height: 56)
+
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 24))
+                        .foregroundColor(.orange)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("More About You")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+
+                    Text("Optional extras")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+            )
+
+            VStack(spacing: 12) {
+                detailsDropdown(
+                    label: "Religion / Spirituality",
+                    selection: religion.isEmpty ? "Select" : religion,
+                    options: religionOptions,
+                    onSelect: { religion = $0 }
+                )
+
+                detailsDropdown(
+                    label: "Pets",
+                    selection: pets.isEmpty ? "Select" : pets,
+                    options: petsOptions,
+                    onSelect: { pets = $0 }
+                )
+
+                // Languages picker
+                Button {
+                    showLanguagePicker = true
+                    HapticManager.shared.impact(.light)
+                } label: {
+                    HStack {
+                        Text("Languages")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+
+                        Spacer()
+
+                        if languages.isEmpty {
+                            Text("Select")
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                        } else {
+                            Text(languages.prefix(2).joined(separator: ", ") + (languages.count > 2 ? " +\(languages.count - 2)" : ""))
+                                .font(.subheadline)
+                                .foregroundColor(.primary)
+                                .lineLimit(1)
+                        }
+
+                        Image(systemName: "chevron.down")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    .padding(14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color(.systemBackground))
+                            .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+                    )
+                }
+            }
+
+            // Age Preference Card
+            VStack(spacing: 16) {
+                // Header with icon
+                HStack(spacing: 16) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.pink.opacity(0.12))
+                            .frame(width: 56, height: 56)
+
+                        Image(systemName: "heart.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(.pink)
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Age Preference")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+
+                        Text("Who would you like to meet?")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
+
+                    // Age range badge
+                    Text("\(ageRangeMin) - \(ageRangeMax)")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(
+                            LinearGradient(
+                                colors: [.pink, .purple],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .cornerRadius(12)
+                }
+
+                // Age pickers
+                HStack(spacing: 16) {
+                    // Min age
+                    VStack(spacing: 6) {
+                        Text("From")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        Picker("Min Age", selection: $ageRangeMin) {
+                            ForEach(18..<99, id: \.self) { age in
+                                Text("\(age)").tag(age)
+                            }
+                        }
+                        .pickerStyle(.wheel)
+                        .frame(width: 70, height: 90)
+                        .clipped()
+                        .onChange(of: ageRangeMin) { _, newValue in
+                            if newValue >= ageRangeMax {
+                                ageRangeMax = newValue + 1
+                            }
+                        }
+                    }
+
+                    Text("to")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+
+                    // Max age
+                    VStack(spacing: 6) {
+                        Text("To")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        Picker("Max Age", selection: $ageRangeMax) {
+                            ForEach(19..<100, id: \.self) { age in
+                                Text("\(age)").tag(age)
+                            }
+                        }
+                        .pickerStyle(.wheel)
+                        .frame(width: 70, height: 90)
+                        .clipped()
+                        .onChange(of: ageRangeMax) { _, newValue in
+                            if newValue <= ageRangeMin {
+                                ageRangeMin = newValue - 1
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+            )
 
             // Completion card - matching style
             HStack(spacing: 16) {
@@ -1571,6 +1824,13 @@ struct SignUpView: View {
         educationLevel = user.educationLevel ?? ""
         smoking = user.smoking ?? ""
         drinking = user.drinking ?? ""
+        religion = user.religion ?? ""
+        exercise = user.exercise ?? ""
+        diet = user.diet ?? ""
+        pets = user.pets ?? ""
+        languages = user.languages
+        ageRangeMin = user.ageRangeMin ?? 18
+        ageRangeMax = user.ageRangeMax ?? 35
 
         // Load existing photos from URLs
         existingPhotoURLs = user.photos
@@ -1703,6 +1963,13 @@ struct SignUpView: View {
             user.educationLevel = educationLevel.isEmpty ? nil : educationLevel
             user.smoking = smoking.isEmpty ? nil : smoking
             user.drinking = drinking.isEmpty ? nil : drinking
+            user.religion = religion.isEmpty || religion == "Prefer not to say" ? nil : religion
+            user.exercise = exercise.isEmpty || exercise == "Prefer not to say" ? nil : exercise
+            user.diet = diet.isEmpty || diet == "Prefer not to say" ? nil : diet
+            user.pets = pets.isEmpty || pets == "Prefer not to say" ? nil : pets
+            user.languages = languages
+            user.ageRangeMin = ageRangeMin
+            user.ageRangeMax = ageRangeMax
 
             do {
                 // Only upload photos if they were actually modified by the user
@@ -1781,6 +2048,25 @@ struct SignUpView: View {
                 if !drinking.isEmpty {
                     user.drinking = drinking
                 }
+                if !religion.isEmpty && religion != "Prefer not to say" {
+                    user.religion = religion
+                }
+                if !exercise.isEmpty && exercise != "Prefer not to say" {
+                    user.exercise = exercise
+                }
+                if !diet.isEmpty && diet != "Prefer not to say" {
+                    user.diet = diet
+                }
+                if !pets.isEmpty && pets != "Prefer not to say" {
+                    user.pets = pets
+                }
+                if !languages.isEmpty {
+                    user.languages = languages
+                }
+
+                // Set age preference
+                user.ageRangeMin = ageRangeMin
+                user.ageRangeMax = ageRangeMax
 
                 // Save updated profile data
                 do {
