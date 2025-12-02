@@ -1573,23 +1573,38 @@ struct SignUpView: View {
         loadExistingPhotos(from: user.photos)
     }
 
-    /// Load existing photos from URLs into photoImages array
+    /// Load existing photos from URLs into photoImages array (parallel download for speed)
     private func loadExistingPhotos(from urls: [String]) {
+        guard !urls.isEmpty else {
+            isLoadingExistingPhotos = false
+            return
+        }
+
         isLoadingExistingPhotos = true
         Task {
-            var loadedImages: [UIImage] = []
-            for urlString in urls {
-                if let url = URL(string: urlString) {
-                    do {
-                        let (data, _) = try await URLSession.shared.data(from: url)
-                        if let image = UIImage(data: data) {
-                            loadedImages.append(image)
+            // Download all photos in parallel for faster loading
+            let loadedImages = await withTaskGroup(of: (Int, UIImage?).self) { group in
+                for (index, urlString) in urls.enumerated() {
+                    group.addTask {
+                        guard let url = URL(string: urlString) else { return (index, nil) }
+                        do {
+                            let (data, _) = try await URLSession.shared.data(from: url)
+                            return (index, UIImage(data: data))
+                        } catch {
+                            Logger.shared.error("Failed to load photo from URL: \(urlString)", category: .general, error: error)
+                            return (index, nil)
                         }
-                    } catch {
-                        Logger.shared.error("Failed to load photo from URL: \(urlString)", category: .general, error: error)
                     }
                 }
+
+                // Collect results and sort by original index to maintain order
+                var results: [(Int, UIImage?)] = []
+                for await result in group {
+                    results.append(result)
+                }
+                return results.sorted { $0.0 < $1.0 }.compactMap { $0.1 }
             }
+
             await MainActor.run {
                 photoImages = loadedImages
                 isLoadingExistingPhotos = false
