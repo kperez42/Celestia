@@ -1075,13 +1075,13 @@ struct SignUpView: View {
                     Spacer()
                     Text("\(selectedInterests.count) selected")
                         .font(.caption)
-                        .foregroundColor(selectedInterests.count >= 3 ? .green : .orange)
+                        .foregroundColor(selectedInterests.count >= 3 ? .purple : .purple.opacity(0.6))
                 }
 
                 if selectedInterests.count < 3 {
                     Text("Pick at least 3 interests to continue")
                         .font(.caption)
-                        .foregroundColor(.orange)
+                        .foregroundColor(.purple)
                 }
             }
 
@@ -1109,7 +1109,7 @@ struct SignUpView: View {
             if selectedInterests.count >= 3 {
                 HStack {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
+                        .foregroundColor(.purple)
                     Text("Great choices! You can select more if you'd like.")
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -1117,7 +1117,7 @@ struct SignUpView: View {
                 .padding()
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.green.opacity(0.1))
+                        .fill(Color.purple.opacity(0.1))
                 )
             }
         }
