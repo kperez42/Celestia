@@ -151,20 +151,20 @@ struct OnboardingView: View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                // Show X/Cancel button only on step 0 (when there's no Back button)
+                // On steps 1-7, the Back button serves as navigation
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        HStack(spacing: 4) {
+                    if currentStep == 0 {
+                        Button {
+                            dismiss()
+                        } label: {
                             Image(systemName: "xmark")
-                            Text("Cancel")
-                                .fontWeight(.medium)
+                                .foregroundColor(.purple)
                         }
-                        .foregroundColor(.purple)
+                        .accessibilityLabel("Close")
+                        .accessibilityHint("Cancel onboarding and return to previous screen")
+                        .accessibilityIdentifier(AccessibilityIdentifier.closeButton)
                     }
-                    .accessibilityLabel("Cancel onboarding")
-                    .accessibilityHint("Exit onboarding and return to previous screen")
-                    .accessibilityIdentifier(AccessibilityIdentifier.cancelButton)
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
