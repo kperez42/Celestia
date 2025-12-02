@@ -187,15 +187,22 @@ struct MainTabView: View {
     }
     
     // MARK: - Custom Tab Bar
-    
+
     private var customTabBar: some View {
-        HStack(spacing: 0) {
+        VStack(spacing: 0) {
+            // Top separator
+            Rectangle()
+                .fill(Color(.separator).opacity(0.2))
+                .frame(height: 0.5)
+
+            HStack(spacing: 0) {
                 // Discover
                 TabBarButton(
                     icon: "flame.fill",
                     title: "Discover",
                     isSelected: selectedTab == 0,
-                    badgeCount: 0
+                    badgeCount: 0,
+                    color: .orange
                 ) {
                     selectedTab = 0
                 }
@@ -205,7 +212,8 @@ struct MainTabView: View {
                     icon: "heart.fill",
                     title: "Likes",
                     isSelected: selectedTab == 1,
-                    badgeCount: newMatchesCount
+                    badgeCount: newMatchesCount,
+                    color: .pink
                 ) {
                     selectedTab = 1
                 }
@@ -215,7 +223,8 @@ struct MainTabView: View {
                     icon: "message.fill",
                     title: "Messages",
                     isSelected: selectedTab == 2,
-                    badgeCount: unreadCount
+                    badgeCount: unreadCount,
+                    color: .blue
                 ) {
                     selectedTab = 2
                 }
@@ -225,7 +234,8 @@ struct MainTabView: View {
                     icon: "bookmark.fill",
                     title: "Saved",
                     isSelected: selectedTab == 3,
-                    badgeCount: 0
+                    badgeCount: 0,
+                    color: .yellow
                 ) {
                     selectedTab = 3
                 }
@@ -235,7 +245,8 @@ struct MainTabView: View {
                     icon: "person.fill",
                     title: "Profile",
                     isSelected: selectedTab == 4,
-                    badgeCount: 0
+                    badgeCount: 0,
+                    color: .purple
                 ) {
                     selectedTab = 4
                 }
@@ -246,16 +257,21 @@ struct MainTabView: View {
                         icon: "shield.fill",
                         title: "Admin",
                         isSelected: selectedTab == 5,
-                        badgeCount: 0
+                        badgeCount: 0,
+                        color: .indigo
                     ) {
                         selectedTab = 5
                     }
                 }
+            }
+            .padding(.horizontal, 4)
+            .padding(.top, 6)
+            .padding(.bottom, 2)
         }
-        .padding(.horizontal, 8)
-        .padding(.top, 8)
-        .padding(.bottom, -20)
-        .background(Color(.systemBackground))
+        .background(
+            Color(.systemBackground)
+                .shadow(color: .black.opacity(0.06), radius: 8, y: -4)
+        )
     }
     
     // MARK: - Warning Banner
@@ -343,6 +359,7 @@ struct TabBarButton: View {
     let title: String
     let isSelected: Bool
     let badgeCount: Int
+    let color: Color
     let action: () -> Void
 
     private var accessibilityHint: String {
@@ -357,47 +374,57 @@ struct TabBarButton: View {
             return "View saved profiles"
         case "Profile":
             return "Edit your profile and settings"
+        case "Admin":
+            return "Admin moderation dashboard"
         default:
             return ""
         }
     }
 
     var body: some View {
-        Button(action: action) {
-            VStack(spacing: 4) {
+        Button(action: {
+            HapticManager.shared.selection()
+            action()
+        }) {
+            VStack(spacing: 5) {
                 ZStack(alignment: .topTrailing) {
-                    // Icon - simple solid colors for performance
-                    Image(systemName: icon)
-                        .font(.title3)
-                        .foregroundColor(isSelected ? .purple : .gray.opacity(0.5))
-                        .frame(height: 24)
+                    // Icon with background circle when selected
+                    ZStack {
+                        if isSelected {
+                            Circle()
+                                .fill(color.opacity(0.15))
+                                .frame(width: 36, height: 36)
+                        }
 
-                    // Badge - simple solid color
+                        Image(systemName: icon)
+                            .font(.system(size: 18, weight: isSelected ? .semibold : .regular))
+                            .foregroundColor(isSelected ? color : Color(.systemGray2))
+                    }
+                    .frame(width: 36, height: 36)
+
+                    // Badge
                     if badgeCount > 0 {
-                        Text("\(badgeCount)")
-                            .font(.caption2.weight(.bold))
+                        Text(badgeCount > 99 ? "99+" : "\(badgeCount)")
+                            .font(.system(size: 10, weight: .bold))
                             .foregroundColor(.white)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 2)
                             .background(
                                 Capsule()
                                     .fill(Color.red)
+                                    .shadow(color: .red.opacity(0.4), radius: 4, y: 2)
                             )
-                            .offset(x: 12, y: -6)
+                            .offset(x: 10, y: -4)
                     }
                 }
 
-                // Title - simple solid colors
+                // Title
                 Text(title)
-                    .font(.caption2.weight(isSelected ? .semibold : .regular))
-                    .foregroundColor(isSelected ? .purple : .gray)
+                    .font(.system(size: 10, weight: isSelected ? .semibold : .medium))
+                    .foregroundColor(isSelected ? color : Color(.systemGray2))
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 15)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(isSelected ? Color.purple.opacity(0.1) : Color.clear)
-            )
+            .padding(.vertical, 8)
             // Accessibility
             .accessibilityLabel("\(title) tab")
             .accessibilityHint(accessibilityHint)
