@@ -41,6 +41,7 @@ struct SignUpView: View {
     @State private var isLoadingPhotos = false
     @State private var existingPhotoURLs: [String] = []  // For edit mode - existing photos to keep
     @State private var isLoadingExistingPhotos = false   // For edit mode - loading state
+    @State private var isSavingProfile = false           // For edit mode - saving state
 
     // Referral code (optional)
     @State private var referralCode = ""
@@ -218,6 +219,8 @@ struct SignUpView: View {
                                     .background(Color.white)
                                     .cornerRadius(15)
                             }
+                            .disabled(isSavingProfile)
+                            .opacity(isSavingProfile ? 0.5 : 1.0)
                             .accessibilityLabel(isEditingProfile && currentStep == 1 ? "Cancel" : "Back")
                             .accessibilityHint(currentStep == (isEditingProfile ? 1 : 0) ? "Cancel and return" : "Go back to previous step")
                             .accessibilityIdentifier(AccessibilityIdentifier.backButton)
@@ -226,7 +229,7 @@ struct SignUpView: View {
                             Button {
                                 handleNext()
                             } label: {
-                                if authService.isLoading || isLoadingPhotos || isLoadingExistingPhotos {
+                                if authService.isLoading || isLoadingPhotos || isLoadingExistingPhotos || isSavingProfile {
                                     ProgressView()
                                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                 } else {
@@ -246,7 +249,7 @@ struct SignUpView: View {
                             )
                             .cornerRadius(15)
                             .opacity(canProceed ? 1.0 : 0.5)
-                            .disabled(!canProceed || authService.isLoading || isLoadingPhotos || isLoadingExistingPhotos)
+                            .disabled(!canProceed || authService.isLoading || isLoadingPhotos || isLoadingExistingPhotos || isSavingProfile)
                             .accessibilityLabel(nextButtonText)
                             .accessibilityHint(currentStep == 6 ? (isEditingProfile ? "Save your profile changes" : "Create your account and sign up") : "Continue to next step")
                             .accessibilityIdentifier(currentStep == 6 ? AccessibilityIdentifier.createAccountButton : AccessibilityIdentifier.nextButton)
@@ -1644,7 +1647,14 @@ struct SignUpView: View {
 
     /// Save profile changes when in edit mode
     private func handleSaveProfileChanges() {
+        isSavingProfile = true
         Task {
+            defer {
+                Task { @MainActor in
+                    isSavingProfile = false
+                }
+            }
+
             guard var user = authService.currentUser else {
                 Logger.shared.error("No current user when saving profile changes", category: .authentication)
                 return
