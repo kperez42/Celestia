@@ -408,10 +408,18 @@ struct UserDetailView: View {
     private var saveButton: some View {
         Button {
             HapticManager.shared.impact(.light)
+            let wasAlreadySaved = isSaved
             isSaved.toggle()
             Task {
                 if isSaved {
-                    await savedProfilesVM.saveProfile(user: user)
+                    // Saving - check for success and revert on failure
+                    let success = await savedProfilesVM.saveProfile(user: user)
+                    if !success {
+                        await MainActor.run {
+                            isSaved = wasAlreadySaved  // Revert on failure
+                            HapticManager.shared.notification(.error)
+                        }
+                    }
                 } else {
                     if let savedProfile = savedProfilesVM.savedProfiles.first(where: { $0.user.id == user.id }) {
                         savedProfilesVM.unsaveProfile(savedProfile)
