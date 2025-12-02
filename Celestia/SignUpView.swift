@@ -15,7 +15,11 @@ struct SignUpView: View {
 
     private let imageUploadService = ImageUploadService.shared
 
-    @State private var currentStep = 1
+    @State private var currentStep = 0  // Start at guidelines step
+
+    // Step 0: Guidelines animation state
+    @State private var guidelinesAppearAnimation = false
+    @State private var checklistAnimations: [Bool] = [false, false, false]
 
     // Step 1: Basic info
     @State private var email = ""
@@ -76,40 +80,114 @@ struct SignUpView: View {
                                 .frame(height: 1)
                                 .id("top")
 
-                            // Progress indicator
-                            HStack(spacing: 10) {
-                                ForEach(1...5, id: \.self) { step in
+                            // Progress indicator (only show for steps 1-4, not guidelines)
+                            if currentStep >= 1 {
+                                HStack(spacing: 10) {
+                                    ForEach(1...4, id: \.self) { step in
+                                        Circle()
+                                            .fill(currentStep >= step ? Color.purple : Color.gray.opacity(0.3))
+                                            .frame(width: 12, height: 12)
+                                            .scaleEffect(currentStep == step ? 1.2 : 1.0)
+                                            .accessibleAnimation(.spring(response: 0.3, dampingFraction: 0.6), value: currentStep)
+                                    }
+                                }
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel("Sign up progress")
+                                .accessibilityValue("Step \(currentStep) of 4")
+                                .padding(.top, 10)
+                            }
+                        
+                        // Header (different for guidelines vs regular steps)
+                        if currentStep == 0 {
+                            // Guidelines header with animated icon
+                            VStack(spacing: 16) {
+                                ZStack {
                                     Circle()
-                                        .fill(currentStep >= step ? Color.purple : Color.gray.opacity(0.3))
-                                        .frame(width: 12, height: 12)
-                                        .scaleEffect(currentStep == step ? 1.2 : 1.0)
-                                        .accessibleAnimation(.spring(response: 0.3, dampingFraction: 0.6), value: currentStep)
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [.purple.opacity(0.2), .blue.opacity(0.15)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .frame(width: 90, height: 90)
+                                        .scaleEffect(guidelinesAppearAnimation ? 1.0 : 0.8)
+
+                                    Circle()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [.purple.opacity(0.3), .blue.opacity(0.2)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .frame(width: 70, height: 70)
+
+                                    Image(systemName: "checkmark.shield.fill")
+                                        .font(.system(size: 36))
+                                        .foregroundStyle(
+                                            LinearGradient(
+                                                colors: [.purple, .blue],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                }
+                                .opacity(guidelinesAppearAnimation ? 1 : 0)
+
+                                VStack(spacing: 8) {
+                                    Text("Before You Begin")
+                                        .font(.title2.bold())
+
+                                    Text("Here's what makes a great profile")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                        .multilineTextAlignment(.center)
+                                }
+                                .opacity(guidelinesAppearAnimation ? 1 : 0)
+                                .offset(y: guidelinesAppearAnimation ? 0 : 20)
+                            }
+                            .padding(.horizontal)
+                            .padding(.top, 20)
+                            .onAppear {
+                                withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                                    guidelinesAppearAnimation = true
+                                }
+                                // Animate checklist items sequentially
+                                for i in 0..<3 {
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3 + Double(i) * 0.15) {
+                                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                                            checklistAnimations[i] = true
+                                        }
+                                    }
                                 }
                             }
-                            .accessibilityElement(children: .ignore)
-                            .accessibilityLabel("Sign up progress")
-                            .accessibilityValue("Step \(currentStep) of 5")
-                            .padding(.top, 10)
-                        
-                        // Header
-                        VStack(spacing: 10) {
-                            Image(systemName: "star.circle.fill")
-                                .font(.system(size: 50))
-                                .foregroundColor(.purple)
-                            
-                            Text(stepTitle)
-                                .font(.title2.bold())
-                            
-                            Text(stepSubtitle)
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.center)
+                        } else {
+                            VStack(spacing: 10) {
+                                Image(systemName: "star.circle.fill")
+                                    .font(.system(size: 50))
+                                    .foregroundColor(.purple)
+
+                                Text(stepTitle)
+                                    .font(.title2.bold())
+
+                                Text(stepSubtitle)
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                            }
+                            .padding(.horizontal)
                         }
-                        .padding(.horizontal)
                         
                         // Step content
                         Group {
                             switch currentStep {
+                            case 0:
+                                step0GuidelinesContent
+                                    .transition(.asymmetric(
+                                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                                        removal: .move(edge: .leading).combined(with: .opacity)
+                                    ))
                             case 1:
                                 step1Content
                                     .transition(.asymmetric(
@@ -130,12 +208,6 @@ struct SignUpView: View {
                                     ))
                             case 4:
                                 step4Content
-                                    .transition(.asymmetric(
-                                        insertion: .move(edge: .trailing).combined(with: .opacity),
-                                        removal: .move(edge: .leading).combined(with: .opacity)
-                                    ))
-                            case 5:
-                                step5Content
                                     .transition(.asymmetric(
                                         insertion: .move(edge: .trailing).combined(with: .opacity),
                                         removal: .move(edge: .leading).combined(with: .opacity)
@@ -184,9 +256,15 @@ struct SignUpView: View {
                                     ProgressView()
                                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                 } else {
-                                    Text(currentStep == 5 ? "Create Account" : "Next")
-                                        .font(.headline)
-                                        .foregroundColor(.white)
+                                    HStack(spacing: 8) {
+                                        Text(currentStep == 0 ? "Let's Go" : (currentStep == 4 ? "Create Account" : "Next"))
+                                            .font(.headline)
+                                        if currentStep == 0 {
+                                            Image(systemName: "arrow.right")
+                                                .font(.headline)
+                                        }
+                                    }
+                                    .foregroundColor(.white)
                                 }
                             }
                             .frame(maxWidth: .infinity)
@@ -201,9 +279,9 @@ struct SignUpView: View {
                             .cornerRadius(15)
                             .opacity(canProceed ? 1.0 : 0.5)
                             .disabled(!canProceed || authService.isLoading || isLoadingPhotos)
-                            .accessibilityLabel(currentStep == 5 ? "Create Account" : "Next")
-                            .accessibilityHint(currentStep == 5 ? "Create your account and sign up" : "Continue to next step")
-                            .accessibilityIdentifier(currentStep == 5 ? AccessibilityIdentifier.createAccountButton : AccessibilityIdentifier.nextButton)
+                            .accessibilityLabel(currentStep == 0 ? "Let's Go" : (currentStep == 4 ? "Create Account" : "Next"))
+                            .accessibilityHint(currentStep == 0 ? "Start the signup process" : (currentStep == 4 ? "Create your account and sign up" : "Continue to next step"))
+                            .accessibilityIdentifier(currentStep == 4 ? AccessibilityIdentifier.createAccountButton : AccessibilityIdentifier.nextButton)
                             .scaleButton()
                         }
                         .padding(.horizontal, 30)
@@ -221,10 +299,10 @@ struct SignUpView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                // FIX: Only show X button on step 1 (when there's no Back button)
+                // Show X button on step 0 and 1 (when there's no Back button)
                 // On steps 2-4, the Back button serves as navigation
                 ToolbarItem(placement: .navigationBarLeading) {
-                    if currentStep == 1 {
+                    if currentStep <= 1 {
                         Button {
                             dismiss()
                         } label: {
@@ -962,104 +1040,42 @@ struct SignUpView: View {
         }
     }
 
-    // MARK: - Step 5: Review Guidelines
-    var step5Content: some View {
-        VStack(spacing: 24) {
-            // Header card
-            VStack(spacing: 16) {
-                ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.blue.opacity(0.2), Color.purple.opacity(0.15)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 80, height: 80)
-
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.blue.opacity(0.3), Color.purple.opacity(0.2)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 60, height: 60)
-
-                    Image(systemName: "checkmark.shield.fill")
-                        .font(.system(size: 28))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.blue, .purple],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                }
-
-                VStack(spacing: 8) {
-                    Text("Almost there!")
-                        .font(.title3)
-                        .fontWeight(.bold)
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.blue, .purple],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-
-                    Text("Your profile will be reviewed before going live")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-            }
-            .padding(.vertical, 20)
-            .frame(maxWidth: .infinity)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.blue.opacity(0.05), Color.purple.opacity(0.03)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            )
-
-            // What we check section
+    // MARK: - Step 0: Guidelines (Before Signup)
+    var step0GuidelinesContent: some View {
+        VStack(spacing: 20) {
+            // What We're Looking For section
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     Image(systemName: "checklist")
                         .font(.headline)
                         .foregroundColor(.purple)
-                    Text("What We're Checking")
+                    Text("What We're Looking For")
                         .font(.headline)
                 }
 
                 VStack(spacing: 12) {
-                    guidelinesRow(
+                    guidelinesRowAnimated(
                         icon: "person.crop.circle.fill",
-                        title: "Profile Photos",
-                        description: "Clear, appropriate photos that show you",
-                        color: .blue
+                        title: "Great Photos",
+                        description: "Clear photos that show your face - no blurry or group pics",
+                        color: .blue,
+                        isAnimated: checklistAnimations[0]
                     )
 
-                    guidelinesRow(
+                    guidelinesRowAnimated(
                         icon: "text.alignleft",
-                        title: "Bio & Information",
-                        description: "Complete and authentic profile details",
-                        color: .purple
+                        title: "Complete Profile",
+                        description: "Fill out your bio and details authentically",
+                        color: .purple,
+                        isAnimated: checklistAnimations[1]
                     )
 
-                    guidelinesRow(
+                    guidelinesRowAnimated(
                         icon: "shield.checkered",
                         title: "Community Guidelines",
-                        description: "Content follows our safety policies",
-                        color: .green
+                        description: "Be respectful - no inappropriate content",
+                        color: .green,
+                        isAnimated: checklistAnimations[2]
                     )
                 }
             }
@@ -1074,23 +1090,23 @@ struct SignUpView: View {
                     .strokeBorder(Color(.separator).opacity(0.2), lineWidth: 1)
             )
 
-            // Info card
+            // Why this matters card
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
                     ZStack {
                         Circle()
                             .fill(Color.orange.opacity(0.15))
                             .frame(width: 36, height: 36)
-                        Image(systemName: "clock.fill")
+                        Image(systemName: "lightbulb.fill")
                             .font(.system(size: 18))
                             .foregroundColor(.orange)
                     }
 
-                    Text("Quick Review")
+                    Text("Why This Matters")
                         .font(.headline)
                 }
 
-                Text("Our team reviews profiles within 24 hours. You'll be notified as soon as your profile is approved and ready to go!")
+                Text("We review all profiles to keep Celestia safe and authentic. Profiles that follow these guidelines get approved faster and get more matches!")
                     .font(.body)
                     .foregroundColor(.primary.opacity(0.85))
                     .lineSpacing(4)
@@ -1105,26 +1121,13 @@ struct SignUpView: View {
                 RoundedRectangle(cornerRadius: 16)
                     .strokeBorder(Color.orange.opacity(0.2), lineWidth: 1)
             )
-
-            // Confirmation checkbox style message
-            HStack(spacing: 12) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.title2)
-                    .foregroundColor(.green)
-
-                Text("By creating your account, you agree to follow our community guidelines")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            .padding()
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.green.opacity(0.08))
-            )
+            .opacity(guidelinesAppearAnimation ? 1 : 0)
+            .offset(y: guidelinesAppearAnimation ? 0 : 30)
+            .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.5), value: guidelinesAppearAnimation)
         }
     }
 
-    private func guidelinesRow(icon: String, title: String, description: String, color: Color) -> some View {
+    private func guidelinesRowAnimated(icon: String, title: String, description: String, color: Color, isAnimated: Bool) -> some View {
         HStack(alignment: .top, spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 10)
@@ -1158,6 +1161,8 @@ struct SignUpView: View {
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color(.systemGray6))
         )
+        .scaleEffect(isAnimated ? 1.0 : 0.95)
+        .opacity(isAnimated ? 1.0 : 0)
     }
 
     private func photoTipChip(icon: String, text: String, color: Color) -> some View {
@@ -1236,6 +1241,8 @@ struct SignUpView: View {
 
     var canProceed: Bool {
         switch currentStep {
+        case 0:
+            return true  // Guidelines step - always can proceed
         case 1:
             return !email.isEmpty && password.count >= 6 && password == confirmPassword
         case 2:
@@ -1245,8 +1252,6 @@ struct SignUpView: View {
             return !location.isEmpty && !country.isEmpty
         case 4:
             return photoImages.count >= 2
-        case 5:
-            return true // Guidelines step - always can proceed
         default:
             return false
         }
@@ -1254,7 +1259,7 @@ struct SignUpView: View {
 
     // MARK: - Actions
     func handleNext() {
-        if currentStep < 5 {
+        if currentStep < 4 {
             withAnimation {
                 currentStep += 1
             }

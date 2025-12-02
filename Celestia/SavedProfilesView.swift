@@ -360,15 +360,6 @@ struct SavedProfilesView: View {
                                     viewModel.unsaveProfile(saved)
                                 }
                                 HapticManager.shared.impact(.medium)
-                            },
-                            onEditNote: {
-                                startEditingNote(for: saved)
-                            },
-                            onLike: {
-                                handleLike(user: saved.user)
-                            },
-                            onMessage: {
-                                handleMessage(user: saved.user)
                             }
                         )
                         .onAppear {
@@ -911,9 +902,6 @@ struct SwipeableSavedCard: View {
     let isUnsaving: Bool
     let onTap: () -> Void
     let onUnsave: () -> Void
-    var onEditNote: (() -> Void)? = nil
-    var onLike: (() -> Void)? = nil
-    var onMessage: (() -> Void)? = nil
 
     @State private var offset: CGFloat = 0
     @State private var showDeleteOverlay = false
@@ -952,10 +940,7 @@ struct SwipeableSavedCard: View {
             EnhancedSavedProfileCard(
                 savedProfile: savedProfile,
                 isUnsaving: isUnsaving,
-                onTap: onTap,
-                onEditNote: onEditNote,
-                onLike: onLike,
-                onMessage: onMessage
+                onTap: onTap
             )
             .offset(x: offset)
             .gesture(
@@ -1012,9 +997,6 @@ struct EnhancedSavedProfileCard: View {
     let savedProfile: SavedProfile
     let isUnsaving: Bool
     let onTap: () -> Void
-    var onEditNote: (() -> Void)? = nil
-    var onLike: (() -> Void)? = nil
-    var onMessage: (() -> Void)? = nil
 
     private let imageHeight: CGFloat = 180
 
@@ -1121,40 +1103,6 @@ struct EnhancedSavedProfileCard: View {
                         }
                         .padding(.top, 2)
                     }
-
-                    // Action buttons
-                    HStack(spacing: 6) {
-                        // Like button
-                        if let onLike = onLike {
-                            SavedActionButton(
-                                icon: "heart.fill",
-                                colors: [.pink, .red]
-                            ) {
-                                onLike()
-                            }
-                        }
-
-                        // Message button
-                        if let onMessage = onMessage {
-                            SavedActionButton(
-                                icon: "message.fill",
-                                colors: [.purple, .blue]
-                            ) {
-                                onMessage()
-                            }
-                        }
-
-                        // Note button
-                        if let onEditNote = onEditNote {
-                            SavedActionButton(
-                                icon: savedProfile.note?.isEmpty == false ? "note.text" : "note.text.badge.plus",
-                                colors: [.orange, .yellow]
-                            ) {
-                                onEditNote()
-                            }
-                        }
-                    }
-                    .padding(.top, 4)
                 }
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
