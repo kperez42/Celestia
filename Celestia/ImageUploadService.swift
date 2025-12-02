@@ -26,14 +26,32 @@ class ImageUploadService {
     // Content moderation
     private let moderationService = ContentModerationService.shared
 
+    // Network monitoring for upload reliability
+    private let networkMonitor = NetworkMonitor.shared
+
     // Whether to pre-check content before upload (can be disabled for performance)
     var enablePreModeration = true
 
     private init() {}
 
+    // MARK: - Network Check
+
+    /// Check if network is available for upload
+    @MainActor
+    private func isNetworkAvailable() -> Bool {
+        return networkMonitor.isConnected
+    }
+
     // MARK: - Upload with Validation, Moderation, and Retry
 
     func uploadImage(_ image: UIImage, path: String, skipModeration: Bool = false) async throws -> String {
+        // NETWORK CHECK: Verify connectivity before starting upload process
+        let connected = await MainActor.run { isNetworkAvailable() }
+        guard connected else {
+            Logger.shared.warning("Image upload blocked: No network connection", category: .networking)
+            throw CelestiaError.networkError
+        }
+
         // Validate image on current thread (fast check)
         try validateImage(image)
 
@@ -202,6 +220,13 @@ class ImageUploadService {
     /// Upload image with maximum quality settings for profile photos
     /// These images appear on cards and need to look crisp and sharp
     private func uploadHighQualityImage(_ image: UIImage, path: String, skipModeration: Bool = false) async throws -> String {
+        // NETWORK CHECK: Verify connectivity before starting upload process
+        let connected = await MainActor.run { isNetworkAvailable() }
+        guard connected else {
+            Logger.shared.warning("High quality image upload blocked: No network connection", category: .networking)
+            throw CelestiaError.networkError
+        }
+
         // Validate image on current thread (fast check)
         try validateImage(image)
 
