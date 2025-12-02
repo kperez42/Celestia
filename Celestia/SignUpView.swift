@@ -780,19 +780,38 @@ struct SignUpView: View {
                 }
             }
 
-            // Additional photos grid - improved styling
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("More photos")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
+            // Additional photos grid - matching card style
+            VStack(alignment: .leading, spacing: 16) {
+                // Header card matching "Time to shine" style
+                HStack(spacing: 16) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.pink.opacity(0.12))
+                            .frame(width: 56, height: 56)
+
+                        Image(systemName: "photo.stack.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(.pink)
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Add more photos")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+
+                        Text("\(max(0, photoImages.count - 1))/5 additional photos")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
 
                     Spacer()
-
-                    Text("\(max(0, photoImages.count - 1))/5 added")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
                 }
+                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color(.systemBackground))
+                        .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+                )
 
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
                     ForEach(1..<6, id: \.self) { index in
@@ -891,57 +910,50 @@ struct SignUpView: View {
                 }
             }
 
-            // Progress indicator with encouraging message
-            VStack(spacing: 12) {
-                // Photo count dots with gradient
-                HStack(spacing: 6) {
-                    ForEach(0..<6, id: \.self) { index in
-                        Circle()
-                            .fill(
-                                index < photoImages.count
-                                    ? LinearGradient(colors: [.purple, .pink], startPoint: .topLeading, endPoint: .bottomTrailing)
-                                    : LinearGradient(colors: [Color.gray.opacity(0.2), Color.gray.opacity(0.2)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                            )
-                            .frame(width: 10, height: 10)
-                    }
+            // Progress indicator card - matching style
+            HStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(progressIconColor.opacity(0.12))
+                        .frame(width: 56, height: 56)
+
+                    Image(systemName: progressIcon)
+                        .font(.system(size: 24))
+                        .foregroundColor(progressIconColor)
                 }
 
-                // Encouraging message based on photo count
-                Group {
-                    if photoImages.count == 0 {
-                        HStack(spacing: 4) {
-                            Image(systemName: "sparkles")
-                                .foregroundColor(.orange)
-                            Text("Add at least 2 photos to continue")
-                                .foregroundColor(.orange)
-                        }
-                    } else if photoImages.count == 1 {
-                        HStack(spacing: 4) {
-                            Image(systemName: "hand.thumbsup.fill")
-                                .foregroundColor(.orange)
-                            Text("Great start! Add 1 more photo")
-                                .foregroundColor(.orange)
-                        }
-                    } else if photoImages.count < 4 {
-                        HStack(spacing: 4) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                            Text("Looking good! More photos = more matches")
-                                .foregroundColor(.secondary)
-                        }
-                    } else {
-                        HStack(spacing: 4) {
-                            Image(systemName: "star.fill")
-                                .foregroundColor(.purple)
-                            Text("Amazing! Your profile will stand out")
-                                .foregroundColor(.purple)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(progressTitle)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+
+                    Text(progressSubtitle)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+
+                    // Photo count dots
+                    HStack(spacing: 6) {
+                        ForEach(0..<6, id: \.self) { index in
+                            Circle()
+                                .fill(
+                                    index < photoImages.count
+                                        ? LinearGradient(colors: [.purple, .pink], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                        : LinearGradient(colors: [Color.gray.opacity(0.2), Color.gray.opacity(0.2)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                )
+                                .frame(width: 8, height: 8)
                         }
                     }
+                    .padding(.top, 2)
                 }
-                .font(.caption)
-                .fontWeight(.medium)
+
+                Spacer()
             }
-            .padding(.top, 4)
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+            )
         }
     }
 
@@ -1406,6 +1418,53 @@ struct SignUpView: View {
         case 5: return "Help us find people with similar vibes"
         case 6: return "Optional info to complete your profile"
         default: return ""
+        }
+    }
+
+    // Progress card computed properties
+    var progressIcon: String {
+        if photoImages.count == 0 {
+            return "sparkles"
+        } else if photoImages.count == 1 {
+            return "hand.thumbsup.fill"
+        } else if photoImages.count < 4 {
+            return "checkmark.circle.fill"
+        } else {
+            return "star.fill"
+        }
+    }
+
+    var progressIconColor: Color {
+        if photoImages.count < 2 {
+            return .orange
+        } else if photoImages.count < 4 {
+            return .green
+        } else {
+            return .purple
+        }
+    }
+
+    var progressTitle: String {
+        if photoImages.count == 0 {
+            return "Get started!"
+        } else if photoImages.count == 1 {
+            return "Great start!"
+        } else if photoImages.count < 4 {
+            return "Looking good!"
+        } else {
+            return "Amazing!"
+        }
+    }
+
+    var progressSubtitle: String {
+        if photoImages.count == 0 {
+            return "Add at least 2 photos to continue"
+        } else if photoImages.count == 1 {
+            return "Add 1 more photo to continue"
+        } else if photoImages.count < 4 {
+            return "More photos = more matches"
+        } else {
+            return "Your profile will stand out"
         }
     }
 
