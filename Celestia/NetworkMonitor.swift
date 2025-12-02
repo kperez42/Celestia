@@ -265,38 +265,43 @@ class NetworkMonitor: ObservableObject {
     // MARK: - Connectivity Verification
 
     /// Verify actual internet connectivity by making a quick request
-    /// Use this as a fallback when NWPathMonitor status is uncertain
+    /// ALWAYS tests network regardless of NWPathMonitor state
     func verifyConnectivity() async -> Bool {
-        // First check NWPathMonitor status
-        if !isConnected {
-            Logger.shared.debug("📶 NWPathMonitor says disconnected", category: .networking)
-            return false
-        }
+        Logger.shared.debug("📶 Verifying connectivity (NWPathMonitor says: \(isConnected ? "connected" : "disconnected"))", category: .networking)
 
-        // Quick connectivity test to Firebase (our actual backend)
+        // ALWAYS test actual connectivity - don't trust NWPathMonitor alone
+        // This catches cases where NWPathMonitor is wrong about connection state
         do {
-            guard let url = URL(string: "https://firebasestorage.googleapis.com") else {
-                return isConnected // Fallback to NWPathMonitor
+            guard let url = URL(string: "https://www.google.com/generate_204") else {
+                Logger.shared.warning("📶 Invalid verification URL", category: .networking)
+                return isConnected
             }
 
             var request = URLRequest(url: url)
-            request.httpMethod = "HEAD"
-            request.timeoutInterval = 5.0
+            request.httpMethod = "GET"
+            request.timeoutInterval = 10.0 // Give it more time
+            request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
 
             let (_, response) = try await URLSession.shared.data(for: request)
 
             if let httpResponse = response as? HTTPURLResponse {
-                let success = (200...499).contains(httpResponse.statusCode)
-                Logger.shared.info("📶 Connectivity verified: \(success) (status: \(httpResponse.statusCode))", category: .networking)
+                // Google's generate_204 returns 204 on success
+                let success = httpResponse.statusCode == 204 || (200...299).contains(httpResponse.statusCode)
+                Logger.shared.info("📶 Connectivity test result: \(success ? "CONNECTED" : "FAILED") (status: \(httpResponse.statusCode))", category: .networking)
+
+                // Update isConnected if verification disagrees with NWPathMonitor
+                if success && !isConnected {
+                    Logger.shared.warning("📶 NWPathMonitor was wrong - we ARE connected!", category: .networking)
+                }
+
                 return success
             }
 
             return true
         } catch {
-            Logger.shared.warning("📶 Connectivity verification failed: \(error.localizedDescription)", category: .networking)
-            // Even if verification fails, trust NWPathMonitor if it says connected
-            // The actual upload might still work
-            return isConnected
+            Logger.shared.warning("📶 Connectivity verification error: \(error.localizedDescription)", category: .networking)
+            // Network request failed - we're probably offline
+            return false
         }
     }
 

@@ -51,28 +51,25 @@ class PhotoUploadService {
             throw CelestiaError.invalidData
         }
 
-        // NETWORK CHECK: Log connectivity status before attempting upload
+        // NETWORK CHECK: Always verify actual connectivity before upload
+        // Don't trust NWPathMonitor alone - it can be wrong
         let networkStatus = await MainActor.run {
             (connected: networkMonitor.isConnected,
              type: networkMonitor.connectionType.description,
              quality: networkMonitor.quality.description)
         }
 
-        Logger.shared.info("📶 Network check for upload - Connected: \(networkStatus.connected), Type: \(networkStatus.type), Quality: \(networkStatus.quality)", category: .networking)
+        Logger.shared.info("📶 Network status - NWPathMonitor: \(networkStatus.connected ? "connected" : "disconnected"), Type: \(networkStatus.type)", category: .networking)
 
-        // Only block if NWPathMonitor definitively says disconnected
-        // Verify with actual connectivity test before blocking
-        if !networkStatus.connected {
-            // Double-check by verifying actual connectivity to Firebase
-            let actuallyConnected = await networkMonitor.verifyConnectivity()
-            if !actuallyConnected {
-                Logger.shared.warning("❌ Photo upload blocked: No network connection verified", category: .networking)
-                throw PhotoUploadError.noNetwork
-            }
-            Logger.shared.info("📶 NWPathMonitor said disconnected but verification succeeded - proceeding", category: .networking)
+        // ALWAYS verify actual connectivity with a real network request
+        let actuallyConnected = await networkMonitor.verifyConnectivity()
+
+        if !actuallyConnected {
+            Logger.shared.warning("❌ Photo upload blocked: Network verification failed", category: .networking)
+            throw PhotoUploadError.noNetwork
         }
 
-        Logger.shared.info("✅ Network OK - Starting \(imageType) photo upload for user: \(userId.prefix(8))...", category: .networking)
+        Logger.shared.info("✅ Network verified - Starting \(imageType) photo upload for user: \(userId.prefix(8))...", category: .networking)
 
         // Use high-quality upload for profile and gallery photos (these appear on cards)
         do {
