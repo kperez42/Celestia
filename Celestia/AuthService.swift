@@ -335,7 +335,14 @@ class AuthService: ObservableObject, AuthServiceProtocol {
 
             // Step 3.5: Upload photos if provided (using high-quality parallel uploader)
             if !photos.isEmpty {
-                Logger.shared.auth("📸 Starting upload of \(photos.count) photos (parallel with retries)", level: .info)
+                // NETWORK CHECK: Verify connectivity before attempting uploads
+                let isConnected = await MainActor.run { NetworkMonitor.shared.isConnected }
+                guard isConnected else {
+                    Logger.shared.auth("❌ Photo upload blocked: No network connection", level: .error)
+                    throw CelestiaError.networkError
+                }
+
+                Logger.shared.auth("📶 Network OK - Starting upload of \(photos.count) photos (parallel with retries)", level: .info)
 
                 let photosPath = "users/\(userId)/photos"
 

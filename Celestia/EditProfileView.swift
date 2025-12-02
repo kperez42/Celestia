@@ -2288,7 +2288,8 @@ struct EditProfileView: View {
                         }
                     }
 
-                    let imageURL = try await ImageUploadService.shared.uploadProfileImage(profileImage, userId: userId)
+                    // Use PhotoUploadService for proper network check
+                    let imageURL = try await PhotoUploadService.shared.uploadPhoto(profileImage, userId: userId, imageType: .profile)
                     user.profileImageURL = imageURL
 
                     // CACHE FIX: Cache the newly uploaded image immediately for instant display across all views

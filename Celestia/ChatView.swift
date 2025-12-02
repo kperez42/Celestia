@@ -1121,7 +1121,8 @@ struct ChatView: View {
             do {
                 if let image = imageToSend {
                     // Upload image first (this is the slow part)
-                    let imageURL = try await ImageUploadService.shared.uploadChatImage(image, matchId: matchId)
+                    // Use PhotoUploadService for proper network check and logging
+                    let imageURL = try await PhotoUploadService.shared.uploadPhoto(image, userId: matchId, imageType: .chat)
 
                     // Send image message (with optional caption)
                     try await MessageService.shared.sendImageMessage(
@@ -1547,8 +1548,8 @@ struct ChatView: View {
         Task {
             do {
                 if let image = failed.image {
-                    // Upload image first
-                    let imageURL = try await ImageUploadService.shared.uploadChatImage(image, matchId: matchId)
+                    // Upload image first - use PhotoUploadService for proper network check
+                    let imageURL = try await PhotoUploadService.shared.uploadPhoto(image, userId: matchId, imageType: .chat)
 
                     // Send image message (with optional caption)
                     try await messageService.sendImageMessage(
