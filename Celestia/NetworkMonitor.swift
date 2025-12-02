@@ -103,6 +103,13 @@ class NetworkMonitor: ObservableObject {
     // MARK: - Setup
 
     private func setupMonitor() {
+        // CRITICAL FIX: Get current path synchronously FIRST before setting up async handler
+        // This prevents the race condition where isConnected is false on first check
+        let currentPath = monitor.currentPath
+        handlePathUpdate(currentPath)
+        Logger.shared.info("📶 Initial network state: connected=\(isConnected), type=\(connectionType.description)", category: .networking)
+
+        // Then set up async handler for future updates
         monitor.pathUpdateHandler = { [weak self] path in
             Task { @MainActor [weak self] in
                 self?.handlePathUpdate(path)
@@ -252,6 +259,44 @@ class NetworkMonitor: ObservableObject {
             quality = .fair
         } else {
             quality = .poor
+        }
+    }
+
+    // MARK: - Connectivity Verification
+
+    /// Verify actual internet connectivity by making a quick request
+    /// Use this as a fallback when NWPathMonitor status is uncertain
+    func verifyConnectivity() async -> Bool {
+        // First check NWPathMonitor status
+        if !isConnected {
+            Logger.shared.debug("📶 NWPathMonitor says disconnected", category: .networking)
+            return false
+        }
+
+        // Quick connectivity test to Firebase (our actual backend)
+        do {
+            guard let url = URL(string: "https://firebasestorage.googleapis.com") else {
+                return isConnected // Fallback to NWPathMonitor
+            }
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "HEAD"
+            request.timeoutInterval = 5.0
+
+            let (_, response) = try await URLSession.shared.data(for: request)
+
+            if let httpResponse = response as? HTTPURLResponse {
+                let success = (200...499).contains(httpResponse.statusCode)
+                Logger.shared.info("📶 Connectivity verified: \(success) (status: \(httpResponse.statusCode))", category: .networking)
+                return success
+            }
+
+            return true
+        } catch {
+            Logger.shared.warning("📶 Connectivity verification failed: \(error.localizedDescription)", category: .networking)
+            // Even if verification fails, trust NWPathMonitor if it says connected
+            // The actual upload might still work
+            return isConnected
         }
     }
 

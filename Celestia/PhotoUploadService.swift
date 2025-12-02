@@ -51,7 +51,7 @@ class PhotoUploadService {
             throw CelestiaError.invalidData
         }
 
-        // NETWORK CHECK: Verify connectivity before attempting upload
+        // NETWORK CHECK: Log connectivity status before attempting upload
         let networkStatus = await MainActor.run {
             (connected: networkMonitor.isConnected,
              type: networkMonitor.connectionType.description,
@@ -60,9 +60,16 @@ class PhotoUploadService {
 
         Logger.shared.info("📶 Network check for upload - Connected: \(networkStatus.connected), Type: \(networkStatus.type), Quality: \(networkStatus.quality)", category: .networking)
 
-        guard networkStatus.connected else {
-            Logger.shared.warning("❌ Photo upload blocked: No network connection", category: .networking)
-            throw PhotoUploadError.noNetwork
+        // Only block if NWPathMonitor definitively says disconnected
+        // Verify with actual connectivity test before blocking
+        if !networkStatus.connected {
+            // Double-check by verifying actual connectivity to Firebase
+            let actuallyConnected = await networkMonitor.verifyConnectivity()
+            if !actuallyConnected {
+                Logger.shared.warning("❌ Photo upload blocked: No network connection verified", category: .networking)
+                throw PhotoUploadError.noNetwork
+            }
+            Logger.shared.info("📶 NWPathMonitor said disconnected but verification succeeded - proceeding", category: .networking)
         }
 
         Logger.shared.info("✅ Network OK - Starting \(imageType) photo upload for user: \(userId.prefix(8))...", category: .networking)
