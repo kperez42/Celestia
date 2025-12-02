@@ -250,8 +250,10 @@ struct SignUpView: View {
                     }
                     }
                     .scrollDismissesKeyboard(.interactively)
-                    // FIX: Auto-scroll to top when changing steps
+                    // FIX: Auto-scroll to top and clear errors when changing steps
                     .onChange(of: currentStep) { _, _ in
+                        // Clear any error messages when navigating between steps
+                        authService.errorMessage = nil
                         withAnimation {
                             scrollProxy.scrollTo("top", anchor: .top)
                         }
@@ -267,6 +269,9 @@ struct SignUpView: View {
             }
         }
         .onAppear {
+            // Clear any error messages from other screens
+            authService.errorMessage = nil
+
             // Pre-fill referral code from deep link
             if let deepLinkCode = deepLinkManager.referralCode {
                 referralCode = deepLinkCode
@@ -274,6 +279,10 @@ struct SignUpView: View {
                 deepLinkManager.clearReferralCode()
                 Logger.shared.info("Pre-filled referral code from deep link: \(deepLinkCode)", category: .referral)
             }
+        }
+        .onDisappear {
+            // Clear error messages when leaving
+            authService.errorMessage = nil
         }
         .alert("Referral Bonus", isPresented: .constant(authService.referralBonusMessage != nil)) {
             Button("Awesome! 🎉") {
