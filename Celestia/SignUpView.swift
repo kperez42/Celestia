@@ -73,6 +73,8 @@ struct SignUpView: View {
     @State private var pets = ""
     @State private var languages: [String] = []
     @State private var showLanguagePicker = false
+    @State private var ageRangeMin: Int = 18
+    @State private var ageRangeMax: Int = 35
 
     let relationshipGoalOptions = ["Long-term relationship", "Casual dating", "New friends", "Not sure yet"]
     let educationLevelOptions = ["High school", "Some college", "Bachelor's degree", "Master's degree", "Doctorate", "Trade school", "Prefer not to say"]
@@ -1467,6 +1469,104 @@ struct SignUpView: View {
                 }
             }
 
+            // Age Preference Card
+            VStack(spacing: 16) {
+                // Header with icon
+                HStack(spacing: 16) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.pink.opacity(0.12))
+                            .frame(width: 56, height: 56)
+
+                        Image(systemName: "heart.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(.pink)
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Age Preference")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+
+                        Text("Who would you like to meet?")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
+
+                    // Age range badge
+                    Text("\(ageRangeMin) - \(ageRangeMax)")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(
+                            LinearGradient(
+                                colors: [.pink, .purple],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .cornerRadius(12)
+                }
+
+                // Age pickers
+                HStack(spacing: 16) {
+                    // Min age
+                    VStack(spacing: 6) {
+                        Text("From")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        Picker("Min Age", selection: $ageRangeMin) {
+                            ForEach(18..<99, id: \.self) { age in
+                                Text("\(age)").tag(age)
+                            }
+                        }
+                        .pickerStyle(.wheel)
+                        .frame(width: 70, height: 90)
+                        .clipped()
+                        .onChange(of: ageRangeMin) { _, newValue in
+                            if newValue >= ageRangeMax {
+                                ageRangeMax = newValue + 1
+                            }
+                        }
+                    }
+
+                    Text("to")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+
+                    // Max age
+                    VStack(spacing: 6) {
+                        Text("To")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        Picker("Max Age", selection: $ageRangeMax) {
+                            ForEach(19..<100, id: \.self) { age in
+                                Text("\(age)").tag(age)
+                            }
+                        }
+                        .pickerStyle(.wheel)
+                        .frame(width: 70, height: 90)
+                        .clipped()
+                        .onChange(of: ageRangeMax) { _, newValue in
+                            if newValue <= ageRangeMin {
+                                ageRangeMin = newValue - 1
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+            )
+
             // Completion card - matching style
             HStack(spacing: 16) {
                 ZStack {
@@ -1729,6 +1829,8 @@ struct SignUpView: View {
         diet = user.diet ?? ""
         pets = user.pets ?? ""
         languages = user.languages
+        ageRangeMin = user.ageRangeMin ?? 18
+        ageRangeMax = user.ageRangeMax ?? 35
 
         // Load existing photos from URLs
         existingPhotoURLs = user.photos
@@ -1866,6 +1968,8 @@ struct SignUpView: View {
             user.diet = diet.isEmpty || diet == "Prefer not to say" ? nil : diet
             user.pets = pets.isEmpty || pets == "Prefer not to say" ? nil : pets
             user.languages = languages
+            user.ageRangeMin = ageRangeMin
+            user.ageRangeMax = ageRangeMax
 
             do {
                 // Only upload photos if they were actually modified by the user
@@ -1959,6 +2063,10 @@ struct SignUpView: View {
                 if !languages.isEmpty {
                     user.languages = languages
                 }
+
+                // Set age preference
+                user.ageRangeMin = ageRangeMin
+                user.ageRangeMax = ageRangeMax
 
                 // Save updated profile data
                 do {
