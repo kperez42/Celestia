@@ -15,13 +15,9 @@ struct SignUpView: View {
 
     private let imageUploadService = ImageUploadService.shared
 
-    @State private var currentStep = 0  // Start at guidelines step
+    @State private var currentStep = 0  // Start at email/password step
 
-    // Step 0: Guidelines animation state
-    @State private var guidelinesAppearAnimation = false
-    @State private var checklistAnimations: [Bool] = [false, false, false]
-
-    // Step 1: Basic info
+    // Step 0: Basic info (email/password)
     @State private var email = ""
     @State private var password = ""
     @State private var confirmPassword = ""
@@ -104,151 +100,77 @@ struct SignUpView: View {
                                 .frame(height: 1)
                                 .id("top")
 
-                            // Progress indicator (only show for steps 1-7, not guidelines)
-                            if currentStep >= 1 {
-                                HStack(spacing: 8) {
-                                    ForEach(1...7, id: \.self) { step in
-                                        Circle()
-                                            .fill(currentStep >= step ? Color.purple : Color.gray.opacity(0.3))
-                                            .frame(width: 10, height: 10)
-                                            .scaleEffect(currentStep == step ? 1.2 : 1.0)
-                                            .accessibleAnimation(.spring(response: 0.3, dampingFraction: 0.6), value: currentStep)
-                                    }
+                            // Progress indicator for steps 0-6 (7 steps total)
+                            HStack(spacing: 8) {
+                                ForEach(0..<7, id: \.self) { step in
+                                    Circle()
+                                        .fill(currentStep >= step ? Color.purple : Color.gray.opacity(0.3))
+                                        .frame(width: 10, height: 10)
+                                        .scaleEffect(currentStep == step ? 1.2 : 1.0)
+                                        .accessibleAnimation(.spring(response: 0.3, dampingFraction: 0.6), value: currentStep)
                                 }
-                                .accessibilityElement(children: .ignore)
-                                .accessibilityLabel("Sign up progress")
-                                .accessibilityValue("Step \(currentStep) of 7")
-                                .padding(.top, 10)
                             }
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("Sign up progress")
+                            .accessibilityValue("Step \(currentStep + 1) of 7")
+                            .padding(.top, 10)
                         
-                        // Header (different for guidelines vs regular steps)
-                        if currentStep == 0 {
-                            // Guidelines header with animated icon
-                            VStack(spacing: 16) {
-                                ZStack {
-                                    Circle()
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [.purple.opacity(0.2), .blue.opacity(0.15)],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                        )
-                                        .frame(width: 90, height: 90)
-                                        .scaleEffect(guidelinesAppearAnimation ? 1.0 : 0.8)
+                        // Header
+                        VStack(spacing: 10) {
+                            Image(systemName: "star.circle.fill")
+                                .font(.system(size: 50))
+                                .foregroundColor(.purple)
 
-                                    Circle()
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [.purple.opacity(0.3), .blue.opacity(0.2)],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                        )
-                                        .frame(width: 70, height: 70)
+                            Text(stepTitle)
+                                .font(.title2.bold())
 
-                                    Image(systemName: "checkmark.shield.fill")
-                                        .font(.system(size: 36))
-                                        .foregroundStyle(
-                                            LinearGradient(
-                                                colors: [.purple, .blue],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                        )
-                                }
-                                .opacity(guidelinesAppearAnimation ? 1 : 0)
-
-                                VStack(spacing: 8) {
-                                    Text("Before You Begin")
-                                        .font(.title2.bold())
-
-                                    Text("Here's what makes a great profile")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                        .multilineTextAlignment(.center)
-                                }
-                                .opacity(guidelinesAppearAnimation ? 1 : 0)
-                                .offset(y: guidelinesAppearAnimation ? 0 : 20)
-                            }
-                            .padding(.horizontal)
-                            .padding(.top, 20)
-                            .onAppear {
-                                withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                                    guidelinesAppearAnimation = true
-                                }
-                                // Animate checklist items sequentially
-                                for i in 0..<3 {
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3 + Double(i) * 0.15) {
-                                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                                            checklistAnimations[i] = true
-                                        }
-                                    }
-                                }
-                            }
-                        } else {
-                            VStack(spacing: 10) {
-                                Image(systemName: "star.circle.fill")
-                                    .font(.system(size: 50))
-                                    .foregroundColor(.purple)
-
-                                Text(stepTitle)
-                                    .font(.title2.bold())
-
-                                Text(stepSubtitle)
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                                    .multilineTextAlignment(.center)
-                            }
-                            .padding(.horizontal)
+                            Text(stepSubtitle)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
                         }
+                        .padding(.horizontal)
                         
                         // Step content
                         Group {
                             switch currentStep {
                             case 0:
-                                step0GuidelinesContent
-                                    .transition(.asymmetric(
-                                        insertion: .move(edge: .trailing).combined(with: .opacity),
-                                        removal: .move(edge: .leading).combined(with: .opacity)
-                                    ))
-                            case 1:
                                 step1Content
                                     .transition(.asymmetric(
                                         insertion: .move(edge: .trailing).combined(with: .opacity),
                                         removal: .move(edge: .leading).combined(with: .opacity)
                                     ))
-                            case 2:
+                            case 1:
                                 step2Content
                                     .transition(.asymmetric(
                                         insertion: .move(edge: .trailing).combined(with: .opacity),
                                         removal: .move(edge: .leading).combined(with: .opacity)
                                     ))
-                            case 3:
+                            case 2:
                                 step3Content
                                     .transition(.asymmetric(
                                         insertion: .move(edge: .trailing).combined(with: .opacity),
                                         removal: .move(edge: .leading).combined(with: .opacity)
                                     ))
-                            case 4:
+                            case 3:
                                 step4Content
                                     .transition(.asymmetric(
                                         insertion: .move(edge: .trailing).combined(with: .opacity),
                                         removal: .move(edge: .leading).combined(with: .opacity)
                                     ))
-                            case 5:
+                            case 4:
                                 step5BioContent
                                     .transition(.asymmetric(
                                         insertion: .move(edge: .trailing).combined(with: .opacity),
                                         removal: .move(edge: .leading).combined(with: .opacity)
                                     ))
-                            case 6:
+                            case 5:
                                 step6InterestsContent
                                     .transition(.asymmetric(
                                         insertion: .move(edge: .trailing).combined(with: .opacity),
                                         removal: .move(edge: .leading).combined(with: .opacity)
                                     ))
-                            case 7:
+                            case 6:
                                 step7LifestyleContent
                                     .transition(.asymmetric(
                                         insertion: .move(edge: .trailing).combined(with: .opacity),
@@ -301,15 +223,9 @@ struct SignUpView: View {
                                     ProgressView()
                                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                 } else {
-                                    HStack(spacing: 8) {
-                                        Text(currentStep == 0 ? "Let's Go" : (currentStep == 7 ? "Create Account" : "Next"))
-                                            .font(.headline)
-                                        if currentStep == 0 {
-                                            Image(systemName: "arrow.right")
-                                                .font(.headline)
-                                        }
-                                    }
-                                    .foregroundColor(.white)
+                                    Text(currentStep == 6 ? "Create Account" : "Next")
+                                        .font(.headline)
+                                        .foregroundColor(.white)
                                 }
                             }
                             .frame(maxWidth: .infinity)
@@ -324,9 +240,9 @@ struct SignUpView: View {
                             .cornerRadius(15)
                             .opacity(canProceed ? 1.0 : 0.5)
                             .disabled(!canProceed || authService.isLoading || isLoadingPhotos)
-                            .accessibilityLabel(currentStep == 0 ? "Let's Go" : (currentStep == 7 ? "Create Account" : "Next"))
-                            .accessibilityHint(currentStep == 0 ? "Start the signup process" : (currentStep == 7 ? "Create your account and sign up" : "Continue to next step"))
-                            .accessibilityIdentifier(currentStep == 7 ? AccessibilityIdentifier.createAccountButton : AccessibilityIdentifier.nextButton)
+                            .accessibilityLabel(currentStep == 6 ? "Create Account" : "Next")
+                            .accessibilityHint(currentStep == 6 ? "Create your account and sign up" : "Continue to next step")
+                            .accessibilityIdentifier(currentStep == 6 ? AccessibilityIdentifier.createAccountButton : AccessibilityIdentifier.nextButton)
                             .scaleButton()
                         }
                         .padding(.horizontal, 30)
@@ -1326,131 +1242,6 @@ struct SignUpView: View {
         }
     }
 
-    // MARK: - Step 0: Guidelines (Before Signup)
-    var step0GuidelinesContent: some View {
-        VStack(spacing: 20) {
-            // What We're Looking For section
-            VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    Image(systemName: "checklist")
-                        .font(.headline)
-                        .foregroundColor(.purple)
-                    Text("What We're Looking For")
-                        .font(.headline)
-                }
-
-                VStack(spacing: 12) {
-                    guidelinesRowAnimated(
-                        icon: "person.crop.circle.fill",
-                        title: "Great Photos",
-                        description: "Clear photos that show your face - no blurry or group pics",
-                        color: .blue,
-                        isAnimated: checklistAnimations[0]
-                    )
-
-                    guidelinesRowAnimated(
-                        icon: "text.alignleft",
-                        title: "Complete Profile",
-                        description: "Fill out your bio and details authentically",
-                        color: .purple,
-                        isAnimated: checklistAnimations[1]
-                    )
-
-                    guidelinesRowAnimated(
-                        icon: "shield.checkered",
-                        title: "Community Guidelines",
-                        description: "Be respectful - no inappropriate content",
-                        color: .green,
-                        isAnimated: checklistAnimations[2]
-                    )
-                }
-            }
-            .padding()
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(.systemBackground))
-                    .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(Color(.separator).opacity(0.2), lineWidth: 1)
-            )
-
-            // Why this matters card
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    ZStack {
-                        Circle()
-                            .fill(Color.orange.opacity(0.15))
-                            .frame(width: 36, height: 36)
-                        Image(systemName: "lightbulb.fill")
-                            .font(.system(size: 18))
-                            .foregroundColor(.orange)
-                    }
-
-                    Text("Why This Matters")
-                        .font(.headline)
-                }
-
-                Text("We review all profiles to keep Celestia safe and authentic. Profiles that follow these guidelines get approved faster and get more matches!")
-                    .font(.body)
-                    .foregroundColor(.primary.opacity(0.85))
-                    .lineSpacing(4)
-            }
-            .padding()
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.orange.opacity(0.08))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(Color.orange.opacity(0.2), lineWidth: 1)
-            )
-            .opacity(guidelinesAppearAnimation ? 1 : 0)
-            .offset(y: guidelinesAppearAnimation ? 0 : 30)
-            .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.5), value: guidelinesAppearAnimation)
-        }
-    }
-
-    private func guidelinesRowAnimated(icon: String, title: String, description: String, color: Color, isAnimated: Bool) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(color.opacity(0.12))
-                    .frame(width: 38, height: 38)
-
-                Image(systemName: icon)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(color)
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundColor(.primary)
-
-                Text(description)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .lineSpacing(2)
-            }
-
-            Spacer()
-
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundColor(.green.opacity(0.7))
-                .font(.body)
-        }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemGray6))
-        )
-        .scaleEffect(isAnimated ? 1.0 : 0.95)
-        .opacity(isAnimated ? 1.0 : 0)
-    }
-
     private func photoTipChip(icon: String, text: String, color: Color) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
@@ -1505,26 +1296,26 @@ struct SignUpView: View {
     // MARK: - Computed Properties
     var stepTitle: String {
         switch currentStep {
-        case 1: return "Create Account"
-        case 2: return "Tell us about yourself"
-        case 3: return "Where are you from?"
-        case 4: return "Show Your Best Self"
-        case 5: return "Write Your Bio"
-        case 6: return "Your Interests"
-        case 7: return "A Few More Details"
+        case 0: return "Create Account"
+        case 1: return "Tell us about yourself"
+        case 2: return "Where are you from?"
+        case 3: return "Show Your Best Self"
+        case 4: return "Write Your Bio"
+        case 5: return "Your Interests"
+        case 6: return "A Few More Details"
         default: return ""
         }
     }
 
     var stepSubtitle: String {
         switch currentStep {
-        case 1: return "Let's get started with your account"
-        case 2: return "This helps us find your perfect match"
-        case 3: return "Connect with people near and far"
-        case 4: return "Photos help you make meaningful connections"
-        case 5: return "Let others know what makes you unique"
-        case 6: return "Help us find people with similar vibes"
-        case 7: return "Optional info to complete your profile"
+        case 0: return "Let's get started with your account"
+        case 1: return "This helps us find your perfect match"
+        case 2: return "Connect with people near and far"
+        case 3: return "Photos help you make meaningful connections"
+        case 4: return "Let others know what makes you unique"
+        case 5: return "Help us find people with similar vibes"
+        case 6: return "Optional info to complete your profile"
         default: return ""
         }
     }
@@ -1532,21 +1323,19 @@ struct SignUpView: View {
     var canProceed: Bool {
         switch currentStep {
         case 0:
-            return true  // Guidelines step - always can proceed
-        case 1:
             return !email.isEmpty && password.count >= 6 && password == confirmPassword
-        case 2:
+        case 1:
             guard let ageInt = Int(age) else { return false }
             return !name.isEmpty && ageInt >= 18
-        case 3:
+        case 2:
             return !location.isEmpty && !country.isEmpty
-        case 4:
+        case 3:
             return photoImages.count >= 2
-        case 5:
+        case 4:
             return bio.count >= 20  // Require at least 20 characters for bio
-        case 6:
+        case 5:
             return selectedInterests.count >= 3  // Require at least 3 interests
-        case 7:
+        case 6:
             return true  // Lifestyle details are optional
         default:
             return false
@@ -1579,7 +1368,7 @@ struct SignUpView: View {
 
     // MARK: - Actions
     func handleNext() {
-        if currentStep < 7 {
+        if currentStep < 6 {
             withAnimation {
                 currentStep += 1
             }
