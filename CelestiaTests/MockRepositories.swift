@@ -409,6 +409,290 @@ class MockInterestRepository: InterestRepository {
     }
 }
 
+// MARK: - Mock Swipe Repository
+
+@MainActor
+class MockSwipeRepository: SwipeRepository {
+
+    // Data storage
+    var likes: [String: (fromUserId: String, toUserId: String, isSuperLike: Bool, isActive: Bool, timestamp: Date)] = [:]
+    var passes: [String: (fromUserId: String, toUserId: String, isActive: Bool, timestamp: Date)] = [:]
+
+    // Call tracking
+    var createLikeCalled = false
+    var createPassCalled = false
+    var checkMutualLikeCalled = false
+    var hasSwipedOnCalled = false
+    var checkLikeExistsCalled = false
+    var unlikeUserCalled = false
+    var getLikesReceivedCalled = false
+    var getLikesSentCalled = false
+    var deleteSwipeCalled = false
+
+    // Last call parameters
+    var lastLikeFromUserId: String?
+    var lastLikeToUserId: String?
+    var lastLikeIsSuperLike: Bool?
+
+    // Failure simulation
+    var shouldFail = false
+    var failureError: Error = CelestiaError.networkError
+    var shouldFailOnCreateLike = false
+    var shouldFailOnCreatePass = false
+    var shouldFailOnCheckMutualLike = false
+    var shouldFailOnHasSwipedOn = false
+    var shouldFailOnCheckLikeExists = false
+    var shouldFailOnUnlikeUser = false
+    var shouldFailOnGetLikesReceived = false
+    var shouldFailOnGetLikesSent = false
+    var shouldFailOnDeleteSwipe = false
+
+    // Custom error for specific operations
+    var createLikeError: Error?
+    var createPassError: Error?
+    var checkMutualLikeError: Error?
+    var hasSwipedOnError: Error?
+    var checkLikeExistsError: Error?
+    var unlikeUserError: Error?
+    var getLikesReceivedError: Error?
+    var getLikesSentError: Error?
+    var deleteSwipeError: Error?
+
+    // Simulate delays for race condition testing
+    var operationDelay: TimeInterval = 0
+
+    // Force specific results
+    var forceMutualLikeResult: Bool?
+    var forceHasSwipedOnResult: (liked: Bool, passed: Bool)?
+    var forceLikeExistsResult: Bool?
+
+    func createLike(fromUserId: String, toUserId: String, isSuperLike: Bool) async throws {
+        createLikeCalled = true
+        lastLikeFromUserId = fromUserId
+        lastLikeToUserId = toUserId
+        lastLikeIsSuperLike = isSuperLike
+
+        if operationDelay > 0 {
+            try await Task.sleep(nanoseconds: UInt64(operationDelay * 1_000_000_000))
+        }
+
+        if shouldFail || shouldFailOnCreateLike {
+            throw createLikeError ?? failureError
+        }
+
+        let likeId = "\(fromUserId)_\(toUserId)"
+        likes[likeId] = (fromUserId: fromUserId, toUserId: toUserId, isSuperLike: isSuperLike, isActive: true, timestamp: Date())
+    }
+
+    func createPass(fromUserId: String, toUserId: String) async throws {
+        createPassCalled = true
+
+        if operationDelay > 0 {
+            try await Task.sleep(nanoseconds: UInt64(operationDelay * 1_000_000_000))
+        }
+
+        if shouldFail || shouldFailOnCreatePass {
+            throw createPassError ?? failureError
+        }
+
+        let passId = "\(fromUserId)_\(toUserId)"
+        passes[passId] = (fromUserId: fromUserId, toUserId: toUserId, isActive: true, timestamp: Date())
+    }
+
+    func checkMutualLike(fromUserId: String, toUserId: String) async throws -> Bool {
+        checkMutualLikeCalled = true
+
+        if operationDelay > 0 {
+            try await Task.sleep(nanoseconds: UInt64(operationDelay * 1_000_000_000))
+        }
+
+        if shouldFail || shouldFailOnCheckMutualLike {
+            throw checkMutualLikeError ?? failureError
+        }
+
+        if let forcedResult = forceMutualLikeResult {
+            return forcedResult
+        }
+
+        // Check if toUser has liked fromUser (the reverse direction)
+        let reverseLikeId = "\(toUserId)_\(fromUserId)"
+        if let reverseLike = likes[reverseLikeId], reverseLike.isActive {
+            return true
+        }
+
+        return false
+    }
+
+    func hasSwipedOn(fromUserId: String, toUserId: String) async throws -> (liked: Bool, passed: Bool) {
+        hasSwipedOnCalled = true
+
+        if operationDelay > 0 {
+            try await Task.sleep(nanoseconds: UInt64(operationDelay * 1_000_000_000))
+        }
+
+        if shouldFail || shouldFailOnHasSwipedOn {
+            throw hasSwipedOnError ?? failureError
+        }
+
+        if let forcedResult = forceHasSwipedOnResult {
+            return forcedResult
+        }
+
+        let swipeId = "\(fromUserId)_\(toUserId)"
+        let hasLiked = likes[swipeId]?.isActive == true
+        let hasPassed = passes[swipeId]?.isActive == true
+
+        return (hasLiked, hasPassed)
+    }
+
+    func checkLikeExists(fromUserId: String, toUserId: String) async throws -> Bool {
+        checkLikeExistsCalled = true
+
+        if operationDelay > 0 {
+            try await Task.sleep(nanoseconds: UInt64(operationDelay * 1_000_000_000))
+        }
+
+        if shouldFail || shouldFailOnCheckLikeExists {
+            throw checkLikeExistsError ?? failureError
+        }
+
+        if let forcedResult = forceLikeExistsResult {
+            return forcedResult
+        }
+
+        let likeId = "\(fromUserId)_\(toUserId)"
+        return likes[likeId]?.isActive == true
+    }
+
+    func unlikeUser(fromUserId: String, toUserId: String) async throws {
+        unlikeUserCalled = true
+
+        if operationDelay > 0 {
+            try await Task.sleep(nanoseconds: UInt64(operationDelay * 1_000_000_000))
+        }
+
+        if shouldFail || shouldFailOnUnlikeUser {
+            throw unlikeUserError ?? failureError
+        }
+
+        let likeId = "\(fromUserId)_\(toUserId)"
+        if var like = likes[likeId] {
+            like.isActive = false
+            likes[likeId] = like
+        }
+    }
+
+    func getLikesReceived(userId: String, limit: Int = 500) async throws -> [String] {
+        getLikesReceivedCalled = true
+
+        if operationDelay > 0 {
+            try await Task.sleep(nanoseconds: UInt64(operationDelay * 1_000_000_000))
+        }
+
+        if shouldFail || shouldFailOnGetLikesReceived {
+            throw getLikesReceivedError ?? failureError
+        }
+
+        return likes.values
+            .filter { $0.toUserId == userId && $0.isActive }
+            .sorted { $0.timestamp > $1.timestamp }
+            .prefix(limit)
+            .map { $0.fromUserId }
+    }
+
+    func getLikesSent(userId: String, limit: Int = 500) async throws -> [String] {
+        getLikesSentCalled = true
+
+        if operationDelay > 0 {
+            try await Task.sleep(nanoseconds: UInt64(operationDelay * 1_000_000_000))
+        }
+
+        if shouldFail || shouldFailOnGetLikesSent {
+            throw getLikesSentError ?? failureError
+        }
+
+        return likes.values
+            .filter { $0.fromUserId == userId && $0.isActive }
+            .sorted { $0.timestamp > $1.timestamp }
+            .prefix(limit)
+            .map { $0.toUserId }
+    }
+
+    func deleteSwipe(fromUserId: String, toUserId: String) async throws {
+        deleteSwipeCalled = true
+
+        if operationDelay > 0 {
+            try await Task.sleep(nanoseconds: UInt64(operationDelay * 1_000_000_000))
+        }
+
+        if shouldFail || shouldFailOnDeleteSwipe {
+            throw deleteSwipeError ?? failureError
+        }
+
+        let swipeId = "\(fromUserId)_\(toUserId)"
+        likes.removeValue(forKey: swipeId)
+        passes.removeValue(forKey: swipeId)
+    }
+
+    // MARK: - Helper Methods
+
+    func addLike(fromUserId: String, toUserId: String, isSuperLike: Bool = false, isActive: Bool = true) {
+        let likeId = "\(fromUserId)_\(toUserId)"
+        likes[likeId] = (fromUserId: fromUserId, toUserId: toUserId, isSuperLike: isSuperLike, isActive: isActive, timestamp: Date())
+    }
+
+    func addPass(fromUserId: String, toUserId: String, isActive: Bool = true) {
+        let passId = "\(fromUserId)_\(toUserId)"
+        passes[passId] = (fromUserId: fromUserId, toUserId: toUserId, isActive: isActive, timestamp: Date())
+    }
+
+    func reset() {
+        likes.removeAll()
+        passes.removeAll()
+
+        createLikeCalled = false
+        createPassCalled = false
+        checkMutualLikeCalled = false
+        hasSwipedOnCalled = false
+        checkLikeExistsCalled = false
+        unlikeUserCalled = false
+        getLikesReceivedCalled = false
+        getLikesSentCalled = false
+        deleteSwipeCalled = false
+
+        lastLikeFromUserId = nil
+        lastLikeToUserId = nil
+        lastLikeIsSuperLike = nil
+
+        shouldFail = false
+        shouldFailOnCreateLike = false
+        shouldFailOnCreatePass = false
+        shouldFailOnCheckMutualLike = false
+        shouldFailOnHasSwipedOn = false
+        shouldFailOnCheckLikeExists = false
+        shouldFailOnUnlikeUser = false
+        shouldFailOnGetLikesReceived = false
+        shouldFailOnGetLikesSent = false
+        shouldFailOnDeleteSwipe = false
+
+        createLikeError = nil
+        createPassError = nil
+        checkMutualLikeError = nil
+        hasSwipedOnError = nil
+        checkLikeExistsError = nil
+        unlikeUserError = nil
+        getLikesReceivedError = nil
+        getLikesSentError = nil
+        deleteSwipeError = nil
+
+        operationDelay = 0
+
+        forceMutualLikeResult = nil
+        forceHasSwipedOnResult = nil
+        forceLikeExistsResult = nil
+    }
+}
+
 // MARK: - Test Repository Factory
 
 /// Factory for creating mock repositories in tests
@@ -437,5 +721,9 @@ struct TestRepositoryFactory {
         let repo = MockInterestRepository()
         interests.forEach { repo.addInterest($0) }
         return repo
+    }
+
+    static func createMockSwipeRepository() -> MockSwipeRepository {
+        return MockSwipeRepository()
     }
 }
