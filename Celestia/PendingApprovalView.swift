@@ -10,6 +10,7 @@ import FirebaseFirestore
 
 struct PendingApprovalView: View {
     @EnvironmentObject var authService: AuthService
+    @EnvironmentObject var deepLinkManager: DeepLinkManager
     @State private var isRefreshing = false
     @State private var appearAnimation = false
     @State private var animateIcon = false
@@ -63,7 +64,7 @@ struct PendingApprovalView: View {
             .fullScreenCover(isPresented: $showSignUpEdit) {
                 SignUpView(isEditingProfile: true)
                     .environmentObject(authService)
-                    .environmentObject(DeepLinkManager.shared)
+                    .environmentObject(deepLinkManager)
             }
             .task {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
@@ -613,4 +614,5 @@ private struct ChecklistRow: View {
 #Preview {
     PendingApprovalView()
         .environmentObject(AuthService.shared)
+        .environmentObject(DeepLinkManager())
 }
