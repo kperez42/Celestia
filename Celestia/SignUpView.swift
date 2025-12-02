@@ -1175,18 +1175,19 @@ struct SignUpView: View {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], spacing: 10) {
                 ForEach(availableInterests, id: \.self) { interest in
                     InterestChip(
-                        title: interest,
-                        isSelected: selectedInterests.contains(interest)
-                    ) {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            if selectedInterests.contains(interest) {
-                                selectedInterests.remove(interest)
-                            } else {
-                                selectedInterests.insert(interest)
+                        interest: interest,
+                        isSelected: selectedInterests.contains(interest),
+                        action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                if selectedInterests.contains(interest) {
+                                    selectedInterests.remove(interest)
+                                } else {
+                                    selectedInterests.insert(interest)
+                                }
                             }
+                            HapticManager.shared.impact(.light)
                         }
-                        HapticManager.shared.impact(.light)
-                    }
+                    )
                 }
             }
 
@@ -1673,35 +1674,6 @@ struct SignUpView: View {
                 HapticManager.shared.notification(isValid ? .success : .error)
             }
         }
-    }
-}
-
-// MARK: - Interest Chip Component
-
-private struct InterestChip: View {
-    let title: String
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.subheadline)
-                .fontWeight(isSelected ? .semibold : .regular)
-                .foregroundColor(isSelected ? .white : .primary)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(
-                    Capsule()
-                        .fill(isSelected ? Color.purple : Color(.systemGray6))
-                )
-                .overlay(
-                    Capsule()
-                        .strokeBorder(isSelected ? Color.purple : Color.clear, lineWidth: 2)
-                )
-        }
-        .buttonStyle(.plain)
-        .scaleEffect(isSelected ? 1.05 : 1.0)
     }
 }
 
