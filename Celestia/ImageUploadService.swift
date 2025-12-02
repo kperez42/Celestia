@@ -14,10 +14,14 @@ import FirebaseStorage
 class ImageUploadService {
     static let shared = ImageUploadService()
 
-    // Image constraints
-    private let maxImageSize: Int = 15 * 1024 * 1024 // 15 MB for higher quality
-    private let maxDimension: CGFloat = 3000 // Higher resolution for sharper images
-    private let compressionQuality: CGFloat = 0.92 // High quality to prevent blurry images
+    // Image constraints - optimized for high quality profile photos
+    private let maxImageSize: Int = 20 * 1024 * 1024 // 20 MB for higher quality
+    private let maxDimension: CGFloat = 4096 // 4K resolution for sharp, crisp images
+    private let compressionQuality: CGFloat = 0.95 // Premium quality to prevent any blurriness
+
+    // Profile-specific settings for maximum quality on cards
+    private let profileMaxDimension: CGFloat = 2048 // Optimal for profile cards
+    private let profileCompressionQuality: CGFloat = 0.97 // Near-lossless for profile photos
 
     // Content moderation
     private let moderationService = ContentModerationService.shared
@@ -189,7 +193,89 @@ class ImageUploadService {
         guard !userId.isEmpty else {
             throw CelestiaError.invalidData
         }
-        return try await uploadImage(image, path: "profile_images/\(userId)")
+        // Use high-quality upload for profile images (these appear on cards)
+        return try await uploadHighQualityImage(image, path: "profile_images/\(userId)")
+    }
+
+    // MARK: - High Quality Upload (for profile photos)
+
+    /// Upload image with maximum quality settings for profile photos
+    /// These images appear on cards and need to look crisp and sharp
+    private func uploadHighQualityImage(_ image: UIImage, path: String, skipModeration: Bool = false) async throws -> String {
+        // Validate image on current thread (fast check)
+        try validateImage(image)
+
+        // Pre-check content for inappropriate material (if enabled)
+        if enablePreModeration && !skipModeration {
+            let moderationResult = await moderationService.preCheckPhoto(image)
+            if !moderationResult.approved {
+                Logger.shared.warning("Image rejected by content moderation: \(moderationResult.message)", category: .general)
+                throw CelestiaError.contentNotAllowed(moderationResult.message)
+            }
+        }
+
+        // Optimize image with HIGH QUALITY settings on background thread
+        let imageData = try await optimizeProfileImageAsync(image)
+
+        // Validate size
+        if imageData.count > maxImageSize {
+            throw CelestiaError.imageTooBig
+        }
+
+        // Upload with retry logic (network operation)
+        return try await RetryManager.shared.retryUploadOperation {
+            try await self.performUpload(imageData: imageData, path: path)
+        }
+    }
+
+    /// Optimize profile images with maximum quality settings
+    private func optimizeProfileImageAsync(_ image: UIImage) async throws -> Data {
+        return try await Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self = self else {
+                throw CelestiaError.invalidImageFormat
+            }
+
+            // Optimize image using HIGH QUALITY settings
+            guard let optimizedImage = self.optimizeProfileImage(image) else {
+                throw CelestiaError.invalidImageFormat
+            }
+
+            // Convert to data with MAXIMUM quality for profile photos
+            guard let imageData = optimizedImage.jpegData(compressionQuality: self.profileCompressionQuality) else {
+                throw CelestiaError.invalidImageFormat
+            }
+
+            return imageData
+        }.value
+    }
+
+    /// Optimize profile image with high-quality interpolation
+    private func optimizeProfileImage(_ image: UIImage) -> UIImage? {
+        let size = image.size
+
+        // Calculate new size if needed (use profile-specific max dimension)
+        var newSize = size
+        if size.width > profileMaxDimension || size.height > profileMaxDimension {
+            let scale = min(profileMaxDimension / size.width, profileMaxDimension / size.height)
+            newSize = CGSize(width: size.width * scale, height: size.height * scale)
+        }
+
+        // Resize if needed using high-quality renderer
+        if newSize != size {
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = 1.0 // Use actual pixel dimensions
+            format.preferredRange = .standard
+
+            let renderer = UIGraphicsImageRenderer(size: newSize, format: format)
+            let resizedImage = renderer.image { context in
+                // Use high-quality interpolation for sharp results
+                context.cgContext.interpolationQuality = .high
+                image.draw(in: CGRect(origin: .zero, size: newSize))
+            }
+            return resizedImage
+        }
+
+        return image
     }
 
     func uploadChatImage(_ image: UIImage, matchId: String) async throws -> String {
