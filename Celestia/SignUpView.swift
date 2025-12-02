@@ -13,9 +13,12 @@ struct SignUpView: View {
     @EnvironmentObject var deepLinkManager: DeepLinkManager
     @Environment(\.dismiss) var dismiss
 
+    // Edit mode - when true, pre-fills data and updates existing profile
+    var isEditingProfile: Bool = false
+
     private let imageUploadService = ImageUploadService.shared
 
-    @State private var currentStep = 0  // Start at email/password step
+    @State private var currentStep = 0  // Start at email/password step (or step 1 if editing)
 
     // Step 0: Basic info (email/password)
     @State private var email = ""
@@ -36,6 +39,8 @@ struct SignUpView: View {
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var photoImages: [UIImage] = []
     @State private var isLoadingPhotos = false
+    @State private var existingPhotoURLs: [String] = []  // For edit mode - existing photos to keep
+    @State private var isLoadingExistingPhotos = false   // For edit mode - loading state
 
     // Referral code (optional)
     @State private var referralCode = ""
@@ -193,9 +198,11 @@ struct SignUpView: View {
                         
                         // Navigation buttons
                         HStack(spacing: 15) {
-                            // Back button on all steps - dismisses on step 0, goes back on steps 1+
+                            // Back button - In edit mode: dismiss at step 1, otherwise go back
+                            // In signup mode: dismiss at step 0, otherwise go back
                             Button {
-                                if currentStep == 0 {
+                                let dismissStep = isEditingProfile ? 1 : 0
+                                if currentStep == dismissStep {
                                     dismiss()
                                 } else {
                                     withAnimation {
@@ -203,7 +210,7 @@ struct SignUpView: View {
                                     }
                                 }
                             } label: {
-                                Text("Back")
+                                Text(isEditingProfile && currentStep == 1 ? "Cancel" : "Back")
                                     .font(.headline)
                                     .foregroundColor(.purple)
                                     .frame(maxWidth: .infinity)
@@ -211,19 +218,19 @@ struct SignUpView: View {
                                     .background(Color.white)
                                     .cornerRadius(15)
                             }
-                            .accessibilityLabel("Back")
-                            .accessibilityHint(currentStep == 0 ? "Cancel sign up and return" : "Go back to previous step")
+                            .accessibilityLabel(isEditingProfile && currentStep == 1 ? "Cancel" : "Back")
+                            .accessibilityHint(currentStep == (isEditingProfile ? 1 : 0) ? "Cancel and return" : "Go back to previous step")
                             .accessibilityIdentifier(AccessibilityIdentifier.backButton)
                             .scaleButton()
 
                             Button {
                                 handleNext()
                             } label: {
-                                if authService.isLoading || isLoadingPhotos {
+                                if authService.isLoading || isLoadingPhotos || isLoadingExistingPhotos {
                                     ProgressView()
                                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                 } else {
-                                    Text(currentStep == 6 ? "Create Account" : "Next")
+                                    Text(nextButtonText)
                                         .font(.headline)
                                         .foregroundColor(.white)
                                 }
@@ -239,9 +246,9 @@ struct SignUpView: View {
                             )
                             .cornerRadius(15)
                             .opacity(canProceed ? 1.0 : 0.5)
-                            .disabled(!canProceed || authService.isLoading || isLoadingPhotos)
-                            .accessibilityLabel(currentStep == 6 ? "Create Account" : "Next")
-                            .accessibilityHint(currentStep == 6 ? "Create your account and sign up" : "Continue to next step")
+                            .disabled(!canProceed || authService.isLoading || isLoadingPhotos || isLoadingExistingPhotos)
+                            .accessibilityLabel(nextButtonText)
+                            .accessibilityHint(currentStep == 6 ? (isEditingProfile ? "Save your profile changes" : "Create your account and sign up") : "Continue to next step")
                             .accessibilityIdentifier(currentStep == 6 ? AccessibilityIdentifier.createAccountButton : AccessibilityIdentifier.nextButton)
                             .scaleButton()
                         }
@@ -264,13 +271,20 @@ struct SignUpView: View {
             // No toolbar X button - Back button at bottom handles navigation
         }
         .onChange(of: authService.userSession) { session in
-            if session != nil {
+            // In edit mode, user is already logged in, so don't auto-dismiss on session change
+            if !isEditingProfile && session != nil {
                 dismiss()
             }
         }
         .onAppear {
             // Clear any error messages from other screens
             authService.errorMessage = nil
+
+            // If editing existing profile, pre-fill all fields
+            if isEditingProfile, let user = authService.currentUser {
+                currentStep = 1  // Skip account creation step
+                prefillUserData(user)
+            }
 
             // Pre-fill referral code from deep link
             if let deepLinkCode = deepLinkManager.referralCode {
@@ -1418,6 +1432,9 @@ struct SignUpView: View {
 
     // MARK: - Computed Properties
     var stepTitle: String {
+        if isEditingProfile && currentStep == 1 {
+            return "Edit Your Profile"
+        }
         switch currentStep {
         case 0: return "Create Account"
         case 1: return "Tell us about yourself"
@@ -1428,6 +1445,13 @@ struct SignUpView: View {
         case 6: return "A Few More Details"
         default: return ""
         }
+    }
+
+    var nextButtonText: String {
+        if currentStep == 6 {
+            return isEditingProfile ? "Save Changes" : "Create Account"
+        }
+        return "Next"
     }
 
     var stepSubtitle: String {
@@ -1514,6 +1538,70 @@ struct SignUpView: View {
 
     // MARK: - Helper Functions
 
+    /// Pre-fill all fields from existing user data (for edit mode)
+    private func prefillUserData(_ user: User) {
+        // Basic info
+        name = user.fullName
+        age = String(user.age)
+        gender = user.gender
+        lookingFor = user.lookingFor
+
+        // Location
+        location = user.location
+        country = user.country
+
+        // Bio
+        bio = user.bio
+
+        // Interests
+        selectedInterests = Set(user.interests)
+
+        // Lifestyle details
+        if let userHeight = user.height {
+            height = formatHeightForDisplay(userHeight)
+        }
+        relationshipGoal = user.relationshipGoal ?? ""
+        educationLevel = user.educationLevel ?? ""
+        smoking = user.smoking ?? ""
+        drinking = user.drinking ?? ""
+
+        // Load existing photos from URLs
+        existingPhotoURLs = user.photos
+        loadExistingPhotos(from: user.photos)
+    }
+
+    /// Load existing photos from URLs into photoImages array
+    private func loadExistingPhotos(from urls: [String]) {
+        isLoadingExistingPhotos = true
+        Task {
+            var loadedImages: [UIImage] = []
+            for urlString in urls {
+                if let url = URL(string: urlString) {
+                    do {
+                        let (data, _) = try await URLSession.shared.data(from: url)
+                        if let image = UIImage(data: data) {
+                            loadedImages.append(image)
+                        }
+                    } catch {
+                        Logger.shared.error("Failed to load photo from URL: \(urlString)", category: .general, error: error)
+                    }
+                }
+            }
+            await MainActor.run {
+                photoImages = loadedImages
+                isLoadingExistingPhotos = false
+            }
+        }
+    }
+
+    /// Convert height in cm to display format (e.g., "5'10\"")
+    private func formatHeightForDisplay(_ cm: Int) -> String {
+        let totalInches = Double(cm) / 2.54
+        let feet = Int(totalInches) / 12
+        let inches = Int(totalInches) % 12
+        return "\(feet)'\(inches)\""
+    }
+
     /// Parse height string to cm (handles formats like "5'10" or "178cm" or "178")
     private func parseHeight(_ heightString: String) -> Int? {
         let trimmed = heightString.trimmingCharacters(in: .whitespaces).lowercased()
@@ -1543,68 +1631,136 @@ struct SignUpView: View {
                 currentStep += 1
             }
         } else {
-            // Final step - create account with photos and additional profile data
-            // Age was validated in step 1, so this should always succeed
-            let ageInt = Int(age) ?? 18
-            Task {
-                do {
-                    try await authService.createUser(
-                        withEmail: InputSanitizer.email(email),
-                        password: password,
-                        fullName: InputSanitizer.strict(name),
-                        age: ageInt,
-                        gender: gender,
-                        lookingFor: lookingFor,
-                        location: InputSanitizer.standard(location),
-                        country: InputSanitizer.basic(country),
-                        referralCode: InputSanitizer.referralCode(referralCode),
-                        photos: photoImages
-                    )
+            // Final step
+            if isEditingProfile {
+                // Edit mode - update existing profile
+                handleSaveProfileChanges()
+            } else {
+                // New account mode - create account
+                handleCreateAccount()
+            }
+        }
+    }
 
-                    // Update profile with additional data (bio, interests, lifestyle)
-                    // Wait briefly to ensure currentUser is set after createUser
-                    try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 second
+    /// Save profile changes when in edit mode
+    private func handleSaveProfileChanges() {
+        Task {
+            guard var user = authService.currentUser else {
+                Logger.shared.error("No current user when saving profile changes", category: .authentication)
+                return
+            }
 
-                    guard var user = authService.currentUser else {
-                        Logger.shared.error("currentUser is nil after createUser - profile data not saved", category: .authentication)
-                        return
-                    }
+            // Update basic info
+            user.fullName = InputSanitizer.strict(name)
+            user.age = Int(age) ?? user.age
+            user.gender = gender
+            user.lookingFor = lookingFor
 
-                    // Set bio and interests
-                    user.bio = InputSanitizer.standard(bio)
-                    user.interests = Array(selectedInterests)
+            // Update location
+            user.location = InputSanitizer.standard(location)
+            user.country = InputSanitizer.basic(country)
 
-                    // Parse height if provided
-                    if !height.isEmpty {
-                        user.height = parseHeight(height)
-                        Logger.shared.info("Setting height: \(height) -> \(user.height ?? 0) cm", category: .authentication)
-                    }
+            // Update bio and interests
+            user.bio = InputSanitizer.standard(bio)
+            user.interests = Array(selectedInterests)
 
-                    // Set optional lifestyle details
-                    if !relationshipGoal.isEmpty {
-                        user.relationshipGoal = relationshipGoal
-                    }
-                    if !educationLevel.isEmpty {
-                        user.educationLevel = educationLevel
-                    }
-                    if !smoking.isEmpty {
-                        user.smoking = smoking
-                    }
-                    if !drinking.isEmpty {
-                        user.drinking = drinking
-                    }
+            // Update height if provided
+            if !height.isEmpty {
+                user.height = parseHeight(height)
+            }
 
-                    // Save updated profile data
-                    do {
-                        try await authService.updateUser(user)
-                        Logger.shared.info("Profile data saved successfully - bio: \(bio.count) chars, interests: \(selectedInterests.count)", category: .authentication)
-                    } catch {
-                        Logger.shared.error("Failed to save profile data", category: .authentication, error: error)
-                    }
-                } catch {
-                    Logger.shared.error("Error creating account", category: .authentication, error: error)
-                    // Error is handled by AuthService setting errorMessage
+            // Update lifestyle details
+            user.relationshipGoal = relationshipGoal.isEmpty ? nil : relationshipGoal
+            user.educationLevel = educationLevel.isEmpty ? nil : educationLevel
+            user.smoking = smoking.isEmpty ? nil : smoking
+            user.drinking = drinking.isEmpty ? nil : drinking
+
+            do {
+                // Upload new photos if they've changed
+                if !photoImages.isEmpty {
+                    let uploadedURLs = try await imageUploadService.uploadPhotos(photoImages, userId: user.effectiveId ?? "")
+                    user.photos = uploadedURLs
+                    user.profileImageURL = uploadedURLs.first ?? user.profileImageURL
                 }
+
+                // Save the updated user
+                try await authService.updateUser(user)
+                Logger.shared.info("Profile updated successfully in edit mode", category: .authentication)
+
+                // Dismiss the view
+                await MainActor.run {
+                    dismiss()
+                }
+            } catch {
+                Logger.shared.error("Failed to update profile", category: .authentication, error: error)
+                await MainActor.run {
+                    authService.errorMessage = "Failed to update profile: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
+    /// Create new account (original signup flow)
+    private func handleCreateAccount() {
+        let ageInt = Int(age) ?? 18
+        Task {
+            do {
+                try await authService.createUser(
+                    withEmail: InputSanitizer.email(email),
+                    password: password,
+                    fullName: InputSanitizer.strict(name),
+                    age: ageInt,
+                    gender: gender,
+                    lookingFor: lookingFor,
+                    location: InputSanitizer.standard(location),
+                    country: InputSanitizer.basic(country),
+                    referralCode: InputSanitizer.referralCode(referralCode),
+                    photos: photoImages
+                )
+
+                // Update profile with additional data (bio, interests, lifestyle)
+                // Wait briefly to ensure currentUser is set after createUser
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 second
+
+                guard var user = authService.currentUser else {
+                    Logger.shared.error("currentUser is nil after createUser - profile data not saved", category: .authentication)
+                    return
+                }
+
+                // Set bio and interests
+                user.bio = InputSanitizer.standard(bio)
+                user.interests = Array(selectedInterests)
+
+                // Parse height if provided
+                if !height.isEmpty {
+                    user.height = parseHeight(height)
+                    Logger.shared.info("Setting height: \(height) -> \(user.height ?? 0) cm", category: .authentication)
+                }
+
+                // Set optional lifestyle details
+                if !relationshipGoal.isEmpty {
+                    user.relationshipGoal = relationshipGoal
+                }
+                if !educationLevel.isEmpty {
+                    user.educationLevel = educationLevel
+                }
+                if !smoking.isEmpty {
+                    user.smoking = smoking
+                }
+                if !drinking.isEmpty {
+                    user.drinking = drinking
+                }
+
+                // Save updated profile data
+                do {
+                    try await authService.updateUser(user)
+                    Logger.shared.info("Profile data saved successfully - bio: \(bio.count) chars, interests: \(selectedInterests.count)", category: .authentication)
+                } catch {
+                    Logger.shared.error("Failed to save profile data", category: .authentication, error: error)
+                }
+            } catch {
+                Logger.shared.error("Error creating account", category: .authentication, error: error)
+                // Error is handled by AuthService setting errorMessage
             }
         }
     }
