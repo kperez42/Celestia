@@ -409,10 +409,10 @@ service cloud.firestore {
     // Document ID format: {fromUserId}_{toUserId}
     match /likes/{likeId} {
       // Users can read likes they sent or received
-      // FIX: Use document ID pattern matching to allow reads even for non-existent documents
-      // This enables checking if someone has liked you (mutual like check)
+      // Note: Using field-based matching to support both single document reads and list queries
+      // This enables cascade delete queries during account deletion
       allow read: if isAuthenticated()
-        && (likeId.matches(request.auth.uid + '_.*') || likeId.matches('.*_' + request.auth.uid));
+        && (resource.data.fromUserId == request.auth.uid || resource.data.toUserId == request.auth.uid);
 
       // Users can create likes they send
       allow create: if isAuthenticated()
@@ -432,9 +432,10 @@ service cloud.firestore {
     // Document ID format: {fromUserId}_{toUserId}
     match /passes/{passId} {
       // Users can read passes they created
-      // FIX: Use document ID pattern matching to allow reads even for non-existent documents
+      // Note: Using field-based matching to support both single document reads and list queries
+      // This enables cascade delete queries during account deletion
       allow read: if isAuthenticated()
-        && passId.matches(request.auth.uid + '_.*');
+        && resource.data.fromUserId == request.auth.uid;
 
       // Users can create passes
       allow create: if isAuthenticated()
