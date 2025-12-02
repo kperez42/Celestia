@@ -2630,7 +2630,12 @@ struct EditProfileView: View {
                 }
             } else if failedCount > 0 {
                 HapticManager.shared.notification(.error)
-                errorMessage = "Failed to upload photos. Please check your connection and try again."
+                // Check if it's likely a network issue
+                if !networkMonitor.isConnected {
+                    errorMessage = "No internet connection. Check your WiFi or cellular data and try again."
+                } else {
+                    errorMessage = "Failed to upload photos. Please check your connection and try again."
+                }
                 showErrorAlert = true
             }
         }

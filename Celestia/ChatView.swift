@@ -147,6 +147,24 @@ struct ChatView: View {
             // - App goes to background (ListenerLifecycleManager handles it)
             cleanupUserListener()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .networkConnectionRestored)) { _ in
+            // AUTO-RETRY: When network is restored and we have a failed message, offer to retry
+            if failedMessage != nil && networkMonitor.isConnected {
+                Task { @MainActor in
+                    errorToastMessage = "Connection restored! Tap retry to send your message."
+                    showErrorToast = true
+                    HapticManager.shared.notification(.success)
+
+                    // Auto-hide after 5 seconds
+                    Task {
+                        try? await Task.sleep(nanoseconds: 5_000_000_000)
+                        if showErrorToast && errorToastMessage.contains("Connection restored") {
+                            showErrorToast = false
+                        }
+                    }
+                }
+            }
+        }
         .confirmationDialog("Unmatch with \(otherUser.fullName)?", isPresented: $showingUnmatchConfirmation, titleVisibility: .visible) {
             Button("Unmatch", role: .destructive) {
                 HapticManager.shared.notification(.warning)
@@ -1154,13 +1172,56 @@ struct ChatView: View {
             } catch {
                 Logger.shared.error("Error sending message", category: .messaging, error: error)
 
+                // Determine appropriate error message based on error type
+                let errorMessage: String
+                if let celestiaError = error as? CelestiaError {
+                    switch celestiaError {
+                    case .networkError, .noInternetConnection:
+                        errorMessage = "No internet connection. Check your WiFi and tap retry."
+                    case .timeout, .requestTimeout:
+                        errorMessage = "Upload timed out. Check your connection and tap retry."
+                    case .imageTooBig:
+                        errorMessage = "Image is too large. Try a smaller photo."
+                    case .imageUploadFailed:
+                        errorMessage = "Failed to upload photo. Tap retry to try again."
+                    default:
+                        errorMessage = "Failed to send message. Tap retry to try again."
+                    }
+                } else if let photoError = error as? PhotoUploadError {
+                    switch photoError {
+                    case .noNetwork:
+                        errorMessage = "No internet connection. Check your WiFi and tap retry."
+                    case .poorConnection:
+                        errorMessage = "Weak connection. Move to better signal and tap retry."
+                    case .uploadFailed(let reason):
+                        errorMessage = "Upload failed: \(reason). Tap retry."
+                    }
+                } else {
+                    // Check for network-related NSError codes
+                    let nsError = error as NSError
+                    if nsError.domain == NSURLErrorDomain {
+                        switch nsError.code {
+                        case NSURLErrorNotConnectedToInternet:
+                            errorMessage = "No internet connection. Check your WiFi and tap retry."
+                        case NSURLErrorTimedOut:
+                            errorMessage = "Upload timed out. Check your connection and tap retry."
+                        case NSURLErrorNetworkConnectionLost:
+                            errorMessage = "Connection lost. Check your WiFi and tap retry."
+                        default:
+                            errorMessage = "Network error. Check your connection and tap retry."
+                        }
+                    } else {
+                        errorMessage = "Failed to send message. Tap retry to try again."
+                    }
+                }
+
                 // Store failed message for retry and show error toast
                 await MainActor.run {
                     self.sendingMessagePreview = nil
                     self.sendingImagePreview = nil
                     self.isSending = false
                     self.failedMessage = (text: text, image: imageToSend)
-                    self.errorToastMessage = "Failed to send message. Tap retry to try again."
+                    self.errorToastMessage = errorMessage
                     self.showErrorToast = true
                     HapticManager.shared.notification(.error)
 
