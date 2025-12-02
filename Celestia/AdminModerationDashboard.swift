@@ -3427,9 +3427,9 @@ struct AdminPendingProfileDetailView: View {
 
     private var hasDetails: Bool {
         profile.height != nil ||
-        (profile.educationLevel != nil && profile.educationLevel != "Prefer not to say" && !profile.educationLevel!.isEmpty) ||
-        (profile.religion != nil && profile.religion != "Prefer not to say" && !profile.religion!.isEmpty) ||
-        (profile.relationshipGoal != nil && profile.relationshipGoal != "Prefer not to say" && !profile.relationshipGoal!.isEmpty)
+        (profile.educationLevel.map { $0 != "Prefer not to say" && !$0.isEmpty } ?? false) ||
+        (profile.religion.map { $0 != "Prefer not to say" && !$0.isEmpty } ?? false) ||
+        (profile.relationshipGoal.map { $0 != "Prefer not to say" && !$0.isEmpty } ?? false)
     }
 
     private var detailsSection: some View {
@@ -3462,11 +3462,11 @@ struct AdminPendingProfileDetailView: View {
     // MARK: - Lifestyle Section
 
     private var hasLifestyle: Bool {
-        (profile.smoking != nil && profile.smoking != "Prefer not to say" && !profile.smoking!.isEmpty) ||
-        (profile.drinking != nil && profile.drinking != "Prefer not to say" && !profile.drinking!.isEmpty) ||
-        (profile.exercise != nil && profile.exercise != "Prefer not to say" && !profile.exercise!.isEmpty) ||
-        (profile.diet != nil && profile.diet != "Prefer not to say" && !profile.diet!.isEmpty) ||
-        (profile.pets != nil && profile.pets != "Prefer not to say" && !profile.pets!.isEmpty)
+        (profile.smoking.map { $0 != "Prefer not to say" && !$0.isEmpty } ?? false) ||
+        (profile.drinking.map { $0 != "Prefer not to say" && !$0.isEmpty } ?? false) ||
+        (profile.exercise.map { $0 != "Prefer not to say" && !$0.isEmpty } ?? false) ||
+        (profile.diet.map { $0 != "Prefer not to say" && !$0.isEmpty } ?? false) ||
+        (profile.pets.map { $0 != "Prefer not to say" && !$0.isEmpty } ?? false)
     }
 
     private var lifestyleSection: some View {
