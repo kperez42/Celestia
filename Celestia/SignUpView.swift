@@ -41,6 +41,7 @@ struct SignUpView: View {
     @State private var isLoadingPhotos = false
     @State private var existingPhotoURLs: [String] = []  // For edit mode - existing photos to keep
     @State private var isLoadingExistingPhotos = false   // For edit mode - loading state
+    @State private var isSavingProfile = false           // For edit mode - saving state
 
     // Referral code (optional)
     @State private var referralCode = ""
@@ -218,6 +219,8 @@ struct SignUpView: View {
                                     .background(Color.white)
                                     .cornerRadius(15)
                             }
+                            .disabled(isSavingProfile)
+                            .opacity(isSavingProfile ? 0.5 : 1.0)
                             .accessibilityLabel(isEditingProfile && currentStep == 1 ? "Cancel" : "Back")
                             .accessibilityHint(currentStep == (isEditingProfile ? 1 : 0) ? "Cancel and return" : "Go back to previous step")
                             .accessibilityIdentifier(AccessibilityIdentifier.backButton)
@@ -226,7 +229,7 @@ struct SignUpView: View {
                             Button {
                                 handleNext()
                             } label: {
-                                if authService.isLoading || isLoadingPhotos || isLoadingExistingPhotos {
+                                if authService.isLoading || isLoadingPhotos || isLoadingExistingPhotos || isSavingProfile {
                                     ProgressView()
                                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                 } else {
@@ -246,7 +249,7 @@ struct SignUpView: View {
                             )
                             .cornerRadius(15)
                             .opacity(canProceed ? 1.0 : 0.5)
-                            .disabled(!canProceed || authService.isLoading || isLoadingPhotos || isLoadingExistingPhotos)
+                            .disabled(!canProceed || authService.isLoading || isLoadingPhotos || isLoadingExistingPhotos || isSavingProfile)
                             .accessibilityLabel(nextButtonText)
                             .accessibilityHint(currentStep == 6 ? (isEditingProfile ? "Save your profile changes" : "Create your account and sign up") : "Continue to next step")
                             .accessibilityIdentifier(currentStep == 6 ? AccessibilityIdentifier.createAccountButton : AccessibilityIdentifier.nextButton)
@@ -1570,23 +1573,38 @@ struct SignUpView: View {
         loadExistingPhotos(from: user.photos)
     }
 
-    /// Load existing photos from URLs into photoImages array
+    /// Load existing photos from URLs into photoImages array (parallel download for speed)
     private func loadExistingPhotos(from urls: [String]) {
+        guard !urls.isEmpty else {
+            isLoadingExistingPhotos = false
+            return
+        }
+
         isLoadingExistingPhotos = true
         Task {
-            var loadedImages: [UIImage] = []
-            for urlString in urls {
-                if let url = URL(string: urlString) {
-                    do {
-                        let (data, _) = try await URLSession.shared.data(from: url)
-                        if let image = UIImage(data: data) {
-                            loadedImages.append(image)
+            // Download all photos in parallel for faster loading
+            let loadedImages = await withTaskGroup(of: (Int, UIImage?).self) { group in
+                for (index, urlString) in urls.enumerated() {
+                    group.addTask {
+                        guard let url = URL(string: urlString) else { return (index, nil) }
+                        do {
+                            let (data, _) = try await URLSession.shared.data(from: url)
+                            return (index, UIImage(data: data))
+                        } catch {
+                            Logger.shared.error("Failed to load photo from URL: \(urlString)", category: .general, error: error)
+                            return (index, nil)
                         }
-                    } catch {
-                        Logger.shared.error("Failed to load photo from URL: \(urlString)", category: .general, error: error)
                     }
                 }
+
+                // Collect results and sort by original index to maintain order
+                var results: [(Int, UIImage?)] = []
+                for await result in group {
+                    results.append(result)
+                }
+                return results.sorted { $0.0 < $1.0 }.compactMap { $0.1 }
             }
+
             await MainActor.run {
                 photoImages = loadedImages
                 isLoadingExistingPhotos = false
@@ -1644,7 +1662,14 @@ struct SignUpView: View {
 
     /// Save profile changes when in edit mode
     private func handleSaveProfileChanges() {
+        isSavingProfile = true
         Task {
+            defer {
+                Task { @MainActor in
+                    isSavingProfile = false
+                }
+            }
+
             guard var user = authService.currentUser else {
                 Logger.shared.error("No current user when saving profile changes", category: .authentication)
                 return
