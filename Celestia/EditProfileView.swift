@@ -2305,9 +2305,26 @@ struct EditProfileView: View {
         HapticManager.shared.impact(.medium)
 
         // Immediately save to Firestore so deletion persists
+        // Also sync profileImageURL: first photo in array is always the profile image
         Task {
             guard var user = authService.currentUser else { return }
             user.photos = photos
+
+            // Sync profileImageURL with first photo in array
+            // If photos array is empty, clear profileImageURL
+            // Otherwise, set profileImageURL to the new first photo
+            if photos.isEmpty {
+                user.profileImageURL = ""
+                // Clear local profile image as well
+                await MainActor.run {
+                    profileImage = nil
+                }
+                Logger.shared.info("All photos deleted - cleared profileImageURL", category: .general)
+            } else if let firstPhoto = photos.first {
+                user.profileImageURL = firstPhoto
+                Logger.shared.info("Updated profileImageURL to new first photo", category: .general)
+            }
+
             do {
                 try await authService.updateUser(user)
                 Logger.shared.info("Photo deleted from profile successfully", category: .general)
@@ -2332,9 +2349,17 @@ struct EditProfileView: View {
 
     private func savePhotoOrder() {
         // Save photo order to Firestore so reordering persists
+        // Also sync profileImageURL: first photo in array is always the profile image
         Task {
             guard var user = authService.currentUser else { return }
             user.photos = photos
+
+            // Sync profileImageURL with first photo in array after reorder
+            if let firstPhoto = photos.first {
+                user.profileImageURL = firstPhoto
+                Logger.shared.info("Updated profileImageURL to match new first photo after reorder", category: .general)
+            }
+
             do {
                 try await authService.updateUser(user)
                 Logger.shared.info("Photo order updated successfully", category: .general)
