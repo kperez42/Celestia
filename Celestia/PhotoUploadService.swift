@@ -52,22 +52,40 @@ class PhotoUploadService {
         }
 
         // NETWORK CHECK: Verify connectivity before attempting upload
-        guard await checkNetworkForUpload() else {
-            Logger.shared.warning("Photo upload blocked: No network connection", category: .networking)
+        let networkStatus = await MainActor.run {
+            (connected: networkMonitor.isConnected,
+             type: networkMonitor.connectionType.description,
+             quality: networkMonitor.quality.description)
+        }
+
+        Logger.shared.info("📶 Network check for upload - Connected: \(networkStatus.connected), Type: \(networkStatus.type), Quality: \(networkStatus.quality)", category: .networking)
+
+        guard networkStatus.connected else {
+            Logger.shared.warning("❌ Photo upload blocked: No network connection", category: .networking)
             throw PhotoUploadError.noNetwork
         }
 
+        Logger.shared.info("✅ Network OK - Starting \(imageType) photo upload for user: \(userId.prefix(8))...", category: .networking)
+
         // Use high-quality upload for profile and gallery photos (these appear on cards)
-        switch imageType {
-        case .profile:
-            // Profile photos use maximum quality settings
-            return try await ImageUploadService.shared.uploadProfileImage(image, userId: userId)
-        case .gallery:
-            // Gallery photos also use high quality (they appear in photo viewers)
-            return try await ImageUploadService.shared.uploadProfileImage(image, userId: userId)
-        case .chat:
-            // Chat images use standard quality (they're smaller and temporary)
-            return try await ImageUploadService.shared.uploadChatImage(image, matchId: userId)
+        do {
+            let url: String
+            switch imageType {
+            case .profile:
+                // Profile photos use maximum quality settings
+                url = try await ImageUploadService.shared.uploadProfileImage(image, userId: userId)
+            case .gallery:
+                // Gallery photos also use high quality (they appear in photo viewers)
+                url = try await ImageUploadService.shared.uploadProfileImage(image, userId: userId)
+            case .chat:
+                // Chat images use standard quality (they're smaller and temporary)
+                url = try await ImageUploadService.shared.uploadChatImage(image, matchId: userId)
+            }
+            Logger.shared.info("✅ Photo upload successful: \(url.prefix(50))...", category: .networking)
+            return url
+        } catch {
+            Logger.shared.error("❌ Photo upload failed", category: .networking, error: error)
+            throw error
         }
     }
 
@@ -103,17 +121,10 @@ class PhotoUploadService {
 
     // MARK: - Network Helpers
 
-    /// Check if network is suitable for upload
-    @MainActor
-    private func checkNetworkForUpload() -> Bool {
-        return networkMonitor.isConnected
-    }
-
     /// Check network quality for large uploads
     @MainActor
     func isNetworkSuitableForUpload() -> Bool {
         guard networkMonitor.isConnected else { return false }
-        // Allow uploads on any connection except when quality is unknown and disconnected
         return true
     }
 
