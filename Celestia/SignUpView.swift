@@ -624,78 +624,44 @@ struct SignUpView: View {
     // MARK: - Step 4: Photos
     var step4Content: some View {
         VStack(spacing: 24) {
-            // Engaging header card
-            VStack(spacing: 16) {
-                // Animated camera icon with gradient background
+            // Clean header card
+            HStack(spacing: 16) {
+                // Camera icon
                 ZStack {
                     Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.purple.opacity(0.2), Color.pink.opacity(0.15), Color.orange.opacity(0.1)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 80, height: 80)
-
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.purple.opacity(0.3), Color.pink.opacity(0.2)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 60, height: 60)
+                        .fill(Color.purple.opacity(0.12))
+                        .frame(width: 56, height: 56)
 
                     Image(systemName: "camera.fill")
-                        .font(.system(size: 28))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.purple, .pink],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .font(.system(size: 24))
+                        .foregroundColor(.purple)
                 }
 
-                VStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text("Time to shine!")
-                        .font(.title3)
-                        .fontWeight(.bold)
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.purple, .pink],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
+                        .font(.headline)
+                        .foregroundColor(.primary)
 
                     Text("Great photos get 10x more matches")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
+
+                Spacer()
             }
-            .padding(.vertical, 20)
-            .frame(maxWidth: .infinity)
+            .padding(16)
             .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.purple.opacity(0.05), Color.pink.opacity(0.03)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
             )
 
             // Quick tips in a horizontal scroll
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     photoTipChip(icon: "face.smiling.fill", text: "Clear face shot", color: .purple)
-                    photoTipChip(icon: "figure.stand", text: "Full body pic", color: .pink)
-                    photoTipChip(icon: "heart.fill", text: "Show personality", color: .orange)
-                    photoTipChip(icon: "sun.max.fill", text: "Good lighting", color: .yellow)
+                    photoTipChip(icon: "heart.fill", text: "Show personality", color: .pink)
+                    photoTipChip(icon: "sun.max.fill", text: "Good lighting", color: .orange)
                 }
                 .padding(.horizontal, 4)
             }
@@ -703,52 +669,40 @@ struct SignUpView: View {
             // Main profile photo (larger, more prominent)
             if !photoImages.isEmpty {
                 ZStack(alignment: .topTrailing) {
-                    Image(uiImage: photoImages[0])
-                        .resizable()
-                        .scaledToFill()
-                        .frame(height: 220)
-                        .frame(maxWidth: .infinity)
-                        .clipped()
-                        .cornerRadius(20)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 20)
-                                .stroke(
-                                    LinearGradient(
-                                        colors: [.purple, .pink, .orange],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 3
-                                )
-                        )
-                        .overlay(
-                            VStack {
-                                Spacer()
-                                HStack(spacing: 6) {
-                                    Image(systemName: "star.fill")
-                                        .font(.caption)
-                                    Text("Main Photo")
-                                        .font(.caption)
-                                        .fontWeight(.bold)
-                                }
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
-                                .background(
-                                    Capsule()
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [.purple, .pink],
-                                                startPoint: .leading,
-                                                endPoint: .trailing
-                                            )
-                                        )
-                                )
-                                .padding(12)
+                    GeometryReader { geometry in
+                        Image(uiImage: photoImages[0])
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: geometry.size.width, height: 220)
+                            .clipped()
+                    }
+                    .frame(height: 220)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.purple.opacity(0.3), lineWidth: 2)
+                    )
+                    .overlay(
+                        VStack {
+                            Spacer()
+                            HStack(spacing: 6) {
+                                Image(systemName: "star.fill")
+                                    .font(.caption)
+                                Text("Main Photo")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
                             }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        )
-                        .shadow(color: .purple.opacity(0.3), radius: 10, x: 0, y: 5)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(
+                                Capsule()
+                                    .fill(Color.purple)
+                            )
+                            .padding(10)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    )
 
                     Button {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
@@ -844,16 +798,19 @@ struct SignUpView: View {
                     ForEach(1..<6, id: \.self) { index in
                         if index < photoImages.count {
                             ZStack(alignment: .topTrailing) {
-                                Image(uiImage: photoImages[index])
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(height: 100)
-                                    .clipped()
-                                    .cornerRadius(14)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 14)
-                                            .stroke(Color.purple.opacity(0.3), lineWidth: 1)
-                                    )
+                                GeometryReader { geometry in
+                                    Image(uiImage: photoImages[index])
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: geometry.size.width, height: 100)
+                                        .clipped()
+                                }
+                                .frame(height: 100)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.purple.opacity(0.2), lineWidth: 1)
+                                )
 
                                 Button {
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
