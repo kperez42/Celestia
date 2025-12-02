@@ -385,12 +385,15 @@ struct ChatView: View {
                             }
                     }
 
-                    // Show conversation starters if no messages
+                    // Show conversation starters ONLY for brand new conversations
                     // BUGFIX: Use hasLoadedMessagesForThisChat to prevent flash of conversation starters
                     // before messages are loaded. This fixes a race condition where the view renders
                     // before onAppear sets the loading state.
                     // FIX: Don't show conversation starters if there was an error loading messages
-                    if messageService.messages.isEmpty, let currentUser = authService.currentUser {
+                    // FIX: Only show if this is truly a NEW conversation (no messages ever sent)
+                    // Check match.lastMessage to determine if conversation has ever had messages
+                    let isNewConversation = match.lastMessage == nil && match.lastMessageTimestamp == nil
+                    if messageService.messages.isEmpty && isNewConversation, let currentUser = authService.currentUser {
                         if messageService.isLoading || !hasLoadedMessagesForThisChat {
                             // Show loading state - either service is loading OR we haven't confirmed load for this chat
                             VStack(spacing: 16) {
