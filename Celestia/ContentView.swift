@@ -30,6 +30,7 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var authService: AuthService
+    @EnvironmentObject var deepLinkManager: DeepLinkManager
     @State private var isAuthenticated = false
     @State private var needsEmailVerification = false
     @State private var isProfilePending = false
@@ -73,11 +74,13 @@ struct ContentView: View {
                         // User must fix issues and request re-review
                         ProfileRejectionFeedbackView()
                             .environmentObject(authService)
+                            .environmentObject(deepLinkManager)
                             .transition(.opacity)
                     } else if isProfilePending {
                         // Show pending approval view while profile is under review
                         PendingApprovalView()
                             .environmentObject(authService)
+                            .environmentObject(deepLinkManager)
                             .transition(.opacity)
                     } else {
                         MainTabView()
