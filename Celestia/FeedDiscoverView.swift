@@ -193,11 +193,13 @@ struct FeedDiscoverView: View {
             // Match animation overlay
             if showMatchAnimation {
                 matchCelebrationView
+                    .zIndex(1)
             }
 
-            // Action feedback toast
+            // Action feedback toast - highest z-index to ensure visibility
             if showActionToast {
                 toastView
+                    .zIndex(2)
             }
         }
     }
@@ -289,7 +291,7 @@ struct FeedDiscoverView: View {
             }
             .padding(.horizontal)
             .padding(.top, 8)
-            .padding(.bottom)
+            .padding(.bottom, 100) // Account for tab bar height
         }
         .scrollDismissesKeyboard(.interactively)
         .scrollIndicators(.hidden)
