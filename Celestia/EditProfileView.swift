@@ -48,6 +48,9 @@ struct EditProfileView: View {
     // Store user ID to ensure it's available during uploads
     @State private var userId: String = ""
 
+    // Network monitoring for upload operations
+    @ObservedObject var networkMonitor = NetworkMonitor.shared
+
     // Advanced profile fields
     @State private var educationLevel: String?
     @State private var height: Int?
@@ -309,8 +312,9 @@ struct EditProfileView: View {
                 Logger.shared.info("🔍 onAppear - Photos count: \(photos.count)", category: .general)
             }
         }
+        .networkStatusBanner() // UX: Show offline status for photo uploads
     }
-    
+
     // MARK: - Combined Photos Section
 
     private var photosSection: some View {
@@ -2414,6 +2418,17 @@ struct EditProfileView: View {
     private func uploadNewPhotos(_ items: [PhotosPickerItem]) async {
         guard !items.isEmpty else {
             Logger.shared.warning("Upload cancelled: No items selected", category: .general)
+            return
+        }
+
+        // NETWORK CHECK: Ensure we have connectivity before attempting upload
+        guard networkMonitor.isConnected else {
+            Logger.shared.warning("Upload cancelled: No network connection", category: .networking)
+            await MainActor.run {
+                errorMessage = "No internet connection. Please check your WiFi or cellular data and try again."
+                showErrorAlert = true
+                HapticManager.shared.notification(.error)
+            }
             return
         }
 

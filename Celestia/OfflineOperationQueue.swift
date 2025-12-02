@@ -8,6 +8,7 @@
 
 import Foundation
 import FirebaseFirestore
+import UIKit
 
 /// Represents an operation that can be queued when offline
 struct PendingOperation: Codable, Identifiable {
@@ -79,7 +80,76 @@ class OfflineOperationQueue: ObservableObject {
         savePendingOperations()
         Logger.shared.info("Cleared all pending operations", category: .offline)
     }
-    
+
+    /// Queue a photo upload for when network is restored
+    /// - Parameters:
+    ///   - image: The UIImage to upload
+    ///   - userId: The user ID for the upload path
+    ///   - imageType: The type of image (profile, gallery, chat)
+    /// - Returns: True if successfully queued, false otherwise
+    func queuePhotoUpload(_ image: UIImage, userId: String, imageType: ImageType) -> Bool {
+        // Save image to temp file
+        guard let imageData = image.jpegData(compressionQuality: 0.9) else {
+            Logger.shared.error("Failed to convert image to JPEG data", category: .offline)
+            return false
+        }
+
+        let tempFileName = "\(UUID().uuidString).jpg"
+        let tempDirectory = FileManager.default.temporaryDirectory
+        let tempFileURL = tempDirectory.appendingPathComponent("offline_uploads", isDirectory: true)
+            .appendingPathComponent(tempFileName)
+
+        do {
+            // Create directory if needed
+            try FileManager.default.createDirectory(
+                at: tempFileURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+
+            // Write image data to temp file
+            try imageData.write(to: tempFileURL)
+
+            // Determine image type string
+            let imageTypeString: String
+            switch imageType {
+            case .profile:
+                imageTypeString = "profile"
+            case .gallery:
+                imageTypeString = "gallery"
+            case .chat:
+                imageTypeString = "chat"
+            }
+
+            // Create and queue operation
+            let operation = PendingOperation(
+                type: .uploadPhoto,
+                data: [
+                    "userId": userId,
+                    "tempFilePath": tempFileURL.path,
+                    "imageType": imageTypeString
+                ]
+            )
+
+            enqueue(operation)
+            Logger.shared.info("Queued photo upload for offline sync", category: .offline)
+            return true
+
+        } catch {
+            Logger.shared.error("Failed to save image to temp file", category: .offline, error: error)
+            return false
+        }
+    }
+
+    /// Queue a photo deletion for when network is restored
+    func queuePhotoDelete(photoURL: String) {
+        let operation = PendingOperation(
+            type: .deletePhoto,
+            data: ["photoURL": photoURL]
+        )
+        enqueue(operation)
+        Logger.shared.info("Queued photo deletion for offline sync", category: .offline)
+    }
+
     // MARK: - Processing
     
     /// Process all pending operations
@@ -193,13 +263,53 @@ class OfflineOperationQueue: ObservableObject {
     }
     
     private func processPhotoUploadOperation(_ operation: PendingOperation) async throws {
-        // Implement photo upload logic
-        Logger.shared.debug("Processing photo upload operation", category: .offline)
+        guard let userId = operation.data["userId"],
+              let tempFilePath = operation.data["tempFilePath"],
+              let imageTypeRaw = operation.data["imageType"] else {
+            throw NSError(domain: "OfflineQueue", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid photo upload data"])
+        }
+
+        // Load image from temp file
+        let fileURL = URL(fileURLWithPath: tempFilePath)
+        guard FileManager.default.fileExists(atPath: tempFilePath),
+              let imageData = try? Data(contentsOf: fileURL),
+              let image = UIImage(data: imageData) else {
+            // Clean up temp file if it exists but couldn't be loaded
+            try? FileManager.default.removeItem(at: fileURL)
+            throw NSError(domain: "OfflineQueue", code: -2, userInfo: [NSLocalizedDescriptionKey: "Failed to load image from temp file"])
+        }
+
+        // Determine image type
+        let imageType: ImageType
+        switch imageTypeRaw {
+        case "profile":
+            imageType = .profile
+        case "gallery":
+            imageType = .gallery
+        case "chat":
+            imageType = .chat
+        default:
+            imageType = .gallery
+        }
+
+        // Upload using PhotoUploadService
+        let uploadedURL = try await PhotoUploadService.shared.uploadPhoto(image, userId: userId, imageType: imageType)
+
+        // Clean up temp file after successful upload
+        try? FileManager.default.removeItem(at: fileURL)
+
+        Logger.shared.info("Successfully uploaded queued photo: \(uploadedURL)", category: .offline)
     }
-    
+
     private func processPhotoDeleteOperation(_ operation: PendingOperation) async throws {
-        // Implement photo delete logic
-        Logger.shared.debug("Processing photo delete operation", category: .offline)
+        guard let photoURL = operation.data["photoURL"] else {
+            throw NSError(domain: "OfflineQueue", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid photo delete data"])
+        }
+
+        // Delete using ImageUploadService
+        try await ImageUploadService.shared.deleteImage(url: photoURL)
+
+        Logger.shared.info("Successfully deleted queued photo: \(photoURL)", category: .offline)
     }
     
     // MARK: - Persistence
