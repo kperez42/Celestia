@@ -21,6 +21,8 @@ struct ManualIDVerificationView: View {
     @State private var showingImageSourcePicker = false
     @State private var imageSourceType: ImageSourceType = .id
     @State private var animateProgress = false
+    @State private var showingImagePreview = false
+    @State private var previewImage: UIImage?
 
     enum ImageSourceType {
         case id, selfie
@@ -50,7 +52,16 @@ struct ManualIDVerificationView: View {
                 Color(.systemGroupedBackground)
                     .ignoresSafeArea()
 
-                if viewModel.isVerified {
+                if viewModel.isCheckingStatus {
+                    // Loading state while checking verification status
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .scaleEffect(1.2)
+                        Text("Checking status...")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                } else if viewModel.isVerified {
                     verifiedView
                         .transition(.asymmetric(
                             insertion: .scale.combined(with: .opacity),
@@ -66,6 +77,7 @@ struct ManualIDVerificationView: View {
                     mainContent
                 }
             }
+            .animation(.spring(response: 0.5), value: viewModel.isCheckingStatus)
             .animation(.spring(response: 0.5), value: viewModel.isVerified)
             .animation(.spring(response: 0.5), value: viewModel.pendingVerification)
             .navigationTitle("")
@@ -149,6 +161,13 @@ struct ManualIDVerificationView: View {
             } message: {
                 Text(viewModel.contentWarningMessage)
             }
+            .fullScreenCover(isPresented: $showingImagePreview) {
+                if let image = previewImage {
+                    IDImagePreviewView(image: image) {
+                        showingImagePreview = false
+                    }
+                }
+            }
             .task {
                 await viewModel.checkVerificationStatus()
             }
@@ -183,7 +202,13 @@ struct ManualIDVerificationView: View {
                             imageSourceType = .id
                             showingImageSourcePicker = true
                         },
-                        onClear: { viewModel.idImage = nil }
+                        onClear: { viewModel.idImage = nil },
+                        onPreview: {
+                            if let image = viewModel.idImage {
+                                previewImage = image
+                                showingImagePreview = true
+                            }
+                        }
                     )
 
                     // Step 3: Selfie
@@ -198,7 +223,13 @@ struct ManualIDVerificationView: View {
                             imageSourceType = .selfie
                             showingImageSourcePicker = true
                         },
-                        onClear: { viewModel.selfieImage = nil }
+                        onClear: { viewModel.selfieImage = nil },
+                        onPreview: {
+                            if let image = viewModel.selfieImage {
+                                previewImage = image
+                                showingImagePreview = true
+                            }
+                        }
                     )
 
                     // Privacy notice
@@ -347,7 +378,8 @@ struct ManualIDVerificationView: View {
         image: UIImage?,
         isActive: Bool,
         onTap: @escaping () -> Void,
-        onClear: @escaping () -> Void
+        onClear: @escaping () -> Void,
+        onPreview: @escaping () -> Void
     ) -> some View {
         VStack(spacing: 0) {
             // Header
@@ -387,24 +419,49 @@ struct ManualIDVerificationView: View {
 
             // Photo area
             if let image = image {
-                // Show uploaded photo
+                // Show uploaded photo with action buttons
                 ZStack(alignment: .topTrailing) {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
                         .frame(height: 180)
                         .clipped()
+                        .onTapGesture {
+                            HapticManager.shared.impact(.light)
+                            onPreview()
+                        }
 
-                    // Remove button
-                    Button(action: onClear) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                            .shadow(radius: 2)
+                    // Action buttons row
+                    HStack(spacing: 8) {
+                        // Replace photo button
+                        Button {
+                            HapticManager.shared.impact(.light)
+                            onTap()
+                        } label: {
+                            Image(systemName: "arrow.triangle.2.circlepath.camera.fill")
+                                .font(.body)
+                                .foregroundColor(.white)
+                                .padding(8)
+                                .background(Color.black.opacity(0.5))
+                                .clipShape(Circle())
+                        }
+
+                        // Remove button
+                        Button(action: onClear) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.title2)
+                                .foregroundColor(.white)
+                                .shadow(radius: 2)
+                        }
                     }
                     .padding(12)
                 }
-                .onTapGesture(perform: onTap)
+
+                // Tap to preview hint
+                Text("Tap image to preview full size")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .padding(.top, 4)
             } else if isActive {
                 // Upload button
                 Button(action: onTap) {
@@ -733,6 +790,7 @@ class ManualIDVerificationViewModel: ObservableObject {
 
     @Published var isSubmitting = false
     @Published var isCheckingContent = false
+    @Published var isCheckingStatus = true  // Start true to prevent flash
     @Published var showingSuccess = false
     @Published var showingError = false
     @Published var errorMessage = ""
@@ -756,7 +814,10 @@ class ManualIDVerificationViewModel: ObservableObject {
     // MARK: - Check Status
 
     func checkVerificationStatus() async {
-        guard let userId = Auth.auth().currentUser?.uid else { return }
+        guard let userId = Auth.auth().currentUser?.uid else {
+            isCheckingStatus = false
+            return
+        }
 
         do {
             let doc = try await db.collection("users").document(userId).getDocument()
@@ -768,6 +829,7 @@ class ManualIDVerificationViewModel: ObservableObject {
             if data["idVerificationRejected"] as? Bool == true {
                 wasRejected = true
                 rejectionReason = data["idVerificationRejectionReason"] as? String
+                isCheckingStatus = false
                 return  // Don't check pending if already rejected
             }
 
@@ -781,8 +843,10 @@ class ManualIDVerificationViewModel: ObservableObject {
                     submittedAt = timestamp.dateValue()
                 }
             }
+            isCheckingStatus = false
         } catch {
             Logger.shared.error("Failed to check verification status", category: .general, error: error)
+            isCheckingStatus = false
         }
     }
 
@@ -941,6 +1005,93 @@ class ManualIDVerificationViewModel: ObservableObject {
         _ = try await ref.putDataAsync(imageData, metadata: metadata)
         let url = try await ref.downloadURL()
         return url.absoluteString
+    }
+}
+
+// MARK: - ID Image Preview View
+
+struct IDImagePreviewView: View {
+    let image: UIImage
+    let onDismiss: () -> Void
+
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFit()
+                .scaleEffect(scale)
+                .offset(offset)
+                .gesture(
+                    MagnificationGesture()
+                        .onChanged { value in
+                            scale = lastScale * value
+                        }
+                        .onEnded { _ in
+                            lastScale = scale
+                            if scale < 1.0 {
+                                withAnimation(.spring()) {
+                                    scale = 1.0
+                                    lastScale = 1.0
+                                }
+                            }
+                        }
+                )
+                .gesture(
+                    DragGesture()
+                        .onChanged { value in
+                            offset = CGSize(
+                                width: lastOffset.width + value.translation.width,
+                                height: lastOffset.height + value.translation.height
+                            )
+                        }
+                        .onEnded { _ in
+                            lastOffset = offset
+                        }
+                )
+                .onTapGesture(count: 2) {
+                    withAnimation(.spring()) {
+                        if scale > 1.0 {
+                            scale = 1.0
+                            lastScale = 1.0
+                            offset = .zero
+                            lastOffset = .zero
+                        } else {
+                            scale = 2.0
+                            lastScale = 2.0
+                        }
+                    }
+                }
+
+            // Close button
+            VStack {
+                HStack {
+                    Spacer()
+                    Button {
+                        HapticManager.shared.impact(.light)
+                        onDismiss()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title)
+                            .foregroundColor(.white)
+                            .padding()
+                    }
+                }
+                Spacer()
+
+                // Instructions
+                Text("Pinch to zoom • Double-tap to zoom in/out")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.7))
+                    .padding(.bottom, 40)
+            }
+        }
     }
 }
 
