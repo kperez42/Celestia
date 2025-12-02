@@ -399,6 +399,7 @@ struct SignUpView: View {
                 TextField("your@email.com", text: $email)
                     .textInputAutocapitalization(.never)
                     .keyboardType(.emailAddress)
+                    .textContentType(.emailAddress)
                     .padding()
                     .background(Color(.systemBackground))
                     .cornerRadius(10)
@@ -413,6 +414,7 @@ struct SignUpView: View {
                     .foregroundColor(.secondary)
                 
                 SecureField("Min. 6 characters", text: $password)
+                    .textContentType(.newPassword)
                     .padding()
                     .background(Color(.systemBackground))
                     .cornerRadius(10)
@@ -427,6 +429,7 @@ struct SignUpView: View {
                     .foregroundColor(.secondary)
 
                 SecureField("Re-enter password", text: $confirmPassword)
+                    .textContentType(.newPassword)
                     .padding()
                     .background(Color(.systemBackground))
                     .cornerRadius(10)
