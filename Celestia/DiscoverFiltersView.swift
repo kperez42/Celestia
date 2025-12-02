@@ -755,12 +755,8 @@ struct SelectableFilterChip: View {
                 .foregroundColor(isSelected ? .white : .primary)
                 .background(
                     isSelected ?
-                    LinearGradient(
-                        colors: [.purple, .pink],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ) :
-                    LinearGradient(colors: [Color(.systemGray6)], startPoint: .leading, endPoint: .trailing)
+                    Color.purple :
+                    Color(.systemGray6)
                 )
                 .cornerRadius(20)
                 .overlay(
