@@ -36,10 +36,10 @@ class RetryManager {
         )
 
         static let conservative = RetryConfig(
-            maxAttempts: 2,
-            initialDelay: 2.0,
-            maxDelay: 5.0,
-            multiplier: 1.5
+            maxAttempts: 3,  // Increased from 2 - WiFi can have momentary issues
+            initialDelay: 1.0,  // Reduced initial delay for faster retry
+            maxDelay: 10.0,  // Increased max delay
+            multiplier: 2.0
         )
     }
 
@@ -63,15 +63,20 @@ class RetryManager {
             } catch {
                 lastError = error
 
+                // Log error details for debugging
+                let nsError = error as NSError
+                Logger.shared.warning("🔄 Retry: Attempt \(attempt) failed - domain: \(nsError.domain), code: \(nsError.code)", category: .networking)
+
                 // Check if error is retryable
-                if !isRetryable(error: error) {
-                    Logger.shared.error("Non-retryable error", category: .networking, error: error)
+                let retryable = isRetryable(error: error)
+                if !retryable {
+                    Logger.shared.error("🔄 Retry: Error is NOT retryable - throwing immediately", category: .networking, error: error)
                     throw error
                 }
 
                 // If this was the last attempt, throw the error
                 if attempt == config.maxAttempts {
-                    Logger.shared.error("All \(config.maxAttempts) attempts failed", category: .networking, error: error)
+                    Logger.shared.error("🔄 Retry: All \(config.maxAttempts) attempts exhausted", category: .networking, error: error)
                     throw error
                 }
 
@@ -79,7 +84,7 @@ class RetryManager {
                 let jitter = Double.random(in: 0.8...1.2)
                 let delay = min(currentDelay * jitter, config.maxDelay)
 
-                Logger.shared.warning("Attempt \(attempt) failed. Retrying in \(String(format: "%.1f", delay))s...", category: .networking)
+                Logger.shared.info("🔄 Retry: Error is retryable - waiting \(String(format: "%.1f", delay))s before attempt \(attempt + 1)...", category: .networking)
 
                 // Wait before retrying
                 try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
@@ -126,25 +131,47 @@ class RetryManager {
                  NSURLErrorCannotConnectToHost,
                  NSURLErrorNetworkConnectionLost,
                  NSURLErrorDNSLookupFailed,
-                 NSURLErrorResourceUnavailable:
+                 NSURLErrorResourceUnavailable,
+                 NSURLErrorSecureConnectionFailed,
+                 NSURLErrorServerCertificateHasBadDate,
+                 NSURLErrorServerCertificateUntrusted:
+                Logger.shared.debug("🔄 isRetryable: NSURLError \(nsError.code) - YES (network issue)", category: .networking)
                 return true
             case NSURLErrorNotConnectedToInternet:
+                Logger.shared.debug("🔄 isRetryable: NSURLError \(nsError.code) - NO (no internet)", category: .networking)
                 return false // Don't retry if there's no internet
             default:
+                Logger.shared.debug("🔄 isRetryable: NSURLError \(nsError.code) - NO (unknown)", category: .networking)
                 return false
             }
         }
 
-        // Firebase errors
-        if nsError.domain == "FIRFirestoreErrorDomain" || nsError.domain == "FIRStorageErrorDomain" {
+        // Firebase Storage errors (domain varies by Firebase version)
+        if nsError.domain == "FIRFirestoreErrorDomain" ||
+           nsError.domain == "FIRStorageErrorDomain" ||
+           nsError.domain.contains("Firebase") ||
+           nsError.domain.contains("Storage") {
             switch nsError.code {
             case 14: // UNAVAILABLE
+                Logger.shared.debug("🔄 isRetryable: Firebase \(nsError.code) - YES (unavailable)", category: .networking)
                 return true
             case 4: // DEADLINE_EXCEEDED
+                Logger.shared.debug("🔄 isRetryable: Firebase \(nsError.code) - YES (deadline exceeded)", category: .networking)
                 return true
             case 10: // ABORTED
+                Logger.shared.debug("🔄 isRetryable: Firebase \(nsError.code) - YES (aborted)", category: .networking)
                 return true
+            case 13: // INTERNAL
+                Logger.shared.debug("🔄 isRetryable: Firebase \(nsError.code) - YES (internal error)", category: .networking)
+                return true
+            case -13000: // FIRStorageErrorCodeUnknown
+                Logger.shared.debug("🔄 isRetryable: Firebase \(nsError.code) - YES (unknown storage error)", category: .networking)
+                return true
+            case -13010: // FIRStorageErrorCodeRetryLimitExceeded
+                Logger.shared.debug("🔄 isRetryable: Firebase \(nsError.code) - NO (Firebase retry limit)", category: .networking)
+                return false
             default:
+                Logger.shared.debug("🔄 isRetryable: Firebase \(nsError.code) - NO (unhandled)", category: .networking)
                 return false
             }
         }
@@ -153,12 +180,15 @@ class RetryManager {
         if let httpError = error as? URLError {
             switch httpError.code {
             case .timedOut, .cannotFindHost, .cannotConnectToHost, .networkConnectionLost:
+                Logger.shared.debug("🔄 isRetryable: URLError \(httpError.code) - YES", category: .networking)
                 return true
             default:
+                Logger.shared.debug("🔄 isRetryable: URLError \(httpError.code) - NO", category: .networking)
                 return false
             }
         }
 
+        Logger.shared.debug("🔄 isRetryable: Unknown error domain \(nsError.domain) - NO", category: .networking)
         return false
     }
 

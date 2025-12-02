@@ -346,7 +346,7 @@ struct AdminModerationDashboard: View {
                         }
                         .background(Color(.systemBackground))
                     }
-                    .padding(.bottom, 100) // Account for tab bar
+                    .padding(.bottom, 80) // Account for tab bar
                 }
                 .background(Color(.systemGroupedBackground))
             }
@@ -393,7 +393,7 @@ struct AdminModerationDashboard: View {
                         }
                         .background(Color(.systemBackground))
                     }
-                    .padding(.bottom, 100) // Account for tab bar
+                    .padding(.bottom, 80) // Account for tab bar
                 }
                 .background(Color(.systemGroupedBackground))
             }
@@ -431,7 +431,7 @@ struct AdminModerationDashboard: View {
                                 .padding(.horizontal, 16)
                         }
                     }
-                    .padding(.bottom, 100) // Account for tab bar
+                    .padding(.bottom, 80) // Account for tab bar
                 }
                 .background(Color(.systemGroupedBackground))
             }
@@ -478,7 +478,7 @@ struct AdminModerationDashboard: View {
                         }
                         .background(Color(.systemBackground))
                     }
-                    .padding(.bottom, 100) // Account for tab bar
+                    .padding(.bottom, 80) // Account for tab bar
                 }
                 .background(Color(.systemGroupedBackground))
             }
@@ -510,7 +510,7 @@ struct AdminModerationDashboard: View {
                 statsSummaryGrid
                 recentActivitySection
             }
-            .padding(.bottom, 100) // Account for tab bar
+            .padding(.bottom, 80) // Account for tab bar
         }
         .background(Color(.systemGroupedBackground))
     }
@@ -3316,7 +3316,7 @@ struct AdminPendingProfileDetailView: View {
                         lookingForSection
                     }
                     .padding(20)
-                    .padding(.bottom, 100)
+                    .padding(.bottom, 80)
                 }
             }
             .background(Color(.systemGroupedBackground))

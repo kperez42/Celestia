@@ -258,7 +258,7 @@ struct ProfileSubscriptionsView: View {
                 benefitsSummaryCard
             }
             .padding(16)
-            .padding(.bottom, 100)
+            .padding(.bottom, 80)
         }
     }
 
@@ -689,7 +689,7 @@ struct ProfileSubscriptionsView: View {
                 helpCard
             }
             .padding(16)
-            .padding(.bottom, 100)
+            .padding(.bottom, 80)
         }
     }
 

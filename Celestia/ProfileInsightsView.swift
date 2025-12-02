@@ -219,7 +219,7 @@ struct ProfileInsightsView: View {
             // Activity insights
             activityCard
         }
-        .padding(.bottom, 100)
+        .padding(.bottom, 80)
     }
 
     // MARK: - Achievements Card
@@ -733,7 +733,7 @@ struct ProfileInsightsView: View {
                 }
             }
         }
-        .padding(.bottom, 100)
+        .padding(.bottom, 80)
     }
 
     private var emptyViewersCard: some View {
@@ -832,7 +832,7 @@ struct ProfileInsightsView: View {
                 }
             }
         }
-        .padding(.bottom, 100)
+        .padding(.bottom, 80)
     }
 
     private var emptyPhotosCard: some View {
@@ -969,7 +969,7 @@ struct ProfileInsightsView: View {
                 }
             }
         }
-        .padding(.bottom, 100)
+        .padding(.bottom, 80)
     }
 
     private func suggestionCard(suggestion: ProfileSuggestion) -> some View {

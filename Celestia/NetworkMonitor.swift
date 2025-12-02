@@ -103,6 +103,13 @@ class NetworkMonitor: ObservableObject {
     // MARK: - Setup
 
     private func setupMonitor() {
+        // CRITICAL FIX: Get current path synchronously FIRST before setting up async handler
+        // This prevents the race condition where isConnected is false on first check
+        let currentPath = monitor.currentPath
+        handlePathUpdate(currentPath)
+        Logger.shared.info("📶 Initial network state: connected=\(isConnected), type=\(connectionType.description)", category: .networking)
+
+        // Then set up async handler for future updates
         monitor.pathUpdateHandler = { [weak self] path in
             Task { @MainActor [weak self] in
                 self?.handlePathUpdate(path)
@@ -252,6 +259,73 @@ class NetworkMonitor: ObservableObject {
             quality = .fair
         } else {
             quality = .poor
+        }
+    }
+
+    // MARK: - Connectivity Verification
+
+    /// Verify actual internet connectivity by making a quick request
+    /// For WiFi/Ethernet: Trust NWPathMonitor (stable connections)
+    /// For Cellular: Verify to prevent accidental data usage surprises
+    func verifyConnectivity() async -> Bool {
+        Logger.shared.debug("📶 Verifying connectivity (NWPathMonitor: \(isConnected ? "connected" : "disconnected"), type: \(connectionType.description))", category: .networking)
+
+        // If NWPathMonitor says we're not connected, we're definitely offline
+        guard isConnected else {
+            Logger.shared.warning("📶 NWPathMonitor reports disconnected", category: .networking)
+            return false
+        }
+
+        // WIFI/ETHERNET FIX: Trust NWPathMonitor for stable connections
+        // These connections are reliable - if NWPathMonitor says connected, trust it
+        // Don't block uploads just because Google is unreachable (firewall, DNS, etc.)
+        switch connectionType {
+        case .wifi, .wiredEthernet:
+            Logger.shared.info("📶 WiFi/Ethernet detected - trusting NWPathMonitor (connected)", category: .networking)
+            return true
+
+        case .cellular:
+            // For cellular, do a quick verification to help users avoid data surprises
+            Logger.shared.debug("📶 Cellular detected - verifying connectivity", category: .networking)
+            return await performConnectivityTest()
+
+        case .other:
+            // Unknown connection type - try to verify but don't block if it fails
+            let verified = await performConnectivityTest()
+            if !verified {
+                Logger.shared.warning("📶 Verification failed but NWPathMonitor says connected - allowing upload", category: .networking)
+                return true // Trust NWPathMonitor, let upload try
+            }
+            return true
+        }
+    }
+
+    /// Perform actual connectivity test
+    private func performConnectivityTest() async -> Bool {
+        do {
+            guard let url = URL(string: "https://www.google.com/generate_204") else {
+                return true // Can't test, assume connected
+            }
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+            request.timeoutInterval = 5.0 // Quick check
+            request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+
+            let (_, response) = try await URLSession.shared.data(for: request)
+
+            if let httpResponse = response as? HTTPURLResponse {
+                let success = httpResponse.statusCode == 204 || (200...299).contains(httpResponse.statusCode)
+                Logger.shared.info("📶 Connectivity test: \(success ? "PASS" : "FAIL") (status: \(httpResponse.statusCode))", category: .networking)
+                return success
+            }
+
+            return true
+        } catch {
+            Logger.shared.warning("📶 Connectivity test error: \(error.localizedDescription)", category: .networking)
+            // If test fails but NWPathMonitor says connected, still return true
+            // Let the actual upload attempt - it will fail with proper error if really offline
+            return isConnected
         }
     }
 
