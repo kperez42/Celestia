@@ -1795,18 +1795,20 @@ class SavedProfilesViewModel: ObservableObject {
         }
     }
 
-    func saveProfile(user: User, note: String? = nil) async {
+    /// Save a profile and return success status for UI revert on failure
+    @discardableResult
+    func saveProfile(user: User, note: String? = nil) async -> Bool {
         guard let currentUserId = AuthService.shared.currentUser?.effectiveId,
               let savedUserId = user.effectiveId else {
             let currentUser = AuthService.shared.currentUser
             Logger.shared.error("Cannot save profile: Missing user ID (currentUser.id=\(currentUser?.id ?? "nil"), currentUser.effectiveId=\(currentUser?.effectiveId ?? "nil"), savedUser.id=\(user.id ?? "nil"), savedUser.effectiveId=\(user.effectiveId ?? "nil"))", category: .general)
-            return
+            return false
         }
 
         // Check if already saved to prevent duplicates
         if savedProfiles.contains(where: { $0.user.effectiveId == savedUserId }) {
             Logger.shared.info("Profile already saved: \(user.fullName)", category: .general)
-            return
+            return true  // Already saved is still a success
         }
 
         do {
@@ -1841,8 +1843,10 @@ class SavedProfilesViewModel: ObservableObject {
                 .profileSaved,
                 properties: ["savedUserId": savedUserId]
             )
+            return true
         } catch {
             Logger.shared.error("Error saving profile to Firestore", category: .general, error: error)
+            return false
         }
     }
 
