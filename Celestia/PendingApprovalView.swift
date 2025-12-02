@@ -18,7 +18,7 @@ struct PendingApprovalView: View {
     @State private var stepAnimations: [Bool] = [false, false, false]
     @State private var showStillPendingToast = false
     @State private var showEditProfile = false
-    @State private var showOnboarding = false
+    @State private var showSignUpEdit = false  // For editing profile via SignUpView
 
     private var user: User? {
         authService.currentUser
@@ -330,10 +330,10 @@ struct PendingApprovalView: View {
 
                     // Action buttons
                     VStack(spacing: 12) {
-                        // Edit Profile button - Goes to Onboarding to update signup info
+                        // Edit Profile button - Goes to SignUpView to update signup info
                         Button(action: {
                             HapticManager.shared.impact(.medium)
-                            showOnboarding = true
+                            showSignUpEdit = true
                         }) {
                             HStack(spacing: 10) {
                                 Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
@@ -406,9 +406,10 @@ struct PendingApprovalView: View {
                 EditProfileView()
                     .environmentObject(authService)
             }
-            .fullScreenCover(isPresented: $showOnboarding) {
-                OnboardingView(isEditingExistingProfile: true)
+            .fullScreenCover(isPresented: $showSignUpEdit) {
+                SignUpView(isEditingProfile: true)
                     .environmentObject(authService)
+                    .environmentObject(DeepLinkManager.shared)
             }
             .task {
                 // Auto-refresh status after a short delay when view appears
