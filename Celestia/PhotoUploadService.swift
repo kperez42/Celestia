@@ -24,18 +24,17 @@ class PhotoUploadService {
             throw CelestiaError.invalidData
         }
 
-        // ImageUploadService.uploadImage expects a directory path
-        // It will append its own UUID filename to the path
-        let path: String
+        // Use high-quality upload for profile and gallery photos (these appear on cards)
         switch imageType {
         case .profile:
-            path = "profile_images/\(userId)"
+            // Profile photos use maximum quality settings
+            return try await ImageUploadService.shared.uploadProfileImage(image, userId: userId)
         case .gallery:
-            path = "gallery_photos/\(userId)"
+            // Gallery photos also use high quality (they appear in photo viewers)
+            return try await ImageUploadService.shared.uploadProfileImage(image, userId: userId)
         case .chat:
-            path = "chat_images/\(userId)"
+            // Chat images use standard quality (they're smaller and temporary)
+            return try await ImageUploadService.shared.uploadChatImage(image, matchId: userId)
         }
-
-        return try await ImageUploadService.shared.uploadImage(image, path: path)
     }
 }

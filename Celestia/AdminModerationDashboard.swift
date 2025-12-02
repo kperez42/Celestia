@@ -15,7 +15,6 @@ struct AdminModerationDashboard: View {
     @State private var showingAlerts = false
     @State private var lastRefreshed = Date()
     @State private var isRefreshing = false
-    @Namespace private var tabAnimation
 
     // Tab configuration with icons and colors
     private let tabs: [(name: String, icon: String, color: Color)] = [
@@ -33,41 +32,10 @@ struct AdminModerationDashboard: View {
                 // Dashboard Header
                 adminHeader
 
-                // Enhanced Tab selector with icons, badges, and smooth animations
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
-                            AdminTabButton(
-                                tab: tab,
-                                isSelected: selectedTab == index,
-                                badgeCount: getBadgeCount(for: index),
-                                namespace: tabAnimation
-                            ) {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                    selectedTab = index
-                                }
-                                HapticManager.shared.selection()
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 4)
-                }
-                .padding(.vertical, 12)
-                .background(
-                    // Frosted glass effect background
-                    Rectangle()
-                        .fill(.ultraThinMaterial)
-                        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
-                )
-                .overlay(alignment: .bottom) {
-                    // Subtle separator line
-                    Rectangle()
-                        .fill(Color(.separator).opacity(0.3))
-                        .frame(height: 0.5)
-                }
+                // Organized Tab Bar - Fixed height, no layout shifts
+                adminTabBar
 
-                // Content - no extra animation modifiers for smooth native swiping
+                // Content area with smooth page transitions
                 TabView(selection: $selectedTab) {
                     pendingProfilesView
                         .tag(0)
@@ -90,6 +58,7 @@ struct AdminModerationDashboard: View {
                 .tabViewStyle(.page(indexDisplayMode: .never))
             }
             .navigationBarHidden(true)
+            .background(Color(.systemGroupedBackground))
         }
         .task {
             await viewModel.loadQueue()
@@ -115,120 +84,207 @@ struct AdminModerationDashboard: View {
     // MARK: - Admin Header
 
     private var adminHeader: some View {
-        HStack(spacing: 12) {
-            // Admin badge and title
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
-                    ZStack {
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [.purple, .pink],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
+        VStack(spacing: 0) {
+            // Main header row
+            HStack(spacing: 14) {
+                // Admin badge with glow effect
+                ZStack {
+                    // Glow effect
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(
+                            LinearGradient(
+                                colors: [.purple.opacity(0.6), .indigo.opacity(0.6)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
                             )
-                            .frame(width: 36, height: 36)
+                        )
+                        .frame(width: 44, height: 44)
+                        .blur(radius: 8)
 
-                        Image(systemName: "shield.checkered")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(.white)
-                    }
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(
+                            LinearGradient(
+                                colors: [.purple, .indigo],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 44, height: 44)
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Admin Dashboard")
-                            .font(.headline)
-                            .foregroundColor(.primary)
+                    Image(systemName: "shield.checkered")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(.white)
+                }
 
-                        Text("Last updated \(lastRefreshed.formatted(.relative(presentation: .named)))")
-                            .font(.caption2)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Admin Panel")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(.primary)
+
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 6, height: 6)
+                        Text("Updated \(lastRefreshed.formatted(.relative(presentation: .named)))")
+                            .font(.system(size: 11, weight: .medium))
                             .foregroundColor(.secondary)
                     }
                 }
+
+                Spacer()
+
+                // Action buttons
+                HStack(spacing: 10) {
+                    // Alerts button
+                    Button {
+                        showingAlerts = true
+                        HapticManager.shared.impact(.light)
+                    } label: {
+                        ZStack(alignment: .topTrailing) {
+                            Circle()
+                                .fill(Color(.secondarySystemBackground))
+                                .frame(width: 40, height: 40)
+                                .overlay(
+                                    Circle()
+                                        .strokeBorder(Color(.separator).opacity(0.3), lineWidth: 1)
+                                )
+
+                            Image(systemName: "bell.fill")
+                                .font(.system(size: 16))
+                                .foregroundColor(.primary)
+
+                            if viewModel.unreadAlertCount > 0 {
+                                Text("\(min(viewModel.unreadAlertCount, 99))")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .frame(minWidth: 18, minHeight: 18)
+                                    .background(
+                                        Circle()
+                                            .fill(Color.red)
+                                            .shadow(color: .red.opacity(0.4), radius: 4, y: 2)
+                                    )
+                                    .offset(x: 8, y: -8)
+                            }
+                        }
+                    }
+
+                    // Refresh button
+                    Button {
+                        Task {
+                            isRefreshing = true
+                            HapticManager.shared.impact(.light)
+                            await viewModel.refresh()
+                            lastRefreshed = Date()
+                            isRefreshing = false
+                            HapticManager.shared.notification(.success)
+                        }
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(Color(.secondarySystemBackground))
+                                .frame(width: 40, height: 40)
+                                .overlay(
+                                    Circle()
+                                        .strokeBorder(Color(.separator).opacity(0.3), lineWidth: 1)
+                                )
+
+                            if isRefreshing {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundColor(.primary)
+                            }
+                        }
+                    }
+                    .disabled(isRefreshing)
+                }
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 14)
 
-            Spacer()
-
-            // Quick stats pill
+            // Quick stats cards
             HStack(spacing: 8) {
-                quickStatPill(
-                    count: viewModel.pendingProfiles.count + viewModel.reports.count,
-                    label: "Pending",
+                AdminQuickStatCard(
+                    value: viewModel.pendingProfiles.count,
+                    label: "New",
+                    icon: "person.badge.plus",
+                    color: .blue
+                )
+                AdminQuickStatCard(
+                    value: viewModel.reports.count,
+                    label: "Reports",
+                    icon: "exclamationmark.triangle.fill",
                     color: .orange
                 )
+                AdminQuickStatCard(
+                    value: viewModel.appeals.count,
+                    label: "Appeals",
+                    icon: "envelope.open.fill",
+                    color: .cyan
+                )
+                AdminQuickStatCard(
+                    value: viewModel.suspiciousProfiles.count,
+                    label: "Suspicious",
+                    icon: "eye.trianglebadge.exclamationmark",
+                    color: .red
+                )
             }
-
-            // Alerts button
-            Button {
-                showingAlerts = true
-                HapticManager.shared.impact(.light)
-            } label: {
-                ZStack(alignment: .topTrailing) {
-                    Circle()
-                        .fill(Color(.systemGray5))
-                        .frame(width: 40, height: 40)
-
-                    Image(systemName: "bell.fill")
-                        .font(.system(size: 16))
-                        .foregroundColor(.primary)
-
-                    if viewModel.unreadAlertCount > 0 {
-                        Text("\(viewModel.unreadAlertCount)")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.white)
-                            .padding(4)
-                            .background(Circle().fill(Color.red))
-                            .offset(x: 4, y: -4)
-                    }
-                }
-            }
-
-            // Refresh button
-            Button {
-                Task {
-                    isRefreshing = true
-                    HapticManager.shared.impact(.light)
-                    await viewModel.refresh()
-                    lastRefreshed = Date()
-                    isRefreshing = false
-                    HapticManager.shared.notification(.success)
-                }
-            } label: {
-                ZStack {
-                    Circle()
-                        .fill(Color(.systemGray5))
-                        .frame(width: 40, height: 40)
-
-                    if isRefreshing {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                    } else {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.primary)
-                    }
-                }
-            }
-            .disabled(isRefreshing)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(Color(.systemBackground))
+        .background(
+            Color(.systemBackground)
+                .shadow(color: .black.opacity(0.04), radius: 8, y: 4)
+        )
     }
 
-    private func quickStatPill(count: Int, label: String, color: Color) -> some View {
-        HStack(spacing: 4) {
-            Text("\(count)")
-                .font(.system(size: 14, weight: .bold, design: .rounded))
-                .foregroundColor(color)
-            Text(label)
-                .font(.caption)
-                .foregroundColor(.secondary)
+    // MARK: - Admin Tab Bar
+
+    private var adminTabBar: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
+                        AdminTabItem(
+                            name: tab.name,
+                            icon: tab.icon,
+                            color: tab.color,
+                            badgeCount: getBadgeCount(for: index),
+                            isSelected: selectedTab == index
+                        )
+                        .id(index)
+                        .onTapGesture {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selectedTab = index
+                            }
+                            HapticManager.shared.selection()
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+            }
+            .frame(height: 62)
+            .background(
+                Color(.systemBackground)
+                    .overlay(alignment: .bottom) {
+                        LinearGradient(
+                            colors: [Color(.separator).opacity(0.2), Color.clear],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 1)
+                    }
+            )
+            .onChange(of: selectedTab) { _, newValue in
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    proxy.scrollTo(newValue, anchor: .center)
+                }
+            }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(color.opacity(0.1))
-        .cornerRadius(12)
     }
 
     // MARK: - Badge Count Helper
@@ -249,44 +305,50 @@ struct AdminModerationDashboard: View {
     private var reportsListView: some View {
         Group {
             if viewModel.isLoading {
-                ReportsLoadingView()
+                AdminLoadingView(message: "Loading reports...")
             } else if let error = viewModel.errorMessage {
-                // Show error state with admin access hint
-                VStack(spacing: 20) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 60))
-                        .foregroundColor(.orange)
-
-                    Text("Could Not Load Reports")
-                        .font(.title2.bold())
-
-                    Text(error)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
-
-                    Button("Retry") {
-                        Task { await viewModel.refresh() }
-                    }
-                    .buttonStyle(.bordered)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                AdminErrorView(
+                    title: "Could Not Load Reports",
+                    message: error,
+                    onRetry: { Task { await viewModel.refresh() } }
+                )
             } else if viewModel.reports.isEmpty {
-                emptyState(
+                AdminEmptyStateView(
                     icon: "checkmark.shield.fill",
                     title: "No Pending Reports",
-                    message: "All reports have been reviewed"
+                    message: "All reports have been reviewed",
+                    color: .green,
+                    onRefresh: { Task { await viewModel.refresh() } }
                 )
             } else {
-                List(viewModel.reports) { report in
-                    NavigationLink {
-                        ReportDetailView(report: report, viewModel: viewModel)
-                    } label: {
-                        ReportRowView(report: report)
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        // Section header
+                        AdminSectionHeader(
+                            title: "Pending Reports",
+                            count: viewModel.reports.count,
+                            icon: "exclamationmark.triangle.fill",
+                            color: .orange
+                        )
+
+                        ForEach(viewModel.reports) { report in
+                            NavigationLink {
+                                ReportDetailView(report: report, viewModel: viewModel)
+                            } label: {
+                                ReportRowView(report: report)
+                            }
+                            .buttonStyle(.plain)
+
+                            if report.id != viewModel.reports.last?.id {
+                                Divider()
+                                    .padding(.leading, 16)
+                            }
+                        }
+                        .background(Color(.systemBackground))
                     }
+                    .padding(.bottom, 100) // Account for tab bar
                 }
-                .listStyle(.plain)
+                .background(Color(.systemGroupedBackground))
             }
         }
     }
@@ -296,22 +358,44 @@ struct AdminModerationDashboard: View {
     private var appealsListView: some View {
         Group {
             if viewModel.isLoading {
-                AppealsLoadingView()
+                AdminLoadingView(message: "Loading appeals...")
             } else if viewModel.appeals.isEmpty {
-                emptyState(
+                AdminEmptyStateView(
                     icon: "checkmark.seal.fill",
                     title: "No Pending Appeals",
-                    message: "All user appeals have been reviewed"
+                    message: "All user appeals have been reviewed",
+                    color: .cyan,
+                    onRefresh: { Task { await viewModel.refresh() } }
                 )
             } else {
-                List(viewModel.appeals) { appeal in
-                    NavigationLink {
-                        AppealDetailView(appeal: appeal, viewModel: viewModel)
-                    } label: {
-                        AppealRowView(appeal: appeal)
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        // Section header
+                        AdminSectionHeader(
+                            title: "User Appeals",
+                            count: viewModel.appeals.count,
+                            icon: "envelope.open.fill",
+                            color: .cyan
+                        )
+
+                        ForEach(viewModel.appeals) { appeal in
+                            NavigationLink {
+                                AppealDetailView(appeal: appeal, viewModel: viewModel)
+                            } label: {
+                                AppealRowView(appeal: appeal)
+                            }
+                            .buttonStyle(.plain)
+
+                            if appeal.id != viewModel.appeals.last?.id {
+                                Divider()
+                                    .padding(.leading, 16)
+                            }
+                        }
+                        .background(Color(.systemBackground))
                     }
+                    .padding(.bottom, 100) // Account for tab bar
                 }
-                .listStyle(.plain)
+                .background(Color(.systemGroupedBackground))
             }
         }
     }
@@ -321,33 +405,35 @@ struct AdminModerationDashboard: View {
     private var pendingProfilesView: some View {
         Group {
             if viewModel.isLoading {
-                PendingProfilesLoadingView()
+                AdminLoadingView(message: "Loading pending profiles...")
             } else if viewModel.pendingProfiles.isEmpty {
-                emptyState(
+                AdminEmptyStateView(
                     icon: "person.crop.circle.badge.checkmark",
                     title: "All Caught Up!",
-                    message: "No new accounts waiting for review"
+                    message: "No new accounts waiting for review",
+                    color: .blue,
+                    onRefresh: { Task { await viewModel.refresh() } }
                 )
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 16) {
-                        // Header with count
-                        HStack {
-                            Text("\(viewModel.pendingProfiles.count) accounts pending")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                        }
-                        .padding(.horizontal)
-                        .padding(.top, 8)
+                    LazyVStack(spacing: 12) {
+                        // Section header
+                        AdminSectionHeader(
+                            title: "New Accounts",
+                            count: viewModel.pendingProfiles.count,
+                            icon: "person.badge.plus",
+                            color: .blue
+                        )
+                        .padding(.bottom, 4)
 
                         ForEach(viewModel.pendingProfiles) { profile in
                             PendingProfileCard(profile: profile, viewModel: viewModel)
-                                .padding(.horizontal)
+                                .padding(.horizontal, 16)
                         }
                     }
-                    .padding(.bottom, 20)
+                    .padding(.bottom, 100) // Account for tab bar
                 }
+                .background(Color(.systemGroupedBackground))
             }
         }
     }
@@ -357,22 +443,44 @@ struct AdminModerationDashboard: View {
     private var suspiciousProfilesView: some View {
         Group {
             if viewModel.isLoading {
-                SuspiciousProfilesLoadingView()
+                AdminLoadingView(message: "Loading suspicious profiles...")
             } else if viewModel.suspiciousProfiles.isEmpty {
-                emptyState(
+                AdminEmptyStateView(
                     icon: "checkmark.circle.fill",
                     title: "No Suspicious Profiles",
-                    message: "Auto-detection found no concerns"
+                    message: "Auto-detection found no concerns",
+                    color: .green,
+                    onRefresh: { Task { await viewModel.refresh() } }
                 )
             } else {
-                List(viewModel.suspiciousProfiles) { item in
-                    NavigationLink {
-                        SuspiciousProfileDetailView(item: item, viewModel: viewModel)
-                    } label: {
-                        SuspiciousProfileRowView(item: item)
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        // Section header
+                        AdminSectionHeader(
+                            title: "Suspicious Activity",
+                            count: viewModel.suspiciousProfiles.count,
+                            icon: "eye.trianglebadge.exclamationmark",
+                            color: .red
+                        )
+
+                        ForEach(viewModel.suspiciousProfiles) { item in
+                            NavigationLink {
+                                SuspiciousProfileDetailView(item: item, viewModel: viewModel)
+                            } label: {
+                                SuspiciousProfileRowView(item: item)
+                            }
+                            .buttonStyle(.plain)
+
+                            if item.id != viewModel.suspiciousProfiles.last?.id {
+                                Divider()
+                                    .padding(.leading, 16)
+                            }
+                        }
+                        .background(Color(.systemBackground))
                     }
+                    .padding(.bottom, 100) // Account for tab bar
                 }
-                .listStyle(.plain)
+                .background(Color(.systemGroupedBackground))
             }
         }
     }
@@ -388,7 +496,7 @@ struct AdminModerationDashboard: View {
     private var statsView: some View {
         Group {
             if viewModel.isLoading {
-                StatsLoadingView()
+                AdminLoadingView(message: "Loading statistics...")
             } else {
                 statsContentView
             }
@@ -397,201 +505,139 @@ struct AdminModerationDashboard: View {
 
     private var statsContentView: some View {
         ScrollView {
-            VStack(spacing: 20) {
-                // Header
+            VStack(spacing: 16) {
+                // Stats Header Card
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Dashboard")
-                            .font(.title2.bold())
-                        Text("Moderation overview")
-                            .font(.subheadline)
+                        Text("Overview")
+                            .font(.system(size: 20, weight: .bold))
+                        Text("Real-time moderation stats")
+                            .font(.system(size: 13))
                             .foregroundColor(.secondary)
                     }
                     Spacer()
 
-                    // Last updated indicator
-                    HStack(spacing: 4) {
+                    // Live indicator
+                    HStack(spacing: 6) {
                         Circle()
                             .fill(.green)
                             .frame(width: 8, height: 8)
                         Text("Live")
-                            .font(.caption.weight(.medium))
+                            .font(.system(size: 12, weight: .medium))
                             .foregroundColor(.secondary)
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background(Color(.systemGray6))
-                    .cornerRadius(12)
+                    .background(Color(.tertiarySystemBackground))
+                    .cornerRadius(8)
                 }
-                .padding(.horizontal)
+                .padding(16)
+                .background(Color(.systemBackground))
+                .cornerRadius(12)
+                .padding(.horizontal, 16)
                 .padding(.top, 8)
 
                 // Summary cards in grid
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                    StatCard(
+                    AdminStatCard(
                         title: "Total Reports",
                         value: "\(viewModel.stats.totalReports)",
                         icon: "exclamationmark.triangle.fill",
                         color: .blue
                     )
 
-                    StatCard(
+                    AdminStatCard(
                         title: "Pending",
                         value: "\(viewModel.stats.pendingReports)",
                         icon: "clock.fill",
                         color: .orange
                     )
 
-                    StatCard(
+                    AdminStatCard(
                         title: "Resolved",
                         value: "\(viewModel.stats.resolvedReports)",
                         icon: "checkmark.circle.fill",
                         color: .green
                     )
 
-                    StatCard(
+                    AdminStatCard(
                         title: "Suspicious",
                         value: "\(viewModel.stats.suspiciousProfiles)",
                         icon: "eye.trianglebadge.exclamationmark.fill",
                         color: .red
                     )
                 }
-                .padding(.horizontal)
+                .padding(.horizontal, 16)
 
-                // Recent activity card
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack {
+                // Recent activity section
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
                         Image(systemName: "clock.arrow.circlepath")
-                            .font(.headline)
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(.purple)
                         Text("Recent Activity")
-                            .font(.headline)
+                            .font(.system(size: 15, weight: .semibold))
                         Spacer()
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
 
                     if viewModel.reports.isEmpty && viewModel.suspiciousProfiles.isEmpty {
-                        HStack {
-                            Spacer()
-                            VStack(spacing: 8) {
-                                Image(systemName: "tray")
-                                    .font(.title2)
-                                    .foregroundColor(.secondary)
-                                Text("No recent activity")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                            .padding(.vertical, 20)
-                            Spacer()
+                        VStack(spacing: 8) {
+                            Image(systemName: "tray")
+                                .font(.system(size: 24))
+                                .foregroundColor(.secondary)
+                            Text("No recent activity")
+                                .font(.system(size: 14))
+                                .foregroundColor(.secondary)
                         }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 24)
                     } else {
-                        VStack(spacing: 12) {
-                            ForEach(viewModel.reports.prefix(5)) { report in
+                        VStack(spacing: 0) {
+                            ForEach(Array(viewModel.reports.prefix(5).enumerated()), id: \.element.id) { index, report in
                                 HStack(spacing: 12) {
                                     ZStack {
                                         Circle()
-                                            .fill(Color.orange.opacity(0.15))
+                                            .fill(Color.orange.opacity(0.12))
                                             .frame(width: 36, height: 36)
                                         Image(systemName: "exclamationmark.circle.fill")
+                                            .font(.system(size: 16))
                                             .foregroundColor(.orange)
                                     }
 
-                                    VStack(alignment: .leading, spacing: 3) {
+                                    VStack(alignment: .leading, spacing: 2) {
                                         Text(report.reason)
-                                            .font(.subheadline.weight(.medium))
+                                            .font(.system(size: 14, weight: .medium))
+                                            .foregroundColor(.primary)
                                         Text(report.timestamp)
-                                            .font(.caption)
+                                            .font(.system(size: 12))
                                             .foregroundColor(.secondary)
                                     }
 
                                     Spacer()
 
                                     Image(systemName: "chevron.right")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(.quaternary)
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+
+                                if index < min(viewModel.reports.count - 1, 4) {
+                                    Divider()
+                                        .padding(.leading, 64)
                                 }
                             }
                         }
                     }
                 }
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(Color(.systemBackground))
-                        .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .strokeBorder(Color(.separator).opacity(0.2), lineWidth: 1)
-                )
-                .padding(.horizontal)
+                .background(Color(.systemBackground))
+                .cornerRadius(12)
+                .padding(.horizontal, 16)
             }
-            .padding(.bottom, 20)
+            .padding(.bottom, 100) // Account for tab bar
         }
-        .background(Color(.systemGroupedBackground))
-    }
-
-    // MARK: - Empty State
-
-    private func emptyState(icon: String, title: String, message: String) -> some View {
-        VStack(spacing: 24) {
-            // Animated icon container
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [.green.opacity(0.15), .green.opacity(0.05)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 120, height: 120)
-
-                Circle()
-                    .fill(.green.opacity(0.1))
-                    .frame(width: 90, height: 90)
-
-                Image(systemName: icon)
-                    .font(.system(size: 44, weight: .medium))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.green, .green.opacity(0.7)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .symbolEffect(.pulse, options: .repeating)
-            }
-
-            VStack(spacing: 8) {
-                Text(title)
-                    .font(.title2.bold())
-                    .foregroundColor(.primary)
-
-                Text(message)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 50)
-            }
-
-            // Refresh hint
-            Button {
-                Task { await viewModel.refresh() }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.clockwise")
-                    Text("Refresh")
-                }
-                .font(.subheadline.weight(.medium))
-                .foregroundColor(.blue)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10)
-                .background(Color.blue.opacity(0.1))
-                .cornerRadius(20)
-            }
-            .padding(.top, 8)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemGroupedBackground))
     }
 }
@@ -602,49 +648,63 @@ struct ReportRowView: View {
     let report: ModerationReport
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
+        HStack(spacing: 12) {
+            // User photo
+            if let user = report.reportedUser, let photoURL = user.photoURL {
+                CachedAsyncImage(url: URL(string: photoURL)) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    Circle().fill(Color(.systemGray4))
+                }
+                .frame(width: 48, height: 48)
+                .clipShape(Circle())
+            } else {
+                Circle()
+                    .fill(Color(.systemGray4))
+                    .frame(width: 48, height: 48)
+                    .overlay(
+                        Image(systemName: "person.fill")
+                            .foregroundColor(.white)
+                    )
+            }
+
+            // Content
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    if let user = report.reportedUser {
+                        Text(user.name)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.primary)
+                    }
+                    Spacer()
+                    Text(report.timestamp)
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                }
+
                 // Reason badge
                 Text(report.reason)
-                    .font(.caption.bold())
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.white)
                     .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 3)
                     .background(reasonColor)
-                    .cornerRadius(6)
+                    .cornerRadius(4)
 
-                Spacer()
-
-                // Timestamp
-                Text(report.timestamp)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-
-            // Reported user - PERFORMANCE: Use CachedAsyncImage
-            if let user = report.reportedUser {
-                HStack(spacing: 8) {
-                    if let photoURL = user.photoURL {
-                        CachedAsyncImage(url: URL(string: photoURL)) { image in
-                            image.resizable()
-                        } placeholder: {
-                            Color.gray
-                        }
-                        .frame(width: 40, height: 40)
-                        .clipShape(Circle())
-                    }
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(user.name)
-                            .font(.subheadline.bold())
-                        Text("Reported by: \(report.reporter?.name ?? "Unknown")")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                if let reporter = report.reporter {
+                    Text("by \(reporter.name)")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
                 }
             }
+
+            // Chevron
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.quaternary)
         }
-        .padding(.vertical, 4)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 
     private var reasonColor: Color {
@@ -903,64 +963,63 @@ struct AppealRowView: View {
     let appeal: UserAppeal
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
+        HStack(spacing: 12) {
+            // User photo
+            if let user = appeal.user, let photoURL = user.photoURL {
+                CachedAsyncImage(url: URL(string: photoURL)) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    Circle().fill(Color(.systemGray4))
+                }
+                .frame(width: 48, height: 48)
+                .clipShape(Circle())
+            } else {
+                Circle()
+                    .fill(Color(.systemGray4))
+                    .frame(width: 48, height: 48)
+                    .overlay(
+                        Image(systemName: "person.fill")
+                            .foregroundColor(.white)
+                    )
+            }
+
+            // Content
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    if let user = appeal.user {
+                        Text(user.name)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.primary)
+                    }
+                    Spacer()
+                    Text(appeal.submittedAt)
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                }
+
                 // Appeal type badge
                 Text(appeal.typeDisplayName)
-                    .font(.caption.bold())
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.white)
                     .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 3)
                     .background(appeal.type == "ban" ? Color.red : Color.orange)
-                    .cornerRadius(6)
+                    .cornerRadius(4)
 
-                Spacer()
-
-                // Timestamp
-                Text(appeal.submittedAt)
-                    .font(.caption)
+                // Message preview
+                Text(appeal.appealMessage)
+                    .font(.system(size: 13))
                     .foregroundColor(.secondary)
+                    .lineLimit(1)
             }
 
-            // User info
-            if let user = appeal.user {
-                HStack(spacing: 8) {
-                    if let photoURL = user.photoURL {
-                        CachedAsyncImage(url: URL(string: photoURL)) { image in
-                            image.resizable()
-                        } placeholder: {
-                            Color.gray
-                        }
-                        .frame(width: 40, height: 40)
-                        .clipShape(Circle())
-                    } else {
-                        Circle()
-                            .fill(Color(.systemGray4))
-                            .frame(width: 40, height: 40)
-                            .overlay(
-                                Image(systemName: "person.fill")
-                                    .foregroundColor(.gray)
-                            )
-                    }
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(user.name)
-                            .font(.subheadline.bold())
-                        Text(user.email)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-            }
-
-            // Appeal message preview
-            Text(appeal.appealMessage)
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .lineLimit(2)
-                .padding(.top, 2)
+            // Chevron
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.quaternary)
         }
-        .padding(.vertical, 4)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 }
 
@@ -1212,34 +1271,70 @@ struct SuspiciousProfileRowView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Severity indicator
-            Circle()
-                .fill(severityColor)
-                .frame(width: 12, height: 12)
+            // User photo with severity ring
+            ZStack {
+                if let user = item.user, let photoURL = user.photos?.first {
+                    CachedAsyncImage(url: URL(string: photoURL)) { image in
+                        image.resizable().scaledToFill()
+                    } placeholder: {
+                        Circle().fill(Color(.systemGray4))
+                    }
+                    .frame(width: 48, height: 48)
+                    .clipShape(Circle())
+                } else {
+                    Circle()
+                        .fill(Color(.systemGray4))
+                        .frame(width: 48, height: 48)
+                        .overlay(
+                            Image(systemName: "person.fill")
+                                .foregroundColor(.white)
+                        )
+                }
 
+                // Severity ring
+                Circle()
+                    .strokeBorder(severityColor, lineWidth: 2.5)
+                    .frame(width: 52, height: 52)
+            }
+
+            // Content
             VStack(alignment: .leading, spacing: 4) {
-                Text(item.user?.name ?? "Unknown User")
-                    .font(.subheadline.bold())
+                HStack(spacing: 8) {
+                    Text(item.user?.name ?? "Unknown User")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.primary)
+                    Spacer()
+                    Text(item.timestamp)
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                }
 
-                Text("Suspicion: \(Int(item.suspicionScore * 100))%")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                // Risk score badge
+                HStack(spacing: 6) {
+                    Text("\(Int(item.suspicionScore * 100))% Risk")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(severityColor)
+                        .cornerRadius(4)
 
-                // Indicators
-                if !item.indicators.isEmpty {
-                    Text(item.indicators.prefix(2).joined(separator: ", "))
-                        .font(.caption2)
-                        .foregroundColor(.orange)
+                    if !item.indicators.isEmpty {
+                        Text(item.indicators.prefix(1).joined(separator: ", "))
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
                 }
             }
 
-            Spacer()
-
-            Text(item.timestamp)
-                .font(.caption)
-                .foregroundColor(.secondary)
+            // Chevron
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.quaternary)
         }
-        .padding(.vertical, 4)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 
     private var severityColor: Color {
@@ -2471,12 +2566,13 @@ struct PendingProfileCard: View {
     @State private var adminComment = ""
 
     // Fixed height for consistent card sizing
-    private let photoHeight: CGFloat = 280
+    private let photoHeight: CGFloat = 300
 
     var body: some View {
         VStack(spacing: 0) {
-            // Photo Gallery - Tap to view full screen (fixed height container)
+            // Photo Gallery with overlay info
             ZStack(alignment: .bottom) {
+                // Photos
                 TabView(selection: $currentPhotoIndex) {
                     ForEach(Array(profile.photos.enumerated()), id: \.offset) { index, photoURL in
                         if let url = URL(string: photoURL) {
@@ -2491,16 +2587,20 @@ struct PendingProfileCard: View {
                                             .clipped()
                                     case .failure:
                                         Rectangle()
-                                            .fill(Color.gray.opacity(0.2))
+                                            .fill(Color(.systemGray5))
                                             .frame(width: geo.size.width, height: photoHeight)
                                             .overlay(
-                                                Image(systemName: "photo")
-                                                    .font(.largeTitle)
-                                                    .foregroundColor(.gray)
+                                                VStack(spacing: 8) {
+                                                    Image(systemName: "photo")
+                                                        .font(.system(size: 32))
+                                                    Text("Failed to load")
+                                                        .font(.caption)
+                                                }
+                                                .foregroundColor(.secondary)
                                             )
                                     case .empty:
                                         Rectangle()
-                                            .fill(Color.gray.opacity(0.1))
+                                            .fill(Color(.systemGray6))
                                             .frame(width: geo.size.width, height: photoHeight)
                                             .overlay(ProgressView())
                                     @unknown default:
@@ -2522,43 +2622,87 @@ struct PendingProfileCard: View {
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .frame(height: photoHeight)
 
-                // Photo indicators
-                if profile.photos.count > 1 {
-                    HStack(spacing: 6) {
-                        ForEach(0..<profile.photos.count, id: \.self) { index in
-                            Circle()
-                                .fill(index == currentPhotoIndex ? Color.white : Color.white.opacity(0.5))
-                                .frame(width: 8, height: 8)
-                        }
-                    }
-                    .padding(.bottom, 12)
-                }
+                // Gradient overlay for text readability
+                LinearGradient(
+                    colors: [.clear, .clear, .black.opacity(0.6)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 120)
+                .allowsHitTesting(false)
 
-                // Photo count badge + tap hint
+                // Bottom overlay with name, age, and info
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(profile.name)
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(.white)
+                        Text("\(profile.age)")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundColor(.white.opacity(0.85))
+                        Spacer()
+                    }
+
+                    HStack(spacing: 12) {
+                        Label(profile.location, systemImage: "mappin.circle.fill")
+                            .font(.system(size: 13, weight: .medium))
+                        Label(profile.gender, systemImage: "person.fill")
+                            .font(.system(size: 13, weight: .medium))
+                    }
+                    .foregroundColor(.white.opacity(0.9))
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                // Top badges
                 HStack {
-                    // Tap to view hint
-                    Label("Tap to view", systemImage: "hand.tap")
-                        .font(.caption2.bold())
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(.ultraThinMaterial)
-                        .cornerRadius(12)
-                        .padding(12)
+                    // Time badge
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock.fill")
+                            .font(.system(size: 10))
+                        Text(profile.createdAt)
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.ultraThinMaterial)
+                    .cornerRadius(16)
 
                     Spacer()
 
-                    Label("\(profile.photos.count)", systemImage: "photo.stack")
-                        .font(.caption.bold())
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(.ultraThinMaterial)
-                        .cornerRadius(20)
-                        .padding(12)
+                    // Photo count
+                    HStack(spacing: 4) {
+                        Image(systemName: "photo.stack.fill")
+                            .font(.system(size: 10))
+                        Text("\(profile.photos.count)")
+                            .font(.system(size: 11, weight: .bold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.ultraThinMaterial)
+                    .cornerRadius(16)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                .padding(12)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+
+                // Photo indicators
+                if profile.photos.count > 1 {
+                    HStack(spacing: 4) {
+                        ForEach(0..<profile.photos.count, id: \.self) { index in
+                            Capsule()
+                                .fill(index == currentPhotoIndex ? Color.white : Color.white.opacity(0.4))
+                                .frame(width: index == currentPhotoIndex ? 20 : 6, height: 4)
+                                .animation(.easeInOut(duration: 0.2), value: currentPhotoIndex)
+                        }
+                    }
+                    .padding(.bottom, 70)
+                }
             }
+            .frame(height: photoHeight)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .fullScreenCover(isPresented: $showPhotoGallery) {
                 AdminPhotoGalleryView(
                     photos: profile.photos,
@@ -2567,92 +2711,77 @@ struct PendingProfileCard: View {
                 )
             }
 
-            // Profile Info
-            VStack(alignment: .leading, spacing: 12) {
-                // Name and Age + View Profile button
-                HStack(alignment: .firstTextBaseline) {
-                    Text(profile.name)
-                        .font(.title2.bold())
-                    Text("\(profile.age)")
-                        .font(.title3)
+            // Profile Details Section
+            VStack(alignment: .leading, spacing: 14) {
+                // Email row
+                HStack(spacing: 8) {
+                    Image(systemName: "envelope.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(.blue)
+                    Text(profile.email)
+                        .font(.system(size: 13))
                         .foregroundColor(.secondary)
                     Spacer()
 
-                    // View Profile button
+                    // View full profile button
                     Button {
                         showProfileDetail = true
                         HapticManager.shared.impact(.light)
                     } label: {
                         HStack(spacing: 4) {
-                            Image(systemName: "person.circle")
-                            Text("View")
+                            Text("Full Profile")
+                                .font(.system(size: 12, weight: .semibold))
+                            Image(systemName: "arrow.up.right")
+                                .font(.system(size: 10, weight: .bold))
                         }
-                        .font(.caption.bold())
                         .foregroundColor(.purple)
                         .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
+                        .padding(.vertical, 6)
                         .background(Color.purple.opacity(0.1))
                         .cornerRadius(8)
                     }
-
-                    // Time badge
-                    Text(profile.createdAt)
-                        .font(.caption)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(Color.orange)
-                        .cornerRadius(12)
                 }
 
-                // Location and Gender
-                HStack(spacing: 16) {
-                    Label(profile.location, systemImage: "mappin.circle.fill")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-
-                    Label(profile.gender, systemImage: "person.fill")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-
-                    if !profile.lookingFor.isEmpty {
-                        Label(profile.lookingFor, systemImage: "heart.fill")
-                            .font(.subheadline)
-                            .foregroundColor(.pink)
-                    }
-                }
-
-                // Email
-                Label(profile.email, systemImage: "envelope.fill")
-                    .font(.caption)
-                    .foregroundColor(.blue)
-
-                // Quick info tags
+                // Tags section
                 if !profile.interests.isEmpty || !profile.languages.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 6) {
+                            if !profile.lookingFor.isEmpty {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "heart.fill")
+                                        .font(.system(size: 9))
+                                    Text(profile.lookingFor)
+                                }
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(.pink)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 5)
+                                .background(Color.pink.opacity(0.1))
+                                .cornerRadius(6)
+                            }
+
                             ForEach(profile.interests.prefix(3), id: \.self) { interest in
                                 Text(interest)
-                                    .font(.caption2)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundColor(.blue)
                                     .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(Color.pink.opacity(0.1))
-                                    .foregroundColor(.pink)
-                                    .cornerRadius(8)
+                                    .padding(.vertical, 5)
+                                    .background(Color.blue.opacity(0.1))
+                                    .cornerRadius(6)
                             }
+
                             ForEach(profile.languages.prefix(2), id: \.self) { language in
-                                Text(language)
-                                    .font(.caption2)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(Color.green.opacity(0.1))
-                                    .foregroundColor(.green)
-                                    .cornerRadius(8)
-                            }
-                            if profile.interests.count > 3 || profile.languages.count > 2 {
-                                Text("+\(max(0, profile.interests.count - 3) + max(0, profile.languages.count - 2)) more")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
+                                HStack(spacing: 3) {
+                                    Image(systemName: "globe")
+                                        .font(.system(size: 9))
+                                    Text(language)
+                                }
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(.green)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 5)
+                                .background(Color.green.opacity(0.1))
+                                .cornerRadius(6)
                             }
                         }
                     }
@@ -2661,81 +2790,65 @@ struct PendingProfileCard: View {
                 // Bio
                 if !profile.bio.isEmpty {
                     Text(profile.bio)
-                        .font(.subheadline)
+                        .font(.system(size: 14))
                         .foregroundColor(.secondary)
-                        .lineLimit(3)
-                        .padding(.top, 4)
+                        .lineLimit(2)
                 }
 
-                Divider()
-                    .padding(.vertical, 8)
-
                 // Action Buttons
-                HStack(spacing: 16) {
+                HStack(spacing: 10) {
                     // Reject Button
-                    Button(action: {
+                    Button {
                         HapticManager.shared.impact(.light)
                         showRejectAlert = true
-                    }) {
-                        HStack(spacing: 8) {
+                    } label: {
+                        HStack(spacing: 6) {
                             if isRejecting {
                                 ProgressView()
-                                    .scaleEffect(0.8)
+                                    .scaleEffect(0.7)
                                     .tint(.white)
                             } else {
                                 Image(systemName: "xmark")
-                                    .font(.title3.bold())
+                                    .font(.system(size: 14, weight: .bold))
                             }
                             Text("Reject")
-                                .fontWeight(.semibold)
+                                .font(.system(size: 14, weight: .semibold))
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(
-                            LinearGradient(
-                                colors: [Color.red.opacity(0.8), Color.red],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .padding(.vertical, 12)
+                        .background(Color.red)
                         .foregroundColor(.white)
-                        .cornerRadius(12)
+                        .cornerRadius(10)
                     }
                     .disabled(isApproving || isRejecting || isFlagging)
 
-                    // Flag for Review Button (orange)
-                    Button(action: {
+                    // Flag Button
+                    Button {
                         HapticManager.shared.impact(.light)
                         showFlagAlert = true
-                    }) {
-                        HStack(spacing: 8) {
+                    } label: {
+                        HStack(spacing: 6) {
                             if isFlagging {
                                 ProgressView()
-                                    .scaleEffect(0.8)
+                                    .scaleEffect(0.7)
                                     .tint(.white)
                             } else {
                                 Image(systemName: "flag.fill")
-                                    .font(.title3.bold())
+                                    .font(.system(size: 14, weight: .bold))
                             }
                             Text("Flag")
-                                .fontWeight(.semibold)
+                                .font(.system(size: 14, weight: .semibold))
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(
-                            LinearGradient(
-                                colors: [Color.orange, Color.orange.opacity(0.8)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .padding(.vertical, 12)
+                        .background(Color.orange)
                         .foregroundColor(.white)
-                        .cornerRadius(12)
+                        .cornerRadius(10)
                     }
                     .disabled(isApproving || isRejecting || isFlagging)
 
                     // Approve Button
-                    Button(action: {
+                    Button {
                         HapticManager.shared.impact(.medium)
                         Task {
                             isApproving = true
@@ -2748,39 +2861,34 @@ struct PendingProfileCard: View {
                             }
                             isApproving = false
                         }
-                    }) {
-                        HStack(spacing: 8) {
+                    } label: {
+                        HStack(spacing: 6) {
                             if isApproving {
                                 ProgressView()
-                                    .scaleEffect(0.8)
+                                    .scaleEffect(0.7)
                                     .tint(.white)
                             } else {
                                 Image(systemName: "checkmark")
-                                    .font(.title3.bold())
+                                    .font(.system(size: 14, weight: .bold))
                             }
                             Text("Approve")
-                                .fontWeight(.semibold)
+                                .font(.system(size: 14, weight: .semibold))
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(
-                            LinearGradient(
-                                colors: [Color.green, Color.green.opacity(0.8)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .padding(.vertical, 12)
+                        .background(Color.green)
                         .foregroundColor(.white)
-                        .cornerRadius(12)
+                        .cornerRadius(10)
                     }
                     .disabled(isApproving || isRejecting || isFlagging)
                 }
+                .padding(.top, 4)
             }
             .padding(16)
         }
         .background(Color(.systemBackground))
-        .cornerRadius(20)
-        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.08), radius: 12, x: 0, y: 4)
         .confirmationDialog("Reject Profile", isPresented: $showRejectAlert, titleVisibility: .visible) {
             // Photo Issues
             Button("📸 No Clear Face Photo", role: .destructive) {
@@ -3322,9 +3430,9 @@ struct AdminPendingProfileDetailView: View {
 
     private var hasDetails: Bool {
         profile.height != nil ||
-        (profile.educationLevel != nil && profile.educationLevel != "Prefer not to say" && !profile.educationLevel!.isEmpty) ||
-        (profile.religion != nil && profile.religion != "Prefer not to say" && !profile.religion!.isEmpty) ||
-        (profile.relationshipGoal != nil && profile.relationshipGoal != "Prefer not to say" && !profile.relationshipGoal!.isEmpty)
+        (profile.educationLevel.map { $0 != "Prefer not to say" && !$0.isEmpty } ?? false) ||
+        (profile.religion.map { $0 != "Prefer not to say" && !$0.isEmpty } ?? false) ||
+        (profile.relationshipGoal.map { $0 != "Prefer not to say" && !$0.isEmpty } ?? false)
     }
 
     private var detailsSection: some View {
@@ -3357,11 +3465,11 @@ struct AdminPendingProfileDetailView: View {
     // MARK: - Lifestyle Section
 
     private var hasLifestyle: Bool {
-        (profile.smoking != nil && profile.smoking != "Prefer not to say" && !profile.smoking!.isEmpty) ||
-        (profile.drinking != nil && profile.drinking != "Prefer not to say" && !profile.drinking!.isEmpty) ||
-        (profile.exercise != nil && profile.exercise != "Prefer not to say" && !profile.exercise!.isEmpty) ||
-        (profile.diet != nil && profile.diet != "Prefer not to say" && !profile.diet!.isEmpty) ||
-        (profile.pets != nil && profile.pets != "Prefer not to say" && !profile.pets!.isEmpty)
+        (profile.smoking.map { $0 != "Prefer not to say" && !$0.isEmpty } ?? false) ||
+        (profile.drinking.map { $0 != "Prefer not to say" && !$0.isEmpty } ?? false) ||
+        (profile.exercise.map { $0 != "Prefer not to say" && !$0.isEmpty } ?? false) ||
+        (profile.diet.map { $0 != "Prefer not to say" && !$0.isEmpty } ?? false) ||
+        (profile.pets.map { $0 != "Prefer not to say" && !$0.isEmpty } ?? false)
     }
 
     private var lifestyleSection: some View {
@@ -4015,72 +4123,300 @@ struct AdminZoomablePhotoView: View {
     }
 }
 
-// MARK: - Admin Tab Button Component
+// MARK: - Admin Quick Stat Card (Header Bar)
 
-struct AdminTabButton: View {
-    let tab: (name: String, icon: String, color: Color)
-    let isSelected: Bool
-    let badgeCount: Int
-    let namespace: Namespace.ID
-    let action: () -> Void
+struct AdminQuickStatCard: View {
+    let value: Int
+    let label: String
+    let icon: String
+    let color: Color
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 7) {
-                Image(systemName: tab.icon)
-                    .font(.system(size: 14, weight: .semibold))
-                    .symbolEffect(.bounce, value: isSelected)
+        VStack(spacing: 6) {
+            // Icon with background
+            ZStack {
+                Circle()
+                    .fill(color.opacity(value > 0 ? 0.15 : 0.08))
+                    .frame(width: 32, height: 32)
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(value > 0 ? color : .secondary)
+            }
 
-                Text(tab.name)
+            // Value
+            Text("\(value)")
+                .font(.system(size: 17, weight: .bold, design: .rounded))
+                .foregroundColor(value > 0 ? .primary : .secondary)
+
+            // Label
+            Text(label)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.secondarySystemBackground))
+        )
+    }
+}
+
+// MARK: - Admin Section Header
+
+struct AdminSectionHeader: View {
+    let title: String
+    let count: Int
+    let icon: String
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 10) {
+            // Icon
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(color.opacity(0.12))
+                    .frame(width: 32, height: 32)
+                Image(systemName: icon)
                     .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(color)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 11)
-            .foregroundColor(isSelected ? .white : .primary.opacity(0.8))
-            .background {
-                if isSelected {
-                    Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [tab.color, tab.color.opacity(0.85)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .shadow(color: tab.color.opacity(0.4), radius: 8, y: 4)
-                        .matchedGeometryEffect(id: "tab_background", in: namespace)
-                } else {
-                    Capsule()
-                        .fill(Color(.systemGray5).opacity(0.8))
+
+            // Title
+            Text(title)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(.primary)
+
+            Spacer()
+
+            // Count badge
+            Text("\(count)")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundColor(color)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(color.opacity(0.12))
+                .cornerRadius(8)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Color(.systemBackground))
+    }
+}
+
+// MARK: - Admin Loading View
+
+struct AdminLoadingView: View {
+    let message: String
+
+    var body: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .scaleEffect(1.2)
+                .tint(.secondary)
+
+            Text(message)
+                .font(.system(size: 14))
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemGroupedBackground))
+    }
+}
+
+// MARK: - Admin Error View
+
+struct AdminErrorView: View {
+    let title: String
+    let message: String
+    let onRetry: () -> Void
+
+    var body: some View {
+        VStack(spacing: 20) {
+            ZStack {
+                Circle()
+                    .fill(Color.orange.opacity(0.12))
+                    .frame(width: 80, height: 80)
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 32))
+                    .foregroundColor(.orange)
+            }
+
+            VStack(spacing: 6) {
+                Text(title)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(.primary)
+
+                Text(message)
+                    .font(.system(size: 14))
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+            }
+
+            Button(action: onRetry) {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("Retry")
+                        .font(.system(size: 14, weight: .semibold))
                 }
+                .foregroundColor(.white)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 10)
+                .background(Color.blue)
+                .cornerRadius(10)
             }
-            .overlay {
-                if isSelected {
-                    Capsule()
-                        .strokeBorder(Color.white.opacity(0.25), lineWidth: 1)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemGroupedBackground))
+    }
+}
+
+// MARK: - Admin Empty State View
+
+struct AdminEmptyStateView: View {
+    let icon: String
+    let title: String
+    let message: String
+    let color: Color
+    var onRefresh: (() -> Void)? = nil
+
+    var body: some View {
+        VStack(spacing: 24) {
+            // Animated icon
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.1))
+                    .frame(width: 100, height: 100)
+                Circle()
+                    .fill(color.opacity(0.08))
+                    .frame(width: 76, height: 76)
+                Image(systemName: icon)
+                    .font(.system(size: 36, weight: .medium))
+                    .foregroundColor(color)
+            }
+
+            VStack(spacing: 8) {
+                Text(title)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(.primary)
+
+                Text(message)
+                    .font(.system(size: 14))
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 50)
+            }
+
+            // Refresh button
+            if let onRefresh = onRefresh {
+                Button {
+                    HapticManager.shared.impact(.light)
+                    onRefresh()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text("Refresh")
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    .foregroundColor(color)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(color.opacity(0.1))
+                    .cornerRadius(20)
                 }
             }
         }
-        .buttonStyle(.plain)
-        .scaleEffect(isSelected ? 1.02 : 1.0)
-        // Badge overlay
-        .overlay(alignment: .topTrailing) {
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemGroupedBackground))
+    }
+}
+
+// MARK: - Admin Stat Card
+
+struct AdminStatCard: View {
+    let title: String
+    let value: String
+    let icon: String
+    let color: Color
+
+    var body: some View {
+        VStack(spacing: 10) {
+            // Icon
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.12))
+                    .frame(width: 40, height: 40)
+                Image(systemName: icon)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(color)
+            }
+
+            // Value
+            Text(value)
+                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .foregroundColor(.primary)
+
+            // Title
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+    }
+}
+
+// MARK: - Admin Tab Item (Clean, Stable Design)
+
+struct AdminTabItem: View {
+    let name: String
+    let icon: String
+    let color: Color
+    let badgeCount: Int
+    let isSelected: Bool
+
+    var body: some View {
+        HStack(spacing: 7) {
+            // Icon
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(isSelected ? .white : color)
+
+            // Label
+            Text(name)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(isSelected ? .white : .primary)
+
+            // Inline badge
             if badgeCount > 0 {
                 Text(badgeCount > 99 ? "99+" : "\(badgeCount)")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(.white)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(isSelected ? color : .white)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)
                     .background(
                         Capsule()
-                            .fill(Color.red)
-                            .shadow(color: .red.opacity(0.4), radius: 4, y: 2)
+                            .fill(isSelected ? Color.white : Color.red)
                     )
-                    .offset(x: 10, y: -8)
-                    .transition(.scale.combined(with: .opacity))
             }
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: badgeCount)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 11)
+        .background(
+            Capsule()
+                .fill(isSelected ? color : Color(.secondarySystemBackground))
+                .shadow(color: isSelected ? color.opacity(0.3) : .clear, radius: 6, y: 3)
+        )
+        .overlay(
+            Capsule()
+                .strokeBorder(isSelected ? Color.white.opacity(0.2) : Color(.separator).opacity(0.2), lineWidth: 1)
+        )
+        .contentShape(Capsule())
     }
 }
 

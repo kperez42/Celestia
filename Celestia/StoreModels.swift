@@ -540,9 +540,10 @@ enum PremiumPlan: String, CaseIterable {
 
     var productID: String {
         switch self {
-        case .monthly: return "com.celestia.premium.monthly"
-        case .sixMonth: return "com.celestia.premium.sixmonth"
-        case .annual: return "com.celestia.premium.annual"
+        // Must match ProductIdentifiers for StoreManager to find products
+        case .monthly: return ProductIdentifiers.subscriptionPremiumMonthly
+        case .sixMonth: return ProductIdentifiers.subscriptionPlusYearly // Map to Plus yearly as closest equivalent
+        case .annual: return ProductIdentifiers.subscriptionPremiumYearly
         }
     }
 }

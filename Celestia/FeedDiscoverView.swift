@@ -193,11 +193,13 @@ struct FeedDiscoverView: View {
             // Match animation overlay
             if showMatchAnimation {
                 matchCelebrationView
+                    .zIndex(1)
             }
 
-            // Action feedback toast
+            // Action feedback toast - highest z-index to ensure visibility
             if showActionToast {
                 toastView
+                    .zIndex(2)
             }
         }
     }
@@ -289,7 +291,7 @@ struct FeedDiscoverView: View {
             }
             .padding(.horizontal)
             .padding(.top, 8)
-            .padding(.bottom)
+            .padding(.bottom, 100) // Account for tab bar height
         }
         .scrollDismissesKeyboard(.interactively)
         .scrollIndicators(.hidden)
@@ -1136,10 +1138,21 @@ struct FeedDiscoverView: View {
                 color: .orange
             )
 
-            // Save to SavedProfilesViewModel - fire and forget with optimistic UI
-            // The saveProfile function handles errors internally and updates local state immediately
+            // Save to SavedProfilesViewModel with error handling
             Task {
-                await savedProfilesViewModel.saveProfile(user: user)
+                let success = await savedProfilesViewModel.saveProfile(user: user)
+                if !success {
+                    // Revert optimistic update on failure
+                    await MainActor.run {
+                        favorites.remove(userId)
+                        showToast(
+                            message: "Failed to save. Try again.",
+                            icon: "exclamationmark.triangle.fill",
+                            color: .red
+                        )
+                        HapticManager.shared.notification(.error)
+                    }
+                }
             }
         }
 

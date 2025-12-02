@@ -81,6 +81,9 @@ struct ChatView: View {
 
     @Environment(\.dismiss) var dismiss
 
+    // Network monitoring for upload operations
+    @ObservedObject var networkMonitor = NetworkMonitor.shared
+
     // Initialize with the passed otherUser data
     init(match: Match, otherUser: User) {
         self.match = match
@@ -90,6 +93,22 @@ struct ChatView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // Network status banner - shows when offline
+            if !networkMonitor.isConnected {
+                HStack(spacing: 8) {
+                    Image(systemName: "wifi.slash")
+                        .font(.subheadline)
+                    Text("No Internet Connection")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    Spacer()
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color.orange)
+            }
+
             // Custom header
             customHeader
 
@@ -1043,6 +1062,14 @@ struct ChatView: View {
             errorToastMessage = "Slow down! You're sending messages too quickly."
             showErrorToast = true
             HapticManager.shared.notification(.warning)
+            return
+        }
+
+        // NETWORK CHECK: Require connection for image uploads (text can use offline queue)
+        if hasImage && !networkMonitor.isConnected {
+            errorToastMessage = "No internet connection. Please check your WiFi or cellular data to send photos."
+            showErrorToast = true
+            HapticManager.shared.notification(.error)
             return
         }
 
