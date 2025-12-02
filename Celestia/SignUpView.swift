@@ -42,6 +42,7 @@ struct SignUpView: View {
     @State private var existingPhotoURLs: [String] = []  // For edit mode - existing photos to keep
     @State private var isLoadingExistingPhotos = false   // For edit mode - loading state
     @State private var isSavingProfile = false           // For edit mode - saving state
+    @State private var photosWereModified = false        // For edit mode - track if photos changed
 
     // Referral code (optional)
     @State private var referralCode = ""
@@ -733,6 +734,7 @@ struct SignUpView: View {
                     Button {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                             _ = photoImages.remove(at: 0)
+                            photosWereModified = true
                         }
                     } label: {
                         Image(systemName: "xmark.circle.fill")
@@ -860,6 +862,7 @@ struct SignUpView: View {
                                 Button {
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                         _ = photoImages.remove(at: index)
+                                        photosWereModified = true
                                     }
                                 } label: {
                                     Image(systemName: "xmark.circle.fill")
@@ -1423,6 +1426,7 @@ struct SignUpView: View {
                 await MainActor.run {
                     if photoImages.count < 6 {
                         photoImages.append(image)
+                        photosWereModified = true  // User added new photos
                     }
                 }
             }
@@ -1701,8 +1705,8 @@ struct SignUpView: View {
             user.drinking = drinking.isEmpty ? nil : drinking
 
             do {
-                // Upload new photos if they've changed
-                if !photoImages.isEmpty {
+                // Only upload photos if they were actually modified by the user
+                if photosWereModified && !photoImages.isEmpty {
                     let userId = user.effectiveId ?? ""
                     let photosPath = "users/\(userId)/photos"
                     let uploadedURLs = try await imageUploadService.uploadMultipleImages(photoImages, path: photosPath)
