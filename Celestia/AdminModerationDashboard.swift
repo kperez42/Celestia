@@ -15,7 +15,6 @@ struct AdminModerationDashboard: View {
     @State private var showingAlerts = false
     @State private var lastRefreshed = Date()
     @State private var isRefreshing = false
-    @Namespace private var tabAnimation
 
     // Tab configuration with icons and colors
     private let tabs: [(name: String, icon: String, color: Color)] = [
@@ -33,41 +32,10 @@ struct AdminModerationDashboard: View {
                 // Dashboard Header
                 adminHeader
 
-                // Enhanced Tab selector with icons, badges, and smooth animations
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
-                            AdminTabButton(
-                                tab: tab,
-                                isSelected: selectedTab == index,
-                                badgeCount: getBadgeCount(for: index),
-                                namespace: tabAnimation
-                            ) {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                    selectedTab = index
-                                }
-                                HapticManager.shared.selection()
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 4)
-                }
-                .padding(.vertical, 12)
-                .background(
-                    // Frosted glass effect background
-                    Rectangle()
-                        .fill(.ultraThinMaterial)
-                        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
-                )
-                .overlay(alignment: .bottom) {
-                    // Subtle separator line
-                    Rectangle()
-                        .fill(Color(.separator).opacity(0.3))
-                        .frame(height: 0.5)
-                }
+                // Organized Tab Bar - Fixed height, no layout shifts
+                adminTabBar
 
-                // Content - no extra animation modifiers for smooth native swiping
+                // Content area with smooth page transitions
                 TabView(selection: $selectedTab) {
                     pendingProfilesView
                         .tag(0)
@@ -90,6 +58,7 @@ struct AdminModerationDashboard: View {
                 .tabViewStyle(.page(indexDisplayMode: .never))
             }
             .navigationBarHidden(true)
+            .background(Color(.systemGroupedBackground))
         }
         .task {
             await viewModel.loadQueue()
@@ -117,46 +86,35 @@ struct AdminModerationDashboard: View {
     private var adminHeader: some View {
         HStack(spacing: 12) {
             // Admin badge and title
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
-                    ZStack {
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [.purple, .pink],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
+            HStack(spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(
+                            LinearGradient(
+                                colors: [.purple, .indigo],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
                             )
-                            .frame(width: 36, height: 36)
+                        )
+                        .frame(width: 38, height: 38)
 
-                        Image(systemName: "shield.checkered")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(.white)
-                    }
+                    Image(systemName: "shield.checkered")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(.white)
+                }
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Admin Dashboard")
-                            .font(.headline)
-                            .foregroundColor(.primary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Admin Panel")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(.primary)
 
-                        Text("Last updated \(lastRefreshed.formatted(.relative(presentation: .named)))")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
+                    Text(lastRefreshed.formatted(.relative(presentation: .named)))
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
                 }
             }
 
             Spacer()
-
-            // Quick stats pill
-            HStack(spacing: 8) {
-                quickStatPill(
-                    count: viewModel.pendingProfiles.count + viewModel.reports.count,
-                    label: "Pending",
-                    color: .orange
-                )
-            }
 
             // Alerts button
             Button {
@@ -165,20 +123,20 @@ struct AdminModerationDashboard: View {
             } label: {
                 ZStack(alignment: .topTrailing) {
                     Circle()
-                        .fill(Color(.systemGray5))
-                        .frame(width: 40, height: 40)
+                        .fill(Color(.secondarySystemBackground))
+                        .frame(width: 38, height: 38)
 
                     Image(systemName: "bell.fill")
-                        .font(.system(size: 16))
+                        .font(.system(size: 15))
                         .foregroundColor(.primary)
 
                     if viewModel.unreadAlertCount > 0 {
-                        Text("\(viewModel.unreadAlertCount)")
+                        Text("\(min(viewModel.unreadAlertCount, 99))")
                             .font(.system(size: 10, weight: .bold))
                             .foregroundColor(.white)
-                            .padding(4)
+                            .frame(minWidth: 16, minHeight: 16)
                             .background(Circle().fill(Color.red))
-                            .offset(x: 4, y: -4)
+                            .offset(x: 6, y: -6)
                     }
                 }
             }
@@ -196,15 +154,15 @@ struct AdminModerationDashboard: View {
             } label: {
                 ZStack {
                     Circle()
-                        .fill(Color(.systemGray5))
-                        .frame(width: 40, height: 40)
+                        .fill(Color(.secondarySystemBackground))
+                        .frame(width: 38, height: 38)
 
                     if isRefreshing {
                         ProgressView()
-                            .scaleEffect(0.8)
+                            .scaleEffect(0.7)
                     } else {
                         Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(.primary)
                     }
                 }
@@ -212,23 +170,47 @@ struct AdminModerationDashboard: View {
             .disabled(isRefreshing)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.vertical, 10)
         .background(Color(.systemBackground))
     }
 
-    private func quickStatPill(count: Int, label: String, color: Color) -> some View {
-        HStack(spacing: 4) {
-            Text("\(count)")
-                .font(.system(size: 14, weight: .bold, design: .rounded))
-                .foregroundColor(color)
-            Text(label)
-                .font(.caption)
-                .foregroundColor(.secondary)
+    // MARK: - Admin Tab Bar
+
+    private var adminTabBar: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
+                        AdminTabItem(
+                            name: tab.name,
+                            icon: tab.icon,
+                            color: tab.color,
+                            badgeCount: getBadgeCount(for: index),
+                            isSelected: selectedTab == index
+                        )
+                        .id(index)
+                        .onTapGesture {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selectedTab = index
+                            }
+                            HapticManager.shared.selection()
+                        }
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+            }
+            .frame(height: 56)
+            .background(Color(.systemBackground))
+            .overlay(alignment: .bottom) {
+                Divider()
+            }
+            .onChange(of: selectedTab) { _, newValue in
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    proxy.scrollTo(newValue, anchor: .center)
+                }
+            }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(color.opacity(0.1))
-        .cornerRadius(12)
     }
 
     // MARK: - Badge Count Helper
@@ -4015,72 +3997,47 @@ struct AdminZoomablePhotoView: View {
     }
 }
 
-// MARK: - Admin Tab Button Component
+// MARK: - Admin Tab Item (Clean, Stable Design)
 
-struct AdminTabButton: View {
-    let tab: (name: String, icon: String, color: Color)
-    let isSelected: Bool
+struct AdminTabItem: View {
+    let name: String
+    let icon: String
+    let color: Color
     let badgeCount: Int
-    let namespace: Namespace.ID
-    let action: () -> Void
+    let isSelected: Bool
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 7) {
-                Image(systemName: tab.icon)
-                    .font(.system(size: 14, weight: .semibold))
-                    .symbolEffect(.bounce, value: isSelected)
+        HStack(spacing: 6) {
+            // Icon
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(isSelected ? .white : color)
 
-                Text(tab.name)
-                    .font(.system(size: 14, weight: .semibold))
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 11)
-            .foregroundColor(isSelected ? .white : .primary.opacity(0.8))
-            .background {
-                if isSelected {
-                    Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [tab.color, tab.color.opacity(0.85)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .shadow(color: tab.color.opacity(0.4), radius: 8, y: 4)
-                        .matchedGeometryEffect(id: "tab_background", in: namespace)
-                } else {
-                    Capsule()
-                        .fill(Color(.systemGray5).opacity(0.8))
-                }
-            }
-            .overlay {
-                if isSelected {
-                    Capsule()
-                        .strokeBorder(Color.white.opacity(0.25), lineWidth: 1)
-                }
-            }
-        }
-        .buttonStyle(.plain)
-        .scaleEffect(isSelected ? 1.02 : 1.0)
-        // Badge overlay
-        .overlay(alignment: .topTrailing) {
+            // Label
+            Text(name)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(isSelected ? .white : .primary)
+
+            // Inline badge (no overlay offset)
             if badgeCount > 0 {
                 Text(badgeCount > 99 ? "99+" : "\(badgeCount)")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(isSelected ? color : .white)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
                     .background(
                         Capsule()
-                            .fill(Color.red)
-                            .shadow(color: .red.opacity(0.4), radius: 4, y: 2)
+                            .fill(isSelected ? Color.white : Color.red)
                     )
-                    .offset(x: 10, y: -8)
-                    .transition(.scale.combined(with: .opacity))
             }
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: badgeCount)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            Capsule()
+                .fill(isSelected ? color : Color(.tertiarySystemBackground))
+        )
+        .contentShape(Capsule())
     }
 }
 
