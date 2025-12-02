@@ -1,78 +1,116 @@
 /**
  * Stat Card Component
- * Displays a metric with icon and subtitle
- * PERFORMANCE: Memoized to prevent unnecessary re-renders
+ * Professional metric card with clean design
  */
 
-import { memo, useState, useEffect } from 'react';
-import { Paper, Box, Typography, Fade } from '@mui/material';
+import { memo } from 'react';
+import { Box, Typography } from '@mui/material';
+import { TrendingUp, TrendingDown } from '@mui/icons-material';
 
-// Memoized StatCard for smooth performance
-const StatCard = memo(function StatCard({ title, value, icon, color, subtitle }) {
-  const [isVisible, setIsVisible] = useState(false);
-  const [displayValue, setDisplayValue] = useState(value);
-
-  // Smooth fade-in on mount
-  useEffect(() => {
-    setIsVisible(true);
-  }, []);
-
-  // Animate value changes
-  useEffect(() => {
-    setDisplayValue(value);
-  }, [value]);
-
+const StatCard = memo(function StatCard({
+  title,
+  value,
+  icon,
+  subtitle,
+  trend,
+  trendDirection = 'up'
+}) {
   return (
-    <Fade in={isVisible} timeout={300}>
-      <Paper
+    <Box
+      sx={{
+        p: 3,
+        height: '100%',
+        backgroundColor: '#1e293b',
+        borderRadius: 2,
+        border: '1px solid #334155',
+        transition: 'border-color 0.2s ease',
+        '&:hover': {
+          borderColor: '#475569',
+        },
+      }}
+    >
+      {/* Header with icon and title */}
+      <Box
         sx={{
-          p: 3,
-          height: '100%',
-          transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-          '&:hover': {
-            transform: 'translateY(-2px)',
-            boxShadow: 4,
-          },
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          mb: 2,
         }}
       >
-        <Box display="flex" alignItems="center" mb={2}>
-          <Box
-            sx={{
-              backgroundColor: color,
-              color: 'white',
-              borderRadius: 2,
-              p: 1,
-              mr: 2,
-              display: 'flex',
-              alignItems: 'center',
-              transition: 'transform 0.2s ease',
-              '&:hover': {
-                transform: 'scale(1.05)',
-              },
-            }}
-          >
-            {icon}
-          </Box>
-          <Typography variant="subtitle2" color="text.secondary">
-            {title}
-          </Typography>
-        </Box>
         <Typography
-          variant="h4"
-          fontWeight="bold"
+          variant="body2"
           sx={{
-            transition: 'opacity 0.15s ease',
+            color: '#94a3b8',
+            fontWeight: 500,
+            fontSize: '0.8125rem',
+            textTransform: 'uppercase',
+            letterSpacing: '0.025em',
           }}
         >
-          {displayValue}
+          {title}
         </Typography>
-        {subtitle && (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            {subtitle}
-          </Typography>
-        )}
-      </Paper>
-    </Fade>
+        <Box
+          sx={{
+            color: '#64748b',
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
+          {icon}
+        </Box>
+      </Box>
+
+      {/* Value */}
+      <Typography
+        variant="h4"
+        sx={{
+          fontWeight: 700,
+          color: '#f1f5f9',
+          fontSize: '1.75rem',
+          letterSpacing: '-0.02em',
+          mb: 1,
+        }}
+      >
+        {value}
+      </Typography>
+
+      {/* Subtitle/Trend */}
+      {(subtitle || trend) && (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {trend && (
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.25,
+                color: trendDirection === 'up' ? '#22c55e' : '#ef4444',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+              }}
+            >
+              {trendDirection === 'up' ? (
+                <TrendingUp sx={{ fontSize: 16 }} />
+              ) : (
+                <TrendingDown sx={{ fontSize: 16 }} />
+              )}
+              {trend}
+            </Box>
+          )}
+          {subtitle && (
+            <Typography
+              variant="body2"
+              sx={{
+                color: '#64748b',
+                fontSize: '0.8125rem',
+              }}
+            >
+              {subtitle}
+            </Typography>
+          )}
+        </Box>
+      )}
+    </Box>
   );
 });
 
