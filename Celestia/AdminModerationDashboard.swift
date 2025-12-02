@@ -231,44 +231,48 @@ struct AdminModerationDashboard: View {
     private var reportsListView: some View {
         Group {
             if viewModel.isLoading {
-                ReportsLoadingView()
+                AdminLoadingView(message: "Loading reports...")
             } else if let error = viewModel.errorMessage {
-                // Show error state with admin access hint
-                VStack(spacing: 20) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 60))
-                        .foregroundColor(.orange)
-
-                    Text("Could Not Load Reports")
-                        .font(.title2.bold())
-
-                    Text(error)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
-
-                    Button("Retry") {
-                        Task { await viewModel.refresh() }
-                    }
-                    .buttonStyle(.bordered)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                AdminErrorView(
+                    title: "Could Not Load Reports",
+                    message: error,
+                    onRetry: { Task { await viewModel.refresh() } }
+                )
             } else if viewModel.reports.isEmpty {
-                emptyState(
+                AdminEmptyStateView(
                     icon: "checkmark.shield.fill",
                     title: "No Pending Reports",
-                    message: "All reports have been reviewed"
+                    message: "All reports have been reviewed",
+                    color: .green
                 )
             } else {
-                List(viewModel.reports) { report in
-                    NavigationLink {
-                        ReportDetailView(report: report, viewModel: viewModel)
-                    } label: {
-                        ReportRowView(report: report)
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        // Section header
+                        AdminSectionHeader(
+                            title: "Pending Reports",
+                            count: viewModel.reports.count,
+                            icon: "exclamationmark.triangle.fill",
+                            color: .orange
+                        )
+
+                        ForEach(viewModel.reports) { report in
+                            NavigationLink {
+                                ReportDetailView(report: report, viewModel: viewModel)
+                            } label: {
+                                ReportRowView(report: report)
+                            }
+                            .buttonStyle(.plain)
+
+                            if report.id != viewModel.reports.last?.id {
+                                Divider()
+                                    .padding(.leading, 16)
+                            }
+                        }
+                        .background(Color(.systemBackground))
                     }
                 }
-                .listStyle(.plain)
+                .background(Color(.systemGroupedBackground))
             }
         }
     }
@@ -278,22 +282,42 @@ struct AdminModerationDashboard: View {
     private var appealsListView: some View {
         Group {
             if viewModel.isLoading {
-                AppealsLoadingView()
+                AdminLoadingView(message: "Loading appeals...")
             } else if viewModel.appeals.isEmpty {
-                emptyState(
+                AdminEmptyStateView(
                     icon: "checkmark.seal.fill",
                     title: "No Pending Appeals",
-                    message: "All user appeals have been reviewed"
+                    message: "All user appeals have been reviewed",
+                    color: .cyan
                 )
             } else {
-                List(viewModel.appeals) { appeal in
-                    NavigationLink {
-                        AppealDetailView(appeal: appeal, viewModel: viewModel)
-                    } label: {
-                        AppealRowView(appeal: appeal)
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        // Section header
+                        AdminSectionHeader(
+                            title: "User Appeals",
+                            count: viewModel.appeals.count,
+                            icon: "envelope.open.fill",
+                            color: .cyan
+                        )
+
+                        ForEach(viewModel.appeals) { appeal in
+                            NavigationLink {
+                                AppealDetailView(appeal: appeal, viewModel: viewModel)
+                            } label: {
+                                AppealRowView(appeal: appeal)
+                            }
+                            .buttonStyle(.plain)
+
+                            if appeal.id != viewModel.appeals.last?.id {
+                                Divider()
+                                    .padding(.leading, 16)
+                            }
+                        }
+                        .background(Color(.systemBackground))
                     }
                 }
-                .listStyle(.plain)
+                .background(Color(.systemGroupedBackground))
             }
         }
     }
@@ -303,33 +327,34 @@ struct AdminModerationDashboard: View {
     private var pendingProfilesView: some View {
         Group {
             if viewModel.isLoading {
-                PendingProfilesLoadingView()
+                AdminLoadingView(message: "Loading pending profiles...")
             } else if viewModel.pendingProfiles.isEmpty {
-                emptyState(
+                AdminEmptyStateView(
                     icon: "person.crop.circle.badge.checkmark",
                     title: "All Caught Up!",
-                    message: "No new accounts waiting for review"
+                    message: "No new accounts waiting for review",
+                    color: .blue
                 )
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 16) {
-                        // Header with count
-                        HStack {
-                            Text("\(viewModel.pendingProfiles.count) accounts pending")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                        }
-                        .padding(.horizontal)
-                        .padding(.top, 8)
+                    LazyVStack(spacing: 12) {
+                        // Section header
+                        AdminSectionHeader(
+                            title: "New Accounts",
+                            count: viewModel.pendingProfiles.count,
+                            icon: "person.badge.plus",
+                            color: .blue
+                        )
+                        .padding(.bottom, 4)
 
                         ForEach(viewModel.pendingProfiles) { profile in
                             PendingProfileCard(profile: profile, viewModel: viewModel)
-                                .padding(.horizontal)
+                                .padding(.horizontal, 16)
                         }
                     }
                     .padding(.bottom, 20)
                 }
+                .background(Color(.systemGroupedBackground))
             }
         }
     }
@@ -339,22 +364,42 @@ struct AdminModerationDashboard: View {
     private var suspiciousProfilesView: some View {
         Group {
             if viewModel.isLoading {
-                SuspiciousProfilesLoadingView()
+                AdminLoadingView(message: "Loading suspicious profiles...")
             } else if viewModel.suspiciousProfiles.isEmpty {
-                emptyState(
+                AdminEmptyStateView(
                     icon: "checkmark.circle.fill",
                     title: "No Suspicious Profiles",
-                    message: "Auto-detection found no concerns"
+                    message: "Auto-detection found no concerns",
+                    color: .green
                 )
             } else {
-                List(viewModel.suspiciousProfiles) { item in
-                    NavigationLink {
-                        SuspiciousProfileDetailView(item: item, viewModel: viewModel)
-                    } label: {
-                        SuspiciousProfileRowView(item: item)
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        // Section header
+                        AdminSectionHeader(
+                            title: "Suspicious Activity",
+                            count: viewModel.suspiciousProfiles.count,
+                            icon: "eye.trianglebadge.exclamationmark",
+                            color: .red
+                        )
+
+                        ForEach(viewModel.suspiciousProfiles) { item in
+                            NavigationLink {
+                                SuspiciousProfileDetailView(item: item, viewModel: viewModel)
+                            } label: {
+                                SuspiciousProfileRowView(item: item)
+                            }
+                            .buttonStyle(.plain)
+
+                            if item.id != viewModel.suspiciousProfiles.last?.id {
+                                Divider()
+                                    .padding(.leading, 16)
+                            }
+                        }
+                        .background(Color(.systemBackground))
                     }
                 }
-                .listStyle(.plain)
+                .background(Color(.systemGroupedBackground))
             }
         }
     }
@@ -370,7 +415,7 @@ struct AdminModerationDashboard: View {
     private var statsView: some View {
         Group {
             if viewModel.isLoading {
-                StatsLoadingView()
+                AdminLoadingView(message: "Loading statistics...")
             } else {
                 statsContentView
             }
@@ -379,201 +424,139 @@ struct AdminModerationDashboard: View {
 
     private var statsContentView: some View {
         ScrollView {
-            VStack(spacing: 20) {
-                // Header
+            VStack(spacing: 16) {
+                // Stats Header Card
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Dashboard")
-                            .font(.title2.bold())
-                        Text("Moderation overview")
-                            .font(.subheadline)
+                        Text("Overview")
+                            .font(.system(size: 20, weight: .bold))
+                        Text("Real-time moderation stats")
+                            .font(.system(size: 13))
                             .foregroundColor(.secondary)
                     }
                     Spacer()
 
-                    // Last updated indicator
-                    HStack(spacing: 4) {
+                    // Live indicator
+                    HStack(spacing: 6) {
                         Circle()
                             .fill(.green)
                             .frame(width: 8, height: 8)
                         Text("Live")
-                            .font(.caption.weight(.medium))
+                            .font(.system(size: 12, weight: .medium))
                             .foregroundColor(.secondary)
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background(Color(.systemGray6))
-                    .cornerRadius(12)
+                    .background(Color(.tertiarySystemBackground))
+                    .cornerRadius(8)
                 }
-                .padding(.horizontal)
+                .padding(16)
+                .background(Color(.systemBackground))
+                .cornerRadius(12)
+                .padding(.horizontal, 16)
                 .padding(.top, 8)
 
                 // Summary cards in grid
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                    StatCard(
+                    AdminStatCard(
                         title: "Total Reports",
                         value: "\(viewModel.stats.totalReports)",
                         icon: "exclamationmark.triangle.fill",
                         color: .blue
                     )
 
-                    StatCard(
+                    AdminStatCard(
                         title: "Pending",
                         value: "\(viewModel.stats.pendingReports)",
                         icon: "clock.fill",
                         color: .orange
                     )
 
-                    StatCard(
+                    AdminStatCard(
                         title: "Resolved",
                         value: "\(viewModel.stats.resolvedReports)",
                         icon: "checkmark.circle.fill",
                         color: .green
                     )
 
-                    StatCard(
+                    AdminStatCard(
                         title: "Suspicious",
                         value: "\(viewModel.stats.suspiciousProfiles)",
                         icon: "eye.trianglebadge.exclamationmark.fill",
                         color: .red
                     )
                 }
-                .padding(.horizontal)
+                .padding(.horizontal, 16)
 
-                // Recent activity card
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack {
+                // Recent activity section
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
                         Image(systemName: "clock.arrow.circlepath")
-                            .font(.headline)
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(.purple)
                         Text("Recent Activity")
-                            .font(.headline)
+                            .font(.system(size: 15, weight: .semibold))
                         Spacer()
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
 
                     if viewModel.reports.isEmpty && viewModel.suspiciousProfiles.isEmpty {
-                        HStack {
-                            Spacer()
-                            VStack(spacing: 8) {
-                                Image(systemName: "tray")
-                                    .font(.title2)
-                                    .foregroundColor(.secondary)
-                                Text("No recent activity")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                            .padding(.vertical, 20)
-                            Spacer()
+                        VStack(spacing: 8) {
+                            Image(systemName: "tray")
+                                .font(.system(size: 24))
+                                .foregroundColor(.secondary)
+                            Text("No recent activity")
+                                .font(.system(size: 14))
+                                .foregroundColor(.secondary)
                         }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 24)
                     } else {
-                        VStack(spacing: 12) {
-                            ForEach(viewModel.reports.prefix(5)) { report in
+                        VStack(spacing: 0) {
+                            ForEach(Array(viewModel.reports.prefix(5).enumerated()), id: \.element.id) { index, report in
                                 HStack(spacing: 12) {
                                     ZStack {
                                         Circle()
-                                            .fill(Color.orange.opacity(0.15))
+                                            .fill(Color.orange.opacity(0.12))
                                             .frame(width: 36, height: 36)
                                         Image(systemName: "exclamationmark.circle.fill")
+                                            .font(.system(size: 16))
                                             .foregroundColor(.orange)
                                     }
 
-                                    VStack(alignment: .leading, spacing: 3) {
+                                    VStack(alignment: .leading, spacing: 2) {
                                         Text(report.reason)
-                                            .font(.subheadline.weight(.medium))
+                                            .font(.system(size: 14, weight: .medium))
+                                            .foregroundColor(.primary)
                                         Text(report.timestamp)
-                                            .font(.caption)
+                                            .font(.system(size: 12))
                                             .foregroundColor(.secondary)
                                     }
 
                                     Spacer()
 
                                     Image(systemName: "chevron.right")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(.quaternary)
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+
+                                if index < min(viewModel.reports.count - 1, 4) {
+                                    Divider()
+                                        .padding(.leading, 64)
                                 }
                             }
                         }
                     }
                 }
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(Color(.systemBackground))
-                        .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .strokeBorder(Color(.separator).opacity(0.2), lineWidth: 1)
-                )
-                .padding(.horizontal)
+                .background(Color(.systemBackground))
+                .cornerRadius(12)
+                .padding(.horizontal, 16)
             }
             .padding(.bottom, 20)
         }
-        .background(Color(.systemGroupedBackground))
-    }
-
-    // MARK: - Empty State
-
-    private func emptyState(icon: String, title: String, message: String) -> some View {
-        VStack(spacing: 24) {
-            // Animated icon container
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [.green.opacity(0.15), .green.opacity(0.05)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 120, height: 120)
-
-                Circle()
-                    .fill(.green.opacity(0.1))
-                    .frame(width: 90, height: 90)
-
-                Image(systemName: icon)
-                    .font(.system(size: 44, weight: .medium))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.green, .green.opacity(0.7)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .symbolEffect(.pulse, options: .repeating)
-            }
-
-            VStack(spacing: 8) {
-                Text(title)
-                    .font(.title2.bold())
-                    .foregroundColor(.primary)
-
-                Text(message)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 50)
-            }
-
-            // Refresh hint
-            Button {
-                Task { await viewModel.refresh() }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.clockwise")
-                    Text("Refresh")
-                }
-                .font(.subheadline.weight(.medium))
-                .foregroundColor(.blue)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10)
-                .background(Color.blue.opacity(0.1))
-                .cornerRadius(20)
-            }
-            .padding(.top, 8)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemGroupedBackground))
     }
 }
@@ -584,49 +567,63 @@ struct ReportRowView: View {
     let report: ModerationReport
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
+        HStack(spacing: 12) {
+            // User photo
+            if let user = report.reportedUser, let photoURL = user.photoURL {
+                CachedAsyncImage(url: URL(string: photoURL)) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    Circle().fill(Color(.systemGray4))
+                }
+                .frame(width: 48, height: 48)
+                .clipShape(Circle())
+            } else {
+                Circle()
+                    .fill(Color(.systemGray4))
+                    .frame(width: 48, height: 48)
+                    .overlay(
+                        Image(systemName: "person.fill")
+                            .foregroundColor(.white)
+                    )
+            }
+
+            // Content
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    if let user = report.reportedUser {
+                        Text(user.name)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.primary)
+                    }
+                    Spacer()
+                    Text(report.timestamp)
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                }
+
                 // Reason badge
                 Text(report.reason)
-                    .font(.caption.bold())
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.white)
                     .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 3)
                     .background(reasonColor)
-                    .cornerRadius(6)
+                    .cornerRadius(4)
 
-                Spacer()
-
-                // Timestamp
-                Text(report.timestamp)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-
-            // Reported user - PERFORMANCE: Use CachedAsyncImage
-            if let user = report.reportedUser {
-                HStack(spacing: 8) {
-                    if let photoURL = user.photoURL {
-                        CachedAsyncImage(url: URL(string: photoURL)) { image in
-                            image.resizable()
-                        } placeholder: {
-                            Color.gray
-                        }
-                        .frame(width: 40, height: 40)
-                        .clipShape(Circle())
-                    }
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(user.name)
-                            .font(.subheadline.bold())
-                        Text("Reported by: \(report.reporter?.name ?? "Unknown")")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                if let reporter = report.reporter {
+                    Text("by \(reporter.name)")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
                 }
             }
+
+            // Chevron
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.quaternary)
         }
-        .padding(.vertical, 4)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 
     private var reasonColor: Color {
@@ -885,64 +882,63 @@ struct AppealRowView: View {
     let appeal: UserAppeal
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
+        HStack(spacing: 12) {
+            // User photo
+            if let user = appeal.user, let photoURL = user.photoURL {
+                CachedAsyncImage(url: URL(string: photoURL)) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    Circle().fill(Color(.systemGray4))
+                }
+                .frame(width: 48, height: 48)
+                .clipShape(Circle())
+            } else {
+                Circle()
+                    .fill(Color(.systemGray4))
+                    .frame(width: 48, height: 48)
+                    .overlay(
+                        Image(systemName: "person.fill")
+                            .foregroundColor(.white)
+                    )
+            }
+
+            // Content
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    if let user = appeal.user {
+                        Text(user.name)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.primary)
+                    }
+                    Spacer()
+                    Text(appeal.submittedAt)
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                }
+
                 // Appeal type badge
                 Text(appeal.typeDisplayName)
-                    .font(.caption.bold())
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.white)
                     .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 3)
                     .background(appeal.type == "ban" ? Color.red : Color.orange)
-                    .cornerRadius(6)
+                    .cornerRadius(4)
 
-                Spacer()
-
-                // Timestamp
-                Text(appeal.submittedAt)
-                    .font(.caption)
+                // Message preview
+                Text(appeal.appealMessage)
+                    .font(.system(size: 13))
                     .foregroundColor(.secondary)
+                    .lineLimit(1)
             }
 
-            // User info
-            if let user = appeal.user {
-                HStack(spacing: 8) {
-                    if let photoURL = user.photoURL {
-                        CachedAsyncImage(url: URL(string: photoURL)) { image in
-                            image.resizable()
-                        } placeholder: {
-                            Color.gray
-                        }
-                        .frame(width: 40, height: 40)
-                        .clipShape(Circle())
-                    } else {
-                        Circle()
-                            .fill(Color(.systemGray4))
-                            .frame(width: 40, height: 40)
-                            .overlay(
-                                Image(systemName: "person.fill")
-                                    .foregroundColor(.gray)
-                            )
-                    }
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(user.name)
-                            .font(.subheadline.bold())
-                        Text(user.email)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-            }
-
-            // Appeal message preview
-            Text(appeal.appealMessage)
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .lineLimit(2)
-                .padding(.top, 2)
+            // Chevron
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.quaternary)
         }
-        .padding(.vertical, 4)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 }
 
@@ -1194,34 +1190,70 @@ struct SuspiciousProfileRowView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Severity indicator
-            Circle()
-                .fill(severityColor)
-                .frame(width: 12, height: 12)
+            // User photo with severity ring
+            ZStack {
+                if let user = item.user, let photoURL = user.photos?.first {
+                    CachedAsyncImage(url: URL(string: photoURL)) { image in
+                        image.resizable().scaledToFill()
+                    } placeholder: {
+                        Circle().fill(Color(.systemGray4))
+                    }
+                    .frame(width: 48, height: 48)
+                    .clipShape(Circle())
+                } else {
+                    Circle()
+                        .fill(Color(.systemGray4))
+                        .frame(width: 48, height: 48)
+                        .overlay(
+                            Image(systemName: "person.fill")
+                                .foregroundColor(.white)
+                        )
+                }
 
+                // Severity ring
+                Circle()
+                    .strokeBorder(severityColor, lineWidth: 2.5)
+                    .frame(width: 52, height: 52)
+            }
+
+            // Content
             VStack(alignment: .leading, spacing: 4) {
-                Text(item.user?.name ?? "Unknown User")
-                    .font(.subheadline.bold())
+                HStack(spacing: 8) {
+                    Text(item.user?.name ?? "Unknown User")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.primary)
+                    Spacer()
+                    Text(item.timestamp)
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                }
 
-                Text("Suspicion: \(Int(item.suspicionScore * 100))%")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                // Risk score badge
+                HStack(spacing: 6) {
+                    Text("\(Int(item.suspicionScore * 100))% Risk")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(severityColor)
+                        .cornerRadius(4)
 
-                // Indicators
-                if !item.indicators.isEmpty {
-                    Text(item.indicators.prefix(2).joined(separator: ", "))
-                        .font(.caption2)
-                        .foregroundColor(.orange)
+                    if !item.indicators.isEmpty {
+                        Text(item.indicators.prefix(1).joined(separator: ", "))
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
                 }
             }
 
-            Spacer()
-
-            Text(item.timestamp)
-                .font(.caption)
-                .foregroundColor(.secondary)
+            // Chevron
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.quaternary)
         }
-        .padding(.vertical, 4)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 
     private var severityColor: Color {
@@ -3994,6 +4026,193 @@ struct AdminZoomablePhotoView: View {
                 HapticManager.shared.impact(.light)
             }
         }
+    }
+}
+
+// MARK: - Admin Section Header
+
+struct AdminSectionHeader: View {
+    let title: String
+    let count: Int
+    let icon: String
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 10) {
+            // Icon
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(color.opacity(0.12))
+                    .frame(width: 32, height: 32)
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(color)
+            }
+
+            // Title
+            Text(title)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(.primary)
+
+            Spacer()
+
+            // Count badge
+            Text("\(count)")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundColor(color)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(color.opacity(0.12))
+                .cornerRadius(8)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Color(.systemBackground))
+    }
+}
+
+// MARK: - Admin Loading View
+
+struct AdminLoadingView: View {
+    let message: String
+
+    var body: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .scaleEffect(1.2)
+                .tint(.secondary)
+
+            Text(message)
+                .font(.system(size: 14))
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemGroupedBackground))
+    }
+}
+
+// MARK: - Admin Error View
+
+struct AdminErrorView: View {
+    let title: String
+    let message: String
+    let onRetry: () -> Void
+
+    var body: some View {
+        VStack(spacing: 20) {
+            ZStack {
+                Circle()
+                    .fill(Color.orange.opacity(0.12))
+                    .frame(width: 80, height: 80)
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 32))
+                    .foregroundColor(.orange)
+            }
+
+            VStack(spacing: 6) {
+                Text(title)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(.primary)
+
+                Text(message)
+                    .font(.system(size: 14))
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+            }
+
+            Button(action: onRetry) {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("Retry")
+                        .font(.system(size: 14, weight: .semibold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 10)
+                .background(Color.blue)
+                .cornerRadius(10)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemGroupedBackground))
+    }
+}
+
+// MARK: - Admin Empty State View
+
+struct AdminEmptyStateView: View {
+    let icon: String
+    let title: String
+    let message: String
+    let color: Color
+
+    var body: some View {
+        VStack(spacing: 20) {
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.1))
+                    .frame(width: 100, height: 100)
+                Circle()
+                    .fill(color.opacity(0.08))
+                    .frame(width: 76, height: 76)
+                Image(systemName: icon)
+                    .font(.system(size: 36, weight: .medium))
+                    .foregroundColor(color)
+            }
+
+            VStack(spacing: 6) {
+                Text(title)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(.primary)
+
+                Text(message)
+                    .font(.system(size: 14))
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 50)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemGroupedBackground))
+    }
+}
+
+// MARK: - Admin Stat Card
+
+struct AdminStatCard: View {
+    let title: String
+    let value: String
+    let icon: String
+    let color: Color
+
+    var body: some View {
+        VStack(spacing: 10) {
+            // Icon
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.12))
+                    .frame(width: 40, height: 40)
+                Image(systemName: icon)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(color)
+            }
+
+            // Value
+            Text(value)
+                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .foregroundColor(.primary)
+
+            // Title
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
     }
 }
 
