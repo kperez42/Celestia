@@ -118,10 +118,10 @@ class UserService: ObservableObject, UserServiceProtocol {
                     // Exclude duplicates already in the array
                     guard let userId = user.id, !existingIds.contains(userId) else { return false }
                     // SAFETY: Client-side profileStatus filter (avoids complex composite index)
-                    // Exclude: pending (unapproved), suspended, flagged profiles
+                    // Exclude: pending (unapproved), suspended, flagged, banned profiles
                     // Include: active, or empty/nil (existing users without field set)
                     let status = user.profileStatus.lowercased()
-                    if status == "pending" || status == "suspended" || status == "flagged" {
+                    if status == "pending" || status == "suspended" || status == "flagged" || status == "banned" {
                         return false
                     }
                     return true

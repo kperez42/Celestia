@@ -214,19 +214,19 @@ class MutualLikesViewModel: ObservableObject {
         defer { isLoading = false }
 
         do {
-            // Get users current user liked
+            // Get users current user liked (likes sent by current user)
             let myLikesSnapshot = try await db.collection("likes")
-                .whereField("userId", isEqualTo: currentUserId)
+                .whereField("fromUserId", isEqualTo: currentUserId)
                 .getDocuments()
 
-            let myLikedUserIds = Set(myLikesSnapshot.documents.compactMap { $0.data()["targetUserId"] as? String })
+            let myLikedUserIds = Set(myLikesSnapshot.documents.compactMap { $0.data()["toUserId"] as? String })
 
-            // Get users who liked current user
+            // Get users who liked current user (likes received)
             let likersSnapshot = try await db.collection("likes")
-                .whereField("targetUserId", isEqualTo: currentUserId)
+                .whereField("toUserId", isEqualTo: currentUserId)
                 .getDocuments()
 
-            let likerIds = Set(likersSnapshot.documents.compactMap { $0.data()["userId"] as? String })
+            let likerIds = Set(likersSnapshot.documents.compactMap { $0.data()["fromUserId"] as? String })
 
             // Find mutual likes (intersection)
             let mutualLikeIds = myLikedUserIds.intersection(likerIds)

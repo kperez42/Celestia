@@ -243,44 +243,44 @@ class LikeActivityViewModel: ObservableObject {
         do {
             var allActivity: [LikeActivity] = []
 
-            // Get received likes
+            // Get received likes (likes where current user is the target)
             let receivedSnapshot = try await db.collection("likes")
-                .whereField("targetUserId", isEqualTo: currentUserId)
+                .whereField("toUserId", isEqualTo: currentUserId)
                 .order(by: "timestamp", descending: true)
                 .limit(to: 50)
                 .getDocuments()
 
             for doc in receivedSnapshot.documents {
                 let data = doc.data()
-                if let userId = data["userId"] as? String,
+                if let fromUserId = data["fromUserId"] as? String,
                    let timestamp = (data["timestamp"] as? Timestamp)?.dateValue() {
                     let isSuperLike = data["isSuperLike"] as? Bool ?? false
 
                     allActivity.append(LikeActivity(
                         id: doc.documentID,
-                        userId: userId,
+                        userId: fromUserId,
                         type: .received(isSuperLike: isSuperLike),
                         timestamp: timestamp
                     ))
                 }
             }
 
-            // Get sent likes
+            // Get sent likes (likes sent by current user)
             let sentSnapshot = try await db.collection("likes")
-                .whereField("userId", isEqualTo: currentUserId)
+                .whereField("fromUserId", isEqualTo: currentUserId)
                 .order(by: "timestamp", descending: true)
                 .limit(to: 50)
                 .getDocuments()
 
             for doc in sentSnapshot.documents {
                 let data = doc.data()
-                if let targetUserId = data["targetUserId"] as? String,
+                if let toUserId = data["toUserId"] as? String,
                    let timestamp = (data["timestamp"] as? Timestamp)?.dateValue() {
                     let isSuperLike = data["isSuperLike"] as? Bool ?? false
 
                     allActivity.append(LikeActivity(
                         id: doc.documentID + "_sent",
-                        userId: targetUserId,
+                        userId: toUserId,
                         type: .sent(isSuperLike: isSuperLike),
                         timestamp: timestamp
                     ))
