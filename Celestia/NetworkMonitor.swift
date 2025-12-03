@@ -265,8 +265,8 @@ class NetworkMonitor: ObservableObject {
     // MARK: - Connectivity Verification
 
     /// Verify actual internet connectivity by making a quick request
-    /// For WiFi/Ethernet: Trust NWPathMonitor (stable connections)
-    /// For Cellular: Verify to prevent accidental data usage surprises
+    /// For ALL connection types: Verify actual connectivity to Firebase/internet
+    /// This prevents silent upload failures when WiFi is connected but has no internet
     func verifyConnectivity() async -> Bool {
         Logger.shared.debug("📶 Verifying connectivity (NWPathMonitor: \(isConnected ? "connected" : "disconnected"), type: \(connectionType.description))", category: .networking)
 
@@ -276,57 +276,99 @@ class NetworkMonitor: ObservableObject {
             return false
         }
 
-        // WIFI/ETHERNET FIX: Trust NWPathMonitor for stable connections
-        // These connections are reliable - if NWPathMonitor says connected, trust it
-        // Don't block uploads just because Google is unreachable (firewall, DNS, etc.)
+        // WIFI FIX: Always verify actual internet connectivity for ALL connection types
+        // WiFi can be "connected" but have no internet (captive portal, weak signal, DNS issues, etc.)
+        // This was causing silent upload failures where uploads would fail at Firebase level
         switch connectionType {
-        case .wifi, .wiredEthernet:
-            Logger.shared.info("📶 WiFi/Ethernet detected - trusting NWPathMonitor (connected)", category: .networking)
-            return true
+        case .wifi:
+            // WiFi requires verification - common issues: captive portals, weak signal, DNS
+            Logger.shared.info("📶 WiFi detected - verifying actual internet connectivity...", category: .networking)
+            let verified = await performConnectivityTest()
+            if !verified {
+                Logger.shared.warning("📶 WiFi connectivity test FAILED - WiFi connected but no internet access", category: .networking)
+                // Log additional diagnostic info
+                Logger.shared.warning("📶 Possible causes: captive portal, weak signal, DNS issues, firewall blocking", category: .networking)
+            } else {
+                Logger.shared.info("📶 WiFi connectivity test PASSED - internet access confirmed", category: .networking)
+            }
+            return verified
+
+        case .wiredEthernet:
+            // Wired ethernet is more reliable, but still verify
+            Logger.shared.info("📶 Ethernet detected - verifying connectivity", category: .networking)
+            return await performConnectivityTest()
 
         case .cellular:
-            // For cellular, do a quick verification to help users avoid data surprises
+            // For cellular, verify to help users avoid data surprises
             Logger.shared.debug("📶 Cellular detected - verifying connectivity", category: .networking)
             return await performConnectivityTest()
 
         case .other:
-            // Unknown connection type - try to verify but don't block if it fails
+            // Unknown connection type - verify
             let verified = await performConnectivityTest()
             if !verified {
-                Logger.shared.warning("📶 Verification failed but NWPathMonitor says connected - allowing upload", category: .networking)
-                return true // Trust NWPathMonitor, let upload try
+                Logger.shared.warning("📶 Unknown connection type - verification failed", category: .networking)
             }
-            return true
+            return verified
         }
     }
 
-    /// Perform actual connectivity test
+    /// Perform actual connectivity test with fallback URLs
+    /// Returns true only if actual internet connectivity is confirmed
     private func performConnectivityTest() async -> Bool {
-        do {
-            guard let url = URL(string: "https://www.google.com/generate_204") else {
-                return true // Can't test, assume connected
+        // Test URLs - try multiple in case one is blocked
+        let testURLs = [
+            "https://www.google.com/generate_204",      // Google connectivity check (returns 204)
+            "https://clients3.google.com/generate_204", // Alternative Google endpoint
+            "https://www.apple.com/library/test/success.html" // Apple connectivity check
+        ]
+
+        for urlString in testURLs {
+            guard let url = URL(string: urlString) else { continue }
+
+            do {
+                var request = URLRequest(url: url)
+                request.httpMethod = "GET"
+                request.timeoutInterval = 3.0 // Shorter timeout for faster feedback
+                request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+
+                let (_, response) = try await URLSession.shared.data(for: request)
+
+                if let httpResponse = response as? HTTPURLResponse {
+                    // Accept 200-299 range or 204 No Content
+                    let success = (200...299).contains(httpResponse.statusCode)
+                    if success {
+                        Logger.shared.info("📶 Connectivity test PASS via \(url.host ?? "unknown") (status: \(httpResponse.statusCode))", category: .networking)
+                        return true
+                    }
+                    Logger.shared.debug("📶 Connectivity test: unexpected status \(httpResponse.statusCode) from \(url.host ?? "unknown")", category: .networking)
+                }
+            } catch let error as NSError {
+                // Log specific error for debugging
+                Logger.shared.debug("📶 Connectivity test failed for \(url.host ?? "unknown"): [\(error.domain):\(error.code)] \(error.localizedDescription)", category: .networking)
+
+                // Check for specific "no internet" errors that indicate definite offline status
+                if error.domain == NSURLErrorDomain {
+                    switch error.code {
+                    case NSURLErrorNotConnectedToInternet:
+                        Logger.shared.warning("📶 Connectivity test: Device reports NO INTERNET", category: .networking)
+                        return false
+                    case NSURLErrorTimedOut:
+                        Logger.shared.warning("📶 Connectivity test: Request timed out - possible weak signal or network congestion", category: .networking)
+                        continue // Try next URL
+                    case NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed:
+                        Logger.shared.warning("📶 Connectivity test: DNS lookup failed - possible captive portal or DNS issue", category: .networking)
+                        continue // Try next URL
+                    default:
+                        continue // Try next URL
+                    }
+                }
             }
-
-            var request = URLRequest(url: url)
-            request.httpMethod = "GET"
-            request.timeoutInterval = 5.0 // Quick check
-            request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-
-            let (_, response) = try await URLSession.shared.data(for: request)
-
-            if let httpResponse = response as? HTTPURLResponse {
-                let success = httpResponse.statusCode == 204 || (200...299).contains(httpResponse.statusCode)
-                Logger.shared.info("📶 Connectivity test: \(success ? "PASS" : "FAIL") (status: \(httpResponse.statusCode))", category: .networking)
-                return success
-            }
-
-            return true
-        } catch {
-            Logger.shared.warning("📶 Connectivity test error: \(error.localizedDescription)", category: .networking)
-            // If test fails but NWPathMonitor says connected, still return true
-            // Let the actual upload attempt - it will fail with proper error if really offline
-            return isConnected
         }
+
+        // All tests failed
+        Logger.shared.warning("📶 Connectivity test: ALL endpoints failed - no internet access confirmed", category: .networking)
+        return false
     }
 
     // MARK: - Utility Methods

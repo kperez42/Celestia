@@ -19,17 +19,23 @@ enum ImageType {
 /// Error types specific to photo uploads
 enum PhotoUploadError: LocalizedError {
     case noNetwork
+    case wifiConnectedNoInternet
     case poorConnection
     case uploadFailed(String)
+    case uploadTimeout
 
     var errorDescription: String? {
         switch self {
         case .noNetwork:
             return "No internet connection. Please check your WiFi or cellular data and try again."
+        case .wifiConnectedNoInternet:
+            return "WiFi connected but no internet access. Please check if you need to sign into the WiFi network, or try a different network."
         case .poorConnection:
             return "Your connection is too slow for photo uploads. Please try again with a stronger signal."
         case .uploadFailed(let reason):
             return "Upload failed: \(reason)"
+        case .uploadTimeout:
+            return "Upload timed out. Please check your connection and try again."
         }
     }
 }
@@ -76,13 +82,22 @@ class PhotoUploadService {
 
         Logger.shared.info("📶 Network check - connected: \(networkStatus.connected), type: \(networkStatus.type.description), quality: \(networkStatus.quality.description)", category: .networking)
 
-        // Verify connectivity (trusts WiFi/Ethernet, verifies cellular)
+        // Verify connectivity (now tests actual internet access for ALL connection types including WiFi)
         let actuallyConnected = await networkMonitor.verifyConnectivity()
         Logger.shared.info("📶 verifyConnectivity() returned: \(actuallyConnected)", category: .networking)
 
         if !actuallyConnected {
-            Logger.shared.warning("❌ Photo upload blocked: Network verification failed", category: .networking)
-            throw PhotoUploadError.noNetwork
+            // Provide specific error message based on connection type
+            let connectionType = await MainActor.run { networkMonitor.connectionType }
+            if connectionType == .wifi && networkStatus.connected {
+                // WiFi is connected but no internet - common issue
+                Logger.shared.warning("❌ Photo upload blocked: WiFi connected but NO INTERNET ACCESS", category: .networking)
+                Logger.shared.warning("❌ User should check: captive portal login, weak signal, or network issues", category: .networking)
+                throw PhotoUploadError.wifiConnectedNoInternet
+            } else {
+                Logger.shared.warning("❌ Photo upload blocked: Network verification failed", category: .networking)
+                throw PhotoUploadError.noNetwork
+            }
         }
 
         Logger.shared.info("✅ Network OK - Proceeding with \(imageType) upload...", category: .networking)

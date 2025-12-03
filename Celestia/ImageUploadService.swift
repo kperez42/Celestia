@@ -137,6 +137,29 @@ class ImageUploadService {
             Logger.shared.error("🔥 Firebase Storage: FAILED - domain: \(error.domain), code: \(error.code)", category: .networking)
             Logger.shared.error("🔥 Firebase Storage: Error description: \(error.localizedDescription)", category: .networking)
 
+            // Enhanced WiFi diagnostics - log underlying cause if available
+            if let underlyingError = error.userInfo[NSUnderlyingErrorKey] as? NSError {
+                Logger.shared.error("🔥 Firebase Storage: Underlying error - domain: \(underlyingError.domain), code: \(underlyingError.code)", category: .networking)
+            }
+
+            // Check for common network-related error codes
+            if error.domain == NSURLErrorDomain {
+                switch error.code {
+                case NSURLErrorNotConnectedToInternet:
+                    Logger.shared.error("🔥 Upload failed: Device reports NO INTERNET (WiFi may have disconnected)", category: .networking)
+                case NSURLErrorTimedOut:
+                    Logger.shared.error("🔥 Upload failed: Request TIMED OUT (possible weak WiFi signal or network congestion)", category: .networking)
+                case NSURLErrorNetworkConnectionLost:
+                    Logger.shared.error("🔥 Upload failed: CONNECTION LOST during upload (WiFi signal may have dropped)", category: .networking)
+                case NSURLErrorCannotConnectToHost:
+                    Logger.shared.error("🔥 Upload failed: Cannot connect to Firebase (possible firewall or network issue)", category: .networking)
+                case NSURLErrorDNSLookupFailed:
+                    Logger.shared.error("🔥 Upload failed: DNS lookup failed (possible captive portal or DNS issue)", category: .networking)
+                default:
+                    Logger.shared.error("🔥 Upload failed: Network error code \(error.code)", category: .networking)
+                }
+            }
+
             // REFACTORED: Use FirebaseErrorMapper for consistent error handling
             FirebaseErrorMapper.logError(error, context: "Image Upload")
 

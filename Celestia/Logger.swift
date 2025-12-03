@@ -92,10 +92,10 @@ class Logger {
     // MARK: - Properties
 
     /// Minimum log level to display (can be changed at runtime)
-    /// NOTE: Set to .warning in DEBUG to improve performance - change to .debug only when debugging
+    /// NOTE: Set to .info in DEBUG to capture networking diagnostics for WiFi/upload issues
     var minimumLogLevel: LogLevel = {
         #if DEBUG
-        return .warning  // Changed from .debug to reduce console spam and improve performance
+        return .info  // Changed from .warning to .info to capture network diagnostics
         #else
         return .warning
         #endif
