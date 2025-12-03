@@ -1192,10 +1192,14 @@ struct ChatView: View {
                     switch photoError {
                     case .noNetwork:
                         errorMessage = "No internet connection. Check your WiFi and tap retry."
+                    case .wifiConnectedNoInternet:
+                        errorMessage = "WiFi connected but no internet. Check your network and tap retry."
                     case .poorConnection:
                         errorMessage = "Weak connection. Move to better signal and tap retry."
                     case .uploadFailed(let reason):
                         errorMessage = "Upload failed: \(reason). Tap retry."
+                    case .uploadTimeout:
+                        errorMessage = "Upload timed out. Check your connection and tap retry."
                     }
                 } else {
                     // Check for network-related NSError codes
