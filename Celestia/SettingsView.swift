@@ -491,40 +491,58 @@ struct SettingsView: View {
 
     private func profileStatusIcon(for status: String?) -> String {
         switch status?.lowercased() {
-        case "approved":
+        case "active", "approved":
             return "checkmark.seal.fill"
         case "pending":
             return "clock.fill"
         case "rejected":
             return "xmark.circle.fill"
+        case "flagged":
+            return "flag.fill"
+        case "suspended":
+            return "pause.circle.fill"
+        case "banned":
+            return "nosign"
         default:
-            return "questionmark.circle.fill"
+            return "clock.fill"
         }
     }
 
     private func profileStatusColor(for status: String?) -> Color {
         switch status?.lowercased() {
-        case "approved":
+        case "active", "approved":
             return .green
         case "pending":
             return .orange
         case "rejected":
             return .red
+        case "flagged":
+            return .yellow
+        case "suspended":
+            return .orange
+        case "banned":
+            return .red
         default:
-            return .gray
+            return .orange
         }
     }
 
     private func profileStatusText(for status: String?) -> String {
         switch status?.lowercased() {
-        case "approved":
-            return "Approved"
+        case "active", "approved":
+            return "Active"
         case "pending":
             return "Pending Review"
         case "rejected":
             return "Needs Updates"
+        case "flagged":
+            return "Under Review"
+        case "suspended":
+            return "Suspended"
+        case "banned":
+            return "Banned"
         default:
-            return "Unknown"
+            return "Pending Review"
         }
     }
 
