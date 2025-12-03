@@ -319,9 +319,9 @@ class AnalyticsServiceEnhanced: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
-        // Fetch user's likes
+        // Fetch user's likes (sent by user)
         let likesSnapshot = try await db.collection("likes")
-            .whereField("userId", isEqualTo: userId)
+            .whereField("fromUserId", isEqualTo: userId)
             .order(by: "timestamp", descending: false)
             .getDocuments()
 
@@ -340,7 +340,7 @@ class AnalyticsServiceEnhanced: ObservableObject {
 
             // Find the like that led to this match
             if let likeDoc = likesSnapshot.documents.first(where: { doc in
-                let targetId = doc.data()["targetUserId"] as? String
+                let targetId = doc.data()["toUserId"] as? String
                 return targetId == otherUserId
             }) {
                 let likeTimestamp = (likeDoc.data()["timestamp"] as? Timestamp)?.dateValue() ?? Date()
@@ -483,9 +483,9 @@ class AnalyticsServiceEnhanced: ObservableObject {
             throw AnalyticsError.invalidDateRange
         }
 
-        // Fetch activity data
+        // Fetch activity data (likes sent by user)
         let likesSnapshot = try? await db.collection("likes")
-            .whereField("userId", isEqualTo: userId)
+            .whereField("fromUserId", isEqualTo: userId)
             .whereField("timestamp", isGreaterThan: last30Days)
             .getDocuments()
 
