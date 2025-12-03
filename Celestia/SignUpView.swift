@@ -229,6 +229,7 @@ struct SignUpView: View {
                             // Back button - In edit mode: dismiss at step 1, otherwise go back
                             // In signup mode: dismiss at step 0, otherwise go back
                             Button {
+                                HapticManager.shared.impact(.light)
                                 let dismissStep = isEditingProfile ? 1 : 0
                                 if currentStep == dismissStep {
                                     dismiss()
@@ -238,13 +239,19 @@ struct SignUpView: View {
                                     }
                                 }
                             } label: {
-                                Text(isEditingProfile && currentStep == 1 ? "Cancel" : "Back")
-                                    .font(.headline)
-                                    .foregroundColor(.purple)
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .background(Color.white)
-                                    .cornerRadius(15)
+                                HStack(spacing: 8) {
+                                    if !(isEditingProfile && currentStep == 1) {
+                                        Image(systemName: "arrow.left")
+                                            .font(.subheadline.weight(.semibold))
+                                    }
+                                    Text(isEditingProfile && currentStep == 1 ? "Cancel" : "Back")
+                                        .font(.headline)
+                                }
+                                .foregroundColor(.purple)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.white)
+                                .cornerRadius(15)
                             }
                             .disabled(isSavingProfile)
                             .opacity(isSavingProfile ? 0.5 : 1.0)
@@ -254,15 +261,28 @@ struct SignUpView: View {
                             .scaleButton()
 
                             Button {
+                                // Haptic feedback on tap
+                                if currentStep == 6 {
+                                    HapticManager.shared.impact(.medium)
+                                } else {
+                                    HapticManager.shared.impact(.light)
+                                }
                                 handleNext()
                             } label: {
                                 if authService.isLoading || isLoadingPhotos || isLoadingExistingPhotos || isSavingProfile {
                                     ProgressView()
                                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                 } else {
-                                    Text(nextButtonText)
-                                        .font(.headline)
-                                        .foregroundColor(.white)
+                                    HStack(spacing: 8) {
+                                        Text(nextButtonText)
+                                            .font(.headline)
+
+                                        if currentStep < 6 {
+                                            Image(systemName: "arrow.right")
+                                                .font(.subheadline.weight(.semibold))
+                                        }
+                                    }
+                                    .foregroundColor(.white)
                                 }
                             }
                             .frame(maxWidth: .infinity)
