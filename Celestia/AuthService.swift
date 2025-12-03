@@ -684,6 +684,7 @@ class AuthService: ObservableObject, AuthServiceProtocol {
             let photoURLs = userDoc?.data()?["photos"] as? [String] ?? []
 
             // Delete all related data in parallel for better performance
+            // Group 1: Core user data
             async let messagesDeleted: () = deleteUserMessages(uid: uid, db: db)
             async let matchesDeleted: () = deleteUserMatches(uid: uid, db: db)
             async let interestsDeleted: () = deleteUserInterests(uid: uid, db: db)
@@ -691,20 +692,34 @@ class AuthService: ObservableObject, AuthServiceProtocol {
             async let savedProfilesDeleted: () = deleteUserSavedProfiles(uid: uid, db: db)
             async let notificationsDeleted: () = deleteUserNotifications(uid: uid, db: db)
             async let blocksDeleted: () = deleteUserBlocks(uid: uid, db: db)
-            async let referralCodesDeleted: () = deleteUserReferralCodes(uid: uid, db: db)
             async let profileViewsDeleted: () = deleteUserProfileViews(uid: uid, db: db)
-            async let profileImagesDeleted: () = deleteUserProfileImages(photoURLs: photoURLs)
             async let passesDeleted: () = deleteUserPasses(uid: uid, db: db)
+            async let profileImagesDeleted: () = deleteUserProfileImages(photoURLs: photoURLs)
+
+            // Group 2: Referral data
+            async let referralCodesDeleted: () = deleteUserReferralCodes(uid: uid, db: db)
+            async let referralDataDeleted: () = deleteUserReferralData(uid: uid, db: db)
+
+            // Group 3: Attribution and experiments
+            async let attributionDeleted: () = deleteUserAttributionData(uid: uid, db: db)
+
+            // Group 4: Compliance and GDPR
+            async let complianceDeleted: () = deleteUserComplianceData(uid: uid, db: db)
+
+            // Group 5: Safety, verifications, and misc
             async let emergencyContactsDeleted: () = deleteUserEmergencyContacts(uid: uid, db: db)
             async let segmentAssignmentsDeleted: () = deleteUserSegmentAssignments(uid: uid, db: db)
             async let pendingVerificationsDeleted: () = deleteUserPendingVerifications(uid: uid, db: db)
+            async let safetyDataDeleted: () = deleteUserSafetyData(uid: uid, db: db)
 
             // Wait for all deletions to complete (ignore errors since Auth is already deleted)
             _ = try? await (messagesDeleted, matchesDeleted, interestsDeleted, likesDeleted,
                           savedProfilesDeleted, notificationsDeleted, blocksDeleted,
-                          referralCodesDeleted, profileViewsDeleted, passesDeleted,
+                          profileViewsDeleted, passesDeleted, profileImagesDeleted,
+                          referralCodesDeleted, referralDataDeleted,
+                          attributionDeleted, complianceDeleted,
                           emergencyContactsDeleted, segmentAssignmentsDeleted,
-                          pendingVerificationsDeleted, profileImagesDeleted)
+                          pendingVerificationsDeleted, safetyDataDeleted)
 
             Logger.shared.auth("All related user data deleted (including profile images)", level: .info)
 
@@ -1056,6 +1071,185 @@ class AuthService: ObservableObject, AuthServiceProtocol {
         }
 
         Logger.shared.auth("Deleted \(deletedCount) profile images (\(failedCount) failed)", level: .debug)
+    }
+
+    /// Delete all referral-related data for the user
+    private func deleteUserReferralData(uid: String, db: Firestore) async throws {
+        // Delete referrals where user is referrer
+        let referralsAsReferrer = try await db.collection("referrals")
+            .whereField("referrerUserId", isEqualTo: uid)
+            .getDocuments()
+        for doc in referralsAsReferrer.documents {
+            try await doc.reference.delete()
+        }
+
+        // Delete referrals where user was referred
+        let referralsAsReferred = try await db.collection("referrals")
+            .whereField("referredUserId", isEqualTo: uid)
+            .getDocuments()
+        for doc in referralsAsReferred.documents {
+            try await doc.reference.delete()
+        }
+
+        // Delete referral rewards
+        let rewards = try await db.collection("referralRewards")
+            .whereField("userId", isEqualTo: uid)
+            .getDocuments()
+        for doc in rewards.documents {
+            try await doc.reference.delete()
+        }
+
+        // Delete referral shares
+        let shares = try await db.collection("referralShares")
+            .whereField("userId", isEqualTo: uid)
+            .getDocuments()
+        for doc in shares.documents {
+            try await doc.reference.delete()
+        }
+
+        // Delete referral milestones
+        let milestones = try await db.collection("referralMilestones")
+            .whereField("userId", isEqualTo: uid)
+            .getDocuments()
+        for doc in milestones.documents {
+            try await doc.reference.delete()
+        }
+
+        // Delete referral signups
+        let signups = try await db.collection("referralSignups")
+            .whereField("userId", isEqualTo: uid)
+            .getDocuments()
+        for doc in signups.documents {
+            try await doc.reference.delete()
+        }
+
+        Logger.shared.auth("Deleted referral data", level: .debug)
+    }
+
+    /// Delete attribution and experiment data
+    private func deleteUserAttributionData(uid: String, db: Firestore) async throws {
+        // Delete attribution touchpoints
+        let touchpoints = try await db.collection("attributionTouchpoints")
+            .whereField("userId", isEqualTo: uid)
+            .getDocuments()
+        for doc in touchpoints.documents {
+            try await doc.reference.delete()
+        }
+
+        // Delete attribution results
+        let results = try await db.collection("attributionResults")
+            .whereField("userId", isEqualTo: uid)
+            .getDocuments()
+        for doc in results.documents {
+            try await doc.reference.delete()
+        }
+
+        // Delete experiment assignments (both variants)
+        let expAssignments = try await db.collection("experimentAssignments")
+            .whereField("userId", isEqualTo: uid)
+            .getDocuments()
+        for doc in expAssignments.documents {
+            try await doc.reference.delete()
+        }
+
+        let expAssignments2 = try await db.collection("experiment_assignments")
+            .whereField("userId", isEqualTo: uid)
+            .getDocuments()
+        for doc in expAssignments2.documents {
+            try await doc.reference.delete()
+        }
+
+        Logger.shared.auth("Deleted attribution and experiment data", level: .debug)
+    }
+
+    /// Delete compliance and consent data (GDPR)
+    private func deleteUserComplianceData(uid: String, db: Firestore) async throws {
+        // Delete consent records
+        let consents = try await db.collection("consentRecords")
+            .whereField("userId", isEqualTo: uid)
+            .getDocuments()
+        for doc in consents.documents {
+            try await doc.reference.delete()
+        }
+
+        // Delete data subject requests
+        let requests = try await db.collection("dataSubjectRequests")
+            .whereField("userId", isEqualTo: uid)
+            .getDocuments()
+        for doc in requests.documents {
+            try await doc.reference.delete()
+        }
+
+        // Delete device fingerprints
+        let fingerprints = try await db.collection("deviceFingerprints")
+            .whereField("userId", isEqualTo: uid)
+            .getDocuments()
+        for doc in fingerprints.documents {
+            try await doc.reference.delete()
+        }
+
+        // Delete fraud assessments
+        let assessments = try await db.collection("fraudAssessments")
+            .whereField("userId", isEqualTo: uid)
+            .getDocuments()
+        for doc in assessments.documents {
+            try await doc.reference.delete()
+        }
+
+        Logger.shared.auth("Deleted compliance and consent data", level: .debug)
+    }
+
+    /// Delete safety and misc user data
+    private func deleteUserSafetyData(uid: String, db: Firestore) async throws {
+        // Delete typing status
+        let typingStatus = try await db.collection("typingStatus")
+            .whereField("userId", isEqualTo: uid)
+            .getDocuments()
+        for doc in typingStatus.documents {
+            try await doc.reference.delete()
+        }
+
+        // Delete screenshot events
+        let screenshots = try await db.collection("screenshotEvents")
+            .whereField("userId", isEqualTo: uid)
+            .getDocuments()
+        for doc in screenshots.documents {
+            try await doc.reference.delete()
+        }
+
+        // Delete shared dates
+        let sharedDates = try await db.collection("shared_dates")
+            .whereField("userId", isEqualTo: uid)
+            .getDocuments()
+        for doc in sharedDates.documents {
+            try await doc.reference.delete()
+        }
+
+        // Delete safety notifications
+        let safetyNotifs = try await db.collection("safety_notifications")
+            .whereField("userId", isEqualTo: uid)
+            .getDocuments()
+        for doc in safetyNotifs.documents {
+            try await doc.reference.delete()
+        }
+
+        // Delete appeals
+        let appeals = try await db.collection("appeals")
+            .whereField("userId", isEqualTo: uid)
+            .getDocuments()
+        for doc in appeals.documents {
+            try await doc.reference.delete()
+        }
+
+        // Delete purchases
+        let purchases = try await db.collection("purchases")
+            .whereField("userId", isEqualTo: uid)
+            .getDocuments()
+        for doc in purchases.documents {
+            try await doc.reference.delete()
+        }
+
+        Logger.shared.auth("Deleted safety and misc data", level: .debug)
     }
 
     // MARK: - Re-authentication
