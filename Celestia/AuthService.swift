@@ -675,6 +675,11 @@ class AuthService: ObservableObject, AuthServiceProtocol {
         do {
             let db = Firestore.firestore()
 
+            // IMPORTANT: Get user's photo URLs BEFORE deleting the user document
+            // so we can clean up their images from Firebase Storage
+            let userDoc = try? await db.collection("users").document(uid).getDocument()
+            let photoURLs = userDoc?.data()?["photos"] as? [String] ?? []
+
             // Delete all related data in parallel for better performance
             async let messagesDeleted: () = deleteUserMessages(uid: uid, db: db)
             async let matchesDeleted: () = deleteUserMatches(uid: uid, db: db)
@@ -685,6 +690,7 @@ class AuthService: ObservableObject, AuthServiceProtocol {
             async let blocksDeleted: () = deleteUserBlocks(uid: uid, db: db)
             async let referralCodesDeleted: () = deleteUserReferralCodes(uid: uid, db: db)
             async let profileViewsDeleted: () = deleteUserProfileViews(uid: uid, db: db)
+            async let profileImagesDeleted: () = deleteUserProfileImages(photoURLs: photoURLs)
             async let passesDeleted: () = deleteUserPasses(uid: uid, db: db)
             async let emergencyContactsDeleted: () = deleteUserEmergencyContacts(uid: uid, db: db)
             async let segmentAssignmentsDeleted: () = deleteUserSegmentAssignments(uid: uid, db: db)
@@ -695,9 +701,9 @@ class AuthService: ObservableObject, AuthServiceProtocol {
                           savedProfilesDeleted, notificationsDeleted, blocksDeleted,
                           referralCodesDeleted, profileViewsDeleted, passesDeleted,
                           emergencyContactsDeleted, segmentAssignmentsDeleted,
-                          pendingVerificationsDeleted)
+                          pendingVerificationsDeleted, profileImagesDeleted)
 
-            Logger.shared.auth("All related user data deleted", level: .info)
+            Logger.shared.auth("All related user data deleted (including profile images)", level: .info)
 
             // Delete user document from Firestore
             try? await db.collection("users").document(uid).delete()
@@ -977,6 +983,30 @@ class AuthService: ObservableObject, AuthServiceProtocol {
         }
 
         Logger.shared.auth("Deleted pending verifications (ID documents)", level: .debug)
+    }
+
+    /// Delete user's profile images from Firebase Storage
+    private func deleteUserProfileImages(photoURLs: [String]) async throws {
+        guard !photoURLs.isEmpty else {
+            Logger.shared.auth("No profile images to delete", level: .debug)
+            return
+        }
+
+        var deletedCount = 0
+        var failedCount = 0
+
+        for photoURL in photoURLs {
+            do {
+                try await ImageUploadService.shared.deleteImage(url: photoURL)
+                deletedCount += 1
+            } catch {
+                // Log but continue - don't fail the whole deletion for one image
+                Logger.shared.auth("Failed to delete image: \(error.localizedDescription)", level: .warning)
+                failedCount += 1
+            }
+        }
+
+        Logger.shared.auth("Deleted \(deletedCount) profile images (\(failedCount) failed)", level: .debug)
     }
 
     // MARK: - Re-authentication
