@@ -265,13 +265,14 @@ struct MainTabView: View {
                 }
             }
             .padding(.horizontal, 4)
-            .padding(.top, 6)
-            .padding(.bottom, 2)
+            .padding(.top, 8)
+            .padding(.bottom, 4)
         }
-        .background(
+        .background {
             Color(.systemBackground)
                 .shadow(color: .black.opacity(0.06), radius: 8, y: -4)
-        )
+                .ignoresSafeArea(edges: .bottom)
+        }
     }
     
     // MARK: - Warning Banner
@@ -383,10 +384,13 @@ struct TabBarButton: View {
 
     var body: some View {
         Button(action: {
-            HapticManager.shared.selection()
+            // Execute action immediately, haptic async for responsiveness
             action()
+            Task { @MainActor in
+                HapticManager.shared.selection()
+            }
         }) {
-            VStack(spacing: 5) {
+            VStack(spacing: 4) {
                 ZStack(alignment: .topTrailing) {
                     // Icon with background circle when selected
                     ZStack {
@@ -397,7 +401,7 @@ struct TabBarButton: View {
                         }
 
                         Image(systemName: icon)
-                            .font(.system(size: 18, weight: isSelected ? .semibold : .regular))
+                            .font(.system(size: 20, weight: isSelected ? .semibold : .regular))
                             .foregroundColor(isSelected ? color : Color(.systemGray2))
                     }
                     .frame(width: 36, height: 36)
@@ -424,14 +428,26 @@ struct TabBarButton: View {
                     .foregroundColor(isSelected ? color : Color(.systemGray2))
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
             // Accessibility
             .accessibilityLabel("\(title) tab")
             .accessibilityHint(accessibilityHint)
             .accessibilityValue(badgeCount > 0 ? "\(badgeCount) unread" : "")
             .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
         }
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(TabBarButtonStyle())
+    }
+}
+
+// MARK: - Tab Bar Button Style (Fast, Responsive)
+
+struct TabBarButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .opacity(configuration.isPressed ? 0.6 : 1.0)
+            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
     }
 }
 
