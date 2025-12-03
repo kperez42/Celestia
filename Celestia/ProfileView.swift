@@ -368,7 +368,6 @@ struct ProfileView: View {
                             Image(systemName: "checkmark.seal.fill")
                                 .font(.title3)
                                 .foregroundColor(.blue)
-                                .shadow(color: .blue.opacity(0.5), radius: 5)
                         }
 
                         if user.isPremium {
