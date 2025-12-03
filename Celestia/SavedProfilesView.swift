@@ -1686,18 +1686,34 @@ class SavedProfilesViewModel: ObservableObject {
 
     func unsaveProfile(_ profile: SavedProfile) {
         guard let currentUserId = AuthService.shared.currentUser?.effectiveId else { return }
+        guard let savedUserId = profile.user.effectiveId else {
+            Logger.shared.error("Cannot unsave profile: Missing user ID", category: .general)
+            return
+        }
 
         // Set loading state
         unsavingProfileId = profile.id
 
         Task {
             do {
-                // Remove from Firestore
+                // Remove the specific document by ID
                 try await db.collection("saved_profiles").document(profile.id).delete()
 
-                // Update local state
+                // BUGFIX: Also delete any duplicate entries for the same user pair
+                // This cleans up legacy random-ID duplicates
+                let duplicatesSnapshot = try await db.collection("saved_profiles")
+                    .whereField("userId", isEqualTo: currentUserId)
+                    .whereField("savedUserId", isEqualTo: savedUserId)
+                    .getDocuments()
+
+                for doc in duplicatesSnapshot.documents {
+                    try await doc.reference.delete()
+                    Logger.shared.debug("Deleted duplicate saved profile: \(doc.documentID)", category: .general)
+                }
+
+                // Update local state - remove ALL entries for this user
                 await MainActor.run {
-                    savedProfiles.removeAll { $0.id == profile.id }
+                    savedProfiles.removeAll { $0.id == profile.id || $0.user.effectiveId == savedUserId }
                     unsavingProfileId = nil
                     // PERFORMANCE: Invalidate cache so next load gets fresh data
                     lastFetchTime = nil
@@ -1705,11 +1721,11 @@ class SavedProfilesViewModel: ObservableObject {
 
                 Logger.shared.info("Unsaved profile: \(profile.user.fullName)", category: .general)
 
-                // Track analytics
+                // Track analytics - safely unwrap optional
                 AnalyticsServiceEnhanced.shared.trackEvent(
                     .profileUnsaved,
                     properties: [
-                        "unsavedUserId": profile.user.id,
+                        "unsavedUserId": savedUserId,
                         "savedDuration": Date().timeIntervalSince(profile.savedAt)
                     ]
                 )
