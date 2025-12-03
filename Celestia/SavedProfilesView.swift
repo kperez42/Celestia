@@ -1733,6 +1733,65 @@ class SavedProfilesViewModel: ObservableObject {
         }
     }
 
+    /// Unsave a profile by user ID (uses deterministic document ID)
+    /// This is more reliable than finding the SavedProfile object first
+    func unsaveByUserId(_ savedUserId: String) {
+        guard let currentUserId = AuthService.shared.currentUser?.effectiveId else { return }
+
+        let docId = "\(currentUserId)_\(savedUserId)"
+        unsavingProfileId = docId
+
+        Task {
+            do {
+                // Delete using deterministic ID
+                try await db.collection("saved_profiles").document(docId).delete()
+
+                // Also try to delete any legacy random-ID documents for this user pair
+                let legacySnapshot = try await db.collection("saved_profiles")
+                    .whereField("userId", isEqualTo: currentUserId)
+                    .whereField("savedUserId", isEqualTo: savedUserId)
+                    .getDocuments()
+
+                for doc in legacySnapshot.documents where doc.documentID != docId {
+                    try await doc.reference.delete()
+                    Logger.shared.debug("Deleted legacy saved profile: \(doc.documentID)", category: .general)
+                }
+
+                // Update local state
+                await MainActor.run {
+                    savedProfiles.removeAll { $0.id == docId || $0.user.effectiveId == savedUserId }
+                    unsavingProfileId = nil
+                    // PERFORMANCE: Invalidate cache so next load gets fresh data
+                    lastFetchTime = nil
+                }
+
+                Logger.shared.info("Unsaved profile by userId: \(savedUserId)", category: .general)
+
+                // Track analytics
+                AnalyticsServiceEnhanced.shared.trackEvent(
+                    .profileUnsaved,
+                    properties: ["unsavedUserId": savedUserId]
+                )
+            } catch {
+                await MainActor.run {
+                    unsavingProfileId = nil
+                    errorMessage = "Failed to unsave profile. Please try again."
+                }
+                Logger.shared.error("Error unsaving profile by userId", category: .general, error: error)
+
+                // Auto-clear error after 3 seconds
+                Task {
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    await MainActor.run {
+                        if errorMessage == "Failed to unsave profile. Please try again." {
+                            errorMessage = ""
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     func clearAllSaved() {
         guard let currentUserId = AuthService.shared.currentUser?.effectiveId else { return }
 
@@ -1805,8 +1864,11 @@ class SavedProfilesViewModel: ObservableObject {
             return false
         }
 
-        // Check if already saved to prevent duplicates
-        if savedProfiles.contains(where: { $0.user.effectiveId == savedUserId }) {
+        // Use deterministic document ID to prevent duplicates (same pattern as likes)
+        let docId = "\(currentUserId)_\(savedUserId)"
+
+        // Check if already saved in local state
+        if savedProfiles.contains(where: { $0.id == docId }) {
             Logger.shared.info("Profile already saved: \(user.fullName)", category: .general)
             return true  // Already saved is still a success
         }
@@ -1819,12 +1881,17 @@ class SavedProfilesViewModel: ObservableObject {
                 "note": note ?? ""
             ]
 
-            let docRef = try await db.collection("saved_profiles").addDocument(data: saveData)
+            // Use setData with deterministic ID to prevent duplicates
+            // setData will create if not exists, or update if exists
+            try await db.collection("saved_profiles").document(docId).setData(saveData)
 
             // Update local state immediately
             await MainActor.run {
+                // Remove any existing entry first (in case of stale data)
+                savedProfiles.removeAll { $0.id == docId || $0.user.effectiveId == savedUserId }
+
                 let newSaved = SavedProfile(
-                    id: docRef.documentID,
+                    id: docId,
                     user: user,
                     savedAt: Date(),
                     note: note
@@ -1836,7 +1903,7 @@ class SavedProfilesViewModel: ObservableObject {
                 cachedForUserId = currentUserId
             }
 
-            Logger.shared.info("Saved profile: \(user.fullName) (\(docRef.documentID))", category: .general)
+            Logger.shared.info("Saved profile: \(user.fullName) (\(docId))", category: .general)
 
             // Track analytics
             AnalyticsServiceEnhanced.shared.trackEvent(

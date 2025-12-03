@@ -789,9 +789,9 @@ struct UserCardView: View {
                                         }
                                     }
                                 } else {
-                                    // Find and remove from saved
-                                    if let savedProfile = savedProfilesVM.savedProfiles.first(where: { $0.user.id == user.id }) {
-                                        savedProfilesVM.unsaveProfile(savedProfile)
+                                    // Unsave using deterministic ID
+                                    if let userId = user.effectiveId {
+                                        savedProfilesVM.unsaveByUserId(userId)
                                     }
                                 }
                             }

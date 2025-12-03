@@ -80,10 +80,6 @@ struct SignUpView: View {
     @State private var ageRangeMin: Int = 18
     @State private var ageRangeMax: Int = 35
 
-    // Guidelines popup state
-    @State private var showGuidelinesPopup = false
-    @State private var hasAcceptedGuidelines = false
-
     let relationshipGoalOptions = ["Long-term relationship", "Casual dating", "New friends", "Not sure yet"]
     let educationLevelOptions = ["High school", "Some college", "Bachelor's degree", "Master's degree", "Doctorate", "Trade school", "Prefer not to say"]
     let smokingOptions = ["Never", "Sometimes", "Regularly", "Prefer not to say"]
@@ -364,17 +360,6 @@ struct SignUpView: View {
         }
         .sheet(isPresented: $showLanguagePicker) {
             languagePickerSheet
-        }
-        .sheet(isPresented: $showGuidelinesPopup) {
-            SignUpGuidelinesPopup {
-                hasAcceptedGuidelines = true
-                // Now proceed with account creation
-                if isEditingProfile {
-                    handleSaveProfileChanges()
-                } else {
-                    handleCreateAccount()
-                }
-            }
         }
         .fullScreenCover(isPresented: $showFullScreenPhoto) {
             SignUpPhotoViewer(
@@ -1990,19 +1975,14 @@ struct SignUpView: View {
                 currentStep += 1
             }
         } else {
-            // Final step - show guidelines popup before creating account
+            // Final step - create account or save profile changes
             if isEditingProfile {
-                // Edit mode - update existing profile (no guidelines needed)
+                // Edit mode - update existing profile
                 handleSaveProfileChanges()
             } else {
-                // New account mode - show guidelines popup first
-                if hasAcceptedGuidelines {
-                    // Already accepted, proceed directly
-                    handleCreateAccount()
-                } else {
-                    // Show guidelines popup
-                    showGuidelinesPopup = true
-                }
+                // New account mode - create account directly
+                // (Guidelines were already shown in WelcomeAwarenessSlidesView before signup)
+                handleCreateAccount()
             }
         }
     }

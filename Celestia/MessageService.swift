@@ -133,6 +133,13 @@ class MessageService: ObservableObject, MessageServiceProtocol, ListenerLifecycl
     /// Listen to messages in real-time for a specific match with pagination
     /// Loads initial batch of recent messages, then listens for new messages only
     func listenToMessages(matchId: String) {
+        // BUGFIX: Prevent multiple calls when already loading for the same match
+        // This fixes ice breakers not showing because isLoading keeps resetting to true
+        if currentMatchId == matchId && isLoading {
+            Logger.shared.debug("Already loading messages for match: \(matchId) - skipping duplicate call", category: .messaging)
+            return
+        }
+
         // AUDIT FIX: Cancel any existing loading task to prevent memory leaks
         loadingTask?.cancel()
         loadingTask = nil
@@ -145,6 +152,10 @@ class MessageService: ObservableObject, MessageServiceProtocol, ListenerLifecycl
         // This prevents conversation starters from flashing when reopening same chat
         let isSameMatch = currentMatchId == matchId && !messages.isEmpty
 
+        // BUGFIX: Also check if we've already loaded this match (even with 0 messages)
+        // This prevents resetting when reopening the same empty conversation
+        let alreadyLoadedThisMatch = currentMatchId == matchId && !isLoading
+
         // AUDIT FIX: Track current matchId to validate listener callbacks
         currentMatchId = matchId
 
@@ -153,6 +164,13 @@ class MessageService: ObservableObject, MessageServiceProtocol, ListenerLifecycl
             let cutoffTimestamp = messages.last?.timestamp ?? Date()
             setupNewMessageListener(matchId: matchId, after: cutoffTimestamp)
             Logger.shared.info("Same match - reconnecting without clearing \(messages.count) messages", category: .messaging)
+            return
+        }
+
+        // If we already loaded this match with 0 messages, just reconnect listener
+        if alreadyLoadedThisMatch && messages.isEmpty {
+            setupNewMessageListener(matchId: matchId, after: Date())
+            Logger.shared.info("Same empty match - reconnecting listener without reload", category: .messaging)
             return
         }
 

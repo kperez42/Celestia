@@ -1124,10 +1124,8 @@ struct FeedDiscoverView: View {
                 color: .orange
             )
 
-            // Remove from SavedProfilesViewModel
-            if let savedProfile = savedProfilesViewModel.savedProfiles.first(where: { $0.user.effectiveId == userId }) {
-                savedProfilesViewModel.unsaveProfile(savedProfile)
-            }
+            // Remove from SavedProfilesViewModel using deterministic ID
+            savedProfilesViewModel.unsaveByUserId(userId)
         } else {
             // Add to favorites (optimistic update)
             favorites.insert(userId)
