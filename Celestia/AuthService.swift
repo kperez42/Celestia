@@ -699,6 +699,10 @@ class AuthService: ObservableObject, AuthServiceProtocol {
             async let pendingVerificationsDeleted: () = deleteUserPendingVerifications(uid: uid, db: db)
             async let safetyDataDeleted: () = deleteUserSafetyData(uid: uid, db: db)
 
+            // Group 6: Reports and notifications subcollection
+            async let reportsDeleted: () = deleteUserReports(uid: uid, db: db)
+            async let notificationsSubcollectionDeleted: () = deleteUserNotificationsSubcollection(uid: uid, db: db)
+
             // Wait for all deletions to complete (ignore errors since Auth is already deleted)
             _ = try? await (messagesDeleted, matchesDeleted, interestsDeleted, likesDeleted,
                           savedProfilesDeleted, notificationsDeleted, blocksDeleted,
@@ -706,7 +710,8 @@ class AuthService: ObservableObject, AuthServiceProtocol {
                           referralCodesDeleted, referralDataDeleted,
                           attributionDeleted, complianceDeleted,
                           emergencyContactsDeleted, segmentAssignmentsDeleted,
-                          pendingVerificationsDeleted, safetyDataDeleted)
+                          pendingVerificationsDeleted, safetyDataDeleted,
+                          reportsDeleted, notificationsSubcollectionDeleted)
 
             Logger.shared.auth("All related user data deleted (including profile images)", level: .info)
 
@@ -1255,6 +1260,37 @@ class AuthService: ObservableObject, AuthServiceProtocol {
         }
 
         Logger.shared.auth("Deleted safety and misc data", level: .debug)
+    }
+
+    /// Delete reports made by or about the user
+    private func deleteUserReports(uid: String, db: Firestore) async throws {
+        // Delete reports made BY the user
+        let reportsMade = try await db.collection("reports")
+            .whereField("reporterId", isEqualTo: uid)
+            .getDocuments()
+        for doc in reportsMade.documents {
+            try await doc.reference.delete()
+        }
+
+        // Delete reports made ABOUT the user
+        let reportsReceived = try await db.collection("reports")
+            .whereField("reportedUserId", isEqualTo: uid)
+            .getDocuments()
+        for doc in reportsReceived.documents {
+            try await doc.reference.delete()
+        }
+
+        Logger.shared.auth("Deleted \(reportsMade.count + reportsReceived.count) reports", level: .debug)
+    }
+
+    /// Delete user notifications subcollection (users/{userId}/notifications)
+    private func deleteUserNotificationsSubcollection(uid: String, db: Firestore) async throws {
+        let notifications = try await db.collection("users").document(uid).collection("notifications").getDocuments()
+        for doc in notifications.documents {
+            try await doc.reference.delete()
+        }
+
+        Logger.shared.auth("Deleted \(notifications.count) user notifications subcollection items", level: .debug)
     }
 
     // MARK: - Re-authentication
