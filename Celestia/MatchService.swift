@@ -119,9 +119,18 @@ class MatchService: ObservableObject, MatchServiceProtocol, ListenerLifecycleAwa
         do {
             let matchId = try await repository.createMatch(match: match)
 
-            // Update match counts for both users
+            // Update match counts for both users (non-blocking - may fail due to permissions)
+            // Note: Security rules only allow users to update their own document, so updating
+            // the other user's matchCount requires a Cloud Function. For now, we just update
+            // the current user's count and log if the other fails.
             if let firestoreRepo = repository as? FirestoreMatchRepository {
-                try await firestoreRepo.updateMatchCounts(user1Id: user1Id, user2Id: user2Id)
+                do {
+                    try await firestoreRepo.updateMatchCounts(user1Id: user1Id, user2Id: user2Id)
+                } catch {
+                    // Expected to fail for the other user due to security rules
+                    // The match is still created, just the denormalized count may be off
+                    Logger.shared.debug("Could not update match counts (expected): \(error.localizedDescription)", category: .matching)
+                }
             }
 
             // PERFORMANCE FIX: Batch fetch both users in a single query (prevents N+1 problem)

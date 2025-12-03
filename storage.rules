@@ -60,13 +60,14 @@ service firebase.storage {
     }
 
     // Chat images - users can upload to match folders they're part of
+    // Match documents use user1Id and user2Id fields, not a participants array
     match /chat_images/{matchId}/{fileName} {
       allow read: if isAuthenticated()
-                  && (request.auth.uid in
-                      firestore.get(/databases/(default)/documents/matches/$(matchId)).data.participants);
+                  && (request.auth.uid == firestore.get(/databases/(default)/documents/matches/$(matchId)).data.user1Id
+                      || request.auth.uid == firestore.get(/databases/(default)/documents/matches/$(matchId)).data.user2Id);
       allow write: if isAuthenticated()
-                   && (request.auth.uid in
-                       firestore.get(/databases/(default)/documents/matches/$(matchId)).data.participants)
+                   && (request.auth.uid == firestore.get(/databases/(default)/documents/matches/$(matchId)).data.user1Id
+                       || request.auth.uid == firestore.get(/databases/(default)/documents/matches/$(matchId)).data.user2Id)
                    && isEmailVerified()
                    && isValidImageSize()
                    && isValidImage();
