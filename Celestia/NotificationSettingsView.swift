@@ -61,12 +61,12 @@ struct NotificationSettingsView: View {
                 }
             }
 
-            // Notification Types
-            Section("Notification Types") {
+            // Core Notifications
+            Section {
                 NotificationToggle(
                     icon: "heart.circle.fill",
-                    title: "New Matches",
-                    description: "When you match with someone",
+                    title: "Matches & Likes",
+                    description: "When someone matches or likes you",
                     isOn: $preferences.newMatchesEnabled
                 )
 
@@ -78,70 +78,15 @@ struct NotificationSettingsView: View {
                 )
 
                 NotificationToggle(
-                    icon: "eye.circle.fill",
-                    title: "Profile Views",
-                    description: "When someone views your profile",
-                    isOn: $preferences.profileViewsEnabled
-                )
-
-                NotificationToggle(
-                    icon: "star.circle.fill",
-                    title: "Super Likes",
-                    description: "When someone super likes you",
-                    isOn: $preferences.superLikesEnabled
-                )
-
-                NotificationToggle(
-                    icon: "sparkles",
-                    title: "Premium Offers",
-                    description: "Special offers and promotions",
-                    isOn: $preferences.premiumOffersEnabled
-                )
-            }
-
-            // Engagement
-            Section("Engagement") {
-                NotificationToggle(
-                    icon: "calendar.circle.fill",
-                    title: "Match Reminders",
-                    description: "Reminders about your matches",
-                    isOn: $preferences.matchRemindersEnabled
-                )
-
-                NotificationToggle(
-                    icon: "bell.circle.fill",
-                    title: "Message Reminders",
-                    description: "Reminders to reply to messages",
-                    isOn: $preferences.messageRemindersEnabled
-                )
-            }
-
-            // Account & Safety
-            Section {
-                NotificationToggle(
-                    icon: "person.badge.shield.checkmark.fill",
-                    title: "Profile Status Updates",
-                    description: "Approval, rejection, and review notifications",
+                    icon: "shield.checkered",
+                    title: "Account Updates",
+                    description: "Important account and safety notifications",
                     isOn: $preferences.accountStatusEnabled
                 )
-
-                NotificationToggle(
-                    icon: "exclamationmark.triangle.fill",
-                    title: "Account Warnings",
-                    description: "Important warnings about your account",
-                    isOn: $preferences.accountWarningsEnabled
-                )
-
-                NotificationToggle(
-                    icon: "checkmark.seal.fill",
-                    title: "Verification Updates",
-                    description: "ID verification status changes",
-                    isOn: $preferences.verificationUpdatesEnabled
-                )
             } header: {
-                Text("Account & Safety")
+                Text("Notifications")
             } footer: {
-                Text("These notifications help keep your account secure and inform you about important status changes.")
+                Text("Stay updated on what matters most")
             }
 
             // Sound & Badge

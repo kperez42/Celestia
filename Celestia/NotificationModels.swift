@@ -795,51 +795,15 @@ struct NotificationPreferenceItem: Identifiable {
     static let allItems: [NotificationPreferenceItem] = [
         NotificationPreferenceItem(
             category: .newMatch,
-            title: "New Matches",
-            description: "Get notified when you have a new match",
+            title: "Matches & Likes",
+            description: "Get notified when someone matches or likes you",
             icon: "heart.fill"
         ),
         NotificationPreferenceItem(
             category: .newMessage,
-            title: "New Messages",
+            title: "Messages",
             description: "Get notified when someone messages you",
             icon: "message.fill"
-        ),
-        NotificationPreferenceItem(
-            category: .profileView,
-            title: "Profile Views",
-            description: "Get notified when someone views your profile",
-            icon: "eye.fill"
-        ),
-        NotificationPreferenceItem(
-            category: .superLike,
-            title: "Super Likes",
-            description: "Get notified when someone super likes you",
-            icon: "star.fill"
-        ),
-        NotificationPreferenceItem(
-            category: .premiumOffer,
-            title: "Premium Offers",
-            description: "Get notified about special offers and promotions",
-            icon: "gift.fill"
-        ),
-        NotificationPreferenceItem(
-            category: .generalUpdate,
-            title: "General Updates",
-            description: "Get notified about app updates and news",
-            icon: "bell.fill"
-        ),
-        NotificationPreferenceItem(
-            category: .matchReminder,
-            title: "Match Reminders",
-            description: "Get reminded to message your matches",
-            icon: "clock.fill"
-        ),
-        NotificationPreferenceItem(
-            category: .messageReminder,
-            title: "Message Reminders",
-            description: "Get reminded to reply to messages",
-            icon: "envelope.fill"
         )
     ]
 }
