@@ -151,8 +151,9 @@ struct MessagesView: View {
                 lastFetchTime = Date()
                 HapticManager.shared.notification(.success)
             }
-            // PERFORMANCE: Update cached conversations only when dependencies change
-            .onChange(of: matchService.matches.count) { _, _ in
+            // PERFORMANCE: Update cached conversations when matches change
+            // Watch the full array to catch lastMessage updates, not just count changes
+            .onChange(of: matchService.matches) { _, _ in
                 updateCachedConversations()
             }
             .onChange(of: matchedUsers.count) { _, _ in
