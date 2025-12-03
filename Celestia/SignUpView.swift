@@ -44,6 +44,10 @@ struct SignUpView: View {
     @State private var isSavingProfile = false           // For edit mode - saving state
     @State private var photosWereModified = false        // For edit mode - track if photos changed
 
+    // Full screen photo viewer state
+    @State private var showFullScreenPhoto = false
+    @State private var selectedPhotoIndex = 0
+
     // Referral code (optional)
     @State private var referralCode = ""
     @State private var isValidatingReferral = false
@@ -351,6 +355,13 @@ struct SignUpView: View {
                     handleCreateAccount()
                 }
             }
+        }
+        .fullScreenCover(isPresented: $showFullScreenPhoto) {
+            SignUpPhotoViewer(
+                images: photoImages,
+                selectedIndex: $selectedPhotoIndex,
+                isPresented: $showFullScreenPhoto
+            )
         }
     }
 
@@ -786,24 +797,49 @@ struct SignUpView: View {
                     .overlay(
                         VStack {
                             Spacer()
-                            HStack(spacing: 6) {
-                                Image(systemName: "star.fill")
-                                    .font(.caption)
-                                Text("Main Photo")
-                                    .font(.caption)
-                                    .fontWeight(.semibold)
+                            HStack {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "star.fill")
+                                        .font(.caption)
+                                    Text("Main Photo")
+                                        .font(.caption)
+                                        .fontWeight(.semibold)
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.purple)
+                                )
+
+                                Spacer()
+
+                                // Tap to view hint
+                                HStack(spacing: 4) {
+                                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                        .font(.caption2)
+                                    Text("Tap to view")
+                                        .font(.caption2)
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.black.opacity(0.5))
+                                )
                             }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(
-                                Capsule()
-                                    .fill(Color.purple)
-                            )
                             .padding(10)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                     )
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        HapticManager.shared.impact(.light)
+                        selectedPhotoIndex = 0
+                        showFullScreenPhoto = true
+                    }
 
                     Button {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
@@ -932,6 +968,12 @@ struct SignUpView: View {
                                     RoundedRectangle(cornerRadius: 12)
                                         .stroke(Color.purple.opacity(0.2), lineWidth: 1)
                                 )
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    HapticManager.shared.impact(.light)
+                                    selectedPhotoIndex = index
+                                    showFullScreenPhoto = true
+                                }
 
                                 Button {
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
@@ -2131,6 +2173,129 @@ struct SignUpView: View {
                 referralCodeValid = isValid
                 HapticManager.shared.notification(isValid ? .success : .error)
             }
+        }
+    }
+}
+
+// MARK: - Full Screen Photo Viewer for UIImages
+
+struct SignUpPhotoViewer: View {
+    let images: [UIImage]
+    @Binding var selectedIndex: Int
+    @Binding var isPresented: Bool
+
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
+
+    var body: some View {
+        ZStack {
+            Color.black
+                .ignoresSafeArea()
+
+            if images.isEmpty {
+                Text("No photos to display")
+                    .foregroundColor(.white)
+            } else {
+                TabView(selection: $selectedIndex) {
+                    ForEach(images.indices, id: \.self) { index in
+                        ZoomableImageView(image: images[index])
+                            .tag(index)
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .always))
+                .indexViewStyle(.page(backgroundDisplayMode: .always))
+            }
+
+            // Close button and counter overlay
+            VStack {
+                HStack {
+                    // Photo counter
+                    if images.count > 1 {
+                        Text("\(selectedIndex + 1) / \(images.count)")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color.black.opacity(0.6))
+                            .cornerRadius(20)
+                    }
+
+                    Spacer()
+
+                    // Close button
+                    Button {
+                        HapticManager.shared.impact(.light)
+                        isPresented = false
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title)
+                            .foregroundStyle(.white, Color.black.opacity(0.6))
+                    }
+                }
+                .padding()
+                .padding(.top, 40)
+
+                Spacer()
+
+                // Swipe hint
+                if images.count > 1 {
+                    HStack(spacing: 6) {
+                        Image(systemName: "hand.draw")
+                            .font(.caption)
+                        Text("Swipe to see more photos")
+                            .font(.caption)
+                    }
+                    .foregroundColor(.white.opacity(0.7))
+                    .padding(.bottom, 80)
+                }
+            }
+        }
+    }
+}
+
+// Zoomable image view for pinch-to-zoom
+struct ZoomableImageView: View {
+    let image: UIImage
+
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+
+    var body: some View {
+        GeometryReader { geometry in
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFit()
+                .scaleEffect(scale)
+                .frame(width: geometry.size.width, height: geometry.size.height)
+                .gesture(
+                    MagnificationGesture()
+                        .onChanged { value in
+                            scale = lastScale * value
+                        }
+                        .onEnded { _ in
+                            withAnimation(.spring()) {
+                                if scale < 1.0 {
+                                    scale = 1.0
+                                } else if scale > 4.0 {
+                                    scale = 4.0
+                                }
+                                lastScale = scale
+                            }
+                        }
+                )
+                .onTapGesture(count: 2) {
+                    withAnimation(.spring()) {
+                        if scale > 1.0 {
+                            scale = 1.0
+                            lastScale = 1.0
+                        } else {
+                            scale = 2.0
+                            lastScale = 2.0
+                        }
+                    }
+                }
         }
     }
 }
