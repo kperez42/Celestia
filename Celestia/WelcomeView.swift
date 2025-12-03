@@ -21,6 +21,10 @@ struct WelcomeView: View {
     @State private var showAwarenessSlides = false
     @State private var navigateToSignUp = false
 
+    // Legal document sheets
+    @State private var showTermsOfService = false
+    @State private var showPrivacyPolicy = false
+
     let features = [
         Feature(icon: "heart.circle.fill", title: "Find Your Match", description: "Meet amazing people near you"),
         Feature(icon: "heart.text.square.fill", title: "Smart Matching", description: "AI-powered compatibility algorithm"),
@@ -86,6 +90,13 @@ struct WelcomeView: View {
                         navigateToSignUp = true
                     }
                 }
+            }
+            // Legal document sheets - displayed from in-app content
+            .sheet(isPresented: $showTermsOfService) {
+                LegalDocumentView(documentType: .termsOfService)
+            }
+            .sheet(isPresented: $showPrivacyPolicy) {
+                LegalDocumentView(documentType: .privacyPolicy)
             }
         }
     }
@@ -287,31 +298,31 @@ struct WelcomeView: View {
             .accessibilityIdentifier(AccessibilityIdentifier.signInButton)
             .scaleButton()
             
-            // Terms & Privacy
-            HStack(spacing: 8) {
+            // Terms & Privacy - Links to in-app legal documents
+            VStack(spacing: 8) {
                 Text("By continuing, you agree to our")
                     .font(.caption)
-                
-                Button("Terms") {
-                    if let url = URL(string: "https://celestia.app/terms") {
-                        UIApplication.shared.open(url)
+
+                HStack(spacing: 8) {
+                    Button("Terms of Service") {
+                        showTermsOfService = true
                     }
-                }
-                .font(.caption)
-                .fontWeight(.semibold)
-                
-                Text("&")
                     .font(.caption)
-                
-                Button("Privacy") {
-                    if let url = URL(string: "https://celestia.app/privacy") {
-                        UIApplication.shared.open(url)
+                    .fontWeight(.semibold)
+                    .underline()
+
+                    Text("&")
+                        .font(.caption)
+
+                    Button("Privacy Policy") {
+                        showPrivacyPolicy = true
                     }
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .underline()
                 }
-                .font(.caption)
-                .fontWeight(.semibold)
             }
-            .foregroundColor(.white.opacity(0.8))
+            .foregroundColor(.white.opacity(0.9))
             .padding(.top, 5)
         }
         .padding(.horizontal, 40)
