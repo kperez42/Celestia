@@ -144,6 +144,28 @@ extension LegalDocumentView {
                 }
             }
 
+            LegalSection(title: "Biometric Data Notice") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("IMPORTANT BIOMETRIC DATA DISCLOSURE (ILLINOIS BIPA & OTHER STATE LAWS)")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.red)
+
+                    Text("If you use our photo verification feature, we may collect biometric data including facial geometry scans. By using photo verification, you consent to the following:")
+                        .font(.subheadline)
+
+                    SimpleBulletPoint("Purpose: Biometric data is used solely for identity verification and fraud prevention")
+                    SimpleBulletPoint("Storage: Facial geometry data is encrypted and stored securely")
+                    SimpleBulletPoint("Retention: Biometric data is permanently deleted within 3 years of your last interaction with the app, or upon account deletion, whichever occurs first")
+                    SimpleBulletPoint("Sharing: We do not sell, lease, trade, or profit from your biometric data")
+                    SimpleBulletPoint("Third Parties: Biometric data may be processed by our secure verification partners under strict contractual obligations")
+
+                    Text("You may opt out of photo verification features. To request deletion of biometric data, contact privacy@celestia.app.")
+                        .font(.caption)
+                        .padding(.top, 4)
+                }
+            }
+
             LegalSection(title: "How We Use Your Information") {
                 VStack(alignment: .leading, spacing: 8) {
                     SimpleBulletPoint("To provide and maintain our dating services")
@@ -456,6 +478,67 @@ extension LegalDocumentView {
 
             LegalSection(title: "No Background Checks") {
                 Text("CELESTIA DOES NOT CONDUCT CRIMINAL BACKGROUND CHECKS OR IDENTITY VERIFICATION ON ALL USERS. We are not responsible for the conduct of any user, whether online or offline. You are solely responsible for your safety and should exercise caution when communicating with or meeting other users.")
+                    .font(.caption)
+            }
+
+            LegalSection(title: "Age Verification Limitations") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("IMPORTANT NOTICE REGARDING AGE VERIFICATION:")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.orange)
+                    Text("While we require users to confirm they are 18 years or older, Celestia cannot independently verify the age of all users. We rely on user-provided information and representations. If you become aware of any user who is under 18, please report them immediately to support@celestia.app.")
+                        .font(.caption)
+                }
+            }
+
+            LegalSection(title: "FOSTA-SESTA Compliance") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Celestia has zero tolerance for sex trafficking, prostitution, or any form of sexual exploitation. In compliance with the Allow States and Victims to Fight Online Sex Trafficking Act (FOSTA) and the Stop Enabling Sex Traffickers Act (SESTA):")
+                        .font(.subheadline)
+                    SimpleBulletPoint("We actively monitor and remove content that promotes or facilitates sex trafficking")
+                    SimpleBulletPoint("We cooperate fully with law enforcement investigations")
+                    SimpleBulletPoint("Users who violate these provisions will be immediately banned and reported to authorities")
+                    SimpleBulletPoint("We maintain records as required by 18 U.S.C. § 2257")
+                    Text("If you witness any suspicious activity, report it immediately to support@celestia.app or contact the National Human Trafficking Hotline at 1-888-373-7888.")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .padding(.top, 4)
+                }
+            }
+
+            LegalSection(title: "User-Generated Content Disclaimer") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Celestia is a platform that hosts user-generated content. We do not endorse, verify, or guarantee the accuracy, completeness, or reliability of any content posted by users, including but not limited to:")
+                        .font(.subheadline)
+                    SimpleBulletPoint("Profile information, photos, and biographical details")
+                    SimpleBulletPoint("Messages and communications between users")
+                    SimpleBulletPoint("Claims about identity, occupation, or personal circumstances")
+                    SimpleBulletPoint("Any representations made by users about themselves")
+                    Text("Content posted by users represents the views and opinions of those users only and does not represent the views of Celestia. We are not responsible for any user content and disclaim all liability arising from user-generated content.")
+                        .font(.caption)
+                        .padding(.top, 4)
+                }
+            }
+
+            LegalSection(title: "Content Moderation") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("While we employ content moderation measures, we cannot review all content in real-time. You acknowledge that:")
+                        .font(.subheadline)
+                    SimpleBulletPoint("Offensive, harmful, or inappropriate content may appear before it is removed")
+                    SimpleBulletPoint("Automated systems may not catch all violations")
+                    SimpleBulletPoint("We are not liable for content that appears temporarily before moderation")
+                    SimpleBulletPoint("You should report any violating content immediately")
+                }
+            }
+
+            LegalSection(title: "No Professional Advice") {
+                Text("Celestia does not provide professional advice of any kind, including but not limited to legal, medical, psychological, financial, or relationship counseling. Any information provided through the app is for general informational purposes only and should not be relied upon as professional advice. Always seek the advice of qualified professionals for specific concerns.")
+                    .font(.caption)
+            }
+
+            LegalSection(title: "Third-Party Trademarks") {
+                Text("All third-party trademarks, service marks, logos, and trade names referenced in this app are the property of their respective owners. Reference to any third-party products, services, or other information does not constitute or imply endorsement, sponsorship, or recommendation by Celestia or any affiliation with such third parties. Apple, the Apple logo, iPhone, and iOS are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.")
                     .font(.caption)
             }
 
