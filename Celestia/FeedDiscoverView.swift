@@ -12,6 +12,7 @@ struct FeedDiscoverView: View {
     @EnvironmentObject var authService: AuthService
     @StateObject private var filters = DiscoveryFilters.shared
     @ObservedObject private var savedProfilesViewModel = SavedProfilesViewModel.shared
+    @ObservedObject private var likesViewModel = LikesViewModel.shared
     @Binding var selectedTab: Int
 
     @State private var users: [User] = []
@@ -1064,6 +1065,11 @@ struct FeedDiscoverView: View {
                     direction: "right"
                 )
 
+                // INSTANT SYNC: Update LikesViewModel immediately so Likes page reflects changes
+                await MainActor.run {
+                    likesViewModel.addLikedUser(user, isMatch: isMatch)
+                }
+
                 if isMatch {
                     // It's a match!
                     await MainActor.run {
@@ -1171,6 +1177,9 @@ struct FeedDiscoverView: View {
         // Optimistic update - remove from liked users
         likedUsers.remove(userId)
 
+        // INSTANT SYNC: Update LikesViewModel immediately so Likes page reflects changes
+        likesViewModel.removeLikedUser(userId)
+
         Task {
             do {
                 try await SwipeService.shared.unlikeUser(
@@ -1192,6 +1201,8 @@ struct FeedDiscoverView: View {
                 // Revert optimistic update on error
                 await MainActor.run {
                     likedUsers.insert(userId)
+                    // Also revert LikesViewModel
+                    likesViewModel.addLikedUser(user)
                     showToast(
                         message: "Failed to unlike. Try again.",
                         icon: "exclamationmark.triangle.fill",
