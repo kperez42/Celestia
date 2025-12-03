@@ -35,27 +35,38 @@ struct AdminModerationDashboard: View {
                 // Organized Tab Bar - Fixed height, no layout shifts
                 adminTabBar
 
-                // Content area with smooth page transitions
-                TabView(selection: $selectedTab) {
-                    pendingProfilesView
-                        .tag(0)
+                // Content area with smooth page transitions - horizontal swipe only
+                GeometryReader { geometry in
+                    TabView(selection: $selectedTab) {
+                        pendingProfilesView
+                            .tag(0)
+                            .frame(width: geometry.size.width, height: geometry.size.height)
 
-                    reportsListView
-                        .tag(1)
+                        reportsListView
+                            .tag(1)
+                            .frame(width: geometry.size.width, height: geometry.size.height)
 
-                    appealsListView
-                        .tag(2)
+                        appealsListView
+                            .tag(2)
+                            .frame(width: geometry.size.width, height: geometry.size.height)
 
-                    suspiciousProfilesView
-                        .tag(3)
+                        suspiciousProfilesView
+                            .tag(3)
+                            .frame(width: geometry.size.width, height: geometry.size.height)
 
-                    idVerificationReviewView
-                        .tag(4)
+                        idVerificationReviewView
+                            .tag(4)
+                            .frame(width: geometry.size.width, height: geometry.size.height)
 
-                    statsView
-                        .tag(5)
+                        statsView
+                            .tag(5)
+                            .frame(width: geometry.size.width, height: geometry.size.height)
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
+                    .animation(.smooth(duration: 0.3), value: selectedTab)
+                    .frame(width: geometry.size.width, height: geometry.size.height)
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
+                .clipped()
             }
             .navigationBarHidden(true)
             .background(Color(.systemGroupedBackground))
@@ -140,7 +151,8 @@ struct AdminModerationDashboard: View {
                         showingAlerts = true
                         HapticManager.shared.impact(.light)
                     } label: {
-                        ZStack(alignment: .topTrailing) {
+                        ZStack {
+                            // Background circle
                             Circle()
                                 .fill(Color(.secondarySystemBackground))
                                 .frame(width: 40, height: 40)
@@ -149,23 +161,27 @@ struct AdminModerationDashboard: View {
                                         .strokeBorder(Color(.separator).opacity(0.3), lineWidth: 1)
                                 )
 
+                            // Centered bell icon
                             Image(systemName: "bell.fill")
                                 .font(.system(size: 16))
                                 .foregroundColor(.primary)
-
+                        }
+                        .overlay(alignment: .topTrailing) {
+                            // Badge positioned at top-right corner
                             if viewModel.unreadAlertCount > 0 {
                                 Text("\(min(viewModel.unreadAlertCount, 99))")
                                     .font(.system(size: 9, weight: .bold))
                                     .foregroundColor(.white)
-                                    .frame(minWidth: 18, minHeight: 18)
+                                    .frame(minWidth: 16, minHeight: 16)
                                     .background(
                                         Circle()
                                             .fill(Color.red)
-                                            .shadow(color: .red.opacity(0.4), radius: 4, y: 2)
+                                            .shadow(color: .red.opacity(0.4), radius: 3, y: 1)
                                     )
-                                    .offset(x: 8, y: -8)
+                                    .offset(x: 4, y: -2)
                             }
                         }
+                        .frame(width: 44, height: 44) // Slightly larger hit area
                     }
 
                     // Refresh button
