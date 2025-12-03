@@ -152,10 +152,6 @@ struct CelestiaApp: App {
     @StateObject private var deepLinkManager = DeepLinkManager()
 
     init() {
-        // MEMORY FIX: Completely disable Firebase Analytics to eliminate malloc errors
-        // Analytics can be re-enabled later if needed via remote config
-        Analytics.setAnalyticsCollectionEnabled(false)
-
         // Configure Firebase first (must be on main thread)
         // NOTE: This is the SINGLE initialization point for Firebase
         // Do NOT call FirebaseApp.configure() anywhere else in the app
@@ -164,9 +160,9 @@ struct CelestiaApp: App {
         // Configure Stripe Identity SDK for ID verification
         StripeConfig.configure()
 
-        // Keep analytics disabled to prevent memory issues
-        // App uses AnalyticsServiceEnhanced for analytics instead
-        Analytics.setAnalyticsCollectionEnabled(false)
+        // Enable Firebase Analytics for event tracking
+        // Must be called AFTER FirebaseApp.configure()
+        Analytics.setAnalyticsCollectionEnabled(true)
 
         // PERFORMANCE: Move Firestore persistence initialization to background thread
         // This reduces cold start time by ~150-200ms
