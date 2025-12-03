@@ -494,26 +494,6 @@ class MessageService: ObservableObject, MessageServiceProtocol, ListenerLifecycl
             return
         }
 
-        // PERFORMANCE: Run rate limit and validation checks IN PARALLEL
-        // This can save 100-200ms compared to sequential execution
-        async let rateLimitTask = performRateLimitCheck(senderId: senderId)
-        async let validationTask = performContentValidation(text: sanitizedText)
-
-        // Wait for both to complete
-        let (rateLimitPassed, validationPassed) = try await (rateLimitTask, validationTask)
-
-        guard rateLimitPassed else {
-            if let timeRemaining = RateLimiter.shared.timeUntilReset(for: .message) {
-                throw CelestiaError.rateLimitExceededWithTime(timeRemaining)
-            }
-            throw CelestiaError.rateLimitExceeded
-        }
-
-        guard validationPassed else {
-            // Validation already threw if there were violations
-            return
-        }
-
         let message = Message(
             matchId: matchId,
             senderId: senderId,
@@ -521,8 +501,32 @@ class MessageService: ObservableObject, MessageServiceProtocol, ListenerLifecycl
             text: sanitizedText
         )
 
-        // PERFORMANCE: Add optimistic message to local list immediately
+        // PERFORMANCE FIX: Add optimistic message IMMEDIATELY so UI shows instant feedback
+        // This is added BEFORE backend checks so users see their message right away
         await addOptimisticMessage(message, localId: localMessageId)
+
+        // PERFORMANCE: Run rate limit and validation checks IN PARALLEL (in background)
+        // These checks have fallbacks so they won't block the message if backend is slow
+        async let rateLimitTask = performRateLimitCheck(senderId: senderId)
+        async let validationTask = performContentValidation(text: sanitizedText)
+
+        // Wait for both to complete
+        let (rateLimitPassed, validationPassed) = try await (rateLimitTask, validationTask)
+
+        guard rateLimitPassed else {
+            // Remove optimistic message since rate limit failed
+            await removeOptimisticMessage(localId: localMessageId)
+            if let timeRemaining = RateLimiter.shared.timeUntilReset(for: .message) {
+                throw CelestiaError.rateLimitExceededWithTime(timeRemaining)
+            }
+            throw CelestiaError.rateLimitExceeded
+        }
+
+        guard validationPassed else {
+            // Remove optimistic message since validation failed
+            await removeOptimisticMessage(localId: localMessageId)
+            return
+        }
 
         // Send message with retry logic for network failures
         do {

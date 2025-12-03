@@ -1307,7 +1307,6 @@ struct PhotoGalleryView: View {
     let user: User
 
     @State private var selectedPhotoIndex = 0
-    @State private var showZoomableViewer = false
 
     // Swipe-down to dismiss state
     @State private var dismissDragOffset: CGFloat = 0
@@ -1352,10 +1351,6 @@ struct PhotoGalleryView: View {
                                     )
                                     .frame(width: imageGeometry.size.width, height: imageGeometry.size.height)
                                     .contentShape(Rectangle())
-                                    .onTapGesture {
-                                        HapticManager.shared.impact(.light)
-                                        showZoomableViewer = true
-                                    }
                                 }
                                 .tag(index)
                             }
@@ -1431,13 +1426,6 @@ struct PhotoGalleryView: View {
                     }
                     .opacity(controlsOpacity)
                 }
-            }
-            .fullScreenCover(isPresented: $showZoomableViewer) {
-                FullScreenPhotoViewer(
-                    photos: validPhotos,
-                    selectedIndex: $selectedPhotoIndex,
-                    isPresented: $showZoomableViewer
-                )
             }
         }
         // PERFORMANCE: Preload adjacent photos on appear
