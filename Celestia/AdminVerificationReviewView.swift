@@ -89,8 +89,11 @@ struct AdminVerificationReviewView: View {
             } message: {
                 Text(viewModel.errorMessage)
             }
-            .task {
-                await viewModel.loadPendingVerifications()
+            .onAppear {
+                viewModel.startListening()
+            }
+            .onDisappear {
+                viewModel.stopListening()
             }
         }
     }
@@ -814,8 +817,57 @@ class AdminVerificationReviewViewModel: ObservableObject {
 
     private let db = Firestore.firestore()
     private let functions = Functions.functions()
+    private var verificationListener: ListenerRegistration?
+    private var previousCount = 0
 
-    // MARK: - Load Pending Verifications
+    // MARK: - Real-Time Listener
+
+    /// Start listening to pending verifications in real-time
+    func startListening() {
+        verificationListener?.remove()
+        isLoading = true
+
+        verificationListener = db.collection("pendingVerifications")
+            .whereField("status", isEqualTo: "pending")
+            .order(by: "submittedAt", descending: false)
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self else { return }
+
+                self.isLoading = false
+
+                if let error = error {
+                    Logger.shared.error("Verification listener error", category: .general, error: error)
+                    self.errorMessage = "Failed to load: \(error.localizedDescription)"
+                    return
+                }
+
+                guard let documents = snapshot?.documents else { return }
+
+                let newVerifications = documents.map { doc in
+                    PendingVerification(id: doc.documentID, data: doc.data())
+                }
+
+                // Detect new verifications and notify
+                if newVerifications.count > self.previousCount && self.previousCount > 0 {
+                    HapticManager.shared.notification(.warning)
+                }
+                self.previousCount = newVerifications.count
+
+                withAnimation(.smooth(duration: 0.3)) {
+                    self.pendingVerifications = newVerifications
+                }
+
+                Logger.shared.info("Real-time update: \(newVerifications.count) pending verifications", category: .general)
+            }
+    }
+
+    /// Stop listening to verifications
+    func stopListening() {
+        verificationListener?.remove()
+        verificationListener = nil
+    }
+
+    // MARK: - Load Pending Verifications (One-time fallback)
 
     func loadPendingVerifications() async {
         isLoading = true
@@ -1046,8 +1098,13 @@ struct IDVerificationReviewEmbeddedView: View {
                 }
             }
         }
-        .task {
-            await viewModel.loadPendingVerifications()
+        .onAppear {
+            // Start real-time listener when view appears
+            viewModel.startListening()
+        }
+        .onDisappear {
+            // Stop listener when view disappears
+            viewModel.stopListening()
         }
         .overlay {
             // Success toast

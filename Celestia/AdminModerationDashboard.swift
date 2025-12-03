@@ -35,40 +35,50 @@ struct AdminModerationDashboard: View {
                 // Organized Tab Bar - Fixed height, no layout shifts
                 adminTabBar
 
-                // Content area with smooth page transitions
-                TabView(selection: $selectedTab) {
-                    pendingProfilesView
-                        .tag(0)
+                // Content area with smooth page transitions - horizontal swipe only
+                GeometryReader { geometry in
+                    TabView(selection: $selectedTab) {
+                        pendingProfilesView
+                            .tag(0)
+                            .frame(width: geometry.size.width, height: geometry.size.height)
 
-                    reportsListView
-                        .tag(1)
+                        reportsListView
+                            .tag(1)
+                            .frame(width: geometry.size.width, height: geometry.size.height)
 
-                    appealsListView
-                        .tag(2)
+                        appealsListView
+                            .tag(2)
+                            .frame(width: geometry.size.width, height: geometry.size.height)
 
-                    suspiciousProfilesView
-                        .tag(3)
+                        suspiciousProfilesView
+                            .tag(3)
+                            .frame(width: geometry.size.width, height: geometry.size.height)
 
-                    idVerificationReviewView
-                        .tag(4)
+                        idVerificationReviewView
+                            .tag(4)
+                            .frame(width: geometry.size.width, height: geometry.size.height)
 
-                    statsView
-                        .tag(5)
+                        statsView
+                            .tag(5)
+                            .frame(width: geometry.size.width, height: geometry.size.height)
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
+                    .animation(.smooth(duration: 0.3), value: selectedTab)
+                    .frame(width: geometry.size.width, height: geometry.size.height)
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
+                .clipped()
             }
             .navigationBarHidden(true)
             .background(Color(.systemGroupedBackground))
         }
-        .task {
-            await viewModel.loadQueue()
+        .onAppear {
+            // Start all real-time listeners when view appears
+            viewModel.startAllListeners()
             lastRefreshed = Date()
         }
-        .onAppear {
-            viewModel.startListeningToAlerts()
-        }
         .onDisappear {
-            viewModel.stopListeningToAlerts()
+            // Clean up all listeners when view disappears
+            viewModel.stopAllListeners()
         }
         .sheet(isPresented: $showingAlerts) {
             AdminAlertsSheet(viewModel: viewModel)
@@ -117,18 +127,32 @@ struct AdminModerationDashboard: View {
                 }
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Admin Panel")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(.primary)
+                    HStack(spacing: 8) {
+                        Text("Admin Panel")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(.primary)
 
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(Color.green)
-                            .frame(width: 6, height: 6)
-                        Text("Updated \(lastRefreshed.formatted(.relative(presentation: .named)))")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(.secondary)
+                        // LIVE indicator with pulsing animation
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 6, height: 6)
+                                .shadow(color: .green.opacity(0.8), radius: 4)
+                            Text("LIVE")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(.green)
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(
+                            Capsule()
+                                .fill(Color.green.opacity(0.15))
+                        )
                     }
+
+                    Text("Real-time updates active")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.secondary)
                 }
 
                 Spacer()
@@ -140,7 +164,8 @@ struct AdminModerationDashboard: View {
                         showingAlerts = true
                         HapticManager.shared.impact(.light)
                     } label: {
-                        ZStack(alignment: .topTrailing) {
+                        ZStack {
+                            // Background circle
                             Circle()
                                 .fill(Color(.secondarySystemBackground))
                                 .frame(width: 40, height: 40)
@@ -149,23 +174,27 @@ struct AdminModerationDashboard: View {
                                         .strokeBorder(Color(.separator).opacity(0.3), lineWidth: 1)
                                 )
 
+                            // Centered bell icon
                             Image(systemName: "bell.fill")
                                 .font(.system(size: 16))
                                 .foregroundColor(.primary)
-
+                        }
+                        .overlay(alignment: .topTrailing) {
+                            // Badge positioned at top-right corner
                             if viewModel.unreadAlertCount > 0 {
                                 Text("\(min(viewModel.unreadAlertCount, 99))")
                                     .font(.system(size: 9, weight: .bold))
                                     .foregroundColor(.white)
-                                    .frame(minWidth: 18, minHeight: 18)
+                                    .frame(minWidth: 16, minHeight: 16)
                                     .background(
                                         Circle()
                                             .fill(Color.red)
-                                            .shadow(color: .red.opacity(0.4), radius: 4, y: 2)
+                                            .shadow(color: .red.opacity(0.4), radius: 3, y: 1)
                                     )
-                                    .offset(x: 8, y: -8)
+                                    .offset(x: 4, y: -2)
                             }
                         }
+                        .frame(width: 44, height: 44) // Slightly larger hit area
                     }
 
                     // Refresh button
@@ -1577,7 +1606,47 @@ class ModerationViewModel: ObservableObject {
 
     private let db = Firestore.firestore()
     private let functions = Functions.functions()
+
+    // Real-time listeners for all admin data
     private var alertsListener: ListenerRegistration?
+    private var pendingProfilesListener: ListenerRegistration?
+    private var reportsListener: ListenerRegistration?
+    private var appealsListener: ListenerRegistration?
+    private var suspiciousProfilesListener: ListenerRegistration?
+
+    // Track previous counts for new item detection
+    private var previousPendingCount = 0
+    private var previousReportsCount = 0
+    private var previousAppealsCount = 0
+    private var previousSuspiciousCount = 0
+
+    /// Start all real-time listeners for admin dashboard
+    func startAllListeners() {
+        startListeningToAlerts()
+        startListeningToPendingProfiles()
+        startListeningToReports()
+        startListeningToAppeals()
+        startListeningToSuspiciousProfiles()
+
+        // Initial load for stats
+        Task {
+            stats = await loadStats()
+        }
+    }
+
+    /// Stop all real-time listeners
+    func stopAllListeners() {
+        alertsListener?.remove()
+        alertsListener = nil
+        pendingProfilesListener?.remove()
+        pendingProfilesListener = nil
+        reportsListener?.remove()
+        reportsListener = nil
+        appealsListener?.remove()
+        appealsListener = nil
+        suspiciousProfilesListener?.remove()
+        suspiciousProfilesListener = nil
+    }
 
     /// Start listening to admin alerts in real-time
     func startListeningToAlerts() {
@@ -1585,9 +1654,11 @@ class ModerationViewModel: ObservableObject {
 
         alertsListener = db.collection("admin_alerts")
             .order(by: "createdAt", descending: true)
-            .limit(to: 20)
+            .limit(to: 50)
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self, let documents = snapshot?.documents else { return }
+
+                let previousCount = self.adminAlerts.count
 
                 self.adminAlerts = documents.compactMap { doc -> AdminAlert? in
                     let data = doc.data()
@@ -1611,13 +1682,306 @@ class ModerationViewModel: ObservableObject {
                 }
 
                 self.unreadAlertCount = self.adminAlerts.filter { !$0.read }.count
+
+                // Notify admin of new alerts with haptic
+                if self.adminAlerts.count > previousCount && previousCount > 0 {
+                    HapticManager.shared.notification(.warning)
+                }
             }
     }
 
-    /// Stop listening to alerts
+    /// Start listening to pending profiles in real-time
+    func startListeningToPendingProfiles() {
+        pendingProfilesListener?.remove()
+
+        pendingProfilesListener = db.collection("users")
+            .whereField("profileStatus", isEqualTo: "pending")
+            .order(by: "timestamp", descending: true)
+            .limit(to: 50)
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self, let documents = snapshot?.documents else { return }
+
+                let newProfiles = documents.compactMap { doc -> PendingProfile? in
+                    let data = doc.data()
+
+                    var createdAt = "Unknown"
+                    var createdAtDate = Date()
+                    if let timestamp = data["timestamp"] as? Timestamp {
+                        createdAtDate = timestamp.dateValue()
+                        let formatter = RelativeDateTimeFormatter()
+                        formatter.unitsStyle = .abbreviated
+                        createdAt = formatter.localizedString(for: createdAtDate, relativeTo: Date())
+                    }
+
+                    return PendingProfile(
+                        id: doc.documentID,
+                        name: data["fullName"] as? String ?? "Unknown",
+                        email: data["email"] as? String ?? "",
+                        age: data["age"] as? Int ?? 0,
+                        gender: data["gender"] as? String ?? "",
+                        location: data["location"] as? String ?? "",
+                        country: data["country"] as? String ?? "",
+                        photoURL: data["profileImageURL"] as? String,
+                        photos: data["photos"] as? [String] ?? [],
+                        bio: data["bio"] as? String ?? "",
+                        createdAt: createdAt,
+                        createdAtDate: createdAtDate,
+                        lookingFor: data["lookingFor"] as? String ?? "",
+                        interests: data["interests"] as? [String] ?? [],
+                        languages: data["languages"] as? [String] ?? [],
+                        height: data["height"] as? Int,
+                        educationLevel: data["educationLevel"] as? String,
+                        religion: data["religion"] as? String,
+                        relationshipGoal: data["relationshipGoal"] as? String,
+                        smoking: data["smoking"] as? String,
+                        drinking: data["drinking"] as? String,
+                        exercise: data["exercise"] as? String,
+                        pets: data["pets"] as? String,
+                        diet: data["diet"] as? String
+                    )
+                }
+
+                // Detect new items and notify
+                if newProfiles.count > self.previousPendingCount && self.previousPendingCount > 0 {
+                    HapticManager.shared.notification(.success)
+                }
+                self.previousPendingCount = newProfiles.count
+
+                withAnimation(.smooth(duration: 0.3)) {
+                    self.pendingProfiles = newProfiles
+                }
+            }
+    }
+
+    /// Start listening to reports in real-time
+    func startListeningToReports() {
+        reportsListener?.remove()
+
+        reportsListener = db.collection("reports")
+            .whereField("status", isEqualTo: "pending")
+            .order(by: "timestamp", descending: true)
+            .limit(to: 50)
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self else { return }
+                guard let documents = snapshot?.documents else {
+                    if let error = error {
+                        Logger.shared.error("Reports listener error", category: .moderation, error: error)
+                    }
+                    return
+                }
+
+                // Process reports asynchronously to fetch user details
+                Task { @MainActor in
+                    var loadedReports: [ModerationReport] = []
+
+                    for doc in documents {
+                        let data = doc.data()
+                        let reporterId = data["reporterId"] as? String ?? ""
+                        let reportedUserId = data["reportedUserId"] as? String ?? ""
+
+                        var reporterInfo: ModerationReport.UserInfo? = nil
+                        var reportedUserInfo: ModerationReport.UserInfo? = nil
+
+                        // Fetch user details in parallel
+                        async let reporterTask: ModerationReport.UserInfo? = {
+                            if !reporterId.isEmpty,
+                               let reporterDoc = try? await self.db.collection("users").document(reporterId).getDocument(),
+                               reporterDoc.exists,
+                               let reporterData = reporterDoc.data() {
+                                return ModerationReport.UserInfo(
+                                    id: reporterId,
+                                    name: reporterData["fullName"] as? String ?? "Unknown",
+                                    email: reporterData["email"] as? String ?? "",
+                                    photoURL: reporterData["profileImageURL"] as? String
+                                )
+                            }
+                            return nil
+                        }()
+
+                        async let reportedTask: ModerationReport.UserInfo? = {
+                            if !reportedUserId.isEmpty,
+                               let reportedDoc = try? await self.db.collection("users").document(reportedUserId).getDocument(),
+                               reportedDoc.exists,
+                               let reportedData = reportedDoc.data() {
+                                return ModerationReport.UserInfo(
+                                    id: reportedUserId,
+                                    name: reportedData["fullName"] as? String ?? "Unknown",
+                                    email: reportedData["email"] as? String ?? "",
+                                    photoURL: reportedData["profileImageURL"] as? String
+                                )
+                            }
+                            return nil
+                        }()
+
+                        reporterInfo = await reporterTask
+                        reportedUserInfo = await reportedTask
+
+                        var timestampStr = "Unknown"
+                        if let timestamp = data["timestamp"] as? Timestamp {
+                            let formatter = RelativeDateTimeFormatter()
+                            formatter.unitsStyle = .abbreviated
+                            timestampStr = formatter.localizedString(for: timestamp.dateValue(), relativeTo: Date())
+                        }
+
+                        let report = ModerationReport(
+                            id: doc.documentID,
+                            reason: data["reason"] as? String ?? "Unknown",
+                            timestamp: timestampStr,
+                            status: data["status"] as? String ?? "pending",
+                            additionalDetails: data["additionalDetails"] as? String,
+                            reporter: reporterInfo,
+                            reportedUser: reportedUserInfo
+                        )
+                        loadedReports.append(report)
+                    }
+
+                    // Detect new reports and notify
+                    if loadedReports.count > self.previousReportsCount && self.previousReportsCount > 0 {
+                        HapticManager.shared.notification(.warning)
+                    }
+                    self.previousReportsCount = loadedReports.count
+
+                    withAnimation(.smooth(duration: 0.3)) {
+                        self.reports = loadedReports
+                    }
+                }
+            }
+    }
+
+    /// Start listening to appeals in real-time
+    func startListeningToAppeals() {
+        appealsListener?.remove()
+
+        appealsListener = db.collection("appeals")
+            .whereField("status", isEqualTo: "pending")
+            .order(by: "submittedAt", descending: true)
+            .limit(to: 50)
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self else { return }
+                guard let documents = snapshot?.documents else { return }
+
+                Task { @MainActor in
+                    var loadedAppeals: [UserAppeal] = []
+
+                    for doc in documents {
+                        let data = doc.data()
+                        let userId = data["userId"] as? String ?? ""
+
+                        var userInfo: UserAppeal.UserInfo? = nil
+                        if !userId.isEmpty {
+                            if let userDoc = try? await self.db.collection("users").document(userId).getDocument(),
+                               userDoc.exists,
+                               let userData = userDoc.data() {
+                                userInfo = UserAppeal.UserInfo(
+                                    id: userId,
+                                    name: userData["fullName"] as? String ?? "Unknown",
+                                    email: userData["email"] as? String ?? "",
+                                    photoURL: userData["profileImageURL"] as? String,
+                                    isSuspended: userData["isSuspended"] as? Bool ?? false,
+                                    isBanned: userData["isBanned"] as? Bool ?? false,
+                                    suspendReason: userData["suspendReason"] as? String,
+                                    banReason: userData["banReason"] as? String
+                                )
+                            }
+                        }
+
+                        var submittedAtStr = "Unknown"
+                        if let timestamp = data["submittedAt"] as? Timestamp {
+                            let formatter = RelativeDateTimeFormatter()
+                            formatter.unitsStyle = .abbreviated
+                            submittedAtStr = formatter.localizedString(for: timestamp.dateValue(), relativeTo: Date())
+                        }
+
+                        let appeal = UserAppeal(
+                            id: doc.documentID,
+                            userId: userId,
+                            type: data["type"] as? String ?? "suspension",
+                            appealMessage: data["appealMessage"] as? String ?? "",
+                            status: data["status"] as? String ?? "pending",
+                            submittedAt: submittedAtStr,
+                            user: userInfo
+                        )
+                        loadedAppeals.append(appeal)
+                    }
+
+                    // Detect new appeals and notify
+                    if loadedAppeals.count > self.previousAppealsCount && self.previousAppealsCount > 0 {
+                        HapticManager.shared.notification(.warning)
+                    }
+                    self.previousAppealsCount = loadedAppeals.count
+
+                    withAnimation(.smooth(duration: 0.3)) {
+                        self.appeals = loadedAppeals
+                    }
+                }
+            }
+    }
+
+    /// Start listening to suspicious profiles in real-time
+    func startListeningToSuspiciousProfiles() {
+        suspiciousProfilesListener?.remove()
+
+        suspiciousProfilesListener = db.collection("moderation_queue")
+            .order(by: "timestamp", descending: true)
+            .limit(to: 50)
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self else { return }
+                guard let documents = snapshot?.documents else { return }
+
+                Task { @MainActor in
+                    var loadedProfiles: [SuspiciousProfileItem] = []
+
+                    for doc in documents {
+                        let data = doc.data()
+                        let userId = data["reportedUserId"] as? String ?? data["userId"] as? String ?? ""
+
+                        var userInfo: SuspiciousProfileItem.UserInfo? = nil
+                        if !userId.isEmpty {
+                            if let userDoc = try? await self.db.collection("users").document(userId).getDocument(),
+                               userDoc.exists,
+                               let userData = userDoc.data() {
+                                userInfo = SuspiciousProfileItem.UserInfo(
+                                    id: userId,
+                                    name: userData["fullName"] as? String ?? "Unknown",
+                                    photoURL: userData["profileImageURL"] as? String
+                                )
+                            }
+                        }
+
+                        var timestampStr = "Unknown"
+                        if let timestamp = data["timestamp"] as? Timestamp {
+                            let formatter = RelativeDateTimeFormatter()
+                            formatter.unitsStyle = .abbreviated
+                            timestampStr = formatter.localizedString(for: timestamp.dateValue(), relativeTo: Date())
+                        }
+
+                        let item = SuspiciousProfileItem(
+                            id: doc.documentID,
+                            suspicionScore: data["suspicionScore"] as? Double ?? 0.5,
+                            indicators: data["indicators"] as? [String] ?? [],
+                            autoDetected: data["autoDetected"] as? Bool ?? true,
+                            timestamp: timestampStr,
+                            user: userInfo
+                        )
+                        loadedProfiles.append(item)
+                    }
+
+                    // Detect new suspicious profiles and notify
+                    if loadedProfiles.count > self.previousSuspiciousCount && self.previousSuspiciousCount > 0 {
+                        HapticManager.shared.notification(.error)
+                    }
+                    self.previousSuspiciousCount = loadedProfiles.count
+
+                    withAnimation(.smooth(duration: 0.3)) {
+                        self.suspiciousProfiles = loadedProfiles
+                    }
+                }
+            }
+    }
+
+    /// Stop listening to alerts (legacy - use stopAllListeners instead)
     func stopListeningToAlerts() {
-        alertsListener?.remove()
-        alertsListener = nil
+        stopAllListeners()
     }
 
     /// Mark an alert as read
@@ -4166,22 +4530,37 @@ struct AdminQuickStatCard: View {
     let icon: String
     let color: Color
 
+    @State private var isPulsing = false
+
     var body: some View {
         VStack(spacing: 6) {
-            // Icon with background
+            // Icon with background and pulse effect for items needing attention
             ZStack {
+                // Pulse ring for active items
+                if value > 0 {
+                    Circle()
+                        .stroke(color.opacity(0.3), lineWidth: 2)
+                        .frame(width: 36, height: 36)
+                        .scaleEffect(isPulsing ? 1.3 : 1.0)
+                        .opacity(isPulsing ? 0 : 0.6)
+                        .animation(.easeOut(duration: 1.5).repeatForever(autoreverses: false), value: isPulsing)
+                }
+
                 Circle()
                     .fill(color.opacity(value > 0 ? 0.15 : 0.08))
                     .frame(width: 32, height: 32)
+
                 Image(systemName: icon)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(value > 0 ? color : .secondary)
             }
 
-            // Value
+            // Value with animation
             Text("\(value)")
                 .font(.system(size: 17, weight: .bold, design: .rounded))
                 .foregroundColor(value > 0 ? .primary : .secondary)
+                .contentTransition(.numericText())
+                .animation(.smooth(duration: 0.3), value: value)
 
             // Label
             Text(label)
@@ -4193,7 +4572,19 @@ struct AdminQuickStatCard: View {
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color(.secondarySystemBackground))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(value > 0 ? color.opacity(0.2) : Color.clear, lineWidth: 1)
+                )
         )
+        .onAppear {
+            if value > 0 {
+                isPulsing = true
+            }
+        }
+        .onChange(of: value) { _, newValue in
+            isPulsing = newValue > 0
+        }
     }
 }
 
