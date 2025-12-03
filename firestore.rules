@@ -116,9 +116,12 @@ service cloud.firestore {
     // Interests (Likes) Collection
     match /interests/{interestId} {
       // Users can read interests sent to them
-      // Note: Email verification NOT required for reads to allow cascade delete queries
+      // Note: Using document ID pattern matching to support reading non-existent documents
+      // (needed for mutual interest checks where the reverse document may not exist yet)
+      // Email verification NOT required for reads to allow cascade delete queries
       allow read: if isAuthenticated()
-        && (resource.data.toUserId == request.auth.uid || resource.data.fromUserId == request.auth.uid);
+        && (interestId.matches('.*' + request.auth.uid + '.*')
+            || (resource != null && (resource.data.toUserId == request.auth.uid || resource.data.fromUserId == request.auth.uid)));
 
       // Users can send interests
       allow create: if isAuthenticated()
@@ -409,10 +412,12 @@ service cloud.firestore {
     // Document ID format: {fromUserId}_{toUserId}
     match /likes/{likeId} {
       // Users can read likes they sent or received
-      // Note: Using field-based matching to support both single document reads and list queries
-      // This enables cascade delete queries during account deletion
+      // Note: Using document ID pattern matching to support reading non-existent documents
+      // (needed for mutual like checks where the reverse document may not exist yet)
+      // This also enables cascade delete queries during account deletion
       allow read: if isAuthenticated()
-        && (resource.data.fromUserId == request.auth.uid || resource.data.toUserId == request.auth.uid);
+        && (likeId.matches('.*' + request.auth.uid + '.*')
+            || (resource != null && (resource.data.fromUserId == request.auth.uid || resource.data.toUserId == request.auth.uid)));
 
       // Users can create likes they send
       allow create: if isAuthenticated()
