@@ -2341,10 +2341,14 @@ struct EditProfileView: View {
                         switch photoError {
                         case .noNetwork:
                             errorMessage = "No internet connection. Please check your WiFi or cellular data and try again."
+                        case .wifiConnectedNoInternet:
+                            errorMessage = "WiFi connected but no internet access. Please check your network and try again."
                         case .poorConnection:
                             errorMessage = "Your connection is too weak. Please move to a stronger signal and try again."
                         case .uploadFailed(let reason):
                             errorMessage = "Photo upload failed: \(reason)"
+                        case .uploadTimeout:
+                            errorMessage = "Upload timed out. Please check your connection and try again."
                         }
                     } else if let celestiaError = error as? CelestiaError {
                         switch celestiaError {
