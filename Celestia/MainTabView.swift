@@ -265,8 +265,8 @@ struct MainTabView: View {
                 }
             }
             .padding(.horizontal, 4)
-            .padding(.top, 8)
-            .padding(.bottom, 4)
+            .padding(.top, 4)
+            .padding(.bottom, 8)
         }
         .background {
             Color(.systemBackground)
