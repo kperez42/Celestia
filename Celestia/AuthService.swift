@@ -515,6 +515,9 @@ class AuthService: ObservableObject, AuthServiceProtocol {
             self.requiresReauthentication = false
             Logger.shared.auth("User signed out successfully", level: .info)
 
+            // Clear all local cached data to ensure clean state for next user
+            clearAllLocalData()
+
             // Clear user cache on logout
             Task {
                 await UserService.shared.clearCache()
@@ -713,11 +716,57 @@ class AuthService: ObservableObject, AuthServiceProtocol {
             Logger.shared.auth("Some Firestore cleanup failed, but account is deleted", level: .warning)
         }
 
+        // Clear all local cached data to prevent conflicts on re-registration
+        clearAllLocalData()
+
         self.userSession = nil
         self.currentUser = nil
         self.requiresReauthentication = false
 
         Logger.shared.auth("Account deleted successfully", level: .info)
+    }
+
+    /// Clear all locally cached data (UserDefaults, image caches, etc.)
+    /// Called during account deletion and sign out to prevent data conflicts
+    private func clearAllLocalData() {
+        let defaults = UserDefaults.standard
+
+        // Clear discovery filters
+        let filterKeys = [
+            "maxDistance", "minAge", "maxAge", "showVerifiedOnly",
+            "selectedInterests", "educationLevels", "minHeight", "maxHeight",
+            "religions", "relationshipGoals", "smokingPreferences",
+            "drinkingPreferences", "petPreferences", "exercisePreferences", "dietPreferences"
+        ]
+        for key in filterKeys {
+            defaults.removeObject(forKey: key)
+        }
+
+        // Clear security settings
+        defaults.removeObject(forKey: "security_level")
+
+        // Clear emergency contacts cache
+        defaults.removeObject(forKey: "emergency_contacts")
+
+        // Clear any daily like limit cache entries (pattern: dailyLikeLimit_{userId})
+        let allKeys = defaults.dictionaryRepresentation().keys
+        for key in allKeys {
+            if key.hasPrefix("dailyLikeLimit_") {
+                defaults.removeObject(forKey: key)
+            }
+        }
+
+        // Clear message queue
+        defaults.removeObject(forKey: "queuedMessages")
+
+        // Synchronize to ensure all changes are persisted
+        defaults.synchronize()
+
+        // Clear image caches
+        ImageCache.shared.clearAll()
+        URLCache.shared.removeAllCachedResponses()
+
+        Logger.shared.auth("All local cached data cleared", level: .info)
     }
 
     // MARK: - Cascade Delete Helpers
