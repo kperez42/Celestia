@@ -21,15 +21,21 @@ struct MessageBubble: View {
                 // Message content
                 if let imageURL = message.imageURL, !imageURL.isEmpty {
                     // Image message - using cached image for better scroll performance
+                    // Fixed dimensions prevent layout shifts during load
                     CachedAsyncImage(url: URL(string: imageURL)) { image in
                         image
                             .resizable()
                             .scaledToFill()
-                            .frame(maxWidth: 200, maxHeight: 200)
+                            .frame(width: 200, height: 200)
                             .cornerRadius(12)
                     } placeholder: {
-                        ProgressView()
+                        // Placeholder matches loaded image size to prevent layout shifts
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.gray.opacity(0.15))
                             .frame(width: 200, height: 200)
+                            .overlay(
+                                ProgressView()
+                            )
                     }
                 } else {
                     // Text message
@@ -140,18 +146,23 @@ struct MessageBubbleGradient: View {
                 VStack(alignment: isFromCurrentUser ? .trailing : .leading, spacing: 0) {
                     if let imageURL = message.imageURL, !imageURL.isEmpty {
                         // Image message - using cached image for better scroll performance
+                        // Fixed dimensions prevent layout shifts during load
                         CachedAsyncImage(url: URL(string: imageURL)) { image in
                             image
                                 .resizable()
                                 .scaledToFill()
-                                .frame(maxWidth: 250, maxHeight: 300)
+                                .frame(width: 250, height: 200)
                                 .clipShape(RoundedRectangle(cornerRadius: 16))
                                 .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
                         } placeholder: {
-                            ProgressView()
+                            // Placeholder matches loaded image size to prevent layout shifts
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color.gray.opacity(0.15))
                                 .frame(width: 250, height: 200)
-                                .background(Color.gray.opacity(0.1))
-                                .cornerRadius(16)
+                                .overlay(
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .gray))
+                                )
                         }
 
                         // Caption if text exists

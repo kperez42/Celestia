@@ -551,6 +551,7 @@ struct ChatView: View {
                 .padding()
             }
             .scrollDismissesKeyboard(.immediately)
+            .defaultScrollAnchor(.bottom) // Start at bottom (most recent messages) like phone messaging
             .background(Color(.systemGroupedBackground))
             .contentShape(Rectangle())
             .onTapGesture {
@@ -564,16 +565,18 @@ struct ChatView: View {
                 // PERFORMANCE: Cancel pending scroll to avoid stacking
                 pendingScrollTask?.cancel()
 
-                // PERFORMANCE: Don't animate scroll on initial load - just jump to bottom
-                let shouldAnimate = !isInitialLoad
-
                 if isInitialLoad {
-                    // Initial load - scroll immediately without animation
-                    scrollToBottom(proxy: proxy, animated: false)
+                    // Initial load - defaultScrollAnchor handles positioning
+                    // Just mark as loaded, no need to scroll since we start at bottom
                     isInitialLoad = false
                 } else {
-                    // Subsequent messages - animate smoothly
-                    scrollToBottom(proxy: proxy, animated: shouldAnimate)
+                    // Subsequent messages - animate smoothly to bottom
+                    // Use slight delay to allow layout to settle
+                    pendingScrollTask = Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 50_000_000) // 50ms for layout
+                        guard !Task.isCancelled else { return }
+                        scrollToBottom(proxy: proxy, animated: !reduceMotion)
+                    }
                 }
             }
             .onChange(of: typingService.isOtherUserTyping) {
