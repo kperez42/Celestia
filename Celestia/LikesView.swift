@@ -10,7 +10,7 @@ import FirebaseFirestore
 
 struct LikesView: View {
     @EnvironmentObject var authService: AuthService
-    @StateObject private var viewModel = LikesViewModel()
+    @ObservedObject private var viewModel = LikesViewModel.shared
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
 
     @State private var selectedTab = 0
@@ -1193,6 +1193,9 @@ struct LikeActionButton: View {
 
 @MainActor
 class LikesViewModel: ObservableObject {
+    // SINGLETON: Shared instance for state sync across all views
+    static let shared = LikesViewModel()
+
     @Published var usersWhoLikedMe: [User] = []
     @Published var usersILiked: [User] = []
     @Published var mutualLikes: [User] = []
@@ -1207,6 +1210,35 @@ class LikesViewModel: ObservableObject {
 
     var totalLikesReceived: Int { usersWhoLikedMe.count }
     var totalLikesSent: Int { usersILiked.count }
+
+    // INSTANT SYNC: Add a user to the liked list immediately without fetching from server
+    // Called from FeedDiscoverView when user likes someone
+    func addLikedUser(_ user: User, isMatch: Bool = false) {
+        guard let userId = user.effectiveId else { return }
+
+        // Check if already in list to avoid duplicates
+        guard !usersILiked.contains(where: { $0.effectiveId == userId }) else { return }
+
+        // Add to usersILiked immediately
+        usersILiked.insert(user, at: 0) // Insert at beginning for "most recent first"
+
+        // If it's a match, also add to mutualLikes
+        if isMatch {
+            if !mutualLikes.contains(where: { $0.effectiveId == userId }) {
+                mutualLikes.insert(user, at: 0)
+            }
+        }
+
+        Logger.shared.debug("LikesViewModel instant sync: added \(user.fullName) to usersILiked (isMatch: \(isMatch))", category: .matching)
+    }
+
+    // INSTANT SYNC: Remove a user from the liked list immediately
+    // Called when user unlikes someone
+    func removeLikedUser(_ userId: String) {
+        usersILiked.removeAll { $0.effectiveId == userId }
+        mutualLikes.removeAll { $0.effectiveId == userId }
+        Logger.shared.debug("LikesViewModel instant sync: removed user \(userId) from liked lists", category: .matching)
+    }
 
     func loadAllLikes(forceRefresh: Bool = false) async {
         // PERFORMANCE: Check cache first - skip fetch if we have recent data

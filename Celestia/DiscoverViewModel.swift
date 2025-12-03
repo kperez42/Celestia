@@ -322,6 +322,11 @@ class DiscoverViewModel: ObservableObject {
                 await decrementDailyLikes()
             }
 
+            // INSTANT SYNC: Update LikesViewModel immediately so Likes page reflects changes
+            await MainActor.run {
+                LikesViewModel.shared.addLikedUser(likedUser, isMatch: isMatch)
+            }
+
             if isMatch {
                 // Show match animation
                 await MainActor.run {
@@ -460,6 +465,11 @@ class DiscoverViewModel: ObservableObject {
 
             // Deduct super like from balance
             await decrementSuperLikes()
+
+            // INSTANT SYNC: Update LikesViewModel immediately so Likes page reflects changes
+            await MainActor.run {
+                LikesViewModel.shared.addLikedUser(superLikedUser, isMatch: isMatch)
+            }
 
             if isMatch {
                 // Show match animation
