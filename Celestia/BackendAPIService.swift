@@ -95,6 +95,10 @@ class BackendAPIService: BackendAPIServiceProtocol {
     // MARK: - Configuration
 
     enum Configuration {
+        // DISABLED: Backend API not deployed yet - use client-side fallbacks
+        // Set to true when api.celestia.app is available
+        static let isEnabled = false
+
         #if DEBUG
         static let useLocalServer = false // Set to true for local development
         static let localServerURL = "http://localhost:3000/api"
@@ -165,6 +169,11 @@ class BackendAPIService: BackendAPIServiceProtocol {
     /// Validate content with server-side moderation
     /// SECURITY: Server-side validation can't be bypassed like client-side
     func validateContent(_ content: String, type: ContentType) async throws -> ContentValidationResponse {
+        // Return immediately if backend is disabled - use client-side validation
+        guard Configuration.isEnabled else {
+            return ContentValidationResponse(isAppropriate: true, violations: [], confidence: 1.0)
+        }
+
         Logger.shared.info("Validating content server-side, type: \(type.rawValue)", category: .moderation)
 
         let payload: [String: Any] = [
@@ -187,6 +196,11 @@ class BackendAPIService: BackendAPIServiceProtocol {
     /// Check rate limit with backend
     /// SECURITY: Server-side rate limiting prevents client bypass
     func checkRateLimit(userId: String, action: RateLimitAction) async throws -> RateLimitResponse {
+        // Return immediately if backend is disabled - use client-side rate limiting
+        guard Configuration.isEnabled else {
+            return RateLimitResponse(allowed: true, remaining: 999, resetTime: nil)
+        }
+
         let payload: [String: Any] = [
             "user_id": userId,
             "action": action.rawValue,
