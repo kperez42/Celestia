@@ -658,25 +658,12 @@ class AuthService: ObservableObject, AuthServiceProtocol {
         // SECURITY FIX: Never log UIDs
         Logger.shared.auth("Deleting user account and all related data", level: .info)
 
-        // IMPORTANT: Try to delete Auth user FIRST to check if re-auth is needed
-        // This prevents the bug where Firestore data is deleted but Auth user remains
-        do {
-            try await user.delete()
-            Logger.shared.auth("Auth account deleted successfully", level: .info)
-        } catch let error as NSError {
-            // Handle requiresRecentLogin error BEFORE deleting any data
-            if error.domain == "FIRAuthErrorDomain" && error.code == 17014 {
-                Logger.shared.auth("Account deletion requires re-authentication", level: .warning)
-                self.requiresReauthentication = true
-                throw CelestiaError.requiresRecentLogin
-            }
-            throw error
-        }
+        // CRITICAL FIX: Delete Firestore data FIRST while user is still authenticated
+        // Security rules require request.auth.uid to match, so we must delete data
+        // BEFORE deleting the Auth user, otherwise all deletions will fail silently.
+        let db = Firestore.firestore()
 
-        // Auth user is now deleted, proceed to clean up Firestore data
-        // Even if this fails, the account is gone and email can be reused
         do {
-            let db = Firestore.firestore()
 
             // IMPORTANT: Get user's photo URLs BEFORE deleting the user document
             // so we can clean up their images from Firebase Storage
@@ -724,11 +711,29 @@ class AuthService: ObservableObject, AuthServiceProtocol {
             Logger.shared.auth("All related user data deleted (including profile images)", level: .info)
 
             // Delete user document from Firestore
-            try? await db.collection("users").document(uid).delete()
+            try await db.collection("users").document(uid).delete()
             Logger.shared.auth("User document deleted", level: .info)
+
         } catch {
-            // Log but don't throw - Auth user is already deleted which is the important part
-            Logger.shared.auth("Some Firestore cleanup failed, but account is deleted", level: .warning)
+            // If Firestore deletion fails, log and continue to try Auth deletion
+            Logger.shared.auth("Some Firestore cleanup failed: \(error.localizedDescription)", level: .warning)
+        }
+
+        // NOW delete the Auth user (after Firestore data is cleaned up)
+        // This ensures security rules can verify request.auth.uid during deletions above
+        do {
+            try await user.delete()
+            Logger.shared.auth("Auth account deleted successfully", level: .info)
+        } catch let error as NSError {
+            // Handle requiresRecentLogin error
+            if error.domain == "FIRAuthErrorDomain" && error.code == 17014 {
+                Logger.shared.auth("Account deletion requires re-authentication", level: .warning)
+                self.requiresReauthentication = true
+                // Note: Firestore data may be partially deleted, but user can re-auth and retry
+                throw CelestiaError.requiresRecentLogin
+            }
+            // For other errors, log but continue - Firestore data is already deleted
+            Logger.shared.auth("Auth deletion failed: \(error.localizedDescription)", level: .error)
         }
 
         // Clear all local cached data to prevent conflicts on re-registration
