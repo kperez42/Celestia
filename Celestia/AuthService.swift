@@ -703,6 +703,11 @@ class AuthService: ObservableObject, AuthServiceProtocol {
             async let reportsDeleted: () = deleteUserReports(uid: uid, db: db)
             async let notificationsSubcollectionDeleted: () = deleteUserNotificationsSubcollection(uid: uid, db: db)
 
+            // Group 7: Sessions, deep links, moderation queue
+            async let sessionsDeleted: () = deleteUserSessions(uid: uid, db: db)
+            async let deepLinksDeleted: () = deleteUserDeferredDeepLinks(uid: uid, db: db)
+            async let moderationQueueDeleted: () = deleteUserModerationQueue(uid: uid, db: db)
+
             // Wait for all deletions to complete (ignore errors since Auth is already deleted)
             _ = try? await (messagesDeleted, matchesDeleted, interestsDeleted, likesDeleted,
                           savedProfilesDeleted, notificationsDeleted, blocksDeleted,
@@ -711,7 +716,8 @@ class AuthService: ObservableObject, AuthServiceProtocol {
                           attributionDeleted, complianceDeleted,
                           emergencyContactsDeleted, segmentAssignmentsDeleted,
                           pendingVerificationsDeleted, safetyDataDeleted,
-                          reportsDeleted, notificationsSubcollectionDeleted)
+                          reportsDeleted, notificationsSubcollectionDeleted,
+                          sessionsDeleted, deepLinksDeleted, moderationQueueDeleted)
 
             Logger.shared.auth("All related user data deleted (including profile images)", level: .info)
 
@@ -1291,6 +1297,42 @@ class AuthService: ObservableObject, AuthServiceProtocol {
         }
 
         Logger.shared.auth("Deleted \(notifications.count) user notifications subcollection items", level: .debug)
+    }
+
+    /// Delete user sessions (analytics/tracking data)
+    private func deleteUserSessions(uid: String, db: Firestore) async throws {
+        let sessions = try await db.collection("sessions")
+            .whereField("userId", isEqualTo: uid)
+            .getDocuments()
+        for doc in sessions.documents {
+            try await doc.reference.delete()
+        }
+
+        Logger.shared.auth("Deleted \(sessions.count) sessions", level: .debug)
+    }
+
+    /// Delete deferred deep links claimed by the user
+    private func deleteUserDeferredDeepLinks(uid: String, db: Firestore) async throws {
+        let links = try await db.collection("deferredDeepLinks")
+            .whereField("claimedBy", isEqualTo: uid)
+            .getDocuments()
+        for doc in links.documents {
+            try await doc.reference.delete()
+        }
+
+        Logger.shared.auth("Deleted \(links.count) deferred deep links", level: .debug)
+    }
+
+    /// Delete moderation queue entries for the user
+    private func deleteUserModerationQueue(uid: String, db: Firestore) async throws {
+        let entries = try await db.collection("moderation_queue")
+            .whereField("reportedUserId", isEqualTo: uid)
+            .getDocuments()
+        for doc in entries.documents {
+            try await doc.reference.delete()
+        }
+
+        Logger.shared.auth("Deleted \(entries.count) moderation queue entries", level: .debug)
     }
 
     // MARK: - Re-authentication
