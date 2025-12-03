@@ -187,7 +187,7 @@ class PersonalizedOnboardingManager: ObservableObject {
             ],
             focusAreas: [.profileDepth, .verificationTrust, .bioOptimization, .interestMatching],
             recommendedFeatures: ["Video Prompts", "Voice Messages", "Verified Matches"],
-            tutorialPriority: ["profile_quality", "matching", "messaging", "safety", "swiping"]
+            tutorialPriority: ["profile_quality", "matching", "messaging", "safety", "scrolling"]
         )
     }
 
@@ -220,7 +220,7 @@ class PersonalizedOnboardingManager: ObservableObject {
             ],
             focusAreas: [.photoQuality, .interestMatching, .locationAccuracy],
             recommendedFeatures: ["Quick Match", "Nearby Matches", "Icebreakers"],
-            tutorialPriority: ["swiping", "matching", "messaging", "profile_quality"]
+            tutorialPriority: ["scrolling", "matching", "messaging", "profile_quality"]
         )
     }
 
@@ -253,7 +253,7 @@ class PersonalizedOnboardingManager: ObservableObject {
             ],
             focusAreas: [.interestMatching, .locationAccuracy, .bioOptimization],
             recommendedFeatures: ["Group Activities", "Interest Groups", "Events"],
-            tutorialPriority: ["swiping", "matching", "messaging", "profile_quality"]
+            tutorialPriority: ["scrolling", "matching", "messaging", "profile_quality"]
         )
     }
 
@@ -319,7 +319,7 @@ class PersonalizedOnboardingManager: ObservableObject {
             ],
             focusAreas: [.photoQuality, .bioOptimization, .interestMatching],
             recommendedFeatures: ["Discovery", "Filters", "Profile Insights"],
-            tutorialPriority: ["welcome", "swiping", "matching", "messaging", "profile_quality"]
+            tutorialPriority: ["welcome", "scrolling", "matching", "messaging", "profile_quality"]
         )
     }
 
@@ -337,7 +337,7 @@ class PersonalizedOnboardingManager: ObservableObject {
 
     func getPrioritizedTutorials() -> [String] {
         guard let path = recommendedPath else {
-            return ["welcome", "swiping", "matching", "messaging"]
+            return ["welcome", "scrolling", "matching", "messaging"]
         }
         return path.tutorialPriority
     }

@@ -44,6 +44,10 @@ struct SignUpView: View {
     @State private var isSavingProfile = false           // For edit mode - saving state
     @State private var photosWereModified = false        // For edit mode - track if photos changed
 
+    // Full screen photo viewer state
+    @State private var showFullScreenPhoto = false
+    @State private var selectedPhotoIndex = 0
+
     // Referral code (optional)
     @State private var referralCode = ""
     @State private var isValidatingReferral = false
@@ -75,6 +79,10 @@ struct SignUpView: View {
     @State private var showLanguagePicker = false
     @State private var ageRangeMin: Int = 18
     @State private var ageRangeMax: Int = 35
+
+    // Guidelines popup state
+    @State private var showGuidelinesPopup = false
+    @State private var hasAcceptedGuidelines = false
 
     let relationshipGoalOptions = ["Long-term relationship", "Casual dating", "New friends", "Not sure yet"]
     let educationLevelOptions = ["High school", "Some college", "Bachelor's degree", "Master's degree", "Doctorate", "Trade school", "Prefer not to say"]
@@ -221,6 +229,7 @@ struct SignUpView: View {
                             // Back button - In edit mode: dismiss at step 1, otherwise go back
                             // In signup mode: dismiss at step 0, otherwise go back
                             Button {
+                                HapticManager.shared.impact(.light)
                                 let dismissStep = isEditingProfile ? 1 : 0
                                 if currentStep == dismissStep {
                                     dismiss()
@@ -230,13 +239,19 @@ struct SignUpView: View {
                                     }
                                 }
                             } label: {
-                                Text(isEditingProfile && currentStep == 1 ? "Cancel" : "Back")
-                                    .font(.headline)
-                                    .foregroundColor(.purple)
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .background(Color.white)
-                                    .cornerRadius(15)
+                                HStack(spacing: 8) {
+                                    if !(isEditingProfile && currentStep == 1) {
+                                        Image(systemName: "arrow.left")
+                                            .font(.subheadline.weight(.semibold))
+                                    }
+                                    Text(isEditingProfile && currentStep == 1 ? "Cancel" : "Back")
+                                        .font(.headline)
+                                }
+                                .foregroundColor(.purple)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.white)
+                                .cornerRadius(15)
                             }
                             .disabled(isSavingProfile)
                             .opacity(isSavingProfile ? 0.5 : 1.0)
@@ -246,15 +261,28 @@ struct SignUpView: View {
                             .scaleButton()
 
                             Button {
+                                // Haptic feedback on tap
+                                if currentStep == 6 {
+                                    HapticManager.shared.impact(.medium)
+                                } else {
+                                    HapticManager.shared.impact(.light)
+                                }
                                 handleNext()
                             } label: {
                                 if authService.isLoading || isLoadingPhotos || isLoadingExistingPhotos || isSavingProfile {
                                     ProgressView()
                                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                 } else {
-                                    Text(nextButtonText)
-                                        .font(.headline)
-                                        .foregroundColor(.white)
+                                    HStack(spacing: 8) {
+                                        Text(nextButtonText)
+                                            .font(.headline)
+
+                                        if currentStep < 6 {
+                                            Image(systemName: "arrow.right")
+                                                .font(.subheadline.weight(.semibold))
+                                        }
+                                    }
+                                    .foregroundColor(.white)
                                 }
                             }
                             .frame(maxWidth: .infinity)
@@ -336,6 +364,24 @@ struct SignUpView: View {
         }
         .sheet(isPresented: $showLanguagePicker) {
             languagePickerSheet
+        }
+        .sheet(isPresented: $showGuidelinesPopup) {
+            SignUpGuidelinesPopup {
+                hasAcceptedGuidelines = true
+                // Now proceed with account creation
+                if isEditingProfile {
+                    handleSaveProfileChanges()
+                } else {
+                    handleCreateAccount()
+                }
+            }
+        }
+        .fullScreenCover(isPresented: $showFullScreenPhoto) {
+            SignUpPhotoViewer(
+                images: photoImages,
+                selectedIndex: $selectedPhotoIndex,
+                isPresented: $showFullScreenPhoto
+            )
         }
     }
 
@@ -771,24 +817,49 @@ struct SignUpView: View {
                     .overlay(
                         VStack {
                             Spacer()
-                            HStack(spacing: 6) {
-                                Image(systemName: "star.fill")
-                                    .font(.caption)
-                                Text("Main Photo")
-                                    .font(.caption)
-                                    .fontWeight(.semibold)
+                            HStack {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "star.fill")
+                                        .font(.caption)
+                                    Text("Main Photo")
+                                        .font(.caption)
+                                        .fontWeight(.semibold)
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.purple)
+                                )
+
+                                Spacer()
+
+                                // Tap to view hint
+                                HStack(spacing: 4) {
+                                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                        .font(.caption2)
+                                    Text("Tap to view")
+                                        .font(.caption2)
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.black.opacity(0.5))
+                                )
                             }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(
-                                Capsule()
-                                    .fill(Color.purple)
-                            )
                             .padding(10)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                     )
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        HapticManager.shared.impact(.light)
+                        selectedPhotoIndex = 0
+                        showFullScreenPhoto = true
+                    }
 
                     Button {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
@@ -917,6 +988,12 @@ struct SignUpView: View {
                                     RoundedRectangle(cornerRadius: 12)
                                         .stroke(Color.purple.opacity(0.2), lineWidth: 1)
                                 )
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    HapticManager.shared.impact(.light)
+                                    selectedPhotoIndex = index
+                                    showFullScreenPhoto = true
+                                }
 
                                 Button {
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
@@ -1913,13 +1990,19 @@ struct SignUpView: View {
                 currentStep += 1
             }
         } else {
-            // Final step
+            // Final step - show guidelines popup before creating account
             if isEditingProfile {
-                // Edit mode - update existing profile
+                // Edit mode - update existing profile (no guidelines needed)
                 handleSaveProfileChanges()
             } else {
-                // New account mode - create account
-                handleCreateAccount()
+                // New account mode - show guidelines popup first
+                if hasAcceptedGuidelines {
+                    // Already accepted, proceed directly
+                    handleCreateAccount()
+                } else {
+                    // Show guidelines popup
+                    showGuidelinesPopup = true
+                }
             }
         }
     }
@@ -2110,6 +2193,129 @@ struct SignUpView: View {
                 referralCodeValid = isValid
                 HapticManager.shared.notification(isValid ? .success : .error)
             }
+        }
+    }
+}
+
+// MARK: - Full Screen Photo Viewer for UIImages
+
+struct SignUpPhotoViewer: View {
+    let images: [UIImage]
+    @Binding var selectedIndex: Int
+    @Binding var isPresented: Bool
+
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
+
+    var body: some View {
+        ZStack {
+            Color.black
+                .ignoresSafeArea()
+
+            if images.isEmpty {
+                Text("No photos to display")
+                    .foregroundColor(.white)
+            } else {
+                TabView(selection: $selectedIndex) {
+                    ForEach(images.indices, id: \.self) { index in
+                        ZoomableImageView(image: images[index])
+                            .tag(index)
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .always))
+                .indexViewStyle(.page(backgroundDisplayMode: .always))
+            }
+
+            // Close button and counter overlay
+            VStack {
+                HStack {
+                    // Photo counter
+                    if images.count > 1 {
+                        Text("\(selectedIndex + 1) / \(images.count)")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color.black.opacity(0.6))
+                            .cornerRadius(20)
+                    }
+
+                    Spacer()
+
+                    // Close button
+                    Button {
+                        HapticManager.shared.impact(.light)
+                        isPresented = false
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title)
+                            .foregroundStyle(.white, Color.black.opacity(0.6))
+                    }
+                }
+                .padding()
+                .padding(.top, 40)
+
+                Spacer()
+
+                // Swipe hint
+                if images.count > 1 {
+                    HStack(spacing: 6) {
+                        Image(systemName: "hand.draw")
+                            .font(.caption)
+                        Text("Swipe to see more photos")
+                            .font(.caption)
+                    }
+                    .foregroundColor(.white.opacity(0.7))
+                    .padding(.bottom, 80)
+                }
+            }
+        }
+    }
+}
+
+// Zoomable image view for pinch-to-zoom
+struct ZoomableImageView: View {
+    let image: UIImage
+
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+
+    var body: some View {
+        GeometryReader { geometry in
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFit()
+                .scaleEffect(scale)
+                .frame(width: geometry.size.width, height: geometry.size.height)
+                .gesture(
+                    MagnificationGesture()
+                        .onChanged { value in
+                            scale = lastScale * value
+                        }
+                        .onEnded { _ in
+                            withAnimation(.spring()) {
+                                if scale < 1.0 {
+                                    scale = 1.0
+                                } else if scale > 4.0 {
+                                    scale = 4.0
+                                }
+                                lastScale = scale
+                            }
+                        }
+                )
+                .onTapGesture(count: 2) {
+                    withAnimation(.spring()) {
+                        if scale > 1.0 {
+                            scale = 1.0
+                            lastScale = 1.0
+                        } else {
+                            scale = 2.0
+                            lastScale = 2.0
+                        }
+                    }
+                }
         }
     }
 }

@@ -311,17 +311,17 @@ class TutorialManager: ObservableObject {
             ),
 
             Tutorial(
-                id: "swiping",
-                title: "Discover & Swipe",
-                description: "Swipe right to like someone, or left to pass. When you both like each other, it's a match!",
-                icon: "hand.point.up.left.fill",
+                id: "scrolling",
+                title: "Discover & Scroll",
+                description: "Scroll through profiles one by one. Tap the heart to like or tap the profile card for more details!",
+                icon: "arrow.up.arrow.down",
                 accentColor: .pink,
                 tips: [
-                    "Tap the profile to view more details",
-                    "Super Like to stand out",
-                    "You get 50 likes per day (unlimited with Premium)"
+                    "Scroll up and down to browse profiles",
+                    "Tap the heart button to like someone",
+                    "Tap the star to save profiles for later"
                 ],
-                interactiveDemo: AnyView(SwipeGestureDemo())
+                interactiveDemo: AnyView(ScrollBrowseDemo())
             ),
 
             Tutorial(
@@ -417,6 +417,90 @@ class TutorialManager: ObservableObject {
 }
 
 // MARK: - Interactive Demos
+
+struct ScrollBrowseDemo: View {
+    @State private var scrollOffset: CGFloat = 0
+    @State private var isLiked: [Bool] = [false, false, false]
+
+    private let demoProfiles = [
+        ("Sarah", "person.fill"),
+        ("Mike", "person.fill"),
+        ("Emma", "person.fill")
+    ]
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Text("Try it! Scroll through profiles")
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+            // Scrollable profile cards
+            ScrollView {
+                VStack(spacing: 12) {
+                    ForEach(Array(demoProfiles.enumerated()), id: \.offset) { index, profile in
+                        HStack(spacing: 12) {
+                            // Profile image
+                            ZStack {
+                                Circle()
+                                    .fill(Color.gray.opacity(0.2))
+                                    .frame(width: 50, height: 50)
+
+                                Image(systemName: profile.1)
+                                    .font(.title2)
+                                    .foregroundColor(.gray)
+                            }
+
+                            // Profile info
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(profile.0)
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+
+                                Text("Demo Profile")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+
+                            Spacer()
+
+                            // Like button
+                            Button {
+                                HapticManager.shared.impact(.light)
+                                withAnimation(.spring(response: 0.3)) {
+                                    isLiked[index].toggle()
+                                }
+                            } label: {
+                                Image(systemName: isLiked[index] ? "heart.fill" : "heart")
+                                    .font(.title3)
+                                    .foregroundColor(isLiked[index] ? .pink : .gray)
+                                    .scaleEffect(isLiked[index] ? 1.2 : 1.0)
+                            }
+                        }
+                        .padding(12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.white)
+                                .shadow(color: .black.opacity(0.05), radius: 4)
+                        )
+                    }
+                }
+                .padding(.horizontal, 4)
+            }
+            .frame(height: 200)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+
+            // Scroll indicator
+            HStack(spacing: 4) {
+                Image(systemName: "arrow.up.arrow.down")
+                    .font(.caption2)
+                Text("Scroll to see more")
+                    .font(.caption2)
+            }
+            .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: 280)
+    }
+}
 
 struct SwipeGestureDemo: View {
     @State private var offset: CGSize = .zero
