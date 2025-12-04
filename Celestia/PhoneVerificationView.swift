@@ -16,33 +16,57 @@ struct PhoneVerificationView: View {
 
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 24) {
-                    // Header
-                    header
+            ZStack {
+                // Premium gradient background
+                LinearGradient(
+                    colors: [
+                        Color.blue.opacity(0.08),
+                        Color.purple.opacity(0.05),
+                        Color(.systemBackground)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
 
-                    // Main content based on state
-                    switch service.verificationState {
-                    case .initial, .sendingCode:
-                        phoneNumberInput
-                    case .codeSent, .verifying:
-                        codeVerificationInput
-                    case .verified:
-                        successView
-                    case .failed:
-                        errorView
+                ScrollView {
+                    VStack(spacing: 24) {
+                        // Header
+                        header
+
+                        // Main content based on state
+                        switch service.verificationState {
+                        case .initial, .sendingCode:
+                            phoneNumberInput
+                        case .codeSent, .verifying:
+                            codeVerificationInput
+                        case .verified:
+                            successView
+                        case .failed:
+                            errorView
+                        }
+
+                        Spacer()
                     }
-
-                    Spacer()
+                    .padding()
                 }
-                .padding()
             }
             .navigationTitle("Phone Verification")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Cancel") {
+                    Button {
                         dismiss()
+                    } label: {
+                        Text("Cancel")
+                            .fontWeight(.medium)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.blue, .purple],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
                     }
                 }
             }
@@ -52,33 +76,71 @@ struct PhoneVerificationView: View {
     // MARK: - Header
 
     private var header: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 18) {
+            // Premium icon with radial glow
             ZStack {
+                // Outer radial glow
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                (service.verificationState == .verified ? Color.green : Color.blue).opacity(0.25),
+                                (service.verificationState == .verified ? Color.mint : Color.purple).opacity(0.15),
+                                Color.clear
+                            ],
+                            center: .center,
+                            startRadius: 25,
+                            endRadius: 90
+                        )
+                    )
+                    .frame(width: 180, height: 180)
+                    .scaleEffect(showSuccessAnimation ? 1.15 : 1.0)
+                    .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: showSuccessAnimation)
+
+                // Inner glow ring
+                Circle()
+                    .stroke(
+                        LinearGradient(
+                            colors: service.verificationState == .verified ?
+                            [.green.opacity(0.4), .mint.opacity(0.2)] :
+                            [.blue.opacity(0.3), .purple.opacity(0.2)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 2
+                    )
+                    .frame(width: 110, height: 110)
+
+                // Background circle
                 Circle()
                     .fill(
                         LinearGradient(
-                            colors: [.green.opacity(0.2), .blue.opacity(0.2)],
+                            colors: service.verificationState == .verified ?
+                            [.green.opacity(0.2), .blue.opacity(0.15)] :
+                            [.blue.opacity(0.15), .purple.opacity(0.1)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
                     .frame(width: 100, height: 100)
+                    .shadow(color: (service.verificationState == .verified ? Color.green : Color.blue).opacity(0.2), radius: 15)
 
                 Image(systemName: service.verificationState == .verified ? "checkmark.shield.fill" : "phone.fill")
-                    .font(.system(size: 50))
+                    .font(.system(size: 45, weight: .medium))
                     .foregroundStyle(
                         LinearGradient(
-                            colors: service.verificationState == .verified ? [.green, .blue] : [.blue, .purple],
+                            colors: service.verificationState == .verified ? [.green, .mint] : [.blue, .purple],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
-                    .scaleEffect(showSuccessAnimation ? 1.2 : 1.0)
+                    .shadow(color: (service.verificationState == .verified ? Color.green : Color.blue).opacity(0.3), radius: 8)
+                    .scaleEffect(showSuccessAnimation ? 1.1 : 1.0)
                     .animation(.spring(response: 0.3, dampingFraction: 0.6), value: showSuccessAnimation)
             }
 
             Text("Verify Your Phone Number")
-                .font(.title2.bold())
+                .font(.system(size: 24, weight: .bold, design: .rounded))
 
             Text("We'll send you a verification code via SMS")
                 .font(.subheadline)
@@ -87,30 +149,68 @@ struct PhoneVerificationView: View {
                 .padding(.horizontal)
         }
         .padding(.vertical)
+        .onAppear {
+            showSuccessAnimation = true
+        }
     }
 
     // MARK: - Phone Number Input
 
     private var phoneNumberInput: some View {
-        VStack(spacing: 20) {
-            VStack(alignment: .leading, spacing: 8) {
+        VStack(spacing: 22) {
+            VStack(alignment: .leading, spacing: 10) {
                 Text("Phone Number")
-                    .font(.subheadline.bold())
+                    .font(.subheadline)
+                    .fontWeight(.bold)
                     .foregroundColor(.secondary)
 
-                HStack {
-                    Image(systemName: "phone.fill")
-                        .foregroundColor(.secondary)
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [.blue.opacity(0.15), .purple.opacity(0.1)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 40, height: 40)
+
+                        Image(systemName: "phone.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.blue, .purple],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    }
 
                     TextField("+1 234 567 8900", text: $phoneInput)
                         .keyboardType(.phonePad)
                         .textContentType(.telephoneNumber)
                         .font(.body)
+                        .fontWeight(.medium)
                         .disabled(service.verificationState == .sendingCode)
                 }
-                .padding()
-                .background(Color(.systemGray6))
-                .cornerRadius(12)
+                .padding(14)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color(.systemBackground))
+                        .shadow(color: .blue.opacity(0.08), radius: 10, y: 5)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [.blue.opacity(0.2), .purple.opacity(0.15)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
 
                 Text("Enter your number in international format (e.g., +1234567890)")
                     .font(.caption)
@@ -123,31 +223,42 @@ struct PhoneVerificationView: View {
                     await sendCode()
                 }
             }) {
-                HStack {
+                HStack(spacing: 10) {
                     if service.verificationState == .sendingCode {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
                     } else {
                         Image(systemName: "paperplane.fill")
+                            .font(.system(size: 16, weight: .semibold))
                     }
                     Text(service.verificationState == .sendingCode ? "Sending..." : "Send Code")
+                        .fontWeight(.bold)
                 }
-                .font(.headline)
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
-                .padding()
+                .padding(.vertical, 18)
                 .background(
                     LinearGradient(
-                        colors: phoneInput.isEmpty ? [.gray, .gray] : [.blue, .purple],
+                        colors: phoneInput.isEmpty ? [.gray.opacity(0.5), .gray.opacity(0.4)] : [.blue, .purple],
                         startPoint: .leading,
                         endPoint: .trailing
                     )
                 )
-                .cornerRadius(12)
+                .cornerRadius(18)
+                .shadow(
+                    color: phoneInput.isEmpty ? .clear : .blue.opacity(0.4),
+                    radius: 12,
+                    y: 6
+                )
+                .shadow(
+                    color: phoneInput.isEmpty ? .clear : .purple.opacity(0.3),
+                    radius: 6,
+                    y: 3
+                )
             }
             .disabled(phoneInput.isEmpty || service.verificationState == .sendingCode)
 
-            // Example format
+            // Premium info box
             infoBox(
                 icon: "info.circle.fill",
                 title: "International Format Required",
@@ -160,26 +271,46 @@ struct PhoneVerificationView: View {
     // MARK: - Code Verification Input
 
     private var codeVerificationInput: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 22) {
             infoBox(
                 icon: "message.fill",
                 title: "Code Sent!",
                 message: "We sent a 6-digit code to \(phoneInput)"
             )
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 Text("Verification Code")
-                    .font(.subheadline.bold())
+                    .font(.subheadline)
+                    .fontWeight(.bold)
                     .foregroundColor(.secondary)
 
-                HStack {
-                    Image(systemName: "number.circle.fill")
-                        .foregroundColor(.secondary)
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [.green.opacity(0.15), .blue.opacity(0.1)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 40, height: 40)
+
+                        Image(systemName: "number.circle.fill")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.green, .blue],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    }
 
                     TextField("123456", text: $codeInput)
                         .keyboardType(.numberPad)
                         .textContentType(.oneTimeCode)
-                        .font(.title3.monospacedDigit())
+                        .font(.system(size: 22, weight: .bold, design: .monospaced))
                         .disabled(service.verificationState == .verifying)
                         .onChange(of: codeInput) { _, newValue in
                             // Auto-verify when 6 digits entered
@@ -190,9 +321,23 @@ struct PhoneVerificationView: View {
                             }
                         }
                 }
-                .padding()
-                .background(Color(.systemGray6))
-                .cornerRadius(12)
+                .padding(14)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color(.systemBackground))
+                        .shadow(color: .green.opacity(0.08), radius: 10, y: 5)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [.green.opacity(0.2), .blue.opacity(0.15)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
 
                 Text("Enter the 6-digit code we sent you")
                     .font(.caption)
@@ -205,39 +350,61 @@ struct PhoneVerificationView: View {
                     await verifyCode()
                 }
             }) {
-                HStack {
+                HStack(spacing: 10) {
                     if service.verificationState == .verifying {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
                     } else {
                         Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 16, weight: .semibold))
                     }
                     Text(service.verificationState == .verifying ? "Verifying..." : "Verify Code")
+                        .fontWeight(.bold)
                 }
-                .font(.headline)
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
-                .padding()
+                .padding(.vertical, 18)
                 .background(
                     LinearGradient(
-                        colors: codeInput.count != 6 ? [.gray, .gray] : [.green, .blue],
+                        colors: codeInput.count != 6 ? [.gray.opacity(0.5), .gray.opacity(0.4)] : [.green, .blue],
                         startPoint: .leading,
                         endPoint: .trailing
                     )
                 )
-                .cornerRadius(12)
+                .cornerRadius(18)
+                .shadow(
+                    color: codeInput.count != 6 ? .clear : .green.opacity(0.4),
+                    radius: 12,
+                    y: 6
+                )
+                .shadow(
+                    color: codeInput.count != 6 ? .clear : .blue.opacity(0.3),
+                    radius: 6,
+                    y: 3
+                )
             }
             .disabled(codeInput.count != 6 || service.verificationState == .verifying)
 
-            // Resend code button
+            // Premium resend code button
             Button(action: {
                 Task {
                     await resendCode()
                 }
             }) {
-                Text("Didn't receive code? Resend")
-                    .font(.subheadline)
-                    .foregroundColor(.blue)
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.caption)
+                    Text("Didn't receive code? Resend")
+                }
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.blue, .purple],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
             }
         }
         .padding(.top)
@@ -246,63 +413,101 @@ struct PhoneVerificationView: View {
     // MARK: - Success View
 
     private var successView: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 28) {
+            // Premium success icon with radial glow
             ZStack {
+                // Outer radial glow
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                Color.green.opacity(0.3),
+                                Color.mint.opacity(0.15),
+                                Color.clear
+                            ],
+                            center: .center,
+                            startRadius: 30,
+                            endRadius: 100
+                        )
+                    )
+                    .frame(width: 200, height: 200)
+                    .scaleEffect(showSuccessAnimation ? 1.1 : 0.8)
+
+                // Inner glow ring
+                Circle()
+                    .stroke(
+                        LinearGradient(
+                            colors: [.green.opacity(0.4), .mint.opacity(0.2)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 3
+                    )
+                    .frame(width: 130, height: 130)
+
                 Circle()
                     .fill(
                         LinearGradient(
-                            colors: [.green.opacity(0.2), .blue.opacity(0.2)],
+                            colors: [.green.opacity(0.2), .blue.opacity(0.15)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
                     .frame(width: 120, height: 120)
+                    .shadow(color: .green.opacity(0.3), radius: 20)
 
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 60))
+                    .font(.system(size: 55, weight: .medium))
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [.green, .blue],
+                            colors: [.green, .mint],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
+                    .shadow(color: .green.opacity(0.4), radius: 10)
             }
             .scaleEffect(showSuccessAnimation ? 1.0 : 0.5)
             .opacity(showSuccessAnimation ? 1.0 : 0.0)
-            .onAppear {
-                withAnimation(.spring(response: 0.6, dampingFraction: 0.6)) {
-                    showSuccessAnimation = true
-                }
-            }
 
             Text("Phone Verified!")
-                .font(.title.bold())
+                .font(.system(size: 28, weight: .bold, design: .rounded))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.green, .mint],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
 
             Text("Your phone number has been successfully verified")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
+                .padding(.horizontal)
 
             Button(action: {
                 dismiss()
             }) {
-                HStack {
+                HStack(spacing: 10) {
                     Image(systemName: "checkmark")
+                        .font(.system(size: 16, weight: .bold))
                     Text("Done")
+                        .fontWeight(.bold)
                 }
-                .font(.headline)
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
-                .padding()
+                .padding(.vertical, 18)
                 .background(
                     LinearGradient(
-                        colors: [.green, .blue],
+                        colors: [.green, .mint, .green.opacity(0.8)],
                         startPoint: .leading,
                         endPoint: .trailing
                     )
                 )
-                .cornerRadius(12)
+                .cornerRadius(18)
+                .shadow(color: .green.opacity(0.4), radius: 12, y: 6)
+                .shadow(color: .mint.opacity(0.3), radius: 6, y: 3)
             }
         }
         .padding(.top, 40)
@@ -311,7 +516,7 @@ struct PhoneVerificationView: View {
     // MARK: - Error View
 
     private var errorView: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 22) {
             infoBox(
                 icon: "exclamationmark.triangle.fill",
                 title: "Verification Failed",
@@ -324,22 +529,25 @@ struct PhoneVerificationView: View {
                 phoneInput = ""
                 codeInput = ""
             }) {
-                HStack {
+                HStack(spacing: 10) {
                     Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 16, weight: .semibold))
                     Text("Try Again")
+                        .fontWeight(.bold)
                 }
-                .font(.headline)
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
-                .padding()
+                .padding(.vertical, 18)
                 .background(
                     LinearGradient(
-                        colors: [.blue, .purple],
+                        colors: [.blue, .purple, .blue.opacity(0.8)],
                         startPoint: .leading,
                         endPoint: .trailing
                     )
                 )
-                .cornerRadius(12)
+                .cornerRadius(18)
+                .shadow(color: .blue.opacity(0.4), radius: 12, y: 6)
+                .shadow(color: .purple.opacity(0.3), radius: 6, y: 3)
             }
         }
         .padding(.top)
@@ -348,25 +556,59 @@ struct PhoneVerificationView: View {
     // MARK: - Helper Views
 
     private func infoBox(icon: String, title: String, message: String, color: Color = .blue) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundColor(color)
+        HStack(alignment: .top, spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [color.opacity(0.2), color.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 40, height: 40)
+
+                Image(systemName: icon)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [color, color.opacity(0.7)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+            }
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.subheadline.bold())
+                    .font(.subheadline)
+                    .fontWeight(.bold)
                     .foregroundColor(color)
 
                 Text(message)
                     .font(.caption)
                     .foregroundColor(.secondary)
+                    .lineSpacing(2)
             }
         }
-        .padding()
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(color.opacity(0.1))
-        .cornerRadius(12)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(.systemBackground))
+                .shadow(color: color.opacity(0.1), radius: 10, y: 5)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [color.opacity(0.3), color.opacity(0.15)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
     }
 
     // MARK: - Actions

@@ -13,6 +13,7 @@ struct TutorialView: View {
     @Environment(\.dismiss) var dismiss
     @State private var currentPage = 0
     @State private var showingTutorial = false
+    @State private var animateBackground = false
 
     let tutorials: [Tutorial]
     let completion: () -> Void
@@ -24,26 +25,78 @@ struct TutorialView: View {
 
     var body: some View {
         ZStack {
-            // Background gradient
+            // Premium background with animated gradient
             LinearGradient(
-                colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.05)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
+                colors: [
+                    Color.purple.opacity(0.15),
+                    Color.pink.opacity(0.08),
+                    Color.blue.opacity(0.05)
+                ],
+                startPoint: animateBackground ? .topLeading : .topTrailing,
+                endPoint: animateBackground ? .bottomTrailing : .bottomLeading
             )
             .ignoresSafeArea()
+            .animation(.easeInOut(duration: 8).repeatForever(autoreverses: true), value: animateBackground)
+
+            // Decorative floating orbs
+            GeometryReader { geometry in
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [Color.purple.opacity(0.15), Color.clear],
+                            center: .center,
+                            startRadius: 20,
+                            endRadius: 150
+                        )
+                    )
+                    .frame(width: 300, height: 300)
+                    .offset(x: -50, y: -100)
+                    .blur(radius: 2)
+
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [Color.pink.opacity(0.12), Color.clear],
+                            center: .center,
+                            startRadius: 20,
+                            endRadius: 120
+                        )
+                    )
+                    .frame(width: 240, height: 240)
+                    .offset(x: geometry.size.width - 100, y: geometry.size.height - 200)
+                    .blur(radius: 2)
+            }
 
             VStack(spacing: 0) {
-                // Skip button
+                // Premium skip button
                 HStack {
                     Spacer()
 
                     Button {
                         completeTutorial()
                     } label: {
-                        Text("Skip")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundColor(.purple)
+                        HStack(spacing: 6) {
+                            Text("Skip")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+
+                            Image(systemName: "arrow.right")
+                                .font(.caption)
+                        }
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule()
+                                .fill(Color.white.opacity(0.8))
+                                .shadow(color: .purple.opacity(0.15), radius: 8, y: 4)
+                        )
                     }
                     .padding()
                 }
@@ -57,63 +110,86 @@ struct TutorialView: View {
                 .tabViewStyle(.page(indexDisplayMode: .always))
                 .indexViewStyle(.page(backgroundDisplayMode: .always))
 
-                // Navigation buttons
+                // Premium navigation buttons
                 HStack(spacing: 16) {
                     if currentPage > 0 {
                         Button {
-                            withAnimation {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                                 currentPage -= 1
                             }
                         } label: {
-                            HStack {
+                            HStack(spacing: 8) {
                                 Image(systemName: "chevron.left")
+                                    .font(.system(size: 14, weight: .bold))
                                 Text("Back")
                             }
                             .fontWeight(.semibold)
-                            .foregroundColor(.purple)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.purple, .pink],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(Color.white)
-                            .cornerRadius(16)
+                            .padding(.vertical, 18)
+                            .background(
+                                RoundedRectangle(cornerRadius: 18)
+                                    .fill(Color.white)
+                                    .shadow(color: .purple.opacity(0.1), radius: 8, y: 4)
+                                    .shadow(color: .black.opacity(0.05), radius: 2, y: 1)
+                            )
                             .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(Color.purple, lineWidth: 2)
+                                RoundedRectangle(cornerRadius: 18)
+                                    .strokeBorder(
+                                        LinearGradient(
+                                            colors: [.purple.opacity(0.5), .pink.opacity(0.5)],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        ),
+                                        lineWidth: 2
+                                    )
                             )
                         }
                     }
 
                     Button {
                         if currentPage < tutorials.count - 1 {
-                            withAnimation {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                                 currentPage += 1
                             }
                         } else {
                             completeTutorial()
                         }
                     } label: {
-                        HStack {
+                        HStack(spacing: 8) {
                             Text(currentPage < tutorials.count - 1 ? "Next" : "Get Started")
-                                .fontWeight(.semibold)
+                                .fontWeight(.bold)
 
                             Image(systemName: currentPage < tutorials.count - 1 ? "chevron.right" : "checkmark")
+                                .font(.system(size: 14, weight: .bold))
                         }
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
+                        .padding(.vertical, 18)
                         .background(
                             LinearGradient(
-                                colors: [.purple, .pink],
+                                colors: [.purple, .pink, .purple.opacity(0.8)],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
                         )
-                        .cornerRadius(16)
-                        .shadow(color: .purple.opacity(0.3), radius: 10, y: 5)
+                        .cornerRadius(18)
+                        .shadow(color: .purple.opacity(0.4), radius: 12, y: 6)
+                        .shadow(color: .pink.opacity(0.3), radius: 6, y: 3)
                     }
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 32)
             }
+        }
+        .onAppear {
+            animateBackground = true
         }
     }
 
@@ -130,20 +206,66 @@ struct TutorialPageView: View {
     let tutorial: Tutorial
     let pageIndex: Int
     let totalPages: Int
+    @State private var animateIcon = false
+    @State private var animateTips = false
 
     var body: some View {
         VStack(spacing: 32) {
             Spacer()
 
-            // Icon/Animation
+            // Premium Icon with radial glow
             ZStack {
+                // Outer radial glow
                 Circle()
-                    .fill(tutorial.accentColor.opacity(0.1))
-                    .frame(width: 200, height: 200)
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                tutorial.accentColor.opacity(0.25),
+                                tutorial.accentColor.opacity(0.1),
+                                Color.clear
+                            ],
+                            center: .center,
+                            startRadius: 40,
+                            endRadius: 140
+                        )
+                    )
+                    .frame(width: 280, height: 280)
+                    .scaleEffect(animateIcon ? 1.05 : 0.95)
+                    .animation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true), value: animateIcon)
+
+                // Inner glow ring
+                Circle()
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                tutorial.accentColor.opacity(0.3),
+                                tutorial.accentColor.opacity(0.1)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 2
+                    )
+                    .frame(width: 180, height: 180)
+
+                // Background circle
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                tutorial.accentColor.opacity(0.15),
+                                tutorial.accentColor.opacity(0.08)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 160, height: 160)
+                    .shadow(color: tutorial.accentColor.opacity(0.2), radius: 20)
 
                 if let animation = tutorial.animation {
                     animation
-                        .font(.system(size: 100))
+                        .font(.system(size: 80, weight: .medium))
                         .foregroundStyle(
                             LinearGradient(
                                 colors: [tutorial.accentColor, tutorial.accentColor.opacity(0.7)],
@@ -151,9 +273,10 @@ struct TutorialPageView: View {
                                 endPoint: .bottomTrailing
                             )
                         )
+                        .shadow(color: tutorial.accentColor.opacity(0.3), radius: 10)
                 } else {
                     Image(systemName: tutorial.icon)
-                        .font(.system(size: 100))
+                        .font(.system(size: 80, weight: .medium))
                         .foregroundStyle(
                             LinearGradient(
                                 colors: [tutorial.accentColor, tutorial.accentColor.opacity(0.7)],
@@ -161,13 +284,22 @@ struct TutorialPageView: View {
                                 endPoint: .bottomTrailing
                             )
                         )
+                        .shadow(color: tutorial.accentColor.opacity(0.3), radius: 10)
+                        .symbolEffect(.pulse, options: .repeating)
                 }
             }
 
             VStack(spacing: 16) {
+                // Premium title with gradient
                 Text(tutorial.title)
-                    .font(.title)
-                    .fontWeight(.bold)
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.primary, .primary.opacity(0.8)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
                     .multilineTextAlignment(.center)
 
                 Text(tutorial.description)
@@ -175,6 +307,7 @@ struct TutorialPageView: View {
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
+                    .lineSpacing(4)
 
                 // Interactive demo
                 if let interactiveDemo = tutorial.interactiveDemo {
@@ -182,33 +315,76 @@ struct TutorialPageView: View {
                         .padding(.top, 20)
                 }
 
-                // Tips
+                // Premium Tips section
                 if !tutorial.tips.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        ForEach(tutorial.tips, id: \.self) { tip in
-                            HStack(alignment: .top, spacing: 12) {
-                                Image(systemName: "lightbulb.fill")
-                                    .font(.caption)
-                                    .foregroundColor(.yellow)
+                    VStack(alignment: .leading, spacing: 14) {
+                        ForEach(Array(tutorial.tips.enumerated()), id: \.element) { index, tip in
+                            HStack(alignment: .top, spacing: 14) {
+                                // Gradient lightbulb icon
+                                ZStack {
+                                    Circle()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [.yellow.opacity(0.3), .orange.opacity(0.2)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .frame(width: 28, height: 28)
+
+                                    Image(systemName: "lightbulb.fill")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(
+                                            LinearGradient(
+                                                colors: [.yellow, .orange],
+                                                startPoint: .top,
+                                                endPoint: .bottom
+                                            )
+                                        )
+                                }
+                                .scaleEffect(animateTips ? 1.0 : 0.8)
+                                .opacity(animateTips ? 1.0 : 0)
+                                .animation(.spring(response: 0.4).delay(Double(index) * 0.1), value: animateTips)
 
                                 Text(tip)
-                                    .font(.caption)
+                                    .font(.subheadline)
                                     .foregroundColor(.secondary)
+                                    .lineSpacing(2)
 
                                 Spacer()
                             }
                         }
                     }
-                    .padding()
-                    .background(Color.white.opacity(0.5))
-                    .cornerRadius(12)
-                    .padding(.horizontal, 32)
+                    .padding(16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color.white.opacity(0.7))
+                            .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .strokeBorder(
+                                LinearGradient(
+                                    colors: [.yellow.opacity(0.3), .orange.opacity(0.2)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1
+                            )
+                    )
+                    .padding(.horizontal, 24)
                 }
             }
 
             Spacer()
         }
         .padding()
+        .onAppear {
+            animateIcon = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                animateTips = true
+            }
+        }
     }
 }
 
@@ -423,35 +599,71 @@ struct ScrollBrowseDemo: View {
     @State private var isLiked: [Bool] = [false, false, false]
 
     private let demoProfiles = [
-        ("Sarah", "person.fill"),
-        ("Mike", "person.fill"),
-        ("Emma", "person.fill")
+        ("Sarah", "person.fill", Color.pink),
+        ("Mike", "person.fill", Color.blue),
+        ("Emma", "person.fill", Color.purple)
     ]
 
     var body: some View {
-        VStack(spacing: 12) {
-            Text("Try it! Scroll through profiles")
-                .font(.caption)
-                .foregroundColor(.secondary)
+        VStack(spacing: 14) {
+            // Premium header
+            HStack(spacing: 6) {
+                Image(systemName: "hand.draw.fill")
+                    .font(.caption)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.pink, .purple],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                Text("Try it! Scroll through profiles")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
+            }
 
-            // Scrollable profile cards
+            // Premium scrollable profile cards
             ScrollView {
                 VStack(spacing: 12) {
                     ForEach(Array(demoProfiles.enumerated()), id: \.offset) { index, profile in
-                        HStack(spacing: 12) {
-                            // Profile image
+                        HStack(spacing: 14) {
+                            // Premium profile image with gradient ring
                             ZStack {
                                 Circle()
-                                    .fill(Color.gray.opacity(0.2))
-                                    .frame(width: 50, height: 50)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [profile.2.opacity(0.2), profile.2.opacity(0.1)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 52, height: 52)
+
+                                Circle()
+                                    .strokeBorder(
+                                        LinearGradient(
+                                            colors: [profile.2.opacity(0.6), profile.2.opacity(0.3)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        lineWidth: 2
+                                    )
+                                    .frame(width: 52, height: 52)
 
                                 Image(systemName: profile.1)
-                                    .font(.title2)
-                                    .foregroundColor(.gray)
+                                    .font(.title3)
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [profile.2, profile.2.opacity(0.7)],
+                                            startPoint: .top,
+                                            endPoint: .bottom
+                                        )
+                                    )
                             }
 
                             // Profile info
-                            VStack(alignment: .leading, spacing: 2) {
+                            VStack(alignment: .leading, spacing: 3) {
                                 Text(profile.0)
                                     .font(.subheadline)
                                     .fontWeight(.semibold)
@@ -463,42 +675,70 @@ struct ScrollBrowseDemo: View {
 
                             Spacer()
 
-                            // Like button
+                            // Premium like button with glow
                             Button {
                                 HapticManager.shared.impact(.light)
                                 withAnimation(.spring(response: 0.3)) {
                                     isLiked[index].toggle()
                                 }
                             } label: {
-                                Image(systemName: isLiked[index] ? "heart.fill" : "heart")
-                                    .font(.title3)
-                                    .foregroundColor(isLiked[index] ? .pink : .gray)
-                                    .scaleEffect(isLiked[index] ? 1.2 : 1.0)
+                                ZStack {
+                                    if isLiked[index] {
+                                        Circle()
+                                            .fill(Color.pink.opacity(0.15))
+                                            .frame(width: 40, height: 40)
+                                    }
+
+                                    Image(systemName: isLiked[index] ? "heart.fill" : "heart")
+                                        .font(.title3)
+                                        .foregroundStyle(
+                                            isLiked[index] ?
+                                            LinearGradient(colors: [.pink, .red], startPoint: .top, endPoint: .bottom) :
+                                            LinearGradient(colors: [.gray, .gray.opacity(0.7)], startPoint: .top, endPoint: .bottom)
+                                        )
+                                        .scaleEffect(isLiked[index] ? 1.15 : 1.0)
+                                        .shadow(color: isLiked[index] ? .pink.opacity(0.4) : .clear, radius: 6)
+                                }
                             }
                         }
-                        .padding(12)
+                        .padding(14)
                         .background(
-                            RoundedRectangle(cornerRadius: 12)
+                            RoundedRectangle(cornerRadius: 16)
                                 .fill(Color.white)
-                                .shadow(color: .black.opacity(0.05), radius: 4)
+                                .shadow(color: .black.opacity(0.06), radius: 8, y: 4)
+                                .shadow(color: .purple.opacity(0.05), radius: 4, y: 2)
                         )
                     }
                 }
                 .padding(.horizontal, 4)
+                .padding(.vertical, 4)
             }
-            .frame(height: 200)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .frame(height: 210)
+            .clipShape(RoundedRectangle(cornerRadius: 18))
 
-            // Scroll indicator
-            HStack(spacing: 4) {
+            // Premium scroll indicator
+            HStack(spacing: 6) {
                 Image(systemName: "arrow.up.arrow.down")
                     .font(.caption2)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
                 Text("Scroll to see more")
                     .font(.caption2)
+                    .foregroundColor(.secondary)
             }
-            .foregroundColor(.secondary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+                Capsule()
+                    .fill(Color.purple.opacity(0.08))
+            )
         }
-        .frame(maxWidth: 280)
+        .frame(maxWidth: 300)
     }
 }
 
@@ -507,28 +747,78 @@ struct SwipeGestureDemo: View {
     @State private var scale: CGFloat = 1.0
 
     var body: some View {
-        VStack(spacing: 12) {
-            Text("Try it! Swipe left or right")
-                .font(.caption)
-                .foregroundColor(.secondary)
+        VStack(spacing: 14) {
+            // Premium header
+            HStack(spacing: 6) {
+                Image(systemName: "hand.draw.fill")
+                    .font(.caption)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.pink, .purple],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                Text("Try it! Swipe left or right")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
+            }
 
             ZStack {
-                // Card
-                RoundedRectangle(cornerRadius: 20)
+                // Premium Card with gradient border
+                RoundedRectangle(cornerRadius: 24)
                     .fill(Color.white)
                     .frame(width: 200, height: 280)
                     .overlay(
-                        VStack {
-                            Image(systemName: "person.fill")
-                                .font(.system(size: 60))
-                                .foregroundColor(.gray)
+                        RoundedRectangle(cornerRadius: 24)
+                            .strokeBorder(
+                                LinearGradient(
+                                    colors: [.purple.opacity(0.2), .pink.opacity(0.2)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 2
+                            )
+                    )
+                    .overlay(
+                        VStack(spacing: 12) {
+                            // Premium avatar
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [.purple.opacity(0.15), .pink.opacity(0.1)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 80, height: 80)
+
+                                Image(systemName: "person.fill")
+                                    .font(.system(size: 40))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [.purple, .pink],
+                                            startPoint: .top,
+                                            endPoint: .bottom
+                                        )
+                                    )
+                            }
 
                             Text("Demo Profile")
                                 .font(.headline)
+                                .fontWeight(.semibold)
 
                             Text("Swipe me!")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.purple.opacity(0.1))
+                                )
                         }
                     )
                     .rotationEffect(.degrees(Double(offset.width / 20)))
@@ -562,20 +852,45 @@ struct SwipeGestureDemo: View {
                                 }
                             }
                     )
-                    .shadow(color: .black.opacity(0.1), radius: 10)
+                    .shadow(color: .purple.opacity(0.15), radius: 15, y: 8)
+                    .shadow(color: .black.opacity(0.08), radius: 5, y: 3)
 
-                // Like/Nope indicators
+                // Premium Like/Nope indicators
                 if offset.width > 20 {
                     Text("LIKE")
                         .font(.title)
                         .fontWeight(.bold)
-                        .foregroundColor(.green)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.green, .mint],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule()
+                                .fill(Color.green.opacity(0.15))
+                        )
                         .opacity(Double(offset.width / 100))
                 } else if offset.width < -20 {
                     Text("NOPE")
                         .font(.title)
                         .fontWeight(.bold)
-                        .foregroundColor(.red)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.red, .orange],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule()
+                                .fill(Color.red.opacity(0.15))
+                        )
                         .opacity(Double(abs(offset.width) / 100))
                 }
             }
@@ -586,47 +901,116 @@ struct SwipeGestureDemo: View {
 
 struct MessageDemo: View {
     @State private var message = ""
+    @State private var showBubble = false
 
     var body: some View {
-        VStack(spacing: 12) {
-            Text("Send your first message")
-                .font(.caption)
-                .foregroundColor(.secondary)
+        VStack(spacing: 14) {
+            // Premium header
+            HStack(spacing: 6) {
+                Image(systemName: "bubble.left.and.bubble.right.fill")
+                    .font(.caption)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.blue, .purple],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                Text("Send your first message")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
+            }
 
-            VStack(alignment: .leading, spacing: 8) {
-                // Sample message bubble
+            VStack(alignment: .leading, spacing: 12) {
+                // Premium sample message bubble
                 HStack {
                     Spacer()
                     Text("Hey! Nice to match with you 👋")
-                        .padding(12)
-                        .background(Color.purple.opacity(0.2))
-                        .cornerRadius(16)
+                        .font(.subheadline)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .clipShape(
+                            .rect(
+                                topLeadingRadius: 20,
+                                bottomLeadingRadius: 20,
+                                bottomTrailingRadius: 6,
+                                topTrailingRadius: 20
+                            )
+                        )
+                        .shadow(color: .purple.opacity(0.25), radius: 8, y: 4)
+                        .scaleEffect(showBubble ? 1.0 : 0.8)
+                        .opacity(showBubble ? 1.0 : 0)
+                        .animation(.spring(response: 0.5).delay(0.2), value: showBubble)
                 }
 
-                // Input field
-                HStack {
+                // Premium input field
+                HStack(spacing: 12) {
                     TextField("Type a message...", text: $message)
-                        .padding(12)
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(20)
+                        .font(.subheadline)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 22)
+                                .fill(Color.gray.opacity(0.08))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 22)
+                                .strokeBorder(
+                                    LinearGradient(
+                                        colors: [.purple.opacity(0.2), .pink.opacity(0.2)],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    ),
+                                    lineWidth: 1
+                                )
+                        )
 
+                    // Premium send button
                     Button {
-                        // Demo action
                         HapticManager.shared.impact(.light)
                         message = ""
                     } label: {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.title2)
-                            .foregroundColor(message.isEmpty ? .gray : .purple)
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    message.isEmpty ?
+                                    LinearGradient(colors: [.gray.opacity(0.3), .gray.opacity(0.2)], startPoint: .top, endPoint: .bottom) :
+                                    LinearGradient(colors: [.purple, .pink], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                )
+                                .frame(width: 40, height: 40)
+                                .shadow(color: message.isEmpty ? .clear : .purple.opacity(0.3), radius: 8, y: 4)
+
+                            Image(systemName: "arrow.up")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(.white)
+                        }
                     }
+                    .scaleEffect(message.isEmpty ? 1.0 : 1.05)
+                    .animation(.spring(response: 0.3), value: message.isEmpty)
                 }
             }
-            .padding()
-            .background(Color.white)
-            .cornerRadius(16)
-            .shadow(color: .black.opacity(0.05), radius: 5)
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color.white)
+                    .shadow(color: .purple.opacity(0.1), radius: 12, y: 6)
+                    .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
+            )
         }
-        .frame(maxWidth: 300)
+        .frame(maxWidth: 320)
+        .onAppear {
+            showBubble = true
+        }
     }
 }
 

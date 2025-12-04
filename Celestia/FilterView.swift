@@ -17,63 +17,98 @@ struct FilterView: View {
     @State private var lookingFor = "Everyone"
     @State private var isLoading = false
     @State private var showSaveConfirmation = false
+    @State private var animateHeader = false
 
     let lookingForOptions = ["Men", "Women", "Everyone"]
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 24) {
-                    // Age Range Section
-                    ageRangeSection
+            ZStack {
+                // Premium gradient background
+                LinearGradient(
+                    colors: [
+                        Color.purple.opacity(0.08),
+                        Color.pink.opacity(0.05),
+                        Color(.systemGroupedBackground)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
 
-                    // Gender Preference Section
-                    genderPreferenceSection
+                ScrollView {
+                    VStack(spacing: 24) {
+                        // Age Range Section
+                        ageRangeSection
+
+                        // Gender Preference Section
+                        genderPreferenceSection
+                    }
+                    .padding()
                 }
-                .padding()
             }
-            .background(Color(.systemGroupedBackground))
             .navigationTitle("Filters")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Reset") {
+                    Button {
                         resetFilters()
+                    } label: {
+                        Text("Reset")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.purple, .pink],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
                     }
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                // Save Button
+                // Premium Save Button
                 Button {
                     applyFilters()
                 } label: {
-                    HStack {
+                    HStack(spacing: 10) {
                         if isLoading {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         } else {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 18, weight: .semibold))
                             Text("Save & Apply")
-                                .fontWeight(.semibold)
+                                .fontWeight(.bold)
                         }
                     }
                     .frame(maxWidth: .infinity)
-                    .padding()
+                    .padding(.vertical, 18)
                     .background(
                         LinearGradient(
-                            colors: [.purple, .pink],
+                            colors: [.purple, .pink, .purple.opacity(0.8)],
                             startPoint: .leading,
                             endPoint: .trailing
                         )
                     )
                     .foregroundColor(.white)
-                    .cornerRadius(12)
+                    .cornerRadius(18)
+                    .shadow(color: .purple.opacity(0.4), radius: 12, y: 6)
+                    .shadow(color: .pink.opacity(0.3), radius: 6, y: 3)
                 }
                 .disabled(isLoading)
-                .padding()
-                .background(Color(.systemGroupedBackground))
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+                .background(
+                    Rectangle()
+                        .fill(.ultraThinMaterial)
+                        .ignoresSafeArea()
+                )
             }
             .onAppear {
                 loadCurrentPreferences()
+                animateHeader = true
             }
             .alert("Preferences Saved", isPresented: $showSaveConfirmation) {
                 Button("OK", role: .cancel) {
@@ -89,21 +124,46 @@ struct FilterView: View {
 
     private var ageRangeSection: some View {
         VStack(spacing: 16) {
-            // Header with icon
-            HStack(spacing: 12) {
+            // Premium header with radial glow icon
+            HStack(spacing: 14) {
                 ZStack {
+                    // Radial glow
                     Circle()
-                        .fill(Color.pink.opacity(0.12))
-                        .frame(width: 40, height: 40)
+                        .fill(
+                            RadialGradient(
+                                colors: [Color.pink.opacity(0.3), Color.pink.opacity(0.1), Color.clear],
+                                center: .center,
+                                startRadius: 5,
+                                endRadius: 30
+                            )
+                        )
+                        .frame(width: 60, height: 60)
+
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.pink.opacity(0.2), Color.purple.opacity(0.15)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 44, height: 44)
+
                     Image(systemName: "heart.circle.fill")
-                        .font(.title3)
-                        .foregroundColor(.pink)
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.pink, .purple],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                 }
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text("Age Preference")
                         .font(.subheadline)
-                        .fontWeight(.semibold)
+                        .fontWeight(.bold)
                     Text("Who would you like to meet?")
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -111,12 +171,12 @@ struct FilterView: View {
 
                 Spacer()
 
-                // Age range badge
+                // Premium age range badge
                 Text("\(ageRangeMin) - \(ageRangeMax)")
                     .font(.subheadline.weight(.bold))
                     .foregroundColor(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
                     .background(
                         LinearGradient(
                             colors: [.pink, .purple],
@@ -124,7 +184,8 @@ struct FilterView: View {
                             endPoint: .trailing
                         )
                     )
-                    .cornerRadius(16)
+                    .clipShape(Capsule())
+                    .shadow(color: .pink.opacity(0.3), radius: 6, y: 3)
             }
 
             // Age pickers
@@ -133,6 +194,7 @@ struct FilterView: View {
                 VStack(spacing: 8) {
                     Text("From")
                         .font(.caption)
+                        .fontWeight(.medium)
                         .foregroundColor(.secondary)
 
                     Picker("Min Age", selection: $ageRangeMin) {
@@ -150,15 +212,27 @@ struct FilterView: View {
                     }
                 }
 
-                // Divider
-                Text("to")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+                // Premium divider
+                VStack {
+                    Image(systemName: "arrow.left.arrow.right")
+                        .font(.caption)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple.opacity(0.6), .pink.opacity(0.6)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                    Text("to")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
 
                 // Max age
                 VStack(spacing: 8) {
                     Text("To")
                         .font(.caption)
+                        .fontWeight(.medium)
                         .foregroundColor(.secondary)
 
                     Picker("Max Age", selection: $ageRangeMax) {
@@ -178,30 +252,70 @@ struct FilterView: View {
             }
             .frame(maxWidth: .infinity)
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
+        .padding(18)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.systemBackground))
+                .shadow(color: .purple.opacity(0.08), radius: 12, y: 6)
+                .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [.pink.opacity(0.2), .purple.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
     }
 
     // MARK: - Gender Preference Section
 
     private var genderPreferenceSection: some View {
-        VStack(spacing: 16) {
-            // Header with icon
-            HStack(spacing: 12) {
+        VStack(spacing: 18) {
+            // Premium header with radial glow icon
+            HStack(spacing: 14) {
                 ZStack {
+                    // Radial glow
                     Circle()
-                        .fill(Color.purple.opacity(0.12))
-                        .frame(width: 40, height: 40)
+                        .fill(
+                            RadialGradient(
+                                colors: [Color.purple.opacity(0.3), Color.purple.opacity(0.1), Color.clear],
+                                center: .center,
+                                startRadius: 5,
+                                endRadius: 30
+                            )
+                        )
+                        .frame(width: 60, height: 60)
+
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.purple.opacity(0.2), Color.pink.opacity(0.15)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 44, height: 44)
+
                     Image(systemName: "person.2.fill")
-                        .font(.title3)
-                        .foregroundColor(.purple)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                 }
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text("Looking For")
                         .font(.subheadline)
-                        .fontWeight(.semibold)
+                        .fontWeight(.bold)
                     Text("Select your preference")
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -210,17 +324,75 @@ struct FilterView: View {
                 Spacer()
             }
 
-            // Gender picker
-            Picker("Looking for", selection: $lookingFor) {
+            // Premium gender picker options
+            HStack(spacing: 12) {
                 ForEach(lookingForOptions, id: \.self) { option in
-                    Text(option).tag(option)
+                    Button {
+                        withAnimation(.spring(response: 0.3)) {
+                            lookingFor = option
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: iconForOption(option))
+                                .font(.system(size: 14, weight: .semibold))
+
+                            Text(option)
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(
+                            lookingFor == option ?
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ) :
+                            LinearGradient(
+                                colors: [Color(.systemGray6), Color(.systemGray6)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .foregroundColor(lookingFor == option ? .white : .secondary)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .shadow(
+                            color: lookingFor == option ? .purple.opacity(0.3) : .clear,
+                            radius: 8,
+                            y: 4
+                        )
+                    }
                 }
             }
-            .pickerStyle(.segmented)
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
+        .padding(18)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.systemBackground))
+                .shadow(color: .purple.opacity(0.08), radius: 12, y: 6)
+                .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [.purple.opacity(0.2), .pink.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
+    }
+
+    private func iconForOption(_ option: String) -> String {
+        switch option {
+        case "Men": return "person.fill"
+        case "Women": return "person.fill"
+        case "Everyone": return "person.2.fill"
+        default: return "person.fill"
+        }
     }
 
     // MARK: - Actions
