@@ -160,7 +160,7 @@ class NetworkManager: NSObject {
             // Log critical security warning
             Logger.shared.error(
                 "⚠️ Certificate pinning not configured in production build. App is vulnerable to MITM attacks.",
-                category: .network
+                category: .networking
             )
         }
 
