@@ -21,8 +21,17 @@ struct ProfileViewersView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(.systemGroupedBackground)
-                    .ignoresSafeArea()
+                // Premium gradient background
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.95, green: 0.94, blue: 1.0),
+                        Color(red: 0.98, green: 0.97, blue: 1.0),
+                        Color(.systemGroupedBackground)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
 
                 if viewModel.isLoading {
                     loadingView
@@ -38,9 +47,23 @@ struct ProfileViewersView: View {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
                         dismiss()
+                        HapticManager.shared.impact(.light)
                     } label: {
-                        Image(systemName: "xmark")
-                            .foregroundColor(.primary)
+                        ZStack {
+                            Circle()
+                                .fill(Color(.systemBackground))
+                                .frame(width: 36, height: 36)
+                                .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
+                            Image(systemName: "xmark")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.purple, .pink],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                        }
                     }
                 }
             }
@@ -80,34 +103,75 @@ struct ProfileViewersView: View {
     // MARK: - Stats Card
 
     private var statsCard: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 20) {
+        VStack(spacing: 16) {
+            // Header
+            HStack {
+                HStack(spacing: 8) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.purple.opacity(0.15), Color.pink.opacity(0.1)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 32, height: 32)
+                        Image(systemName: "chart.bar.fill")
+                            .font(.system(size: 14))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.purple, .pink],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    }
+                    Text("Your Stats")
+                        .font(.headline.weight(.semibold))
+                }
+                Spacer()
+            }
+
+            HStack(spacing: 16) {
                 ViewerStatBox(
                     value: "\(viewModel.viewers.count)",
                     label: "Total Views",
                     icon: "eye.fill",
-                    color: .blue
+                    gradientColors: [.blue, .cyan]
                 )
 
                 ViewerStatBox(
                     value: "\(viewModel.todayCount)",
                     label: "Today",
                     icon: "calendar",
-                    color: .green
+                    gradientColors: [.green, .mint]
                 )
 
                 ViewerStatBox(
                     value: "\(viewModel.weekCount)",
                     label: "This Week",
                     icon: "chart.line.uptrend.xyaxis",
-                    color: .purple
+                    gradientColors: [.purple, .pink]
                 )
             }
         }
-        .padding()
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 5, y: 2)
+        .padding(20)
+        .background(Color(.systemBackground))
+        .cornerRadius(20)
+        .shadow(color: .black.opacity(0.06), radius: 12, y: 6)
+        .shadow(color: .purple.opacity(0.08), radius: 20, y: 10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(
+                    LinearGradient(
+                        colors: [Color.purple.opacity(0.15), Color.pink.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
         .padding(.horizontal)
     }
 
@@ -162,10 +226,33 @@ struct ProfileViewersView: View {
     // MARK: - Loading View
 
     private var loadingView: some View {
-        VStack(spacing: 16) {
-            ProgressView()
+        VStack(spacing: 20) {
+            ZStack {
+                Circle()
+                    .stroke(Color.gray.opacity(0.2), lineWidth: 4)
+                    .frame(width: 56, height: 56)
+
+                Circle()
+                    .trim(from: 0, to: 0.7)
+                    .stroke(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ),
+                        style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                    )
+                    .frame(width: 56, height: 56)
+                    .rotationEffect(.degrees(-90))
+                    .animation(
+                        .linear(duration: 1)
+                        .repeatForever(autoreverses: false),
+                        value: viewModel.isLoading
+                    )
+            }
+
             Text("Loading viewers...")
-                .font(.subheadline)
+                .font(.subheadline.weight(.medium))
                 .foregroundColor(.secondary)
         }
     }
@@ -174,14 +261,50 @@ struct ProfileViewersView: View {
 
     private var emptyStateView: some View {
         VStack(spacing: 24) {
-            Image(systemName: "eye.slash")
-                .font(.system(size: 80))
-                .foregroundColor(.gray.opacity(0.5))
+            // Icon with radial glow
+            ZStack {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [Color.purple.opacity(0.15), Color.pink.opacity(0.08), Color.clear],
+                            center: .center,
+                            startRadius: 30,
+                            endRadius: 100
+                        )
+                    )
+                    .frame(width: 200, height: 200)
 
-            VStack(spacing: 8) {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.purple.opacity(0.12), Color.pink.opacity(0.08)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 120, height: 120)
+
+                Image(systemName: "eye.slash")
+                    .font(.system(size: 50))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple.opacity(0.6), .pink.opacity(0.5)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+
+            VStack(spacing: 12) {
                 Text("No Views Yet")
-                    .font(.title2)
-                    .fontWeight(.bold)
+                    .font(.title2.weight(.bold))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.primary, .primary.opacity(0.8)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
 
                 Text("When someone views your profile, they'll appear here")
                     .font(.subheadline)
@@ -189,8 +312,65 @@ struct ProfileViewersView: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
             }
+
+            // Tips card
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "lightbulb.fill")
+                        .font(.caption)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.yellow, .orange],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                    Text("Tips to get more views")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.secondary)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    tipItem(icon: "photo.fill", text: "Add more photos")
+                    tipItem(icon: "heart.fill", text: "Be active on the app")
+                    tipItem(icon: "sparkles", text: "Complete your profile")
+                }
+            }
+            .padding(16)
+            .background(Color(.systemBackground))
+            .cornerRadius(16)
+            .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+            .padding(.horizontal, 40)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func tipItem(icon: String, text: String) -> some View {
+        HStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.purple.opacity(0.12), Color.pink.opacity(0.08)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 28, height: 28)
+                Image(systemName: icon)
+                    .font(.system(size: 12))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+            Text(text)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
     }
 }
 
@@ -200,16 +380,41 @@ struct ViewerStatBox: View {
     let value: String
     let label: String
     let icon: String
-    let color: Color
+    let gradientColors: [Color]
 
     var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundColor(color)
+        VStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: gradientColors.map { $0.opacity(0.15) },
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 44, height: 44)
+
+                Image(systemName: icon)
+                    .font(.system(size: 18))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: gradientColors,
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
 
             Text(value)
                 .font(.title2.bold())
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: gradientColors,
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
 
             Text(label)
                 .font(.caption)
@@ -231,6 +436,11 @@ struct ProfileViewerCard: View {
         authService.currentUser?.isPremium ?? false
     }
 
+    private var isRecentView: Bool {
+        let hourAgo = Calendar.current.date(byAdding: .hour, value: -1, to: Date()) ?? Date()
+        return viewer.timestamp > hourAgo
+    }
+
     var body: some View {
         Button {
             HapticManager.shared.impact(.light)
@@ -240,51 +450,153 @@ struct ProfileViewerCard: View {
                 showUpgrade = true
             }
         } label: {
-            HStack(spacing: 12) {
-                // Profile image - always visible
-                Group {
-                    if let imageURL = viewer.user.photos.first, let url = URL(string: imageURL) {
-                        CachedProfileImage(url: url, size: 60)
-                    } else {
-                        LinearGradient(
-                            colors: [.purple.opacity(0.6), .pink.opacity(0.5)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+            HStack(spacing: 14) {
+                // Profile image with gradient border
+                ZStack {
+                    Circle()
+                        .stroke(
+                            LinearGradient(
+                                colors: [.purple.opacity(0.4), .pink.opacity(0.3)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 2.5
                         )
-                        .frame(width: 60, height: 60)
-                        .clipShape(Circle())
+                        .frame(width: 66, height: 66)
+
+                    Group {
+                        if let imageURL = viewer.user.photos.first, let url = URL(string: imageURL) {
+                            CachedProfileImage(url: url, size: 60)
+                        } else {
+                            ZStack {
+                                LinearGradient(
+                                    colors: [.purple.opacity(0.6), .pink.opacity(0.5)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                                Text(viewer.user.fullName.prefix(1))
+                                    .font(.title2.weight(.semibold))
+                                    .foregroundColor(.white)
+                            }
+                            .frame(width: 60, height: 60)
+                            .clipShape(Circle())
+                        }
+                    }
+
+                    // Recent view indicator
+                    if isRecentView {
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 14, height: 14)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.white, lineWidth: 2)
+                            )
+                            .offset(x: 22, y: -22)
                     }
                 }
 
-                // User info - always visible
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
+                // User info
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 6) {
                         Text(viewer.user.fullName)
                             .font(.headline)
+                            .foregroundColor(.primary)
                         Text("\(viewer.user.age)")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
+
+                        if viewer.user.isVerified {
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(.system(size: 12))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.blue, .cyan],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                        }
                     }
 
-                    Text(viewer.user.location)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    HStack(spacing: 4) {
+                        Image(systemName: "mappin.circle.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.purple.opacity(0.7), .pink.opacity(0.6)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                        Text(viewer.user.location)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
 
-                    Text("Viewed \(viewer.timestamp.timeAgo())")
-                        .font(.caption)
-                        .foregroundColor(.blue)
+                    HStack(spacing: 4) {
+                        Image(systemName: "eye.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.blue, .cyan],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                        Text("Viewed \(viewer.timestamp.timeAgo())")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.blue, .cyan],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                    }
                 }
 
                 Spacer()
 
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.purple.opacity(0.12), Color.pink.opacity(0.08)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 32, height: 32)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
             }
-            .padding()
-            .background(Color.white)
-            .cornerRadius(12)
-            .shadow(color: .black.opacity(0.05), radius: 3, y: 1)
+            .padding(16)
+            .background(Color(.systemBackground))
+            .cornerRadius(16)
+            .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color.purple.opacity(isRecentView ? 0.25 : 0.1),
+                                Color.pink.opacity(isRecentView ? 0.2 : 0.05)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            )
         }
         .buttonStyle(ScaleButtonStyle())
         .sheet(isPresented: $showUserDetail) {

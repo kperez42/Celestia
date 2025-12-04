@@ -556,38 +556,56 @@ struct MatchesView: View {
     }
     
     // MARK: - Empty State
-    
+
     private var emptyStateView: some View {
         VStack(spacing: 24) {
             Spacer()
-            
-            // Icon
+
+            // Icon with radial glow
             ZStack {
                 Circle()
                     .fill(
+                        RadialGradient(
+                            colors: [Color.purple.opacity(0.2), Color.pink.opacity(0.1), Color.clear],
+                            center: .center,
+                            startRadius: 30,
+                            endRadius: 120
+                        )
+                    )
+                    .frame(width: 220, height: 220)
+
+                Circle()
+                    .fill(
                         LinearGradient(
-                            colors: [Color.purple.opacity(0.2), Color.blue.opacity(0.1)],
+                            colors: [Color.purple.opacity(0.15), Color.pink.opacity(0.1)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
                     .frame(width: 140, height: 140)
-                
+
                 Image(systemName: "heart.circle.fill")
                     .font(.system(size: 70))
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [.purple, .blue],
+                            colors: [.purple, .pink, .purple.opacity(0.8)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
+                    .shadow(color: .purple.opacity(0.3), radius: 10, y: 5)
             }
-            
+
             VStack(spacing: 12) {
                 Text("No Matches Yet")
-                    .font(.title2)
-                    .fontWeight(.bold)
+                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
                     .dynamicTypeSize(min: .large, max: .accessibility2)
                     .accessibilityAddTraits(.isHeader)
 
@@ -606,19 +624,20 @@ struct MatchesView: View {
                     Image(systemName: "sparkles")
                         .font(.body)
                     Text("Go to Discover Tab")
-                        .font(.headline)
+                        .font(.headline.weight(.semibold))
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
                 .foregroundColor(.white)
                 .background(
                     LinearGradient(
-                        colors: [.purple, .pink],
+                        colors: [.purple, .pink, .purple.opacity(0.9)],
                         startPoint: .leading,
                         endPoint: .trailing
                     )
                 )
                 .cornerRadius(16)
+                .shadow(color: .purple.opacity(0.4), radius: 12, y: 6)
                 .contentShape(RoundedRectangle(cornerRadius: 16))
 
                 Text("Tap the first tab to start swiping")
@@ -627,42 +646,88 @@ struct MatchesView: View {
             }
             .padding(.horizontal, 40)
 
-            // Tips
+            // Tips with premium card styling
             VStack(spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "lightbulb.fill")
+                        .font(.caption)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.yellow, .orange],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                    Text("Tips for success")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
+
                 tipRow(icon: "photo.fill", text: "Add more photos to your profile")
                 tipRow(icon: "text.alignleft", text: "Write an interesting bio")
                 tipRow(icon: "heart.fill", text: "Be active and swipe regularly")
             }
             .padding(20)
-            .background(Color.white)
-            .cornerRadius(16)
+            .background(Color(.systemBackground))
+            .cornerRadius(20)
+            .shadow(color: .black.opacity(0.05), radius: 12, y: 6)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(
+                        LinearGradient(
+                            colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.05)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            )
             .padding(.horizontal, 30)
 
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemGroupedBackground))
+        .background(
+            LinearGradient(
+                colors: [
+                    Color(red: 0.95, green: 0.94, blue: 1.0),
+                    Color(.systemGroupedBackground)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
     }
-    
+
     private func tipRow(icon: String, text: String) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.callout)
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [.purple, .blue],
-                        startPoint: .leading,
-                        endPoint: .trailing
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.purple.opacity(0.12), Color.pink.opacity(0.08)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     )
-                )
-                .frame(width: 36, height: 36)
-                .background(Color.purple.opacity(0.1))
-                .cornerRadius(8)
-            
+                    .frame(width: 36, height: 36)
+
+                Image(systemName: icon)
+                    .font(.system(size: 14))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+            }
+
             Text(text)
                 .font(.subheadline)
                 .foregroundColor(.primary)
-            
+
             Spacer()
         }
     }
@@ -673,20 +738,51 @@ struct MatchesView: View {
         VStack(spacing: 24) {
             Spacer()
 
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 70))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [.red.opacity(0.7), .orange.opacity(0.5)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+            // Icon with radial glow
+            ZStack {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [Color.red.opacity(0.15), Color.orange.opacity(0.08), Color.clear],
+                            center: .center,
+                            startRadius: 30,
+                            endRadius: 100
+                        )
                     )
-                )
+                    .frame(width: 180, height: 180)
+
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.red.opacity(0.12), Color.orange.opacity(0.08)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 110, height: 110)
+
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 50))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.red, .orange],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .shadow(color: .red.opacity(0.3), radius: 8, y: 4)
+            }
 
             VStack(spacing: 12) {
                 Text("Oops! Something Went Wrong")
-                    .font(.title2)
-                    .fontWeight(.bold)
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.red, .orange],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
 
                 Text(errorMessage)
                     .font(.subheadline)
@@ -696,33 +792,46 @@ struct MatchesView: View {
             }
 
             Button {
-                errorMessage = ""  // Clear error
+                HapticManager.shared.impact(.medium)
+                errorMessage = ""
                 Task {
                     await loadMatches()
                 }
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "arrow.clockwise")
+                        .font(.callout.weight(.semibold))
                     Text("Try Again")
+                        .font(.headline.weight(.semibold))
                 }
-                .fontWeight(.semibold)
                 .foregroundColor(.white)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 14)
+                .padding(.horizontal, 32)
+                .padding(.vertical, 16)
                 .background(
                     LinearGradient(
-                        colors: [.purple, .pink],
+                        colors: [.purple, .pink, .purple.opacity(0.9)],
                         startPoint: .leading,
                         endPoint: .trailing
                     )
                 )
-                .cornerRadius(12)
+                .cornerRadius(16)
+                .shadow(color: .purple.opacity(0.4), radius: 12, y: 6)
             }
+            .scaleButton()
 
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemGroupedBackground))
+        .background(
+            LinearGradient(
+                colors: [
+                    Color(red: 1.0, green: 0.96, blue: 0.96),
+                    Color(.systemGroupedBackground)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
     }
 
     // MARK: - Helper Functions
