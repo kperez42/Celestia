@@ -481,7 +481,11 @@ struct MatchesView: View {
                 Capsule()
                     .stroke(
                         isActive ?
-                        Color.clear :
+                        LinearGradient(
+                            colors: [Color.clear, Color.clear],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ) :
                         LinearGradient(
                             colors: [Color.purple.opacity(0.2), Color.pink.opacity(0.15)],
                             startPoint: .topLeading,
