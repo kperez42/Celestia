@@ -139,9 +139,22 @@ class FirestoreMatchRepository: MatchRepository {
                 return nil
             }
 
-            // If match already exists, return existing ID
-            guard !matchDoc.exists else {
-                Logger.shared.info("Match already exists (transaction): \(matchId)", category: .matching)
+            // If match already exists, check if it needs to be reactivated
+            if matchDoc.exists {
+                let data = matchDoc.data()
+                let isActive = data?["isActive"] as? Bool ?? false
+
+                if !isActive {
+                    // BUGFIX: Reactivate previously unmatched conversation
+                    // This allows users to message again after unmatching
+                    transaction.updateData([
+                        "isActive": true,
+                        "reactivatedAt": FieldValue.serverTimestamp()
+                    ], forDocument: matchRef)
+                    Logger.shared.info("Match reactivated (transaction): \(matchId)", category: .matching)
+                } else {
+                    Logger.shared.info("Match already exists (transaction): \(matchId)", category: .matching)
+                }
                 return matchId
             }
 
