@@ -146,11 +146,10 @@ class FirestoreMatchRepository: MatchRepository {
             }
 
             // Create new match atomically
-            var matchData = match
-            matchData.id = matchId
-
+            // NOTE: Do NOT set matchData.id manually - @DocumentID is managed by Firestore
+            // The document ID is already set via matchRef = db.collection("matches").document(matchId)
             do {
-                let encodedMatch = try Firestore.Encoder().encode(matchData)
+                let encodedMatch = try Firestore.Encoder().encode(match)
                 transaction.setData(encodedMatch, forDocument: matchRef)
                 Logger.shared.info("Match created (transaction): \(matchId)", category: .matching)
                 return matchId
