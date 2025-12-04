@@ -452,25 +452,25 @@ struct WelcomeAwarenessSlidesView: View {
             ]
         ),
         AwarenessSlide(
-            icon: "hand.point.up.left.fill",
-            title: "Discover & Swipe",
-            description: "Swipe right to like someone, or left to pass. When you both like each other, it's a match!",
+            icon: "scroll.fill",
+            title: "Browse & Discover",
+            description: "Scroll through profiles in your feed. Tap the heart to like someone, or keep scrolling to see more!",
             color: .pink,
             tips: [
-                "Tap the profile to view more details",
-                "Super Like to stand out from the crowd",
-                "Take your time - quality over quantity"
+                "Scroll up and down to browse profiles",
+                "Tap any card to view full profile details",
+                "Like profiles that interest you"
             ]
         ),
         AwarenessSlide(
             icon: "heart.fill",
-            title: "Make Matches",
-            description: "When someone you liked also likes you back, you'll both be notified and can start chatting!",
+            title: "Likes & Matches",
+            description: "Tap the heart on profiles you like. When they like you back, it's a match and you can start chatting!",
             color: .red,
             tips: [
-                "Matches appear in your Matches tab",
-                "Send the first message to break the ice",
-                "Be respectful and genuine"
+                "Your matches appear in the Matches tab",
+                "Send a message to start the conversation",
+                "Be genuine and respectful"
             ]
         ),
         AwarenessSlide(
@@ -522,36 +522,35 @@ struct WelcomeAwarenessSlidesView: View {
 
     var body: some View {
         ZStack {
-            // Background gradient
-            LinearGradient(
-                colors: [slides[currentPage].color.opacity(0.15), Color.white],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            // Clean background matching signup page
+            Color(.systemGroupedBackground)
+                .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // Header with skip button
-                HStack {
-                    // Progress dots
+                // Header with progress and skip - matching signup style
+                VStack(spacing: 16) {
+                    // Progress dots - matching signup page style
                     HStack(spacing: 8) {
                         ForEach(0..<slides.count, id: \.self) { index in
                             Circle()
-                                .fill(currentPage >= index ? slides[currentPage].color : Color.gray.opacity(0.3))
-                                .frame(width: currentPage == index ? 12 : 8, height: currentPage == index ? 12 : 8)
-                                .animation(.spring(response: 0.3), value: currentPage)
+                                .fill(currentPage >= index ? Color.purple : Color.gray.opacity(0.3))
+                                .frame(width: currentPage == index ? 10 : 8, height: currentPage == index ? 10 : 8)
+                                .scaleEffect(currentPage == index ? 1.2 : 1.0)
+                                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: currentPage)
                         }
                     }
 
-                    Spacer()
-
-                    Button {
-                        onComplete()
-                    } label: {
-                        Text("Skip")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundColor(slides[currentPage].color)
+                    // Skip button
+                    HStack {
+                        Spacer()
+                        Button {
+                            onComplete()
+                        } label: {
+                            Text("Skip")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundColor(.purple)
+                        }
                     }
                 }
                 .padding(.horizontal, 24)
@@ -566,8 +565,8 @@ struct WelcomeAwarenessSlidesView: View {
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
 
-                // Navigation buttons
-                HStack(spacing: 16) {
+                // Navigation buttons - matching signup page style
+                HStack(spacing: 15) {
                     if currentPage > 0 {
                         Button {
                             withAnimation(.spring(response: 0.3)) {
@@ -575,20 +574,17 @@ struct WelcomeAwarenessSlidesView: View {
                                 HapticManager.shared.impact(.light)
                             }
                         } label: {
-                            HStack {
-                                Image(systemName: "chevron.left")
+                            HStack(spacing: 8) {
+                                Image(systemName: "arrow.left")
+                                    .font(.subheadline.weight(.semibold))
                                 Text("Back")
+                                    .font(.headline)
                             }
-                            .fontWeight(.semibold)
-                            .foregroundColor(slides[currentPage].color)
+                            .foregroundColor(.purple)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
+                            .padding()
                             .background(Color.white)
-                            .cornerRadius(16)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(slides[currentPage].color, lineWidth: 2)
-                            )
+                            .cornerRadius(15)
                         }
                     }
 
@@ -603,28 +599,28 @@ struct WelcomeAwarenessSlidesView: View {
                             onComplete()
                         }
                     } label: {
-                        HStack {
+                        HStack(spacing: 8) {
                             Text(currentPage < slides.count - 1 ? "Next" : "Get Started")
-                                .fontWeight(.semibold)
+                                .font(.headline)
 
-                            Image(systemName: currentPage < slides.count - 1 ? "chevron.right" : "arrow.right.circle.fill")
+                            Image(systemName: currentPage < slides.count - 1 ? "arrow.right" : "arrow.right.circle.fill")
+                                .font(.subheadline.weight(.semibold))
                         }
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
+                        .padding()
                         .background(
                             LinearGradient(
-                                colors: [slides[currentPage].color, slides[currentPage].color.opacity(0.8)],
+                                colors: [Color.purple, Color.blue],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
                         )
-                        .cornerRadius(16)
-                        .shadow(color: slides[currentPage].color.opacity(0.3), radius: 10, y: 5)
+                        .cornerRadius(15)
                     }
                 }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 40)
+                .padding(.horizontal, 30)
+                .padding(.bottom, 30)
             }
         }
     }
@@ -647,77 +643,92 @@ struct AwarenessSlideView: View {
     let slide: AwarenessSlide
 
     var body: some View {
-        VStack(spacing: 32) {
-            Spacer()
+        ScrollView {
+            VStack(spacing: 24) {
+                Spacer(minLength: 20)
 
-            // Icon with glow effect
-            ZStack {
-                Circle()
-                    .fill(slide.color.opacity(0.15))
-                    .frame(width: 180, height: 180)
-                    .blur(radius: 20)
+                // Header card with icon - matching signup page style
+                VStack(spacing: 20) {
+                    // Icon circle - matching signup page header cards
+                    ZStack {
+                        Circle()
+                            .fill(Color.purple.opacity(0.12))
+                            .frame(width: 80, height: 80)
 
-                Circle()
-                    .fill(slide.color.opacity(0.1))
-                    .frame(width: 150, height: 150)
+                        Image(systemName: slide.icon)
+                            .font(.system(size: 36))
+                            .foregroundColor(.purple)
+                    }
 
-                Image(systemName: slide.icon)
-                    .font(.system(size: 80))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [slide.color, slide.color.opacity(0.7)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            }
+                    VStack(spacing: 10) {
+                        Text(slide.title)
+                            .font(.title2.bold())
+                            .multilineTextAlignment(.center)
 
-            VStack(spacing: 16) {
-                Text(slide.title)
-                    .font(.title)
-                    .fontWeight(.bold)
-                    .multilineTextAlignment(.center)
+                        Text(slide.description)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                }
+                .padding(.vertical, 24)
+                .padding(.horizontal, 20)
+                .frame(maxWidth: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color(.systemBackground))
+                        .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+                )
+                .padding(.horizontal, 24)
 
-                Text(slide.description)
-                    .font(.body)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
-            }
-
-            // Tips section
-            VStack(alignment: .leading, spacing: 12) {
-                ForEach(slide.tips, id: \.self) { tip in
-                    HStack(alignment: .top, spacing: 12) {
+                // Tips card - matching signup page card style
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(spacing: 12) {
                         ZStack {
                             Circle()
-                                .fill(slide.color.opacity(0.15))
-                                .frame(width: 28, height: 28)
+                                .fill(Color.purple.opacity(0.12))
+                                .frame(width: 44, height: 44)
 
-                            Image(systemName: "checkmark")
-                                .font(.caption.bold())
-                                .foregroundColor(slide.color)
+                            Image(systemName: "lightbulb.fill")
+                                .font(.system(size: 18))
+                                .foregroundColor(.purple)
                         }
 
-                        Text(tip)
-                            .font(.subheadline)
-                            .foregroundColor(.primary.opacity(0.8))
+                        Text("Quick Tips")
+                            .font(.headline)
+                            .foregroundColor(.primary)
 
                         Spacer()
                     }
-                }
-            }
-            .padding(20)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.white)
-                    .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
-            )
-            .padding(.horizontal, 24)
 
-            Spacer()
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(slide.tips, id: \.self) { tip in
+                            HStack(alignment: .top, spacing: 12) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.body)
+                                    .foregroundColor(.purple)
+
+                                Text(tip)
+                                    .font(.subheadline)
+                                    .foregroundColor(.primary.opacity(0.8))
+
+                                Spacer()
+                            }
+                        }
+                    }
+                }
+                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color(.systemBackground))
+                        .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+                )
+                .padding(.horizontal, 24)
+
+                Spacer(minLength: 20)
+            }
         }
-        .padding(.vertical)
+        .scrollIndicators(.hidden)
     }
 }
 
