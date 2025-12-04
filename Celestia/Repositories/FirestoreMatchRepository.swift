@@ -129,7 +129,7 @@ class FirestoreMatchRepository: MatchRepository {
         let matchRef = db.collection("matches").document(matchId)
 
         // Use transaction for atomic check-and-create
-        let result: Any = try await db.runTransaction({ (transaction, errorPointer) -> Any? in
+        let result: Any? = try await db.runTransaction({ (transaction, errorPointer) -> Any? in
             // Get document without throwing - use errorPointer instead
             let matchDoc: DocumentSnapshot
             do {

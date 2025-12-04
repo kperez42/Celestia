@@ -58,7 +58,7 @@ class ActivationMetrics: ObservableObject {
         // Computed metrics
         var profileCompletionPercentage: Double {
             var completed = 0.0
-            var total = 7.0
+            let total = 7.0
 
             if hasProfilePhoto { completed += 1 }
             if profilePhotoCount >= 3 { completed += 1 }

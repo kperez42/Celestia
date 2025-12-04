@@ -73,7 +73,7 @@ class ABTestingManager: ObservableObject {
                 userVariants[experiment.id] = variant.id
 
                 // Save assignment to Firestore
-                try? await saveAssignment(experimentId: experiment.id, userId: userId, variantId: variant.id)
+                _ = try? await saveAssignment(experimentId: experiment.id, userId: userId, variantId: variant.id)
 
                 // Track analytics
                 analyticsService.trackEvent(.experimentVariantAssigned, properties: [
@@ -218,7 +218,7 @@ class ABTestingManager: ObservableObject {
         Task {
             guard let userId = AuthService.shared.currentUser?.id else { return }
 
-            try? await db.collection("experiment_conversions").addDocument(data: [
+            _ = try? await db.collection("experiment_conversions").addDocument(data: [
                 "userId": userId,
                 "event": event,
                 "properties": enhancedProperties,
@@ -243,7 +243,7 @@ class ABTestingManager: ObservableObject {
         Task {
             guard let userId = AuthService.shared.currentUser?.id else { return }
 
-            try? await db.collection("experiment_metrics").addDocument(data: [
+            _ = try? await db.collection("experiment_metrics").addDocument(data: [
                 "experimentId": experimentId,
                 "userId": userId,
                 "variantId": userVariants[experimentId] ?? "unknown",
@@ -508,7 +508,7 @@ extension ABTestingManager {
     /// Creates default onboarding experiments
     func setupDefaultOnboardingExperiments() async {
         // Experiment 1: Onboarding Tutorial
-        try? await createExperiment(
+        _ = try? await createExperiment(
             name: "Onboarding Tutorial Test",
             description: "Test if showing interactive tutorials improves activation",
             variants: [
@@ -532,7 +532,7 @@ extension ABTestingManager {
         )
 
         // Experiment 2: Profile Quality Tips
-        try? await createExperiment(
+        _ = try? await createExperiment(
             name: "Profile Quality Tips",
             description: "Test if showing real-time profile tips improves profile completion",
             variants: [
@@ -556,7 +556,7 @@ extension ABTestingManager {
         )
 
         // Experiment 3: Progressive Disclosure
-        try? await createExperiment(
+        _ = try? await createExperiment(
             name: "Progressive Disclosure",
             description: "Test if progressive disclosure reduces onboarding abandonment",
             variants: [
@@ -580,7 +580,7 @@ extension ABTestingManager {
         )
 
         // Experiment 4: Completion Incentives
-        try? await createExperiment(
+        _ = try? await createExperiment(
             name: "Completion Incentives",
             description: "Test which incentive increases profile completion rate",
             variants: [
@@ -656,7 +656,7 @@ extension ABTestingManager {
             targeting: nil
         )
 
-        try? await createExperiment(
+        _ = try? await createExperiment(
             name: colorExperiment.name,
             description: colorExperiment.description,
             variants: colorExperiment.variants
@@ -697,7 +697,7 @@ extension ABTestingManager {
             )
         )
 
-        try? await createExperiment(
+        _ = try? await createExperiment(
             name: notificationExperiment.name,
             description: notificationExperiment.description,
             variants: notificationExperiment.variants,

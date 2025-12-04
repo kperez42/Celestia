@@ -267,6 +267,7 @@ struct CompactStarterButton: View {
 
 // MARK: - Preview
 
+#if DEBUG
 #Preview {
     VStack {
         ConversationStartersView(
@@ -287,3 +288,4 @@ struct CompactStarterButton: View {
         .padding()
     }
 }
+#endif
