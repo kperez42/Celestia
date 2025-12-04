@@ -28,6 +28,7 @@ struct ChatView: View {
     @State private var messageText = ""
     @FocusState private var isInputFocused: Bool
     @State private var showingUnmatchConfirmation = false
+    @State private var showingBlockConfirmation = false
     @State private var showingUserProfile = false
     @State private var showingReportSheet = false
     @State private var showingPremiumUpgrade = false
@@ -186,6 +187,16 @@ struct ChatView: View {
             }
         } message: {
             Text("You won't be able to message each other anymore, and this match will be removed from your list.")
+        }
+        .alert("Block \(otherUser.fullName)?", isPresented: $showingBlockConfirmation) {
+            Button("Cancel", role: .cancel) {
+                HapticManager.shared.impact(.light)
+            }
+            Button("Block", role: .destructive) {
+                blockUser()
+            }
+        } message: {
+            Text("They won't be able to see your profile or contact you. This will also remove them from your matches.")
         }
         .detectScreenshots(
             context: ScreenshotDetectionService.ScreenshotContext.chat(
@@ -371,6 +382,13 @@ struct ChatView: View {
                     HapticManager.shared.impact(.light)
                 } label: {
                     Label("Report User", systemImage: "exclamationmark.triangle")
+                }
+
+                Button(role: .destructive) {
+                    showingBlockConfirmation = true
+                    HapticManager.shared.impact(.medium)
+                } label: {
+                    Label("Block User", systemImage: "hand.raised.fill")
                 }
 
                 Button(role: .destructive) {
@@ -1354,11 +1372,11 @@ struct ChatView: View {
                 }
 
                 Button {
-                    showingUnmatchConfirmation = true
+                    showingBlockConfirmation = true
                     HapticManager.shared.impact(.medium)
                 } label: {
                     HStack(spacing: 4) {
-                        Image(systemName: "xmark.circle.fill")
+                        Image(systemName: "hand.raised.fill")
                         Text("Block")
                     }
                     .font(.caption)
@@ -1616,6 +1634,30 @@ struct ChatView: View {
                 }
             }
             isSending = false
+        }
+    }
+
+    /// Block the user and dismiss the chat
+    private func blockUser() {
+        guard let userId = otherUser.id,
+              let currentUserId = authService.currentUser?.id else { return }
+
+        HapticManager.shared.notification(.warning)
+
+        Task {
+            do {
+                try await BlockReportService.shared.blockUser(
+                    userId: userId,
+                    currentUserId: currentUserId
+                )
+                HapticManager.shared.notification(.success)
+                dismiss()
+            } catch {
+                Logger.shared.error("Error blocking user", category: .moderation, error: error)
+                errorToastMessage = "Failed to block user. Please try again."
+                showErrorToast = true
+                HapticManager.shared.notification(.error)
+            }
         }
     }
 }
