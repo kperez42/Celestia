@@ -128,6 +128,7 @@ struct MessageBubbleGradient: View {
     let message: Message
     let isFromCurrentUser: Bool
     var currentUserId: String? = nil
+    var showReadStatus: Bool = true // Only show read indicator on the most recent read message
     var onReaction: ((String) -> Void)? = nil
     var onReply: (() -> Void)? = nil
     var onEdit: (() -> Void)? = nil
@@ -244,7 +245,8 @@ struct MessageBubbleGradient: View {
                     }
 
                     if isFromCurrentUser {
-                        if message.isRead {
+                        // Only show "Read" on the most recent read message (controlled by showReadStatus)
+                        if message.isRead && showReadStatus {
                             HStack(spacing: 2) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.caption2)
@@ -254,7 +256,8 @@ struct MessageBubbleGradient: View {
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
                             }
-                        } else if message.isDelivered {
+                        } else if message.isDelivered || message.isRead {
+                            // Show delivered checkmark for delivered messages or read messages that shouldn't show "Read"
                             Image(systemName: "checkmark.circle")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)

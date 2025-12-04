@@ -491,6 +491,9 @@ struct ChatView: View {
                         }
                     }
 
+                    // Get the last read message ID to only show "Read" on the most recent
+                    let lastReadId = lastReadMessageId()
+
                     ForEach(groupedMessages(), id: \.0) { section in
                         // Date divider
                         Text(section.0)
@@ -504,6 +507,7 @@ struct ChatView: View {
                                 message: message,
                                 isFromCurrentUser: message.senderId == authService.currentUser?.id || message.senderId == "current_user",
                                 currentUserId: authService.currentUser?.id,
+                                showReadStatus: message.id == lastReadId,
                                 onReaction: { emoji in
                                     handleReaction(messageId: message.id ?? "", emoji: emoji)
                                 },
@@ -721,6 +725,19 @@ struct ChatView: View {
     private func updateGroupedMessagesCache() {
         cachedGroupedMessages = computeGroupedMessages()
         lastMessageCount = messageService.messages.count
+    }
+
+    /// Returns the ID of the last read message from the current user
+    /// This is used to only show "Read" indicator on the most recent read message
+    private func lastReadMessageId() -> String? {
+        guard let currentUserId = authService.currentUser?.id else { return nil }
+
+        // Find all messages from current user that are read, then get the last one
+        let currentUserReadMessages = messageService.messages.filter { message in
+            (message.senderId == currentUserId || message.senderId == "current_user") && message.isRead
+        }
+
+        return currentUserReadMessages.last?.id
     }
 
     private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool = true) {
