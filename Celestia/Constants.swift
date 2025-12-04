@@ -148,7 +148,7 @@ enum AppConstants {
         static let searchInterval: TimeInterval = 0.3
         static let maxMessagesPerMinute = 30
         static let maxLikesPerDay = 10 // Free users get 10 likes per day, premium unlimited
-        static let maxDailyMessagesForFreeUsers = 20 // Free users get 20 messages per day total, premium unlimited
+        static let maxDailyMessagesForFreeUsers = 10 // Free users get 10 messages per day total, premium unlimited
     }
     
     // MARK: - Cache
