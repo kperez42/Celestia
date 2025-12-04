@@ -797,7 +797,8 @@ private struct ReviewStepView: View {
                 Image(systemName: icon)
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(
-                        isCompleted ? .white :
+                        isCompleted ?
+                        LinearGradient(colors: [.white, .white], startPoint: .leading, endPoint: .trailing) :
                         (isActive ?
                          LinearGradient(colors: [color, secondaryColor], startPoint: .leading, endPoint: .trailing) :
                          LinearGradient(colors: [.gray, .gray.opacity(0.8)], startPoint: .leading, endPoint: .trailing))
