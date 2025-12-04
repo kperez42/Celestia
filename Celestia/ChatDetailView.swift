@@ -40,10 +40,14 @@ struct ChatDetailView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 12) {
+                        // Get the last read message ID to only show "Read" on the most recent
+                        let lastReadId = lastReadMessageId()
+
                         ForEach(viewModel.messages) { message in
                             MessageBubbleGradient(
                                 message: message,
-                                isFromCurrentUser: message.senderID == authService.currentUser?.id
+                                isFromCurrentUser: message.senderID == authService.currentUser?.id,
+                                showReadStatus: message.id == lastReadId
                             )
                             .id(message.id)
                         }
@@ -215,6 +219,19 @@ struct ChatDetailView: View {
                 isSending = false
             }
         }
+    }
+
+    /// Returns the ID of the last read message from the current user
+    /// This is used to only show "Read" indicator on the most recent read message
+    private func lastReadMessageId() -> String? {
+        guard let currentUserId = authService.currentUser?.id else { return nil }
+
+        // Find all messages from current user that are read, then get the last one
+        let currentUserReadMessages = viewModel.messages.filter { message in
+            message.senderID == currentUserId && message.isRead
+        }
+
+        return currentUserReadMessages.last?.id
     }
 }
 
