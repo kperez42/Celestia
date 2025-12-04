@@ -28,6 +28,14 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         // Do NOT call FirebaseApp.configure() anywhere else in the app
         FirebaseApp.configure()
 
+        // Configure Firestore settings immediately after Firebase configuration
+        // This must happen before any Firestore operations
+        let settings = FirestoreSettings()
+        settings.isPersistenceEnabled = true
+        settings.cacheSizeBytes = 50 * 1024 * 1024 // 50MB limit
+        Firestore.firestore().settings = settings
+        Logger.shared.info("Firestore persistence initialized (50MB cache limit)", category: .database)
+
         // Enable Firebase Analytics for event tracking
         Analytics.setAnalyticsCollectionEnabled(true)
 
@@ -161,35 +169,18 @@ struct CelestiaApp: App {
     @StateObject private var deepLinkManager = DeepLinkManager()
 
     init() {
-        // NOTE: Firebase is configured in AppDelegate.didFinishLaunchingWithOptions
+        // NOTE: Firebase and Firestore are configured in AppDelegate.didFinishLaunchingWithOptions
         // This ensures proper swizzling for push notifications and analytics
-        // Do NOT call FirebaseApp.configure() here
+        // Do NOT call FirebaseApp.configure() or set Firestore settings here
 
         // Configure Stripe Identity SDK for ID verification
         StripeConfig.configure()
-
-        // PERFORMANCE: Move Firestore persistence initialization to background thread
-        // This reduces cold start time by ~150-200ms
-        Task.detached(priority: .userInitiated) {
-            let settings = FirestoreSettings()
-            settings.isPersistenceEnabled = true
-
-            // PERFORMANCE: Set cache size limit to 50MB (reduced from 100MB)
-            // Prevents memory bloat and malloc errors on all devices
-            settings.cacheSizeBytes = 50 * 1024 * 1024 // 50MB limit
-
-            // Apply settings on main thread as required by Firestore
-            await MainActor.run {
-                Firestore.firestore().settings = settings
-                Logger.shared.info("Firestore persistence initialized (50MB cache limit)", category: .database)
-            }
-        }
 
         // MEMORY FIX: Reduce startup memory pressure by deferring heavy service initialization
         // This helps reduce malloc errors during Firebase initialization
         Task.detached(priority: .background) {
             // Allow Firebase core services to initialize first
-            try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second delay (increased from 500ms)
+            try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second delay
 
             // Pre-warm AnalyticsServiceEnhanced singleton on background to distribute memory allocations
             await MainActor.run {
