@@ -578,12 +578,19 @@ struct ConversationRow: View {
 
                 if isActive {
                     Circle()
-                        .fill(Color.green)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.green, Color.green.opacity(0.8)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                         .frame(width: 18, height: 18)
                         .overlay(
                             Circle()
                                 .stroke(Color.white, lineWidth: 3)
                         )
+                        .shadow(color: .green.opacity(0.5), radius: 4)
                         .offset(x: 4, y: -4)
                 }
             }
@@ -740,20 +747,19 @@ struct ConversationRow: View {
     
     private var unreadBadge: some View {
         Text("\(unreadCount)")
-            .font(.caption2)
-            .fontWeight(.bold)
+            .font(.caption.weight(.bold))
             .foregroundColor(.white)
-            .frame(minWidth: 22, minHeight: 22)
-            .padding(.horizontal, 6)
+            .frame(minWidth: 24, minHeight: 24)
+            .padding(.horizontal, 8)
             .background(
                 LinearGradient(
-                    colors: [Color.purple, Color.pink],
+                    colors: [Color.purple, Color.pink.opacity(0.9)],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
             )
             .clipShape(Capsule())
-            .shadow(color: .purple.opacity(0.3), radius: 5)
+            .shadow(color: .purple.opacity(0.4), radius: 6, y: 2)
     }
     
     private func timeAgo(from date: Date) -> String {
