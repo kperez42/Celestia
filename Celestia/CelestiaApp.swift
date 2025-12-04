@@ -22,6 +22,15 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
+        // Configure Firebase FIRST in AppDelegate (not in App.init())
+        // This ensures proper swizzling for push notifications and analytics
+        // NOTE: This is the SINGLE initialization point for Firebase
+        // Do NOT call FirebaseApp.configure() anywhere else in the app
+        FirebaseApp.configure()
+
+        // Enable Firebase Analytics for event tracking
+        Analytics.setAnalyticsCollectionEnabled(true)
+
         // Set notification center delegate
         UNUserNotificationCenter.current().delegate = self
 
@@ -152,17 +161,12 @@ struct CelestiaApp: App {
     @StateObject private var deepLinkManager = DeepLinkManager()
 
     init() {
-        // Configure Firebase first (must be on main thread)
-        // NOTE: This is the SINGLE initialization point for Firebase
-        // Do NOT call FirebaseApp.configure() anywhere else in the app
-        FirebaseApp.configure()
+        // NOTE: Firebase is configured in AppDelegate.didFinishLaunchingWithOptions
+        // This ensures proper swizzling for push notifications and analytics
+        // Do NOT call FirebaseApp.configure() here
 
         // Configure Stripe Identity SDK for ID verification
         StripeConfig.configure()
-
-        // Enable Firebase Analytics for event tracking
-        // Must be called AFTER FirebaseApp.configure()
-        Analytics.setAnalyticsCollectionEnabled(true)
 
         // PERFORMANCE: Move Firestore persistence initialization to background thread
         // This reduces cold start time by ~150-200ms

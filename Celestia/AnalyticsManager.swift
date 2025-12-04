@@ -3,10 +3,11 @@
 //  Celestia
 //
 //  Analytics tracking and event logging
-//  Integrates with Firebase Analytics, Mixpanel, or similar services
+//  Integrates with Firebase Analytics
 //
 
 import Foundation
+import FirebaseAnalytics
 
 // MARK: - Analytics Event
 
@@ -222,9 +223,8 @@ class AnalyticsManager: ObservableObject {
         Logger.shared.debug("📊 Analytics Event: \(event)\(paramsString)", category: .analytics)
         #endif
 
-        // In production, send to analytics service:
-        // FirebaseAnalytics.Analytics.logEvent(event, parameters: parameters)
-        // Mixpanel.track(event: event, properties: parameters)
+        // Send event to Firebase Analytics
+        Analytics.logEvent(event, parameters: parameters)
     }
 
     /// Set user ID for analytics
@@ -235,9 +235,8 @@ class AnalyticsManager: ObservableObject {
         Logger.shared.debug("📊 Analytics User ID set: \(userId)", category: .analytics)
         #endif
 
-        // In production:
-        // FirebaseAnalytics.Analytics.setUserID(userId)
-        // Mixpanel.identify(distinctId: userId)
+        // Set user ID in Firebase Analytics
+        Analytics.setUserID(userId)
     }
 
     /// Set user property
@@ -248,9 +247,8 @@ class AnalyticsManager: ObservableObject {
         Logger.shared.debug("📊 Analytics User Property: \(name) = \(value)", category: .analytics)
         #endif
 
-        // In production:
-        // FirebaseAnalytics.Analytics.setUserProperty(value, forName: name)
-        // Mixpanel.people.set(property: name, to: value)
+        // Set user property in Firebase Analytics
+        Analytics.setUserProperty(value, forName: name)
     }
 
     /// Log screen view
@@ -261,11 +259,11 @@ class AnalyticsManager: ObservableObject {
         Logger.shared.debug("📊 Screen View: \(name) (\(screenClass))", category: .analytics)
         #endif
 
-        // In production:
-        // FirebaseAnalytics.Analytics.logEvent(AnalyticsEventScreenView, parameters: [
-        //     AnalyticsParameterScreenName: name,
-        //     AnalyticsParameterScreenClass: screenClass
-        // ])
+        // Log screen view to Firebase Analytics
+        Analytics.logEvent(AnalyticsEventScreenView, parameters: [
+            AnalyticsParameterScreenName: name,
+            AnalyticsParameterScreenClass: screenClass
+        ])
     }
 
     // MARK: - Convenience Methods
@@ -321,8 +319,8 @@ class AnalyticsManager: ObservableObject {
         Logger.shared.debug("📊 Analytics \(enabled ? "enabled" : "disabled")", category: .analytics)
         #endif
 
-        // In production:
-        // FirebaseAnalytics.Analytics.setAnalyticsCollectionEnabled(enabled)
+        // Update Firebase Analytics collection state
+        Analytics.setAnalyticsCollectionEnabled(enabled)
     }
 
     // MARK: - Privacy
@@ -336,9 +334,8 @@ class AnalyticsManager: ObservableObject {
         Logger.shared.debug("📊 Analytics user data cleared", category: .analytics)
         #endif
 
-        // In production:
-        // FirebaseAnalytics.Analytics.resetAnalyticsData()
-        // Mixpanel.reset()
+        // Reset Firebase Analytics data for privacy compliance
+        Analytics.resetAnalyticsData()
     }
 }
 
