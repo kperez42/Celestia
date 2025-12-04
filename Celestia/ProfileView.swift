@@ -1264,7 +1264,7 @@ struct ProfileView: View {
                     .font(.title3)
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [.blue, .cyan],
+                            colors: [.purple, .pink],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -1283,16 +1283,16 @@ struct ProfileView: View {
                         .padding(.vertical, 8)
                         .background(
                             LinearGradient(
-                                colors: [Color.blue.opacity(0.15), Color.cyan.opacity(0.1)],
+                                colors: [Color.purple.opacity(0.15), Color.pink.opacity(0.1)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .foregroundColor(.blue)
+                        .foregroundColor(.purple)
                         .cornerRadius(20)
                         .overlay(
                             RoundedRectangle(cornerRadius: 20)
-                                .stroke(Color.blue.opacity(0.2), lineWidth: 1)
+                                .stroke(Color.purple.opacity(0.2), lineWidth: 1)
                         )
                 }
             }
@@ -1306,7 +1306,7 @@ struct ProfileView: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.blue.opacity(0.1), lineWidth: 1)
+                .stroke(Color.purple.opacity(0.1), lineWidth: 1)
         )
         .padding(.horizontal, 20)
     }
@@ -1320,7 +1320,7 @@ struct ProfileView: View {
                     .font(.title3)
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [.orange, .pink],
+                            colors: [.pink, .purple],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -1339,16 +1339,16 @@ struct ProfileView: View {
                         .padding(.vertical, 8)
                         .background(
                             LinearGradient(
-                                colors: [Color.orange.opacity(0.15), Color.pink.opacity(0.1)],
+                                colors: [Color.pink.opacity(0.15), Color.purple.opacity(0.1)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .foregroundColor(.orange)
+                        .foregroundColor(.pink)
                         .cornerRadius(20)
                         .overlay(
                             RoundedRectangle(cornerRadius: 20)
-                                .stroke(Color.orange.opacity(0.2), lineWidth: 1)
+                                .stroke(Color.pink.opacity(0.2), lineWidth: 1)
                         )
                 }
             }
@@ -1362,7 +1362,7 @@ struct ProfileView: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.orange.opacity(0.1), lineWidth: 1)
+                .stroke(Color.pink.opacity(0.1), lineWidth: 1)
         )
         .padding(.horizontal, 20)
     }
