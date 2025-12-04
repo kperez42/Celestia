@@ -75,8 +75,16 @@ struct LikesView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(.systemGroupedBackground)
-                    .ignoresSafeArea()
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.98, green: 0.95, blue: 0.98),
+                        Color(red: 0.99, green: 0.97, blue: 0.99),
+                        Color.white
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
 
                 VStack(spacing: 0) {
                     // Header
@@ -351,58 +359,81 @@ struct LikesView: View {
 
     private var headerView: some View {
         ZStack {
+            // Premium gradient background
             LinearGradient(
                 colors: [
-                    Color.pink.opacity(0.9),
-                    Color.pink.opacity(0.7),
-                    Color.purple.opacity(0.5)
+                    Color.pink.opacity(0.95),
+                    Color.pink.opacity(0.8),
+                    Color.purple.opacity(0.65)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
 
+            // Radial glow overlay
+            RadialGradient(
+                colors: [
+                    Color.white.opacity(0.15),
+                    Color.clear
+                ],
+                center: .topLeading,
+                startRadius: 20,
+                endRadius: 300
+            )
+
             VStack(spacing: 12) {
                 HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 6) {
                         Text("Likes")
-                            .font(.largeTitle.weight(.bold))
+                            .font(.system(size: 32, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
+                            .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
                             .dynamicTypeSize(min: .large, max: .accessibility2)
 
-                        HStack(spacing: 8) {
+                        HStack(spacing: 10) {
                             HStack(spacing: 4) {
                                 Image(systemName: "heart.fill")
                                     .font(.caption)
                                 Text("\(viewModel.totalLikesReceived)")
-                                    .fontWeight(.semibold)
+                                    .fontWeight(.bold)
                             }
-
-                            Circle()
-                                .fill(Color.white.opacity(0.5))
-                                .frame(width: 4, height: 4)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(Color.white.opacity(0.2))
+                            .cornerRadius(12)
 
                             HStack(spacing: 4) {
                                 Image(systemName: "heart")
                                     .font(.caption)
-                                Text("\(viewModel.totalLikesSent) sent")
-                                    .fontWeight(.semibold)
+                                Text("\(viewModel.totalLikesSent)")
+                                    .fontWeight(.bold)
                             }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(Color.white.opacity(0.15))
+                            .cornerRadius(12)
 
                             if viewModel.mutualLikes.count > 0 {
-                                Circle()
-                                    .fill(Color.white.opacity(0.5))
-                                    .frame(width: 4, height: 4)
-
                                 HStack(spacing: 4) {
                                     Image(systemName: "heart.circle.fill")
                                         .font(.caption)
-                                    Text("\(viewModel.mutualLikes.count) mutual")
-                                        .fontWeight(.semibold)
+                                    Text("\(viewModel.mutualLikes.count)")
+                                        .fontWeight(.bold)
                                 }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                                .background(
+                                    LinearGradient(
+                                        colors: [Color.white.opacity(0.25), Color.white.opacity(0.15)],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .cornerRadius(12)
                             }
                         }
                         .font(.caption)
-                        .foregroundColor(.white.opacity(0.95))
+                        .foregroundColor(.white)
                     }
 
                     Spacer()
@@ -412,28 +443,40 @@ struct LikesView: View {
                             premiumBadge
                         }
 
-                        // Filter button
+                        // Filter button with gradient
                         Button {
                             showFilters = true
                             HapticManager.shared.impact(.light)
                         } label: {
                             HStack(spacing: 6) {
-                                Image(systemName: "line.3.horizontal.decrease.circle")
+                                Image(systemName: "line.3.horizontal.decrease.circle.fill")
                                     .font(.system(size: 14))
                                 Text("Filter")
-                                    .font(.caption)
-                                    .fontWeight(.medium)
+                                    .font(.caption.weight(.semibold))
                                 if selectedAgeFilter != .all || selectedSortOption != .recent {
                                     Circle()
-                                        .fill(Color.yellow)
-                                        .frame(width: 6, height: 6)
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [.yellow, .orange],
+                                                startPoint: .top,
+                                                endPoint: .bottom
+                                            )
+                                        )
+                                        .frame(width: 7, height: 7)
+                                        .shadow(color: .yellow.opacity(0.5), radius: 3)
                                 }
                             }
-                            .foregroundColor(.white.opacity(0.9))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(Color.white.opacity(0.2))
-                            .cornerRadius(20)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .background(
+                                Capsule()
+                                    .fill(Color.white.opacity(0.2))
+                                    .overlay(
+                                        Capsule()
+                                            .strokeBorder(Color.white.opacity(0.3), lineWidth: 1)
+                                    )
+                            )
                         }
                     }
                 }
@@ -442,7 +485,7 @@ struct LikesView: View {
             }
             .padding(.bottom, 16)
         }
-        .frame(height: 110)
+        .frame(height: 120)
     }
 
     private var premiumBadge: some View {
@@ -450,20 +493,39 @@ struct LikesView: View {
             Image(systemName: "crown.fill")
                 .font(.caption)
             Text("Premium")
-                .font(.caption)
-                .fontWeight(.semibold)
+                .font(.caption.weight(.bold))
         }
-        .foregroundColor(.yellow)
+        .foregroundStyle(
+            LinearGradient(
+                colors: [.yellow, .orange.opacity(0.9)],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        )
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(
             Capsule()
-                .fill(Color.yellow.opacity(0.2))
+                .fill(
+                    LinearGradient(
+                        colors: [Color.yellow.opacity(0.25), Color.orange.opacity(0.15)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
                 .overlay(
                     Capsule()
-                        .stroke(Color.yellow.opacity(0.5), lineWidth: 1)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [Color.yellow.opacity(0.6), Color.orange.opacity(0.4)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
                 )
         )
+        .shadow(color: .yellow.opacity(0.3), radius: 6, y: 2)
     }
 
     // MARK: - Tab Selector
@@ -478,33 +540,55 @@ struct LikesView: View {
                     }
                 } label: {
                     VStack(spacing: 8) {
-                        HStack(spacing: 4) {
+                        HStack(spacing: 5) {
                             Text(title)
                                 .font(.subheadline)
                                 .fontWeight(selectedTab == index ? .semibold : .medium)
 
-                            // Badge count
+                            // Badge count with gradient
                             let count = getCountForTab(index)
                             if count > 0 {
                                 Text("\(count)")
-                                    .font(.caption2)
-                                    .fontWeight(.bold)
+                                    .font(.caption2.weight(.bold))
                                     .foregroundColor(.white)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 3)
                                     .background(
                                         selectedTab == index ?
-                                        Color.pink : Color.gray.opacity(0.5)
+                                        LinearGradient(
+                                            colors: [.pink, .purple.opacity(0.9)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ) :
+                                        LinearGradient(
+                                            colors: [Color.gray.opacity(0.5), Color.gray.opacity(0.4)],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
                                     )
                                     .clipShape(Capsule())
+                                    .shadow(color: selectedTab == index ? .pink.opacity(0.3) : .clear, radius: 4, y: 2)
                             }
                         }
-                        .foregroundColor(selectedTab == index ? .pink : .gray)
+                        .foregroundStyle(
+                            selectedTab == index ?
+                            LinearGradient(colors: [.pink, .purple], startPoint: .leading, endPoint: .trailing) :
+                            LinearGradient(colors: [.gray, .gray.opacity(0.8)], startPoint: .leading, endPoint: .trailing)
+                        )
 
-                        Rectangle()
-                            .fill(selectedTab == index ? Color.pink : Color.clear)
+                        // Gradient underline
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(
+                                selectedTab == index ?
+                                LinearGradient(
+                                    colors: [.pink, .purple.opacity(0.8)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                ) :
+                                LinearGradient(colors: [Color.clear, Color.clear], startPoint: .leading, endPoint: .trailing)
+                            )
                             .frame(height: 3)
-                            .cornerRadius(1.5)
+                            .shadow(color: selectedTab == index ? .pink.opacity(0.4) : .clear, radius: 4, y: 1)
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -512,7 +596,10 @@ struct LikesView: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 12)
-        .background(Color.white)
+        .background(
+            Color.white
+                .shadow(color: .black.opacity(0.03), radius: 4, y: 2)
+        )
     }
 
     private func getCountForTab(_ index: Int) -> Int {
@@ -658,7 +745,7 @@ struct LikesView: View {
                     .padding(.horizontal, 20)
             }
 
-            // Unlock button
+            // Unlock button with premium styling
             Button {
                 HapticManager.shared.impact(.medium)
                 showPremiumUpgrade = true
@@ -668,27 +755,40 @@ struct LikesView: View {
                         .font(.body)
 
                     Text("Unlock Who Likes You")
-                        .fontWeight(.semibold)
+                        .fontWeight(.bold)
                 }
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
+                .padding(.vertical, 18)
                 .background(
                     LinearGradient(
-                        colors: [.pink, .purple],
-                        startPoint: .leading,
-                        endPoint: .trailing
+                        colors: [.pink, .purple, .pink.opacity(0.9)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
                     )
                 )
-                .cornerRadius(14)
-                .shadow(color: .pink.opacity(0.4), radius: 10, y: 5)
+                .cornerRadius(16)
+                .shadow(color: .pink.opacity(0.4), radius: 12, y: 6)
+                .shadow(color: .purple.opacity(0.25), radius: 20, y: 10)
             }
         }
         .padding(24)
         .background(
             RoundedRectangle(cornerRadius: 24)
                 .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.08), radius: 20, y: 10)
+                .shadow(color: .black.opacity(0.06), radius: 16, y: 8)
+                .shadow(color: .pink.opacity(0.08), radius: 24, y: 12)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [Color.pink.opacity(0.15), Color.purple.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
         )
     }
 
@@ -712,21 +812,36 @@ struct LikesView: View {
     }
 
     private func premiumFeatureRow(icon: String, title: String, description: String, color: Color) -> some View {
-        HStack(spacing: 14) {
+        let secondaryColor: Color = color == .pink ? .red : (color == .purple ? .pink : .yellow)
+
+        return HStack(spacing: 14) {
             ZStack {
                 Circle()
-                    .fill(color.opacity(0.15))
-                    .frame(width: 40, height: 40)
+                    .fill(
+                        LinearGradient(
+                            colors: [color.opacity(0.2), secondaryColor.opacity(0.12)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 44, height: 44)
 
                 Image(systemName: icon)
-                    .font(.system(size: 16))
-                    .foregroundColor(color)
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [color, secondaryColor],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
             }
+            .shadow(color: color.opacity(0.15), radius: 6, y: 2)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.primary)
 
                 Text(description)
                     .font(.caption)
@@ -734,7 +849,22 @@ struct LikesView: View {
             }
 
             Spacer()
+
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 16))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.green, .mint],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
         }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color(.systemBackground).opacity(0.8))
+        )
     }
 
     // MARK: - My Likes Tab
@@ -844,14 +974,30 @@ struct LikesView: View {
     // MARK: - Empty State
 
     private func emptyStateView(icon: String, title: String, message: String) -> some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 28) {
             Spacer()
 
             ZStack {
+                // Outer radial glow
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                Color.pink.opacity(0.2),
+                                Color.purple.opacity(0.1),
+                                Color.clear
+                            ],
+                            center: .center,
+                            startRadius: 30,
+                            endRadius: 100
+                        )
+                    )
+                    .frame(width: 200, height: 200)
+
                 Circle()
                     .fill(
                         LinearGradient(
-                            colors: [Color.pink.opacity(0.2), Color.purple.opacity(0.1)],
+                            colors: [Color.pink.opacity(0.15), Color.purple.opacity(0.1)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -867,12 +1013,19 @@ struct LikesView: View {
                             endPoint: .bottomTrailing
                         )
                     )
+                    .shadow(color: .pink.opacity(0.3), radius: 10)
             }
 
             VStack(spacing: 12) {
                 Text(title)
-                    .font(.title2)
-                    .fontWeight(.bold)
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.pink, .purple],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
 
                 Text(message)
                     .font(.subheadline)
