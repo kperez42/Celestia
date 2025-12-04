@@ -13,7 +13,6 @@ import FirebaseFirestore
 struct SafetyCenterView: View {
     @EnvironmentObject var authService: AuthService
     @StateObject private var viewModel = SafetyCenterViewModel()
-    @Environment(\.dismiss) var dismiss
 
     var body: some View {
         NavigationStack {
@@ -30,16 +29,6 @@ struct SafetyCenterView: View {
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Safety Center")
             .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .foregroundColor(.primary)
-                    }
-                }
-            }
             .task {
                 await viewModel.loadSafetyData()
             }

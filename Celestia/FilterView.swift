@@ -36,12 +36,6 @@ struct FilterView: View {
             .navigationTitle("Filters")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Reset") {
                         resetFilters()

@@ -12,7 +12,6 @@ import Combine
 struct PrivacySettingsView: View {
     @EnvironmentObject var authService: AuthService
     @StateObject private var viewModel = PrivacySettingsViewModel()
-    @Environment(\.dismiss) var dismiss
 
     var body: some View {
         NavigationStack {
@@ -39,14 +38,6 @@ struct PrivacySettingsView: View {
             }
             .navigationTitle("Privacy Settings")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .foregroundColor(.purple)
-                }
-            }
             .onAppear {
                 viewModel.loadSettings()
             }
