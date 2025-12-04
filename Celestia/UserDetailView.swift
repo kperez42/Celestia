@@ -996,7 +996,7 @@ struct FullScreenPhotoViewer: View {
                 // Close button and counter overlay
                 VStack {
                     HStack {
-                        // Close button
+                        // Close button with blur background
                         Button {
                             HapticManager.shared.impact(.light)
                             isPresented = false
@@ -1004,21 +1004,23 @@ struct FullScreenPhotoViewer: View {
                             Image(systemName: "xmark")
                                 .font(.title3.weight(.semibold))
                                 .foregroundColor(.white)
-                                .frame(width: 40, height: 40)
-                                .background(Color.black.opacity(0.5))
+                                .frame(width: 44, height: 44)
+                                .background(.ultraThinMaterial)
                                 .clipShape(Circle())
+                                .shadow(color: .black.opacity(0.2), radius: 8, y: 2)
                         }
 
                         Spacer()
 
-                        // Photo counter
+                        // Photo counter with blur background
                         Text("\(selectedIndex + 1) / \(photos.count)")
                             .font(.subheadline.weight(.semibold))
                             .foregroundColor(.white)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(Color.black.opacity(0.5))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(.ultraThinMaterial)
                             .cornerRadius(20)
+                            .shadow(color: .black.opacity(0.2), radius: 8, y: 2)
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 60)
@@ -1098,55 +1100,62 @@ struct ZoomablePhotoView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            // PERFORMANCE: Use immediate priority for current photo, high for others
-            CachedCardImage(url: url, priority: isCurrentPhoto ? .immediate : .high)
-                .aspectRatio(contentMode: .fit)
-                .frame(width: geometry.size.width, height: geometry.size.height)
-                .scaleEffect(scale)
-                .offset(offset)
-                .gesture(
-                    MagnificationGesture()
-                        .onChanged { value in
-                            let delta = value / lastScale
-                            lastScale = value
-                            scale = min(max(scale * delta, 1), 4)
-                        }
-                        .onEnded { _ in
-                            lastScale = 1.0
-                            if scale < 1 {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                    scale = 1
-                                    offset = .zero
+            ZStack {
+                // Subtle background for better image presentation
+                Color.black
+
+                // PERFORMANCE: Use immediate priority for current photo, high for others
+                CachedCardImage(url: url, priority: isCurrentPhoto ? .immediate : .high)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .scaleEffect(scale)
+                    .offset(offset)
+                    // Add subtle shadow for depth
+                    .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
+                    .gesture(
+                        MagnificationGesture()
+                            .onChanged { value in
+                                let delta = value / lastScale
+                                lastScale = value
+                                scale = min(max(scale * delta, 1), 4)
+                            }
+                            .onEnded { _ in
+                                lastScale = 1.0
+                                if scale < 1 {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                        scale = 1
+                                        offset = .zero
+                                    }
                                 }
                             }
+                    )
+                    .simultaneousGesture(
+                        scale > 1 ?
+                        DragGesture()
+                            .onChanged { value in
+                                offset = CGSize(
+                                    width: lastOffset.width + value.translation.width,
+                                    height: lastOffset.height + value.translation.height
+                                )
+                            }
+                            .onEnded { _ in
+                                lastOffset = offset
+                            }
+                        : nil
+                    )
+                    .onTapGesture(count: 2) {
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
+                            if scale > 1 {
+                                scale = 1
+                                offset = .zero
+                                lastOffset = .zero
+                            } else {
+                                scale = 2
+                            }
                         }
-                )
-                .simultaneousGesture(
-                    scale > 1 ?
-                    DragGesture()
-                        .onChanged { value in
-                            offset = CGSize(
-                                width: lastOffset.width + value.translation.width,
-                                height: lastOffset.height + value.translation.height
-                            )
-                        }
-                        .onEnded { _ in
-                            lastOffset = offset
-                        }
-                    : nil
-                )
-                .onTapGesture(count: 2) {
-                    withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
-                        if scale > 1 {
-                            scale = 1
-                            offset = .zero
-                            lastOffset = .zero
-                        } else {
-                            scale = 2
-                        }
+                        HapticManager.shared.impact(.light)
                     }
-                    HapticManager.shared.impact(.light)
-                }
+            }
         }
     }
 }

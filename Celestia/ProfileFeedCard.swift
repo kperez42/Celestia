@@ -99,14 +99,30 @@ struct ProfileFeedCard: View {
     private var profileImage: some View {
         // Use HighQualityCardImage for consistent sizing and high-quality rendering
         // The fixed height ensures cards don't expand based on image aspect ratios
-        HighQualityCardImage(
-            url: URL(string: displayPhotoURL),
-            targetHeight: Self.cardImageHeight,
-            cornerRadius: 0,  // We apply corner radius to specific corners below
-            priority: .normal
-        )
+        ZStack(alignment: .bottom) {
+            HighQualityCardImage(
+                url: URL(string: displayPhotoURL),
+                targetHeight: Self.cardImageHeight,
+                cornerRadius: 0,  // We apply corner radius to specific corners below
+                priority: .normal
+            )
+            .frame(height: Self.cardImageHeight)
+            .frame(maxWidth: .infinity)
+
+            // Subtle gradient overlay for depth and visual appeal
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0),
+                    Color.black.opacity(0.02),
+                    Color.black.opacity(0.08),
+                    Color.black.opacity(0.15)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: Self.cardImageHeight * 0.4)
+        }
         .frame(height: Self.cardImageHeight)
-        .frame(maxWidth: .infinity)
         .clipShape(
             RoundedCorner(radius: 16, corners: [.topLeft, .topRight])
         )
