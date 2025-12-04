@@ -509,8 +509,8 @@ enum PremiumPlan: String, CaseIterable {
     var price: String {
         switch self {
         case .monthly: return "$19.99"
-        case .sixMonth: return "$14.99"
-        case .annual: return "$9.99"
+        case .sixMonth: return "$15.00"
+        case .annual: return "$10.00"
         }
     }
 
@@ -525,8 +525,8 @@ enum PremiumPlan: String, CaseIterable {
     var totalPrice: String {
         switch self {
         case .monthly: return "$19.99/month"
-        case .sixMonth: return "$89.94 total"
-        case .annual: return "$119.88 total"
+        case .sixMonth: return "$89.99 total"
+        case .annual: return "$119.99 total"
         }
     }
 

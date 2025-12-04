@@ -40,11 +40,10 @@ enum AppConstants {
     
     // MARK: - Premium Pricing
     enum Premium {
-        static let monthlyPrice = 9.99
-        static let threeMonthPrice = 24.99
-        static let yearlyPrice = 79.99
-        static let lifetimePrice = 199.99
-        
+        static let monthlyPrice = 19.99
+        static let sixMonthPrice = 89.99
+        static let yearlyPrice = 119.99
+
         // Features
         static let freeSwipesPerDay = 50
         static let premiumUnlimitedSwipes = true
