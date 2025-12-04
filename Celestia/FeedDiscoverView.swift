@@ -1350,7 +1350,7 @@ struct PhotoGalleryView: View {
                                         fixedHeight: imageGeometry.size.height
                                     )
                                     .frame(width: imageGeometry.size.width, height: imageGeometry.size.height)
-                                    .contentShape(Rectangle())
+                                    .allowsHitTesting(false)
                                 }
                                 .tag(index)
                             }
