@@ -7,6 +7,7 @@
 
 import SwiftUI
 import FirebaseFirestore
+import Combine
 
 struct PrivacySettingsView: View {
     @EnvironmentObject var authService: AuthService
@@ -27,8 +28,8 @@ struct PrivacySettingsView: View {
                         // Profile Visibility
                         profileVisibilitySection
 
-                        // Activity Status
-                        activityStatusSection
+                        // Chat Settings
+                        chatSettingsSection
 
                         // Blocked Users
                         blockedUsersSection
@@ -104,21 +105,14 @@ struct PrivacySettingsView: View {
             .padding(.horizontal)
 
             VStack(spacing: 12) {
-                VisibilityOptionCard(
+                PrivacyToggleCard(
                     title: "Show Me in Discovery",
                     description: "Appear in other users' discovery feed",
                     isOn: $viewModel.showInDiscovery,
                     icon: "magnifyingglass"
                 )
 
-                VisibilityOptionCard(
-                    title: "Show My Distance",
-                    description: "Display distance to other users",
-                    isOn: $viewModel.showDistance,
-                    icon: "location.fill"
-                )
-
-                VisibilityOptionCard(
+                PrivacyToggleCard(
                     title: "Show Online Status",
                     description: "Let others see when you're online",
                     isOn: $viewModel.showOnlineStatus,
@@ -129,9 +123,9 @@ struct PrivacySettingsView: View {
         }
     }
 
-    // MARK: - Activity Status
+    // MARK: - Chat Settings
 
-    private var activityStatusSection: some View {
+    private var chatSettingsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
                 Image(systemName: "message.fill")
@@ -143,14 +137,14 @@ struct PrivacySettingsView: View {
             .padding(.horizontal)
 
             VStack(spacing: 12) {
-                VisibilityOptionCard(
+                PrivacyToggleCard(
                     title: "Show Typing Indicator",
                     description: "Let others see when you're typing",
                     isOn: $viewModel.showTypingIndicator,
                     icon: "ellipsis.bubble.fill"
                 )
 
-                VisibilityOptionCard(
+                PrivacyToggleCard(
                     title: "Show Read Receipts",
                     description: "Let senders know when you've read messages",
                     isOn: $viewModel.showReadReceipts,
@@ -208,9 +202,9 @@ struct PrivacySettingsView: View {
     }
 }
 
-// MARK: - Supporting Views
+// MARK: - Privacy Toggle Card
 
-struct VisibilityOptionCard: View {
+struct PrivacyToggleCard: View {
     let title: String
     let description: String
     @Binding var isOn: Bool
@@ -245,26 +239,55 @@ struct VisibilityOptionCard: View {
 
 @MainActor
 class PrivacySettingsViewModel: ObservableObject {
-    @Published var showInDiscovery = true
-    @Published var showDistance = true
-    @Published var showOnlineStatus = true
-    @Published var showTypingIndicator = true
-    @Published var showReadReceipts = true
+    @Published var showInDiscovery: Bool = true {
+        didSet { saveSetting("showInDiscovery", value: showInDiscovery) }
+    }
+    @Published var showOnlineStatus: Bool = true {
+        didSet { saveSetting("showOnlineStatus", value: showOnlineStatus) }
+    }
+    @Published var showTypingIndicator: Bool = true {
+        didSet { saveSetting("showTypingIndicator", value: showTypingIndicator) }
+    }
+    @Published var showReadReceipts: Bool = true {
+        didSet { saveSetting("showReadReceipts", value: showReadReceipts) }
+    }
     @Published var blockedUsersCount = 0
 
     private let db = Firestore.firestore()
     private let userDefaults = UserDefaults.standard
+    private var isLoading = true // Prevent saving during initial load
 
     func loadSettings() {
-        // Load from UserDefaults
-        showInDiscovery = userDefaults.bool(forKey: "showInDiscovery")
-        showDistance = userDefaults.bool(forKey: "showDistance")
-        showOnlineStatus = userDefaults.bool(forKey: "showOnlineStatus")
-        showTypingIndicator = userDefaults.bool(forKey: "showTypingIndicator")
-        showReadReceipts = userDefaults.bool(forKey: "showReadReceipts")
+        isLoading = true
+
+        // Load from UserDefaults with proper defaults (true if not set)
+        showInDiscovery = userDefaults.object(forKey: "showInDiscovery") as? Bool ?? true
+        showOnlineStatus = userDefaults.object(forKey: "showOnlineStatus") as? Bool ?? true
+        showTypingIndicator = userDefaults.object(forKey: "showTypingIndicator") as? Bool ?? true
+        showReadReceipts = userDefaults.object(forKey: "showReadReceipts") as? Bool ?? true
 
         // Load blocked count
         loadBlockedCount()
+
+        isLoading = false
+    }
+
+    private func saveSetting(_ key: String, value: Bool) {
+        guard !isLoading else { return }
+
+        // Save to UserDefaults
+        userDefaults.set(value, forKey: key)
+
+        // Save to Firestore
+        guard let userId = AuthService.shared.currentUser?.id else { return }
+
+        db.collection("users").document(userId).updateData([
+            "privacySettings.\(key)": value
+        ]) { error in
+            if let error = error {
+                Logger.shared.error("Failed to save privacy setting", category: .database, error: error)
+            }
+        }
     }
 
     private func loadBlockedCount() {
