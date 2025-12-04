@@ -16,12 +16,22 @@ struct SeeWhoLikesYouView: View {
     @State private var showUpgradeSheet = false
     @State private var selectedUser: User?
     @State private var showUserProfile = false
+    @State private var animateHeader = false
 
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(.systemGroupedBackground)
-                    .ignoresSafeArea()
+                // Premium gradient background
+                LinearGradient(
+                    colors: [
+                        Color.pink.opacity(0.08),
+                        Color.purple.opacity(0.05),
+                        Color(.systemGroupedBackground)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
 
                 ScrollView {
                     VStack(spacing: 20) {
@@ -60,6 +70,9 @@ struct SeeWhoLikesYouView: View {
             .task {
                 await viewModel.loadUsersWhoLiked()
             }
+            .onAppear {
+                animateHeader = true
+            }
             .sheet(isPresented: $showUpgradeSheet) {
                 PremiumUpgradeView()
                     .environmentObject(authService)
@@ -76,29 +89,74 @@ struct SeeWhoLikesYouView: View {
     // MARK: - Header
 
     private var headerView: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 12) {
-                Image(systemName: "heart.fill")
-                    .font(.title)
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.pink, .purple],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+        VStack(spacing: 16) {
+            ZStack {
+                // Radial glow
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                Color.pink.opacity(0.3),
+                                Color.purple.opacity(0.15),
+                                Color.clear
+                            ],
+                            center: .center,
+                            startRadius: 20,
+                            endRadius: 80
                         )
                     )
+                    .frame(width: 160, height: 160)
+                    .scaleEffect(animateHeader ? 1.05 : 1.0)
+                    .animation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true), value: animateHeader)
 
-                Text("\(viewModel.usersWhoLiked.count)")
-                    .font(.system(size: 48, weight: .bold))
-                    .foregroundColor(.primary)
+                HStack(spacing: 12) {
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 36))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.pink, .purple],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .symbolEffect(.pulse, options: .repeating)
+
+                    Text("\(viewModel.usersWhoLiked.count)")
+                        .font(.system(size: 56, weight: .bold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.pink, .purple],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                }
             }
 
             Text(viewModel.usersWhoLiked.count == 1 ? "person likes you" : "people like you")
                 .font(.title3)
+                .fontWeight(.medium)
                 .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 20)
+        .padding(.vertical, 24)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.systemBackground))
+                .shadow(color: .pink.opacity(0.08), radius: 15, y: 5)
+                .shadow(color: .black.opacity(0.03), radius: 5, y: 2)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [Color.pink.opacity(0.15), Color.purple.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
     }
 
     // MARK: - Premium Promo Banner
@@ -108,10 +166,39 @@ struct SeeWhoLikesYouView: View {
             showUpgradeSheet = true
             HapticManager.shared.impact(.medium)
         } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "crown.fill")
-                    .font(.title2)
-                    .foregroundColor(.orange)
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [.orange.opacity(0.25), .orange.opacity(0.1), Color.clear],
+                                center: .center,
+                                startRadius: 5,
+                                endRadius: 28
+                            )
+                        )
+                        .frame(width: 56, height: 56)
+
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [.orange.opacity(0.2), .yellow.opacity(0.15)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 44, height: 44)
+
+                    Image(systemName: "crown.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.orange, .yellow],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Upgrade to Premium")
@@ -126,17 +213,27 @@ struct SeeWhoLikesYouView: View {
                 Spacer()
 
                 Image(systemName: "chevron.right")
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.secondary.opacity(0.6))
             }
-            .padding()
+            .padding(16)
             .background(
-                LinearGradient(
-                    colors: [Color.orange.opacity(0.1), Color.pink.opacity(0.1)],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .orange.opacity(0.1), radius: 12, y: 5)
+                    .shadow(color: .black.opacity(0.03), radius: 4, y: 2)
             )
-            .cornerRadius(16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [Color.orange.opacity(0.2), Color.yellow.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            )
         }
     }
 
@@ -188,11 +285,39 @@ struct SeeWhoLikesYouView: View {
 
     private var emptyStateView: some View {
         VStack(spacing: 24) {
-            Image(systemName: "heart.slash")
-                .font(.system(size: 80))
-                .foregroundColor(.gray.opacity(0.5))
+            ZStack {
+                // Radial glow
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                Color.gray.opacity(0.15),
+                                Color.gray.opacity(0.05),
+                                Color.clear
+                            ],
+                            center: .center,
+                            startRadius: 30,
+                            endRadius: 80
+                        )
+                    )
+                    .frame(width: 160, height: 160)
 
-            VStack(spacing: 8) {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.gray.opacity(0.1), .gray.opacity(0.05)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 120, height: 120)
+
+                Image(systemName: "heart.slash")
+                    .font(.system(size: 50))
+                    .foregroundColor(.gray.opacity(0.5))
+            }
+
+            VStack(spacing: 10) {
                 Text("No Likes Yet")
                     .font(.title2)
                     .fontWeight(.bold)
@@ -204,6 +329,12 @@ struct SeeWhoLikesYouView: View {
             }
         }
         .padding(.vertical, 60)
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.04), radius: 12, y: 4)
+        )
     }
 }
 
@@ -262,15 +393,27 @@ struct LikeCardView: View {
                             .blur(radius: 20)
                             .frame(height: 180)
 
-                        VStack {
+                        VStack(spacing: 8) {
                             Spacer()
-                            Image(systemName: "lock.fill")
-                                .font(.title)
-                                .foregroundColor(.white)
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [.orange.opacity(0.3), .yellow.opacity(0.2)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 50, height: 50)
+
+                                Image(systemName: "lock.fill")
+                                    .font(.title2)
+                                    .foregroundColor(.white)
+                            }
 
                             Text("Premium")
                                 .font(.caption)
-                                .fontWeight(.semibold)
+                                .fontWeight(.bold)
                                 .foregroundColor(.white)
                             Spacer()
                         }
@@ -313,10 +456,18 @@ struct LikeCardView: View {
             }
             .background(Color(.systemBackground))
             .cornerRadius(16)
-            .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
+            .shadow(color: .pink.opacity(0.08), radius: 10, y: 5)
+            .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.gray.opacity(0.1), lineWidth: 1)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [Color.pink.opacity(0.12), Color.purple.opacity(0.08)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
             )
         }
         .buttonStyle(ScaleButtonStyle())
