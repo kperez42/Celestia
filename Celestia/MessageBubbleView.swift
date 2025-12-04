@@ -10,13 +10,15 @@ import SwiftUI
 struct MessageBubble: View {
     let message: Message
     let isFromCurrentUser: Bool
-    
+
+    @State private var showFullScreenImage = false
+
     var body: some View {
         HStack {
             if isFromCurrentUser {
                 Spacer(minLength: 60)
             }
-            
+
             VStack(alignment: isFromCurrentUser ? .trailing : .leading, spacing: 4) {
                 // Message content
                 if let imageURL = message.imageURL, !imageURL.isEmpty {
@@ -36,6 +38,13 @@ struct MessageBubble: View {
                             .overlay(
                                 ProgressView()
                             )
+                    }
+                    .onTapGesture {
+                        showFullScreenImage = true
+                        HapticManager.shared.impact(.light)
+                    }
+                    .fullScreenCover(isPresented: $showFullScreenImage) {
+                        FullScreenMessageImageViewer(imageURL: imageURL, isPresented: $showFullScreenImage)
                     }
                 } else {
                     // Text message
@@ -126,6 +135,7 @@ struct MessageBubbleGradient: View {
 
     @State private var showReactionPicker = false
     @State private var showContextMenu = false
+    @State private var showFullScreenImage = false
 
     // Common reaction emojis
     private let quickReactions = ["❤️", "😂", "😮", "😢", "👍", "🔥"]
@@ -163,6 +173,13 @@ struct MessageBubbleGradient: View {
                                     ProgressView()
                                         .progressViewStyle(CircularProgressViewStyle(tint: .gray))
                                 )
+                        }
+                        .onTapGesture {
+                            showFullScreenImage = true
+                            HapticManager.shared.impact(.light)
+                        }
+                        .fullScreenCover(isPresented: $showFullScreenImage) {
+                            FullScreenMessageImageViewer(imageURL: imageURL, isPresented: $showFullScreenImage)
                         }
 
                         // Caption if text exists
@@ -575,5 +592,127 @@ extension Date {
             )
         }
         .padding()
+    }
+}
+
+// MARK: - Full Screen Message Image Viewer
+
+struct FullScreenMessageImageViewer: View {
+    let imageURL: String
+    @Binding var isPresented: Bool
+
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @State private var dismissDragOffset: CGFloat = 0
+
+    private let dismissThreshold: CGFloat = 150
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                // Black background with opacity based on drag
+                Color.black
+                    .opacity(max(0, 1 - (dismissDragOffset / 300)))
+                    .ignoresSafeArea()
+
+                // Zoomable image
+                CachedAsyncImage(url: URL(string: imageURL)) { image in
+                    image
+                        .resizable()
+                        .scaledToFit()
+                        .scaleEffect(scale)
+                        .offset(y: dismissDragOffset)
+                        .gesture(
+                            MagnificationGesture()
+                                .onChanged { value in
+                                    let newScale = lastScale * value
+                                    scale = min(max(newScale, 1.0), 4.0)
+                                }
+                                .onEnded { _ in
+                                    lastScale = scale
+                                    if scale < 1.0 {
+                                        withAnimation(.spring()) {
+                                            scale = 1.0
+                                            lastScale = 1.0
+                                        }
+                                    }
+                                }
+                        )
+                        .gesture(
+                            DragGesture()
+                                .onChanged { value in
+                                    // Only allow vertical drag for dismiss when not zoomed
+                                    if scale <= 1.0 && value.translation.height > 0 {
+                                        dismissDragOffset = value.translation.height
+                                    }
+                                }
+                                .onEnded { value in
+                                    if value.translation.height > dismissThreshold {
+                                        HapticManager.shared.impact(.light)
+                                        withAnimation(.easeOut(duration: 0.2)) {
+                                            dismissDragOffset = geometry.size.height
+                                        }
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                            isPresented = false
+                                        }
+                                    } else {
+                                        withAnimation(.spring()) {
+                                            dismissDragOffset = 0
+                                        }
+                                    }
+                                }
+                        )
+                        .onTapGesture(count: 2) {
+                            // Double tap to zoom in/out
+                            withAnimation(.spring()) {
+                                if scale > 1.0 {
+                                    scale = 1.0
+                                    lastScale = 1.0
+                                } else {
+                                    scale = 2.0
+                                    lastScale = 2.0
+                                }
+                            }
+                        }
+                } placeholder: {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(1.5)
+                }
+
+                // Close button
+                VStack {
+                    HStack {
+                        Button {
+                            HapticManager.shared.impact(.light)
+                            isPresented = false
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.title3.weight(.semibold))
+                                .foregroundColor(.white)
+                                .frame(width: 40, height: 40)
+                                .background(Color.black.opacity(0.5))
+                                .clipShape(Circle())
+                        }
+
+                        Spacer()
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 60)
+
+                    Spacer()
+
+                    // Hint text
+                    Text("Pinch to zoom • Swipe down to close")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.6))
+                        .padding(.bottom, 40)
+                }
+                .opacity(max(0, 1 - (dismissDragOffset / 150)))
+            }
+        }
+        .background(Color.black)
+        .ignoresSafeArea()
     }
 }
