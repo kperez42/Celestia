@@ -104,21 +104,12 @@ struct PrivacySettingsView: View {
             }
             .padding(.horizontal)
 
-            VStack(spacing: 12) {
-                PrivacyToggleCard(
-                    title: "Show Me in Discovery",
-                    description: "Appear in other users' discovery feed",
-                    isOn: $viewModel.showInDiscovery,
-                    icon: "magnifyingglass"
-                )
-
-                PrivacyToggleCard(
-                    title: "Show Online Status",
-                    description: "Let others see when you're online",
-                    isOn: $viewModel.showOnlineStatus,
-                    icon: "circle.fill"
-                )
-            }
+            PrivacyToggleCard(
+                title: "Show Online Status",
+                description: "Let others see when you're online",
+                isOn: $viewModel.showOnlineStatus,
+                icon: "circle.fill"
+            )
             .padding(.horizontal)
         }
     }
@@ -239,9 +230,6 @@ struct PrivacyToggleCard: View {
 
 @MainActor
 class PrivacySettingsViewModel: ObservableObject {
-    @Published var showInDiscovery: Bool = true {
-        didSet { saveSetting("showInDiscovery", value: showInDiscovery) }
-    }
     @Published var showOnlineStatus: Bool = true {
         didSet { saveSetting("showOnlineStatus", value: showOnlineStatus) }
     }
@@ -261,7 +249,6 @@ class PrivacySettingsViewModel: ObservableObject {
         isLoading = true
 
         // Load from UserDefaults with proper defaults (true if not set)
-        showInDiscovery = userDefaults.object(forKey: "showInDiscovery") as? Bool ?? true
         showOnlineStatus = userDefaults.object(forKey: "showOnlineStatus") as? Bool ?? true
         showTypingIndicator = userDefaults.object(forKey: "showTypingIndicator") as? Bool ?? true
         showReadReceipts = userDefaults.object(forKey: "showReadReceipts") as? Bool ?? true
