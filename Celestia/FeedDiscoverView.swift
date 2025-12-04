@@ -71,15 +71,36 @@ struct FeedDiscoverView: View {
                             showFilters = true
                         } label: {
                             ZStack(alignment: .topTrailing) {
-                                Image(systemName: "slider.horizontal.3")
-                                    .font(.title3)
-                                    .foregroundColor(.purple)
+                                ZStack {
+                                    Circle()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [Color.purple.opacity(0.12), Color.pink.opacity(0.08)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .frame(width: 36, height: 36)
+                                    Image(systemName: "slider.horizontal.3")
+                                        .font(.callout.weight(.medium))
+                                        .foregroundStyle(
+                                            LinearGradient(colors: [.purple, .pink], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                        )
+                                }
 
                                 if filters.hasActiveFilters {
-                                    Circle()
-                                        .fill(Color.red)
-                                        .frame(width: 8, height: 8)
-                                        .offset(x: 2, y: -2)
+                                    ZStack {
+                                        Circle()
+                                            .fill(Color.red.opacity(0.3))
+                                            .frame(width: 14, height: 14)
+                                            .blur(radius: 2)
+                                        Circle()
+                                            .fill(
+                                                LinearGradient(colors: [.red, .pink], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                            )
+                                            .frame(width: 10, height: 10)
+                                    }
+                                    .offset(x: 4, y: -2)
                                 }
                             }
                         }
@@ -259,19 +280,45 @@ struct FeedDiscoverView: View {
 
                 // Loading indicator with instant appearance
                 if isLoading {
-                    HStack(spacing: 12) {
-                        ProgressView()
-                            .tint(.purple)
+                    HStack(spacing: 14) {
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color.purple.opacity(0.12), Color.pink.opacity(0.08)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 40, height: 40)
+                            ProgressView()
+                                .tint(.purple)
+                        }
 
                         Text("Finding more people...")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(
+                                LinearGradient(colors: [.purple, .pink], startPoint: .leading, endPoint: .trailing)
+                            )
                     }
-                    .padding()
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 14)
                     .background(
-                        RoundedRectangle(cornerRadius: 12)
+                        RoundedRectangle(cornerRadius: 20)
                             .fill(Color(.systemBackground))
-                            .shadow(color: Color.black.opacity(0.05), radius: 8)
+                            .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
+                            .shadow(color: .purple.opacity(0.08), radius: 20, y: 8)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [Color.purple.opacity(0.2), Color.pink.opacity(0.1)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1
+                            )
                     )
                     .transition(.opacity)
                 }
@@ -305,22 +352,26 @@ struct FeedDiscoverView: View {
 
     private var toastView: some View {
         VStack {
-            HStack(spacing: 12) {
-                Image(systemName: toastIcon)
-                    .font(.title3)
-                    .foregroundColor(.white)
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.2))
+                        .frame(width: 40, height: 40)
+                    Image(systemName: toastIcon)
+                        .font(.title3.weight(.semibold))
+                        .foregroundColor(.white)
+                }
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text(toastMessage)
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
+                        .font(.subheadline.weight(.bold))
                         .foregroundColor(.white)
 
                     // Show navigation hint for save toasts
                     if toastIcon == "star.fill" && toastColor == .orange {
                         Text("Tap to view saved profiles")
                             .font(.caption2)
-                            .foregroundColor(.white.opacity(0.9))
+                            .foregroundColor(.white.opacity(0.85))
                     }
                 }
 
@@ -328,16 +379,38 @@ struct FeedDiscoverView: View {
 
                 // Show arrow for save toasts to indicate it's tappable
                 if toastIcon == "star.fill" && toastColor == .orange {
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.7))
+                    ZStack {
+                        Circle()
+                            .fill(Color.white.opacity(0.15))
+                            .frame(width: 28, height: 28)
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.bold))
+                            .foregroundColor(.white)
+                    }
                 }
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, 18)
             .padding(.vertical, 14)
-            .background(toastColor)
-            .cornerRadius(12)
-            .shadow(color: toastColor.opacity(0.4), radius: 12, y: 6)
+            .background(
+                ZStack {
+                    // Glow layer
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(toastColor.opacity(0.4))
+                        .blur(radius: 8)
+                    // Main background
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(
+                            LinearGradient(
+                                colors: toastGradientColors,
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                }
+            )
+            .shadow(color: toastColor.opacity(0.5), radius: 16, y: 8)
+            .shadow(color: toastColor.opacity(0.3), radius: 6, y: 3)
+            .padding(.horizontal, 16)
             .padding(.top, 16)
             .contentShape(Rectangle())
             .onTapGesture {
@@ -354,6 +427,23 @@ struct FeedDiscoverView: View {
             Spacer()
         }
         .transition(.opacity)
+    }
+
+    private var toastGradientColors: [Color] {
+        switch toastColor {
+        case .pink:
+            return [.pink, .red, .pink.opacity(0.9)]
+        case .orange:
+            return [.orange, .yellow, .orange.opacity(0.9)]
+        case .green:
+            return [.green, .mint, .green.opacity(0.9)]
+        case .red:
+            return [.red, .pink, .red.opacity(0.9)]
+        case .gray:
+            return [.gray, .gray.opacity(0.7), .gray.opacity(0.9)]
+        default:
+            return [toastColor, toastColor.opacity(0.8), toastColor.opacity(0.9)]
+        }
     }
 
     // MARK: - Helper Methods
@@ -787,32 +877,81 @@ struct FeedDiscoverView: View {
     }
 
     private var endOfResultsView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 40))
-                .foregroundColor(.green)
+        VStack(spacing: 20) {
+            ZStack {
+                // Outer glow ring
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [Color.green.opacity(0.15), Color.mint.opacity(0.08), Color.clear],
+                            center: .center,
+                            startRadius: 20,
+                            endRadius: 70
+                        )
+                    )
+                    .frame(width: 120, height: 120)
 
-            Text("You've seen everyone!")
-                .font(.headline)
+                // Inner circle background
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.green.opacity(0.15), Color.mint.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 80, height: 80)
 
-            Text("Check back later for new profiles")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 44))
+                    .foregroundStyle(
+                        LinearGradient(colors: [.green, .mint], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    )
+                    .shadow(color: .green.opacity(0.3), radius: 8, y: 4)
+            }
+
+            VStack(spacing: 8) {
+                Text("You've seen everyone!")
+                    .font(.title3.weight(.bold))
+
+                Text("Check back later for new profiles")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
 
             Button {
                 Task {
                     await refreshFeed()
                 }
             } label: {
-                HStack {
+                HStack(spacing: 10) {
                     Image(systemName: "arrow.clockwise")
+                        .font(.subheadline.weight(.semibold))
                     Text("Refresh")
+                        .font(.subheadline.weight(.semibold))
                 }
-                .foregroundColor(.purple)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10)
-                .background(Color.purple.opacity(0.1))
-                .cornerRadius(10)
+                .foregroundStyle(
+                    LinearGradient(colors: [.purple, .pink], startPoint: .leading, endPoint: .trailing)
+                )
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
+                .background(
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.purple.opacity(0.12), Color.pink.opacity(0.08)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                )
+                .overlay(
+                    Capsule()
+                        .stroke(
+                            LinearGradient(colors: [.purple.opacity(0.3), .pink.opacity(0.2)], startPoint: .leading, endPoint: .trailing),
+                            lineWidth: 1
+                        )
+                )
             }
         }
         .padding(40)
@@ -822,55 +961,123 @@ struct FeedDiscoverView: View {
 
     private var matchCelebrationView: some View {
         ZStack {
-            Color.black.opacity(0.8)
-                .ignoresSafeArea()
+            // Background with radial gradient
+            ZStack {
+                Color.black.opacity(0.9)
+                RadialGradient(
+                    colors: [Color.purple.opacity(0.3), Color.pink.opacity(0.2), Color.clear],
+                    center: .center,
+                    startRadius: 50,
+                    endRadius: 400
+                )
+            }
+            .ignoresSafeArea()
 
-            VStack(spacing: 30) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 80))
-                    .foregroundColor(.yellow)
+            VStack(spacing: 32) {
+                // Animated sparkles icon with glow
+                ZStack {
+                    // Outer glow
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [Color.yellow.opacity(0.4), Color.orange.opacity(0.2), Color.clear],
+                                center: .center,
+                                startRadius: 30,
+                                endRadius: 100
+                            )
+                        )
+                        .frame(width: 180, height: 180)
 
-                Text("It's a Match! 🎉")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
+                    // Inner glow ring
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.yellow.opacity(0.2), Color.orange.opacity(0.15)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 120, height: 120)
 
-                if let user = matchedUser {
-                    Text("You and \(user.fullName) liked each other!")
-                        .font(.title3)
-                        .foregroundColor(.white)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(2)
-                        .truncationMode(.tail)
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 70, weight: .medium))
+                        .foregroundStyle(
+                            LinearGradient(colors: [.yellow, .orange], startPoint: .topLeading, endPoint: .bottomTrailing)
+                        )
+                        .shadow(color: .yellow.opacity(0.6), radius: 20, y: 0)
                 }
 
-                Button("Send Message") {
-                    // Navigate to Messages tab and open chat with matched user
-                    if let matchedUser = matchedUser, let matchedUserId = matchedUser.id {
-                        selectedTab = 2
-                        showMatchAnimation = false
-                        HapticManager.shared.notification(.success)
+                VStack(spacing: 12) {
+                    Text("It's a Match!")
+                        .font(.system(size: 36, weight: .bold))
+                        .foregroundStyle(
+                            LinearGradient(colors: [.white, .white.opacity(0.9)], startPoint: .top, endPoint: .bottom)
+                        )
 
-                        // Small delay to ensure Messages tab loads before opening chat
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            NotificationCenter.default.post(
-                                name: .openChatWithUser,
-                                object: nil,
-                                userInfo: ["userId": matchedUserId, "user": matchedUser]
-                            )
-                        }
-
-                        Logger.shared.info("Navigating to messages for match: \(matchedUserId)", category: .ui)
+                    if let user = matchedUser {
+                        Text("You and \(user.fullName) liked each other!")
+                            .font(.title3)
+                            .foregroundColor(.white.opacity(0.85))
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+                            .truncationMode(.tail)
                     }
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.purple)
-                .controlSize(.large)
 
-                Button("Keep Browsing") {
-                    showMatchAnimation = false
+                VStack(spacing: 16) {
+                    Button {
+                        // Navigate to Messages tab and open chat with matched user
+                        if let matchedUser = matchedUser, let matchedUserId = matchedUser.id {
+                            selectedTab = 2
+                            showMatchAnimation = false
+                            HapticManager.shared.notification(.success)
+
+                            // Small delay to ensure Messages tab loads before opening chat
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                NotificationCenter.default.post(
+                                    name: .openChatWithUser,
+                                    object: nil,
+                                    userInfo: ["userId": matchedUserId, "user": matchedUser]
+                                )
+                            }
+
+                            Logger.shared.info("Navigating to messages for match: \(matchedUserId)", category: .ui)
+                        }
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "paperplane.fill")
+                                .font(.headline)
+                            Text("Send Message")
+                                .font(.headline.weight(.bold))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            LinearGradient(
+                                colors: [.purple, .pink, .purple.opacity(0.9)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .clipShape(Capsule())
+                        .shadow(color: .purple.opacity(0.5), radius: 12, y: 6)
+                        .shadow(color: .pink.opacity(0.3), radius: 6, y: 3)
+                    }
+
+                    Button {
+                        showMatchAnimation = false
+                    } label: {
+                        Text("Keep Browsing")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.white.opacity(0.7))
+                            .padding(.vertical, 12)
+                            .padding(.horizontal, 24)
+                            .background(Color.white.opacity(0.1))
+                            .clipShape(Capsule())
+                    }
                 }
-                .foregroundColor(.white)
+                .padding(.horizontal, 40)
             }
             .padding(40)
         }
