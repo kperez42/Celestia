@@ -7,6 +7,7 @@
 
 import SwiftUI
 import PhotosUI
+import FirebaseFirestore
 
 struct SignUpView: View {
     @EnvironmentObject var authService: AuthService
@@ -2080,61 +2081,101 @@ struct SignUpView: View {
                 )
 
                 // Update profile with additional data (bio, interests, lifestyle)
-                // Wait briefly to ensure currentUser is set after createUser
-                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 second
-
-                guard var user = authService.currentUser else {
-                    Logger.shared.error("currentUser is nil after createUser - profile data not saved", category: .authentication)
+                // Use userSession UID directly to ensure data is saved even if currentUser isn't set yet
+                guard let userId = authService.userSession?.uid else {
+                    Logger.shared.error("No user session after createUser - profile data not saved", category: .authentication)
                     return
                 }
 
-                // Set bio and interests
-                user.bio = InputSanitizer.standard(bio)
-                user.interests = Array(selectedInterests)
+                // Build the profile data update
+                var profileData: [String: Any] = [
+                    "bio": InputSanitizer.standard(bio),
+                    "interests": Array(selectedInterests),
+                    "ageRangeMin": ageRangeMin,
+                    "ageRangeMax": ageRangeMax
+                ]
 
-                // Parse height if provided
-                if !height.isEmpty {
-                    user.height = parseHeight(height)
-                    Logger.shared.info("Setting height: \(height) -> \(user.height ?? 0) cm", category: .authentication)
+                // Add height if provided
+                if !height.isEmpty, let parsedHeight = parseHeight(height) {
+                    profileData["height"] = parsedHeight
+                    Logger.shared.info("Setting height: \(height) -> \(parsedHeight) cm", category: .authentication)
                 }
 
-                // Set optional lifestyle details
+                // Add optional lifestyle details
                 if !relationshipGoal.isEmpty {
-                    user.relationshipGoal = relationshipGoal
+                    profileData["relationshipGoal"] = relationshipGoal
                 }
                 if !educationLevel.isEmpty {
-                    user.educationLevel = educationLevel
+                    profileData["educationLevel"] = educationLevel
                 }
                 if !smoking.isEmpty {
-                    user.smoking = smoking
+                    profileData["smoking"] = smoking
                 }
                 if !drinking.isEmpty {
-                    user.drinking = drinking
+                    profileData["drinking"] = drinking
                 }
                 if !religion.isEmpty && religion != "Prefer not to say" {
-                    user.religion = religion
+                    profileData["religion"] = religion
                 }
                 if !exercise.isEmpty && exercise != "Prefer not to say" {
-                    user.exercise = exercise
+                    profileData["exercise"] = exercise
                 }
                 if !diet.isEmpty && diet != "Prefer not to say" {
-                    user.diet = diet
+                    profileData["diet"] = diet
                 }
                 if !pets.isEmpty && pets != "Prefer not to say" {
-                    user.pets = pets
+                    profileData["pets"] = pets
                 }
                 if !languages.isEmpty {
-                    user.languages = languages
+                    profileData["languages"] = languages
                 }
 
-                // Set age preference
-                user.ageRangeMin = ageRangeMin
-                user.ageRangeMax = ageRangeMax
-
-                // Save updated profile data
+                // Save profile data directly to Firestore
                 do {
-                    try await authService.updateUser(user)
+                    try await Firestore.firestore().collection("users").document(userId).updateData(profileData)
                     Logger.shared.info("Profile data saved successfully - bio: \(bio.count) chars, interests: \(selectedInterests.count)", category: .authentication)
+
+                    // Also update currentUser if it's now available
+                    if var user = authService.currentUser {
+                        user.bio = InputSanitizer.standard(bio)
+                        user.interests = Array(selectedInterests)
+                        user.ageRangeMin = ageRangeMin
+                        user.ageRangeMax = ageRangeMax
+                        if !height.isEmpty {
+                            user.height = parseHeight(height)
+                        }
+                        if !relationshipGoal.isEmpty {
+                            user.relationshipGoal = relationshipGoal
+                        }
+                        if !educationLevel.isEmpty {
+                            user.educationLevel = educationLevel
+                        }
+                        if !smoking.isEmpty {
+                            user.smoking = smoking
+                        }
+                        if !drinking.isEmpty {
+                            user.drinking = drinking
+                        }
+                        if !religion.isEmpty && religion != "Prefer not to say" {
+                            user.religion = religion
+                        }
+                        if !exercise.isEmpty && exercise != "Prefer not to say" {
+                            user.exercise = exercise
+                        }
+                        if !diet.isEmpty && diet != "Prefer not to say" {
+                            user.diet = diet
+                        }
+                        if !pets.isEmpty && pets != "Prefer not to say" {
+                            user.pets = pets
+                        }
+                        if !languages.isEmpty {
+                            user.languages = languages
+                        }
+                        // Update local currentUser
+                        await MainActor.run {
+                            authService.currentUser = user
+                        }
+                    }
                 } catch {
                     Logger.shared.error("Failed to save profile data", category: .authentication, error: error)
                 }
