@@ -372,6 +372,7 @@ struct SecuritySettingsView: View {
         case .low: return "shield"
         case .medium: return "shield.lefthalf.filled"
         case .high: return "shield.checkered"
+        case .custom: return "shield.badge.plus"
         }
     }
 
