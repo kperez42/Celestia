@@ -141,10 +141,10 @@ struct SavedProfilesView: View {
                     }
                 } label: {
                     VStack(spacing: 8) {
-                        HStack(spacing: 4) {
+                        HStack(spacing: 6) {
                             Text(title)
                                 .font(.subheadline)
-                                .fontWeight(selectedTab == index ? .semibold : .medium)
+                                .fontWeight(selectedTab == index ? .bold : .medium)
 
                             // Badge count
                             let count = countForTab(index)
@@ -153,21 +153,62 @@ struct SavedProfilesView: View {
                                     .font(.caption2)
                                     .fontWeight(.bold)
                                     .foregroundColor(.white)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 3)
                                     .background(
-                                        selectedTab == index ?
-                                        Color.orange : Color.gray.opacity(0.5)
+                                        Capsule()
+                                            .fill(
+                                                selectedTab == index ?
+                                                LinearGradient(
+                                                    colors: [.orange, .pink],
+                                                    startPoint: .leading,
+                                                    endPoint: .trailing
+                                                ) :
+                                                LinearGradient(
+                                                    colors: [Color.gray.opacity(0.5), Color.gray.opacity(0.4)],
+                                                    startPoint: .leading,
+                                                    endPoint: .trailing
+                                                )
+                                            )
                                     )
-                                    .clipShape(Capsule())
+                                    .shadow(
+                                        color: selectedTab == index ? Color.orange.opacity(0.3) : .clear,
+                                        radius: 4,
+                                        y: 2
+                                    )
                             }
                         }
-                        .foregroundColor(selectedTab == index ? .orange : .gray)
+                        .foregroundStyle(
+                            selectedTab == index ?
+                            LinearGradient(
+                                colors: [.orange, .pink],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ) :
+                            LinearGradient(
+                                colors: [.gray, .gray],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
 
-                        Rectangle()
-                            .fill(selectedTab == index ? Color.orange : Color.clear)
+                        // Indicator bar with gradient
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(
+                                selectedTab == index ?
+                                LinearGradient(
+                                    colors: [.orange, .pink, .orange.opacity(0.8)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                ) :
+                                LinearGradient(colors: [.clear], startPoint: .leading, endPoint: .trailing)
+                            )
                             .frame(height: 3)
-                            .cornerRadius(1.5)
+                            .shadow(
+                                color: selectedTab == index ? Color.orange.opacity(0.4) : .clear,
+                                radius: 3,
+                                y: 1
+                            )
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -175,7 +216,8 @@ struct SavedProfilesView: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 12)
-        .background(Color.white)
+        .padding(.bottom, 4)
+        .background(Color(.systemBackground))
     }
 
     private func countForTab(_ index: Int) -> Int {
@@ -538,46 +580,89 @@ struct SavedProfilesView: View {
 
     // MARK: - Empty State
 
-    private func emptyStateView(message: String, hint: String) -> some View {
-        VStack(spacing: 24) {
-            Image(systemName: "bookmark.slash")
-                .font(.system(size: 80))
-                .foregroundColor(.gray.opacity(0.5))
+    @State private var emptyStatePulse: CGFloat = 1.0
 
-            VStack(spacing: 8) {
+    private func emptyStateView(message: String, hint: String) -> some View {
+        VStack(spacing: 28) {
+            // Icon with animated glow
+            ZStack {
+                // Outer pulsing glow
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [Color.orange.opacity(0.2), Color.pink.opacity(0.1), Color.clear],
+                            center: .center,
+                            startRadius: 30,
+                            endRadius: 90
+                        )
+                    )
+                    .frame(width: 180, height: 180)
+                    .scaleEffect(emptyStatePulse)
+
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.orange.opacity(0.15), Color.pink.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 140, height: 140)
+                    .shadow(color: .orange.opacity(0.15), radius: 20)
+
+                Image(systemName: "bookmark.slash")
+                    .font(.system(size: 60))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.orange, .pink, .orange.opacity(0.8)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .shadow(color: .orange.opacity(0.3), radius: 8, y: 4)
+            }
+            .onAppear {
+                withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
+                    emptyStatePulse = 1.1
+                }
+            }
+
+            VStack(spacing: 12) {
                 Text(message)
-                    .font(.title2)
-                    .fontWeight(.bold)
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(.primary)
 
                 Text(hint)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
+                    .padding(.horizontal, 36)
             }
 
-            // CTA button to go back to discovering
+            // CTA button with enhanced styling
             Button {
                 dismiss()
                 HapticManager.shared.impact(.light)
             } label: {
-                HStack(spacing: 8) {
+                HStack(spacing: 10) {
                     Image(systemName: "sparkles")
                         .font(.body.weight(.semibold))
                     Text("Start Discovering")
                         .font(.headline)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
+                .padding(.vertical, 18)
                 .foregroundColor(.white)
                 .background(
                     LinearGradient(
-                        colors: [.purple, .pink],
+                        colors: [.orange, .pink, .purple.opacity(0.9)],
                         startPoint: .leading,
                         endPoint: .trailing
                     )
                 )
-                .cornerRadius(16)
+                .cornerRadius(28)
+                .shadow(color: .orange.opacity(0.4), radius: 16, y: 8)
+                .shadow(color: .pink.opacity(0.2), radius: 8, y: 4)
             }
             .padding(.horizontal, 40)
             .padding(.top, 8)

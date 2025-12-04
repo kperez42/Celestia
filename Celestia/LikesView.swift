@@ -75,8 +75,16 @@ struct LikesView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(.systemGroupedBackground)
-                    .ignoresSafeArea()
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.98, green: 0.95, blue: 0.98),
+                        Color(red: 0.99, green: 0.97, blue: 0.99),
+                        Color.white
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
 
                 VStack(spacing: 0) {
                     // Header
@@ -351,58 +359,81 @@ struct LikesView: View {
 
     private var headerView: some View {
         ZStack {
+            // Premium gradient background
             LinearGradient(
                 colors: [
-                    Color.pink.opacity(0.9),
-                    Color.pink.opacity(0.7),
-                    Color.purple.opacity(0.5)
+                    Color.pink.opacity(0.95),
+                    Color.pink.opacity(0.8),
+                    Color.purple.opacity(0.65)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
 
+            // Radial glow overlay
+            RadialGradient(
+                colors: [
+                    Color.white.opacity(0.15),
+                    Color.clear
+                ],
+                center: .topLeading,
+                startRadius: 20,
+                endRadius: 300
+            )
+
             VStack(spacing: 12) {
                 HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 6) {
                         Text("Likes")
-                            .font(.largeTitle.weight(.bold))
+                            .font(.system(size: 32, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
+                            .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
                             .dynamicTypeSize(min: .large, max: .accessibility2)
 
-                        HStack(spacing: 8) {
+                        HStack(spacing: 10) {
                             HStack(spacing: 4) {
                                 Image(systemName: "heart.fill")
                                     .font(.caption)
                                 Text("\(viewModel.totalLikesReceived)")
-                                    .fontWeight(.semibold)
+                                    .fontWeight(.bold)
                             }
-
-                            Circle()
-                                .fill(Color.white.opacity(0.5))
-                                .frame(width: 4, height: 4)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(Color.white.opacity(0.2))
+                            .cornerRadius(12)
 
                             HStack(spacing: 4) {
                                 Image(systemName: "heart")
                                     .font(.caption)
-                                Text("\(viewModel.totalLikesSent) sent")
-                                    .fontWeight(.semibold)
+                                Text("\(viewModel.totalLikesSent)")
+                                    .fontWeight(.bold)
                             }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(Color.white.opacity(0.15))
+                            .cornerRadius(12)
 
                             if viewModel.mutualLikes.count > 0 {
-                                Circle()
-                                    .fill(Color.white.opacity(0.5))
-                                    .frame(width: 4, height: 4)
-
                                 HStack(spacing: 4) {
                                     Image(systemName: "heart.circle.fill")
                                         .font(.caption)
-                                    Text("\(viewModel.mutualLikes.count) mutual")
-                                        .fontWeight(.semibold)
+                                    Text("\(viewModel.mutualLikes.count)")
+                                        .fontWeight(.bold)
                                 }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                                .background(
+                                    LinearGradient(
+                                        colors: [Color.white.opacity(0.25), Color.white.opacity(0.15)],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .cornerRadius(12)
                             }
                         }
                         .font(.caption)
-                        .foregroundColor(.white.opacity(0.95))
+                        .foregroundColor(.white)
                     }
 
                     Spacer()
@@ -412,28 +443,40 @@ struct LikesView: View {
                             premiumBadge
                         }
 
-                        // Filter button
+                        // Filter button with gradient
                         Button {
                             showFilters = true
                             HapticManager.shared.impact(.light)
                         } label: {
                             HStack(spacing: 6) {
-                                Image(systemName: "line.3.horizontal.decrease.circle")
+                                Image(systemName: "line.3.horizontal.decrease.circle.fill")
                                     .font(.system(size: 14))
                                 Text("Filter")
-                                    .font(.caption)
-                                    .fontWeight(.medium)
+                                    .font(.caption.weight(.semibold))
                                 if selectedAgeFilter != .all || selectedSortOption != .recent {
                                     Circle()
-                                        .fill(Color.yellow)
-                                        .frame(width: 6, height: 6)
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [.yellow, .orange],
+                                                startPoint: .top,
+                                                endPoint: .bottom
+                                            )
+                                        )
+                                        .frame(width: 7, height: 7)
+                                        .shadow(color: .yellow.opacity(0.5), radius: 3)
                                 }
                             }
-                            .foregroundColor(.white.opacity(0.9))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(Color.white.opacity(0.2))
-                            .cornerRadius(20)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .background(
+                                Capsule()
+                                    .fill(Color.white.opacity(0.2))
+                                    .overlay(
+                                        Capsule()
+                                            .strokeBorder(Color.white.opacity(0.3), lineWidth: 1)
+                                    )
+                            )
                         }
                     }
                 }
@@ -442,7 +485,7 @@ struct LikesView: View {
             }
             .padding(.bottom, 16)
         }
-        .frame(height: 110)
+        .frame(height: 120)
     }
 
     private var premiumBadge: some View {
@@ -450,20 +493,39 @@ struct LikesView: View {
             Image(systemName: "crown.fill")
                 .font(.caption)
             Text("Premium")
-                .font(.caption)
-                .fontWeight(.semibold)
+                .font(.caption.weight(.bold))
         }
-        .foregroundColor(.yellow)
+        .foregroundStyle(
+            LinearGradient(
+                colors: [.yellow, .orange.opacity(0.9)],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        )
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(
             Capsule()
-                .fill(Color.yellow.opacity(0.2))
+                .fill(
+                    LinearGradient(
+                        colors: [Color.yellow.opacity(0.25), Color.orange.opacity(0.15)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
                 .overlay(
                     Capsule()
-                        .stroke(Color.yellow.opacity(0.5), lineWidth: 1)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [Color.yellow.opacity(0.6), Color.orange.opacity(0.4)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
                 )
         )
+        .shadow(color: .yellow.opacity(0.3), radius: 6, y: 2)
     }
 
     // MARK: - Tab Selector
@@ -478,33 +540,55 @@ struct LikesView: View {
                     }
                 } label: {
                     VStack(spacing: 8) {
-                        HStack(spacing: 4) {
+                        HStack(spacing: 5) {
                             Text(title)
                                 .font(.subheadline)
                                 .fontWeight(selectedTab == index ? .semibold : .medium)
 
-                            // Badge count
+                            // Badge count with gradient
                             let count = getCountForTab(index)
                             if count > 0 {
                                 Text("\(count)")
-                                    .font(.caption2)
-                                    .fontWeight(.bold)
+                                    .font(.caption2.weight(.bold))
                                     .foregroundColor(.white)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 3)
                                     .background(
                                         selectedTab == index ?
-                                        Color.pink : Color.gray.opacity(0.5)
+                                        LinearGradient(
+                                            colors: [.pink, .purple.opacity(0.9)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ) :
+                                        LinearGradient(
+                                            colors: [Color.gray.opacity(0.5), Color.gray.opacity(0.4)],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
                                     )
                                     .clipShape(Capsule())
+                                    .shadow(color: selectedTab == index ? .pink.opacity(0.3) : .clear, radius: 4, y: 2)
                             }
                         }
-                        .foregroundColor(selectedTab == index ? .pink : .gray)
+                        .foregroundStyle(
+                            selectedTab == index ?
+                            LinearGradient(colors: [.pink, .purple], startPoint: .leading, endPoint: .trailing) :
+                            LinearGradient(colors: [.gray, .gray.opacity(0.8)], startPoint: .leading, endPoint: .trailing)
+                        )
 
-                        Rectangle()
-                            .fill(selectedTab == index ? Color.pink : Color.clear)
+                        // Gradient underline
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(
+                                selectedTab == index ?
+                                LinearGradient(
+                                    colors: [.pink, .purple.opacity(0.8)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                ) :
+                                LinearGradient(colors: [Color.clear, Color.clear], startPoint: .leading, endPoint: .trailing)
+                            )
                             .frame(height: 3)
-                            .cornerRadius(1.5)
+                            .shadow(color: selectedTab == index ? .pink.opacity(0.4) : .clear, radius: 4, y: 1)
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -512,7 +596,10 @@ struct LikesView: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 12)
-        .background(Color.white)
+        .background(
+            Color.white
+                .shadow(color: .black.opacity(0.03), radius: 4, y: 2)
+        )
     }
 
     private func getCountForTab(_ index: Int) -> Int {
@@ -658,7 +745,7 @@ struct LikesView: View {
                     .padding(.horizontal, 20)
             }
 
-            // Unlock button
+            // Unlock button with premium styling
             Button {
                 HapticManager.shared.impact(.medium)
                 showPremiumUpgrade = true
@@ -668,27 +755,40 @@ struct LikesView: View {
                         .font(.body)
 
                     Text("Unlock Who Likes You")
-                        .fontWeight(.semibold)
+                        .fontWeight(.bold)
                 }
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
+                .padding(.vertical, 18)
                 .background(
                     LinearGradient(
-                        colors: [.pink, .purple],
-                        startPoint: .leading,
-                        endPoint: .trailing
+                        colors: [.pink, .purple, .pink.opacity(0.9)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
                     )
                 )
-                .cornerRadius(14)
-                .shadow(color: .pink.opacity(0.4), radius: 10, y: 5)
+                .cornerRadius(16)
+                .shadow(color: .pink.opacity(0.4), radius: 12, y: 6)
+                .shadow(color: .purple.opacity(0.25), radius: 20, y: 10)
             }
         }
         .padding(24)
         .background(
             RoundedRectangle(cornerRadius: 24)
                 .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.08), radius: 20, y: 10)
+                .shadow(color: .black.opacity(0.06), radius: 16, y: 8)
+                .shadow(color: .pink.opacity(0.08), radius: 24, y: 12)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [Color.pink.opacity(0.15), Color.purple.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
         )
     }
 
@@ -712,21 +812,36 @@ struct LikesView: View {
     }
 
     private func premiumFeatureRow(icon: String, title: String, description: String, color: Color) -> some View {
-        HStack(spacing: 14) {
+        let secondaryColor: Color = color == .pink ? .red : (color == .purple ? .pink : .yellow)
+
+        return HStack(spacing: 14) {
             ZStack {
                 Circle()
-                    .fill(color.opacity(0.15))
-                    .frame(width: 40, height: 40)
+                    .fill(
+                        LinearGradient(
+                            colors: [color.opacity(0.2), secondaryColor.opacity(0.12)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 44, height: 44)
 
                 Image(systemName: icon)
-                    .font(.system(size: 16))
-                    .foregroundColor(color)
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [color, secondaryColor],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
             }
+            .shadow(color: color.opacity(0.15), radius: 6, y: 2)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.primary)
 
                 Text(description)
                     .font(.caption)
@@ -734,7 +849,22 @@ struct LikesView: View {
             }
 
             Spacer()
+
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 16))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.green, .mint],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
         }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color(.systemBackground).opacity(0.8))
+        )
     }
 
     // MARK: - My Likes Tab
@@ -844,14 +974,30 @@ struct LikesView: View {
     // MARK: - Empty State
 
     private func emptyStateView(icon: String, title: String, message: String) -> some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 28) {
             Spacer()
 
             ZStack {
+                // Outer radial glow
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                Color.pink.opacity(0.2),
+                                Color.purple.opacity(0.1),
+                                Color.clear
+                            ],
+                            center: .center,
+                            startRadius: 30,
+                            endRadius: 100
+                        )
+                    )
+                    .frame(width: 200, height: 200)
+
                 Circle()
                     .fill(
                         LinearGradient(
-                            colors: [Color.pink.opacity(0.2), Color.purple.opacity(0.1)],
+                            colors: [Color.pink.opacity(0.15), Color.purple.opacity(0.1)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -867,12 +1013,19 @@ struct LikesView: View {
                             endPoint: .bottomTrailing
                         )
                     )
+                    .shadow(color: .pink.opacity(0.3), radius: 10)
             }
 
             VStack(spacing: 12) {
                 Text(title)
-                    .font(.title2)
-                    .fontWeight(.bold)
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.pink, .purple],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
 
                 Text(message)
                     .font(.subheadline)
@@ -906,19 +1059,30 @@ struct LikeProfileCard: View {
             ZStack(alignment: .topTrailing) {
                 profileImage
 
-                // Verified badge
+                // Verified badge with enhanced styling
                 if user.isVerified {
                     Image(systemName: "checkmark.seal.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(.blue)
-                        .background(Circle().fill(.white).padding(-2))
-                        .padding(8)
+                        .font(.system(size: 22))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.blue, .cyan],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .background(
+                            Circle()
+                                .fill(.white)
+                                .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
+                                .padding(-3)
+                        )
+                        .padding(10)
                 }
             }
             .frame(height: imageHeight)
             .clipped()
             .contentShape(Rectangle())
-            .cornerRadius(16, corners: [.topLeft, .topRight])
+            .cornerRadius(20, corners: [.topLeft, .topRight])
 
             // User info
             VStack(alignment: .leading, spacing: 8) {
@@ -937,7 +1101,13 @@ struct LikeProfileCard: View {
                 HStack(spacing: 4) {
                     Image(systemName: "mappin.circle.fill")
                         .font(.system(size: 12))
-                        .foregroundColor(.purple)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                     Text(user.location)
                         .font(.system(size: 13))
                         .foregroundColor(.secondary)
@@ -973,9 +1143,13 @@ struct LikeProfileCard: View {
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+                .shadow(color: .black.opacity(0.04), radius: 20, x: 0, y: 8)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 20))
         .onTapGesture {
             HapticManager.shared.impact(.light)
             onTap()
@@ -1000,14 +1174,37 @@ struct LikeProfileCard: View {
     private var placeholderImage: some View {
         ZStack {
             LinearGradient(
-                colors: [Color.purple.opacity(0.7), Color.pink.opacity(0.6)],
+                colors: [
+                    Color.purple.opacity(0.8),
+                    Color.pink.opacity(0.7),
+                    Color.purple.opacity(0.6)
+                ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
 
+            // Subtle radial glow
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [Color.white.opacity(0.2), Color.clear],
+                        center: .center,
+                        startRadius: 20,
+                        endRadius: 80
+                    )
+                )
+                .blur(radius: 15)
+
             Text(user.fullName.prefix(1))
                 .font(.system(size: 48, weight: .bold))
-                .foregroundColor(.white)
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.white, .white.opacity(0.9)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
         }
     }
 }
@@ -1019,27 +1216,68 @@ struct LikeCardSkeleton: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Rectangle()
-                .fill(Color.gray.opacity(0.2))
+            // Image placeholder with shimmer effect
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        Color.gray.opacity(0.15),
+                        Color.gray.opacity(0.1),
+                        Color.gray.opacity(0.15)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
                 .frame(height: 180)
 
+                // Shimmer overlay
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [Color.white.opacity(0.15), Color.clear],
+                            center: .center,
+                            startRadius: 10,
+                            endRadius: 60
+                        )
+                    )
+                    .blur(radius: 20)
+                    .offset(x: isAnimating ? 50 : -50)
+            }
+            .frame(height: 180)
+            .cornerRadius(20, corners: [.topLeft, .topRight])
+
             VStack(alignment: .leading, spacing: 8) {
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.gray.opacity(0.2))
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.gray.opacity(0.15), Color.gray.opacity(0.1)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
                     .frame(width: 120, height: 20)
 
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.gray.opacity(0.2))
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.gray.opacity(0.12), Color.gray.opacity(0.08)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
                     .frame(width: 80, height: 14)
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
-        .opacity(isAnimating ? 0.5 : 1.0)
-        .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isAnimating)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 2)
+                .shadow(color: .black.opacity(0.03), radius: 16, x: 0, y: 6)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .opacity(isAnimating ? 0.6 : 1.0)
+        .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: isAnimating)
         .onAppear { isAnimating = true }
     }
 }
@@ -1060,31 +1298,66 @@ struct BlurredLikeCard: View {
                     CachedCardImage(url: imageURL)
                         .frame(height: imageHeight)
                 } else {
-                    LinearGradient(
-                        colors: [.purple.opacity(0.7), .pink.opacity(0.6)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .frame(height: imageHeight)
-                    .overlay {
+                    ZStack {
+                        LinearGradient(
+                            colors: [
+                                .purple.opacity(0.8),
+                                .pink.opacity(0.7),
+                                .purple.opacity(0.6)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+
+                        // Radial glow
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    colors: [Color.white.opacity(0.2), Color.clear],
+                                    center: .center,
+                                    startRadius: 20,
+                                    endRadius: 80
+                                )
+                            )
+                            .blur(radius: 15)
+
                         Text(user.fullName.prefix(1))
                             .font(.system(size: 48, weight: .bold))
-                            .foregroundColor(.white)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.white, .white.opacity(0.9)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
                     }
+                    .frame(height: imageHeight)
                 }
 
-                // Verified badge
+                // Verified badge with enhanced styling
                 if user.isVerified {
                     Image(systemName: "checkmark.seal.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(.blue)
-                        .background(Circle().fill(.white).padding(-2))
-                        .padding(8)
+                        .font(.system(size: 22))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.blue, .cyan],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .background(
+                            Circle()
+                                .fill(.white)
+                                .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
+                                .padding(-3)
+                        )
+                        .padding(10)
                 }
             }
             .frame(height: imageHeight)
             .clipped()
-            .cornerRadius(16, corners: [.topLeft, .topRight])
+            .cornerRadius(20, corners: [.topLeft, .topRight])
 
             // User info - visible
             VStack(alignment: .leading, spacing: 8) {
@@ -1099,16 +1372,29 @@ struct BlurredLikeCard: View {
 
                     Spacer()
 
-                    // Heart indicator showing they liked you
+                    // Heart indicator showing they liked you with glow
                     Image(systemName: "heart.fill")
-                        .foregroundColor(.pink)
-                        .font(.caption)
+                        .font(.system(size: 14))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.pink, .red.opacity(0.8)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .shadow(color: .pink.opacity(0.4), radius: 4)
                 }
 
                 HStack(spacing: 4) {
                     Image(systemName: "mappin.circle.fill")
                         .font(.system(size: 12))
-                        .foregroundColor(.purple)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                     Text(user.location)
                         .font(.system(size: 13))
                         .foregroundColor(.secondary)
@@ -1118,9 +1404,13 @@ struct BlurredLikeCard: View {
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+                .shadow(color: .black.opacity(0.04), radius: 20, x: 0, y: 8)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 20))
     }
 }
 
@@ -1150,16 +1440,16 @@ struct LikeActionButton: View {
             }
             action()
         } label: {
-            HStack(spacing: 4) {
+            HStack(spacing: 5) {
                 Image(systemName: icon)
-                    .font(.system(size: 12))
+                    .font(.system(size: 12, weight: .semibold))
                     .scaleEffect(isAnimating ? 1.3 : 1.0)
                 Text(text)
                     .font(.system(size: 12, weight: .semibold))
             }
             .foregroundColor(.white)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
+            .padding(.vertical, 9)
             .background(
                 LinearGradient(
                     colors: colors,
@@ -1167,7 +1457,8 @@ struct LikeActionButton: View {
                     endPoint: .trailing
                 )
             )
-            .cornerRadius(8)
+            .cornerRadius(10)
+            .shadow(color: colors.first?.opacity(0.35) ?? .clear, radius: 6, x: 0, y: 3)
             .scaleEffect(isPressed ? 0.95 : (isAnimating ? 1.05 : 1.0))
         }
         .buttonStyle(PlainButtonStyle())
@@ -1403,17 +1694,18 @@ struct SwipeableLikeCard: View {
 
     var body: some View {
         ZStack {
-            // Background action indicator
+            // Background action indicator with enhanced styling
             if showLikeBack {
                 HStack {
                     Spacer()
-                    VStack(spacing: 4) {
+                    VStack(spacing: 6) {
                         Image(systemName: "heart.fill")
-                            .font(.title)
+                            .font(.system(size: 28))
                             .foregroundColor(.white)
+                            .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
                         Text("Like")
                             .font(.caption)
-                            .fontWeight(.semibold)
+                            .fontWeight(.bold)
                             .foregroundColor(.white)
                     }
                     .frame(width: 80)
@@ -1422,12 +1714,12 @@ struct SwipeableLikeCard: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(
                     LinearGradient(
-                        colors: [.pink, .red],
-                        startPoint: .leading,
-                        endPoint: .trailing
+                        colors: [.pink, .red.opacity(0.9), .pink.opacity(0.8)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
                     )
                 )
-                .cornerRadius(16)
+                .cornerRadius(20)
             }
 
             // Main card content
@@ -1477,13 +1769,20 @@ struct SwipeableLikeCard: View {
             if showLikeOverlay && showLikeBack {
                 VStack {
                     Image(systemName: "heart.fill")
-                        .font(.system(size: 50))
-                        .foregroundColor(.pink)
-                        .shadow(color: .pink.opacity(0.5), radius: 10)
+                        .font(.system(size: 54))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.pink, .red],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .shadow(color: .pink.opacity(0.6), radius: 12)
+                        .shadow(color: .red.opacity(0.3), radius: 20)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.black.opacity(0.3))
-                .cornerRadius(16)
+                .background(Color.black.opacity(0.35))
+                .clipShape(RoundedRectangle(cornerRadius: 20))
                 .allowsHitTesting(false)
             }
         }
@@ -1500,140 +1799,255 @@ struct MatchCelebrationOverlay: View {
     @State private var showConfetti = false
     @State private var heartScale: CGFloat = 0.5
     @State private var textOpacity: Double = 0
+    @State private var sparkleRotation: Double = 0
+    @State private var pulseScale: CGFloat = 1.0
 
     var body: some View {
         ZStack {
-            // Background blur
-            Color.black.opacity(0.8)
-                .ignoresSafeArea()
-                .onTapGesture {
-                    onDismiss()
-                }
+            // Enhanced gradient background
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.95),
+                    Color.purple.opacity(0.3),
+                    Color.pink.opacity(0.2),
+                    Color.black.opacity(0.95)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+            .onTapGesture {
+                onDismiss()
+            }
 
-            VStack(spacing: 24) {
-                // Animated hearts
+            // Sparkle particles
+            ForEach(0..<12, id: \.self) { index in
+                Image(systemName: "sparkle")
+                    .font(.system(size: CGFloat.random(in: 8...16)))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.pink, .purple, .white],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .offset(
+                        x: cos(Double(index) * .pi / 6 + sparkleRotation) * CGFloat(120 + index * 8),
+                        y: sin(Double(index) * .pi / 6 + sparkleRotation) * CGFloat(120 + index * 8)
+                    )
+                    .opacity(showConfetti ? 0.8 : 0)
+                    .scaleEffect(showConfetti ? 1.0 : 0.3)
+            }
+
+            VStack(spacing: 28) {
+                // Animated hearts with enhanced styling
                 ZStack {
+                    // Multiple pulsing glow rings
+                    ForEach(0..<3, id: \.self) { ring in
+                        Circle()
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color.pink.opacity(0.4 - Double(ring) * 0.1),
+                                        Color.purple.opacity(0.3 - Double(ring) * 0.1)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 2
+                            )
+                            .frame(width: CGFloat(180 + ring * 40), height: CGFloat(180 + ring * 40))
+                            .scaleEffect(pulseScale)
+                            .opacity(showConfetti ? 0.6 : 0)
+                    }
+
                     // Outer glow
                     Circle()
                         .fill(
                             RadialGradient(
-                                colors: [Color.pink.opacity(0.4), Color.clear],
+                                colors: [
+                                    Color.pink.opacity(0.5),
+                                    Color.purple.opacity(0.3),
+                                    Color.clear
+                                ],
                                 center: .center,
                                 startRadius: 40,
-                                endRadius: 120
+                                endRadius: 140
                             )
                         )
-                        .frame(width: 240, height: 240)
-                        .scaleEffect(showConfetti ? 1.2 : 0.8)
+                        .frame(width: 280, height: 280)
+                        .scaleEffect(showConfetti ? 1.15 : 0.8)
                         .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: showConfetti)
 
-                    // User photos
-                    HStack(spacing: -30) {
+                    // User photos with enhanced styling
+                    HStack(spacing: -35) {
                         // Your photo placeholder
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [.purple, .pink],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 100, height: 100)
-                            .overlay(
-                                Image(systemName: "person.fill")
-                                    .font(.system(size: 40))
-                                    .foregroundColor(.white)
-                            )
-                            .overlay(Circle().stroke(Color.white, lineWidth: 4))
-
-                        // Their photo
-                        if let imageURL = URL(string: user.profileImageURL), !user.profileImageURL.isEmpty {
-                            CachedAsyncImage(url: imageURL) { image in
-                                image
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 100, height: 100)
-                                    .clipShape(Circle())
-                                    .overlay(Circle().stroke(Color.white, lineWidth: 4))
-                            } placeholder: {
-                                Circle()
-                                    .fill(Color.gray.opacity(0.3))
-                                    .frame(width: 100, height: 100)
-                            }
-                        } else {
+                        ZStack {
                             Circle()
                                 .fill(
                                     LinearGradient(
-                                        colors: [.pink, .orange],
+                                        colors: [.purple, .pink, .purple.opacity(0.8)],
                                         startPoint: .topLeading,
                                         endPoint: .bottomTrailing
                                     )
                                 )
-                                .frame(width: 100, height: 100)
-                                .overlay(
-                                    Text(user.fullName.prefix(1))
-                                        .font(.system(size: 40, weight: .bold))
-                                        .foregroundColor(.white)
+                                .frame(width: 110, height: 110)
+                                .shadow(color: .purple.opacity(0.5), radius: 12, y: 4)
+
+                            Image(systemName: "person.fill")
+                                .font(.system(size: 44))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.white, .white.opacity(0.9)],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
                                 )
-                                .overlay(Circle().stroke(Color.white, lineWidth: 4))
                         }
+                        .overlay(
+                            Circle()
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [.white, .white.opacity(0.8)],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    ),
+                                    lineWidth: 4
+                                )
+                                .shadow(color: .white.opacity(0.3), radius: 4)
+                        )
+
+                        // Their photo
+                        ZStack {
+                            if let imageURL = URL(string: user.profileImageURL), !user.profileImageURL.isEmpty {
+                                CachedAsyncImage(url: imageURL) { image in
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 110, height: 110)
+                                        .clipShape(Circle())
+                                } placeholder: {
+                                    Circle()
+                                        .fill(Color.gray.opacity(0.3))
+                                        .frame(width: 110, height: 110)
+                                }
+                            } else {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [.pink, .orange, .pink.opacity(0.8)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 110, height: 110)
+                                    .overlay(
+                                        Text(user.fullName.prefix(1))
+                                            .font(.system(size: 44, weight: .bold))
+                                            .foregroundStyle(
+                                                LinearGradient(
+                                                    colors: [.white, .white.opacity(0.9)],
+                                                    startPoint: .top,
+                                                    endPoint: .bottom
+                                                )
+                                            )
+                                    )
+                            }
+                        }
+                        .shadow(color: .pink.opacity(0.5), radius: 12, y: 4)
+                        .overlay(
+                            Circle()
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [.white, .white.opacity(0.8)],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    ),
+                                    lineWidth: 4
+                                )
+                                .shadow(color: .white.opacity(0.3), radius: 4)
+                        )
                     }
 
-                    // Heart in center
-                    Image(systemName: "heart.fill")
-                        .font(.system(size: 30))
-                        .foregroundColor(.pink)
-                        .offset(y: 40)
-                        .scaleEffect(heartScale)
+                    // Heart in center with gradient and glow
+                    ZStack {
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 36))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.pink, .red, .pink],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .shadow(color: .pink.opacity(0.8), radius: 10)
+                            .shadow(color: .red.opacity(0.5), radius: 20)
+                    }
+                    .offset(y: 50)
+                    .scaleEffect(heartScale * pulseScale)
                 }
                 .scaleEffect(heartScale)
 
-                // Text
-                VStack(spacing: 12) {
+                // Text with gradient
+                VStack(spacing: 14) {
                     Text("It's a Match!")
-                        .font(.system(size: 36, weight: .bold))
-                        .foregroundColor(.white)
-
-                    Text("You and \(user.fullName) liked each other")
-                        .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.8))
-                }
-                .opacity(textOpacity)
-
-                // Action buttons
-                VStack(spacing: 12) {
-                    Button {
-                        onMessage()
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "message.fill")
-                            Text("Send a Message")
-                                .fontWeight(.semibold)
-                        }
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(
+                        .font(.system(size: 38, weight: .bold))
+                        .foregroundStyle(
                             LinearGradient(
-                                colors: [.pink, .purple],
+                                colors: [.white, .pink.opacity(0.9), .white],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
                         )
-                        .cornerRadius(30)
+                        .shadow(color: .pink.opacity(0.5), radius: 10)
+
+                    Text("You and \(user.fullName) liked each other")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.white.opacity(0.85))
+                }
+                .opacity(textOpacity)
+
+                // Action buttons with enhanced styling
+                VStack(spacing: 14) {
+                    Button {
+                        HapticManager.shared.impact(.medium)
+                        onMessage()
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "message.fill")
+                                .font(.system(size: 18))
+                            Text("Send a Message")
+                                .font(.system(size: 17, weight: .semibold))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 18)
+                        .background(
+                            LinearGradient(
+                                colors: [.pink, .purple, .pink.opacity(0.9)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .cornerRadius(28)
+                        .shadow(color: .pink.opacity(0.5), radius: 12, y: 6)
                     }
 
                     Button {
                         onDismiss()
                     } label: {
                         Text("Keep Browsing")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundColor(.white.opacity(0.8))
-                            .padding(.vertical, 12)
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(.white.opacity(0.7))
+                            .padding(.vertical, 14)
+                            .padding(.horizontal, 24)
+                            .background(
+                                Capsule()
+                                    .fill(Color.white.opacity(0.1))
+                            )
                     }
                 }
-                .padding(.horizontal, 40)
+                .padding(.horizontal, 36)
                 .opacity(textOpacity)
             }
         }
@@ -1647,6 +2061,14 @@ struct MatchCelebrationOverlay: View {
             }
             withAnimation(.easeInOut(duration: 0.3).delay(0.1)) {
                 showConfetti = true
+            }
+            // Sparkle rotation
+            withAnimation(.linear(duration: 8).repeatForever(autoreverses: false)) {
+                sparkleRotation = .pi * 2
+            }
+            // Pulse animation
+            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true).delay(0.3)) {
+                pulseScale = 1.08
             }
         }
     }

@@ -173,14 +173,33 @@ struct DiscoverFiltersView: View {
     private var activeFiltersSummary: some View {
         let activeCount = countActiveFilters()
 
-        return HStack(spacing: 8) {
-            Image(systemName: "line.3.horizontal.decrease.circle.fill")
-                .foregroundColor(.purple)
+        return HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.purple.opacity(0.2), Color.pink.opacity(0.15)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 36, height: 36)
 
-            Text("\(activeCount) filter\(activeCount == 1 ? "" : "s") active")
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .foregroundColor(.primary)
+                Image(systemName: "line.3.horizontal.decrease.circle.fill")
+                    .font(.callout)
+                    .foregroundStyle(
+                        LinearGradient(colors: [.purple, .pink], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    )
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(activeCount) filter\(activeCount == 1 ? "" : "s") active")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.primary)
+                Text("Refining your matches")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
 
             Spacer()
 
@@ -191,14 +210,28 @@ struct DiscoverFiltersView: View {
                 }
             } label: {
                 Text("Clear All")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.purple)
+                    .font(.caption.weight(.bold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(
+                                LinearGradient(colors: [.purple, .pink], startPoint: .leading, endPoint: .trailing)
+                            )
+                            .shadow(color: .purple.opacity(0.3), radius: 4, y: 2)
+                    )
             }
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 12)
-        .background(Color.purple.opacity(0.08))
+        .padding(.vertical, 14)
+        .background(
+            LinearGradient(
+                colors: [Color.purple.opacity(0.08), Color.pink.opacity(0.05)],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        )
     }
 
     // MARK: - Filter Section Container
@@ -220,17 +253,28 @@ struct DiscoverFiltersView: View {
                     }
                 }
             } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: icon)
-                        .font(.title3)
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.purple, .pink],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
+                HStack(spacing: 14) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [sectionColors(section)[0].opacity(0.15), sectionColors(section)[1].opacity(0.1)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
                             )
-                        )
-                        .frame(width: 32)
+                            .frame(width: 40, height: 40)
+
+                        Image(systemName: icon)
+                            .font(.callout.weight(.medium))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: sectionColors(section),
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    }
 
                     Text(section.rawValue)
                         .font(.headline)
@@ -241,24 +285,25 @@ struct DiscoverFiltersView: View {
                     // Section filter count badge
                     if let count = sectionFilterCount(section), count > 0 {
                         Text("\(count)")
-                            .font(.caption2)
-                            .fontWeight(.bold)
+                            .font(.caption2.weight(.bold))
                             .foregroundColor(.white)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
                             .background(
-                                LinearGradient(
-                                    colors: [.purple, .pink],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
+                                Capsule()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: sectionColors(section),
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    .shadow(color: sectionColors(section)[0].opacity(0.3), radius: 3, y: 2)
                             )
-                            .clipShape(Capsule())
                     }
 
                     Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .fontWeight(.semibold)
+                        .font(.caption.weight(.semibold))
                         .foregroundColor(.secondary)
                         .rotationEffect(.degrees(expandedSections.contains(section) ? 90 : 0))
                 }
@@ -274,8 +319,26 @@ struct DiscoverFiltersView: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 2)
+                .shadow(color: .black.opacity(0.03), radius: 16, x: 0, y: 6)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+    }
+
+    private func sectionColors(_ section: FilterSection) -> [Color] {
+        switch section {
+        case .basics:
+            return [.purple, .pink]
+        case .interests:
+            return [.orange, .yellow]
+        case .background:
+            return [.blue, .cyan]
+        case .lifestyle:
+            return [.green, .mint]
+        }
     }
 
     // MARK: - Age Range Section
@@ -551,24 +614,41 @@ struct DiscoverFiltersView: View {
 
     private func lifestyleChipsSection(_ title: String, icon: String, options: [String], selected: Binding<Set<String>>) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: icon)
-                    .font(.subheadline)
-                    .foregroundColor(.purple)
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.green.opacity(0.15), Color.mint.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 28, height: 28)
+
+                    Image(systemName: icon)
+                        .font(.caption)
+                        .foregroundStyle(
+                            LinearGradient(colors: [.green, .mint], startPoint: .topLeading, endPoint: .bottomTrailing)
+                        )
+                }
 
                 Text(title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                    .font(.subheadline.weight(.medium))
 
                 Spacer()
 
                 if !selected.wrappedValue.isEmpty {
-                    Button("Clear") {
+                    Button {
                         HapticManager.shared.impact(.light)
                         selected.wrappedValue.removeAll()
+                    } label: {
+                        Text("Clear")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(
+                                LinearGradient(colors: [.green, .mint], startPoint: .leading, endPoint: .trailing)
+                            )
                     }
-                    .font(.caption)
-                    .foregroundColor(.purple)
                 }
             }
 
@@ -599,20 +679,30 @@ struct DiscoverFiltersView: View {
                 filters.resetFilters()
             }
         } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "arrow.counterclockwise")
-                    .font(.body.weight(.medium))
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(Color.red.opacity(0.12))
+                        .frame(width: 32, height: 32)
+
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.callout.weight(.medium))
+                        .foregroundColor(.red)
+                }
+
                 Text("Reset All Filters")
-                    .fontWeight(.medium)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.red)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .foregroundColor(.red)
-            .background(Color.red.opacity(0.1))
-            .cornerRadius(12)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.red.opacity(0.08))
+            )
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.red.opacity(0.2), lineWidth: 1)
             )
         }
     }
@@ -750,20 +840,31 @@ struct SelectableFilterChip: View {
             Text(title)
                 .font(.subheadline)
                 .fontWeight(isSelected ? .semibold : .regular)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
                 .foregroundColor(isSelected ? .white : .primary)
                 .background(
-                    isSelected ?
-                    Color.purple :
-                    Color(.systemGray6)
+                    Group {
+                        if isSelected {
+                            LinearGradient(
+                                colors: [.purple, .pink, .purple.opacity(0.9)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        } else {
+                            Color(.systemGray6)
+                        }
+                    }
                 )
-                .cornerRadius(20)
+                .clipShape(Capsule())
+                .shadow(color: isSelected ? .purple.opacity(0.3) : .clear, radius: 4, y: 2)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(isSelected ? Color.clear : Color.gray.opacity(0.2), lineWidth: 1)
+                    Capsule()
+                        .stroke(isSelected ? Color.clear : Color.gray.opacity(0.15), lineWidth: 1)
                 )
         }
+        .scaleEffect(isSelected ? 1.02 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
     }
 }
 

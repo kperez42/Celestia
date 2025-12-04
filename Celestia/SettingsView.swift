@@ -35,25 +35,31 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Account") {
-                    HStack {
-                        Text("Email")
-                        Spacer()
-                        Text(authService.currentUser?.email ?? "")
-                            .foregroundColor(.gray)
+                Section {
+                    settingsRow(icon: "envelope.fill", colors: [.blue, .cyan]) {
+                        HStack {
+                            Text("Email")
+                            Spacer()
+                            Text(authService.currentUser?.email ?? "")
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
                     }
 
-                    HStack {
-                        Text("Account Type")
-                        Spacer()
-                        HStack(spacing: 4) {
+                    settingsRow(icon: "crown.fill", colors: [.orange, .yellow]) {
+                        HStack {
+                            Text("Account Type")
+                            Spacer()
                             if authService.currentUser?.isPremium == true {
-                                Image(systemName: "crown.fill")
-                                    .font(.caption)
-                                    .foregroundColor(.orange)
+                                Text("Premium")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(
+                                        LinearGradient(colors: [.orange, .yellow], startPoint: .leading, endPoint: .trailing)
+                                    )
+                            } else {
+                                Text("Free")
+                                    .foregroundColor(.secondary)
                             }
-                            Text(authService.currentUser?.isPremium == true ? "Premium" : "Free")
-                                .foregroundColor(.gray)
                         }
                     }
 
@@ -61,66 +67,98 @@ struct SettingsView: View {
                     if let user = authService.currentUser,
                        user.isPremium,
                        let expiryDate = user.subscriptionExpiryDate {
-                        HStack {
-                            Text("Premium Until")
-                            Spacer()
-                            Text(expiryDate.formatted(date: .abbreviated, time: .omitted))
-                                .foregroundColor(.orange)
-                                .fontWeight(.medium)
+                        settingsRow(icon: "calendar.badge.clock", colors: [.orange, .pink]) {
+                            HStack {
+                                Text("Premium Until")
+                                Spacer()
+                                Text(expiryDate.formatted(date: .abbreviated, time: .omitted))
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(
+                                        LinearGradient(colors: [.orange, .yellow], startPoint: .leading, endPoint: .trailing)
+                                    )
+                            }
                         }
                     }
 
                     // Profile Status
                     if let user = authService.currentUser {
-                        HStack {
-                            Text("Profile Status")
-                            Spacer()
-                            HStack(spacing: 4) {
-                                Image(systemName: profileStatusIcon(for: user.profileStatus))
-                                    .font(.caption)
-                                    .foregroundColor(profileStatusColor(for: user.profileStatus))
-                                Text(profileStatusText(for: user.profileStatus))
-                                    .foregroundColor(profileStatusColor(for: user.profileStatus))
+                        settingsRow(icon: profileStatusIcon(for: user.profileStatus), colors: profileStatusColors(for: user.profileStatus)) {
+                            HStack {
+                                Text("Profile Status")
+                                Spacer()
+                                statusBadge(
+                                    text: profileStatusText(for: user.profileStatus),
+                                    colors: profileStatusColors(for: user.profileStatus)
+                                )
                             }
                         }
 
                         // ID Verification Status
-                        HStack {
-                            Text("ID Verification")
-                            Spacer()
-                            HStack(spacing: 4) {
-                                Image(systemName: verificationStatusIcon(for: user))
-                                    .font(.caption)
-                                    .foregroundColor(verificationStatusColor(for: user))
-                                Text(verificationStatusText(for: user))
-                                    .foregroundColor(verificationStatusColor(for: user))
+                        settingsRow(icon: verificationStatusIcon(for: user), colors: verificationStatusColors(for: user)) {
+                            HStack {
+                                Text("ID Verification")
+                                Spacer()
+                                statusBadge(
+                                    text: verificationStatusText(for: user),
+                                    colors: verificationStatusColors(for: user)
+                                )
                             }
                         }
                     }
+                } header: {
+                    Text("Account")
                 }
 
                 Section {
                     Button {
                         showPremiumUpgrade = true
                     } label: {
-                        HStack {
-                            Image(systemName: "crown.fill")
-                                .foregroundColor(.orange)
+                        HStack(spacing: 14) {
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.orange.opacity(0.15), Color.yellow.opacity(0.1)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 36, height: 36)
+                                Image(systemName: "crown.fill")
+                                    .font(.callout)
+                                    .foregroundStyle(
+                                        LinearGradient(colors: [.orange, .yellow], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                    )
+                            }
                             Text("Upgrade to Premium")
                                 .foregroundColor(.primary)
                             Spacer()
                             Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundColor(.gray)
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(.secondary)
                         }
                     }
 
                     Button {
                         showReferralDashboard = true
                     } label: {
-                        HStack {
-                            Image(systemName: "gift.fill")
-                                .foregroundColor(.purple)
+                        HStack(spacing: 14) {
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.purple.opacity(0.15), Color.pink.opacity(0.1)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 36, height: 36)
+                                Image(systemName: "gift.fill")
+                                    .font(.callout)
+                                    .foregroundStyle(
+                                        LinearGradient(colors: [.purple, .pink], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                    )
+                            }
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Invite Friends")
                                     .foregroundColor(.primary)
@@ -131,26 +169,44 @@ struct SettingsView: View {
                             Spacer()
                             if let referrals = authService.currentUser?.referralStats.totalReferrals, referrals > 0 {
                                 Text("\(referrals)")
-                                    .font(.caption)
-                                    .fontWeight(.semibold)
+                                    .font(.caption.weight(.bold))
                                     .foregroundColor(.white)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(Color.purple)
-                                    .cornerRadius(10)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(
+                                        Capsule()
+                                            .fill(
+                                                LinearGradient(colors: [.purple, .pink], startPoint: .leading, endPoint: .trailing)
+                                            )
+                                            .shadow(color: .purple.opacity(0.3), radius: 4, y: 2)
+                                    )
                             }
                             Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundColor(.gray)
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(.secondary)
                         }
                     }
 
                     Button {
                         showSeeWhoLikesYou = true
                     } label: {
-                        HStack {
-                            Image(systemName: "heart.fill")
-                                .foregroundColor(.pink)
+                        HStack(spacing: 14) {
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.pink.opacity(0.15), Color.red.opacity(0.1)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 36, height: 36)
+                                Image(systemName: "heart.fill")
+                                    .font(.callout)
+                                    .foregroundStyle(
+                                        LinearGradient(colors: [.pink, .red], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                    )
+                            }
                             VStack(alignment: .leading, spacing: 2) {
                                 HStack(spacing: 6) {
                                     Text("See Who Likes You")
@@ -158,7 +214,9 @@ struct SettingsView: View {
                                     if !(authService.currentUser?.isPremium ?? false) {
                                         Image(systemName: "crown.fill")
                                             .font(.caption2)
-                                            .foregroundColor(.orange)
+                                            .foregroundStyle(
+                                                LinearGradient(colors: [.orange, .yellow], startPoint: .leading, endPoint: .trailing)
+                                            )
                                     }
                                 }
                                 Text("Premium feature")
@@ -167,42 +225,91 @@ struct SettingsView: View {
                             }
                             Spacer()
                             Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundColor(.gray)
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(.secondary)
                         }
                     }
                 } header: {
                     Text("Premium & Rewards")
                 }
 
-                Section("Preferences") {
+                Section {
                     NavigationLink {
                         FilterView()
                     } label: {
-                        HStack {
-                            Image(systemName: "slider.horizontal.3")
+                        HStack(spacing: 14) {
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.indigo.opacity(0.15), Color.purple.opacity(0.1)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 36, height: 36)
+                                Image(systemName: "slider.horizontal.3")
+                                    .font(.callout)
+                                    .foregroundStyle(
+                                        LinearGradient(colors: [.indigo, .purple], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                    )
+                            }
                             Text("Discovery Filters")
                         }
                     }
+                } header: {
+                    Text("Preferences")
                 }
 
-                Section("Notifications") {
+                Section {
                     NavigationLink {
                         NotificationSettingsView()
                     } label: {
-                        HStack {
-                            Image(systemName: "bell.badge.fill")
+                        HStack(spacing: 14) {
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.red.opacity(0.15), Color.orange.opacity(0.1)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 36, height: 36)
+                                Image(systemName: "bell.badge.fill")
+                                    .font(.callout)
+                                    .foregroundStyle(
+                                        LinearGradient(colors: [.red, .orange], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                    )
+                            }
                             Text("Notification Preferences")
                         }
                     }
+                } header: {
+                    Text("Notifications")
                 }
 
-                Section("Safety & Privacy") {
+                Section {
                     NavigationLink {
                         PrivacySettingsView()
                     } label: {
-                        HStack {
-                            Image(systemName: "hand.raised.fill")
+                        HStack(spacing: 14) {
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.blue.opacity(0.15), Color.cyan.opacity(0.1)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 36, height: 36)
+                                Image(systemName: "hand.raised.fill")
+                                    .font(.callout)
+                                    .foregroundStyle(
+                                        LinearGradient(colors: [.blue, .cyan], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                    )
+                            }
                             Text("Privacy Controls")
                         }
                     }
@@ -210,8 +317,23 @@ struct SettingsView: View {
                     NavigationLink {
                         SafetyCenterView()
                     } label: {
-                        HStack {
-                            Image(systemName: "shield.checkered")
+                        HStack(spacing: 14) {
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.green.opacity(0.15), Color.mint.opacity(0.1)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 36, height: 36)
+                                Image(systemName: "shield.checkered")
+                                    .font(.callout)
+                                    .foregroundStyle(
+                                        LinearGradient(colors: [.green, .mint], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                    )
+                            }
                             Text("Safety Center")
                         }
                     }
@@ -219,168 +341,152 @@ struct SettingsView: View {
                     NavigationLink {
                         BlockedUsersView()
                     } label: {
-                        HStack {
-                            Image(systemName: "hand.raised.slash")
+                        HStack(spacing: 14) {
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.gray.opacity(0.15), Color.gray.opacity(0.08)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 36, height: 36)
+                                Image(systemName: "hand.raised.slash")
+                                    .font(.callout)
+                                    .foregroundColor(.gray)
+                            }
                             Text("Blocked Users")
                         }
                     }
+                } header: {
+                    Text("Safety & Privacy")
                 }
-                
-                Section("Support") {
+
+                Section {
                     Link(destination: Self.supportEmailURL) {
-                        HStack {
-                            Image(systemName: "envelope")
+                        HStack(spacing: 14) {
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.teal.opacity(0.15), Color.cyan.opacity(0.1)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 36, height: 36)
+                                Image(systemName: "envelope.fill")
+                                    .font(.callout)
+                                    .foregroundStyle(
+                                        LinearGradient(colors: [.teal, .cyan], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                    )
+                            }
                             Text("Contact Support")
                             Spacer()
                             Image(systemName: "arrow.up.right")
-                                .font(.caption)
-                                .foregroundColor(.gray)
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(.secondary)
                         }
                     }
+                } header: {
+                    Text("Support")
                 }
 
-                Section("Legal") {
-                    Button {
+                Section {
+                    legalRow(icon: "lock.shield.fill", colors: [.blue, .cyan], title: "Privacy Policy") {
                         showPrivacyPolicy = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "lock.shield")
-                                .foregroundColor(.blue)
-                            Text("Privacy Policy")
-                                .foregroundColor(.primary)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
                     }
 
-                    Button {
+                    legalRow(icon: "doc.text.fill", colors: [.purple, .pink], title: "Terms of Service") {
                         showTermsOfService = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "doc.text")
-                                .foregroundColor(.purple)
-                            Text("Terms of Service")
-                                .foregroundColor(.primary)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
                     }
 
-                    Button {
+                    legalRow(icon: "person.3.fill", colors: [.green, .mint], title: "Community Guidelines") {
                         showCommunityGuidelines = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "person.3.fill")
-                                .foregroundColor(.green)
-                            Text("Community Guidelines")
-                                .foregroundColor(.primary)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
                     }
 
-                    Button {
+                    legalRow(icon: "shield.checkered", colors: [.orange, .yellow], title: "Dating Safety Tips") {
                         showSafetyTips = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "shield.checkered")
-                                .foregroundColor(.orange)
-                            Text("Dating Safety Tips")
-                                .foregroundColor(.primary)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
                     }
 
-                    Button {
+                    legalRow(icon: "server.rack", colors: [.gray, .gray.opacity(0.7)], title: "Cookie & Data Policy") {
                         showCookiePolicy = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "server.rack")
-                                .foregroundColor(.gray)
-                            Text("Cookie & Data Policy")
-                                .foregroundColor(.primary)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
                     }
 
-                    Button {
+                    legalRow(icon: "doc.badge.gearshape.fill", colors: [.indigo, .purple], title: "End User License Agreement") {
                         showEULA = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "doc.badge.gearshape")
-                                .foregroundColor(.indigo)
-                            Text("End User License Agreement")
-                                .foregroundColor(.primary)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
                     }
 
-                    Button {
+                    legalRow(icon: "accessibility", colors: [.teal, .mint], title: "Accessibility Statement") {
                         showAccessibility = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "accessibility")
-                                .foregroundColor(.teal)
-                            Text("Accessibility Statement")
-                                .foregroundColor(.primary)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
                     }
+                } header: {
+                    Text("Legal")
                 }
                 
                 // Admin section - only visible for admin users
                 if isAdminUser {
-                    Section("Admin") {
+                    Section {
                         Button {
                             showAdminDashboard = true
                         } label: {
-                            HStack {
-                                Image(systemName: "shield.checkered")
-                                    .foregroundColor(.red)
+                            HStack(spacing: 14) {
+                                ZStack {
+                                    Circle()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [Color.red.opacity(0.15), Color.pink.opacity(0.1)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .frame(width: 36, height: 36)
+                                    Image(systemName: "shield.checkered")
+                                        .font(.callout)
+                                        .foregroundStyle(
+                                            LinearGradient(colors: [.red, .pink], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                        )
+                                }
                                 Text("Moderation Dashboard")
                                     .foregroundColor(.primary)
                                 Spacer()
                                 Image(systemName: "chevron.right")
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundColor(.secondary)
                             }
                         }
+                    } header: {
+                        Text("Admin")
                     }
                 }
 
-                Section("Danger Zone") {
+                Section {
                     Button(role: .destructive) {
                         showDeleteConfirmation = true
                     } label: {
-                        HStack {
-                            Image(systemName: "trash")
+                        HStack(spacing: 14) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.red.opacity(0.12))
+                                    .frame(width: 36, height: 36)
+                                Image(systemName: "trash.fill")
+                                    .font(.callout)
+                                    .foregroundColor(.red)
+                            }
                             Text("Delete Account")
+                                .foregroundColor(.red)
                             if isDeleting {
                                 Spacer()
                                 ProgressView()
                                     .progressViewStyle(CircularProgressViewStyle())
+                                    .tint(.red)
                             }
                         }
                     }
                     .disabled(isDeleting)
+                } header: {
+                    Text("Danger Zone")
                 }
             }
             .navigationTitle("Settings")
@@ -487,6 +593,79 @@ struct SettingsView: View {
         return adminEmails.contains(email.lowercased())
     }
 
+    // MARK: - Row Styling Helpers
+
+    @ViewBuilder
+    private func settingsRow<Content: View>(icon: String, colors: [Color], @ViewBuilder content: () -> Content) -> some View {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [colors[0].opacity(0.15), colors.last!.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 36, height: 36)
+                Image(systemName: icon)
+                    .font(.callout)
+                    .foregroundStyle(
+                        LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
+                    )
+            }
+            content()
+        }
+    }
+
+    @ViewBuilder
+    private func statusBadge(text: String, colors: [Color]) -> some View {
+        Text(text)
+            .font(.caption.weight(.semibold))
+            .foregroundColor(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(
+                Capsule()
+                    .fill(
+                        LinearGradient(colors: colors, startPoint: .leading, endPoint: .trailing)
+                    )
+                    .shadow(color: colors[0].opacity(0.3), radius: 3, y: 2)
+            )
+    }
+
+    @ViewBuilder
+    private func legalRow(icon: String, colors: [Color], title: String, action: @escaping () -> Void) -> some View {
+        Button {
+            action()
+        } label: {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [colors[0].opacity(0.15), colors.last!.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 36, height: 36)
+                    Image(systemName: icon)
+                        .font(.callout)
+                        .foregroundStyle(
+                            LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
+                        )
+                }
+                Text(title)
+                    .foregroundColor(.primary)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+
     // MARK: - Profile Status Helpers
 
     private func profileStatusIcon(for status: String?) -> String {
@@ -508,22 +687,22 @@ struct SettingsView: View {
         }
     }
 
-    private func profileStatusColor(for status: String?) -> Color {
+    private func profileStatusColors(for status: String?) -> [Color] {
         switch status?.lowercased() {
         case "active", "approved":
-            return .green
+            return [.green, .mint]
         case "pending":
-            return .orange
+            return [.orange, .yellow]
         case "rejected":
-            return .red
+            return [.red, .pink]
         case "flagged":
-            return .yellow
+            return [.yellow, .orange]
         case "suspended":
-            return .orange
+            return [.orange, .red]
         case "banned":
-            return .red
+            return [.red, .pink]
         default:
-            return .orange
+            return [.orange, .yellow]
         }
     }
 
@@ -558,13 +737,13 @@ struct SettingsView: View {
         }
     }
 
-    private func verificationStatusColor(for user: User) -> Color {
+    private func verificationStatusColors(for user: User) -> [Color] {
         if user.isVerified {
-            return .green
+            return [.green, .mint]
         } else if user.idVerificationRejected {
-            return .red
+            return [.red, .pink]
         } else {
-            return .gray
+            return [.gray, .gray.opacity(0.7)]
         }
     }
 

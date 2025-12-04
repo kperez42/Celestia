@@ -26,28 +26,78 @@ struct BannedAccountView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Header icon
+                    // Header icon with premium radial glow
                     ZStack {
-                        // Outer pulse ring
+                        // Large radial glow background
                         Circle()
-                            .stroke(Color.red.opacity(0.3), lineWidth: 2)
-                            .frame(width: 120, height: 120)
-                            .scaleEffect(animateIcon ? 1.2 : 1.0)
-                            .opacity(animateIcon ? 0 : 0.8)
-
-                        Circle()
-                            .fill(Color.red.opacity(0.15))
-                            .frame(width: 100, height: 100)
-
-                        Image(systemName: "xmark.octagon.fill")
-                            .font(.system(size: 50))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [.red, .red.opacity(0.7)],
-                                    startPoint: .top,
-                                    endPoint: .bottom
+                            .fill(
+                                RadialGradient(
+                                    colors: [
+                                        Color.red.opacity(0.25),
+                                        Color.red.opacity(0.12),
+                                        Color.clear
+                                    ],
+                                    center: .center,
+                                    startRadius: 30,
+                                    endRadius: 100
                                 )
                             )
+                            .frame(width: 200, height: 200)
+                            .scaleEffect(animateIcon ? 1.1 : 1.0)
+
+                        // Outer pulse ring with gradient
+                        Circle()
+                            .stroke(
+                                LinearGradient(
+                                    colors: [Color.red.opacity(0.5), Color.red.opacity(0.3)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 3
+                            )
+                            .frame(width: 130, height: 130)
+                            .scaleEffect(animateIcon ? 1.25 : 1.0)
+                            .opacity(animateIcon ? 0 : 0.8)
+
+                        // Middle glow layer
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.red.opacity(0.2), Color.red.opacity(0.12)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 110, height: 110)
+
+                        // Inner glow
+                        Circle()
+                            .fill(Color.white.opacity(0.2))
+                            .frame(width: 95, height: 95)
+                            .blur(radius: 8)
+
+                        // Icon background
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.white.opacity(0.9), Color.white.opacity(0.7)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 90, height: 90)
+                            .shadow(color: .red.opacity(0.25), radius: 10, y: 4)
+
+                        Image(systemName: "xmark.octagon.fill")
+                            .font(.system(size: 44))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.red, .red.opacity(0.8)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .shadow(color: .red.opacity(0.35), radius: 8)
                             .symbolEffect(.pulse, options: .repeating)
                     }
                     .padding(.top, 40)
@@ -62,38 +112,102 @@ struct BannedAccountView: View {
                         }
                     }
 
-                    // Title
+                    // Title with gradient
                     Text("Account Permanently Banned")
                         .opacity(appearAnimation ? 1 : 0)
                         .offset(y: appearAnimation ? 0 : 20)
-                        .font(.title.bold())
+                        .font(.system(size: 26, weight: .bold, design: .rounded))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.red, .red.opacity(0.8)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
                         .multilineTextAlignment(.center)
-                        .foregroundColor(.red)
 
-                    // Reason card
+                    // Reason card with premium styling
                     VStack(alignment: .leading, spacing: 16) {
-                        Label("Reason for Ban", systemImage: "info.circle.fill")
-                            .font(.headline)
-                            .foregroundColor(.red)
+                        HStack(spacing: 10) {
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.red.opacity(0.2), Color.red.opacity(0.12)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 36, height: 36)
+
+                                Image(systemName: "info.circle.fill")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(
+                                        LinearGradient(colors: [.red, .red.opacity(0.8)], startPoint: .leading, endPoint: .trailing)
+                                    )
+                            }
+
+                            Text("Reason for Ban")
+                                .font(.headline)
+                        }
 
                         Text(user?.banReason ?? "Your account has been permanently banned due to serious violations of our community guidelines.")
                             .font(.body)
                             .foregroundColor(.secondary)
+                            .lineSpacing(3)
                     }
-                    .padding()
+                    .padding(18)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.red.opacity(0.1))
-                    .cornerRadius(16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 18)
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.red.opacity(0.1), Color.red.opacity(0.06)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18)
+                            .strokeBorder(
+                                LinearGradient(
+                                    colors: [Color.red.opacity(0.25), Color.red.opacity(0.12)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1
+                            )
+                    )
                     .padding(.horizontal)
                     .opacity(appearAnimation ? 1 : 0)
                     .offset(y: appearAnimation ? 0 : 30)
                     .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.2), value: appearAnimation)
 
-                    // What this means
+                    // What this means with premium styling
                     VStack(alignment: .leading, spacing: 16) {
-                        Label("What This Means", systemImage: "exclamationmark.triangle.fill")
-                            .font(.headline)
-                            .foregroundColor(.orange)
+                        HStack(spacing: 10) {
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.orange.opacity(0.2), Color.yellow.opacity(0.15)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 36, height: 36)
+
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(
+                                        LinearGradient(colors: [.orange, .yellow], startPoint: .leading, endPoint: .trailing)
+                                    )
+                            }
+
+                            Text("What This Means")
+                                .font(.headline)
+                        }
 
                         VStack(alignment: .leading, spacing: 12) {
                             bulletPoint("Your profile is no longer visible to other users")
@@ -102,26 +216,71 @@ struct BannedAccountView: View {
                             bulletPoint("This decision is permanent unless successfully appealed")
                         }
                     }
-                    .padding()
+                    .padding(18)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.orange.opacity(0.1))
-                    .cornerRadius(16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 18)
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.orange.opacity(0.1), Color.yellow.opacity(0.06)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18)
+                            .strokeBorder(
+                                LinearGradient(
+                                    colors: [Color.orange.opacity(0.25), Color.yellow.opacity(0.15)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1
+                            )
+                    )
                     .padding(.horizontal)
                     .opacity(appearAnimation ? 1 : 0)
                     .offset(y: appearAnimation ? 0 : 30)
                     .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.3), value: appearAnimation)
 
-                    // Guidelines reminder
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Community Guidelines")
-                            .font(.headline)
-                            .padding(.horizontal)
+                    // Guidelines reminder with premium styling
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack(spacing: 10) {
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.purple.opacity(0.15), Color.pink.opacity(0.1)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 32, height: 32)
+
+                                Image(systemName: "list.bullet.clipboard.fill")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(
+                                        LinearGradient(colors: [.purple, .pink], startPoint: .leading, endPoint: .trailing)
+                                    )
+                            }
+
+                            Text("Community Guidelines")
+                                .font(.headline)
+                        }
+                        .padding(.horizontal)
 
                         ForEach(guidelines, id: \.title) { guideline in
                             HStack(alignment: .top, spacing: 12) {
-                                Image(systemName: guideline.icon)
-                                    .foregroundColor(guideline.color)
-                                    .frame(width: 24)
+                                ZStack {
+                                    Circle()
+                                        .fill(guideline.color.opacity(0.12))
+                                        .frame(width: 32, height: 32)
+
+                                    Image(systemName: guideline.icon)
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundColor(guideline.color)
+                                }
 
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(guideline.title)
@@ -134,36 +293,50 @@ struct BannedAccountView: View {
                             .padding(.horizontal)
                         }
                     }
-                    .padding(.top, 8)
+                    .padding(.vertical, 16)
+                    .background(Color(.systemBackground))
+                    .cornerRadius(18)
+                    .shadow(color: .black.opacity(0.04), radius: 10, y: 4)
+                    .padding(.horizontal)
                     .opacity(appearAnimation ? 1 : 0)
                     .offset(y: appearAnimation ? 0 : 30)
                     .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.4), value: appearAnimation)
 
                     Spacer(minLength: 40)
 
-                    // Action buttons
-                    VStack(spacing: 12) {
-                        // Appeal button
+                    // Action buttons with premium styling
+                    VStack(spacing: 14) {
+                        // Appeal button with gradient
                         Button(action: {
                             HapticManager.shared.impact(.medium)
                             showingAppealSheet = true
                         }) {
-                            HStack {
+                            HStack(spacing: 10) {
                                 Image(systemName: hasExistingAppeal ? "checkmark.circle.fill" : "envelope.fill")
+                                    .font(.title3)
                                 Text(hasExistingAppeal ? "Appeal Submitted" : "Appeal This Decision")
+                                    .fontWeight(.semibold)
                             }
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
-                            .padding()
+                            .padding(.vertical, 18)
                             .background(
                                 LinearGradient(
-                                    colors: hasExistingAppeal ? [.gray, .gray.opacity(0.8)] : [.orange, .red],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
+                                    colors: hasExistingAppeal ? [.gray, .gray.opacity(0.8)] : [.orange, .red, .orange.opacity(0.9)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
                                 )
                             )
-                            .cornerRadius(16)
+                            .cornerRadius(18)
+                            .shadow(
+                                color: hasExistingAppeal ? .clear : .orange.opacity(0.35),
+                                radius: 12, y: 6
+                            )
+                            .shadow(
+                                color: hasExistingAppeal ? .clear : .red.opacity(0.2),
+                                radius: 20, y: 10
+                            )
                         }
                         .disabled(hasExistingAppeal)
 
@@ -172,7 +345,7 @@ struct BannedAccountView: View {
                             authService.signOut()
                         }) {
                             Text("Sign Out")
-                                .font(.subheadline)
+                                .font(.subheadline.weight(.medium))
                                 .foregroundColor(.secondary)
                         }
                         .padding(.top, 8)
@@ -184,6 +357,18 @@ struct BannedAccountView: View {
                     .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.5), value: appearAnimation)
                 }
             }
+            .background(
+                LinearGradient(
+                    colors: [
+                        Color(red: 1.0, green: 0.95, blue: 0.95),
+                        Color(red: 1.0, green: 0.97, blue: 0.97),
+                        Color(.systemGroupedBackground)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+            )
             .navigationTitle("Account Status")
             .navigationBarTitleDisplayMode(.inline)
             .task {

@@ -128,6 +128,7 @@ struct MessageBubbleGradient: View {
     let message: Message
     let isFromCurrentUser: Bool
     var currentUserId: String? = nil
+    var showReadStatus: Bool = true // Only show read indicator on the most recent read message
     var onReaction: ((String) -> Void)? = nil
     var onReply: (() -> Void)? = nil
     var onEdit: (() -> Void)? = nil
@@ -244,7 +245,8 @@ struct MessageBubbleGradient: View {
                     }
 
                     if isFromCurrentUser {
-                        if message.isRead {
+                        // Only show "Read" on the most recent read message (controlled by showReadStatus)
+                        if message.isRead && showReadStatus {
                             HStack(spacing: 2) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.caption2)
@@ -254,7 +256,8 @@ struct MessageBubbleGradient: View {
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
                             }
-                        } else if message.isDelivered {
+                        } else if message.isDelivered || message.isRead {
+                            // Show delivered checkmark for delivered messages or read messages that shouldn't show "Read"
                             Image(systemName: "checkmark.circle")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
@@ -326,7 +329,7 @@ struct MessageBubbleGradient: View {
 
     @ViewBuilder
     private var reactionsView: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 6) {
             ForEach(message.uniqueReactionEmojis, id: \.self) { emoji in
                 let count = message.reactionCount(for: emoji)
                 let hasUserReacted = currentUserId.map { message.hasUserReacted(userId: $0, emoji: emoji) } ?? false
@@ -334,23 +337,39 @@ struct MessageBubbleGradient: View {
                 Button {
                     onReaction?(emoji)
                 } label: {
-                    HStack(spacing: 2) {
+                    HStack(spacing: 3) {
                         Text(emoji)
-                            .font(.system(size: 12))
+                            .font(.system(size: 14))
                         if count > 1 {
                             Text("\(count)")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
+                                .font(.caption2.weight(.medium))
+                                .foregroundColor(hasUserReacted ? .purple : .secondary)
                         }
                     }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(hasUserReacted ? Color.purple.opacity(0.2) : Color.gray.opacity(0.15))
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(hasUserReacted ? Color.purple.opacity(0.5) : Color.clear, lineWidth: 1)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(
+                        hasUserReacted ?
+                        AnyShapeStyle(
+                            LinearGradient(
+                                colors: [Color.purple.opacity(0.2), Color.pink.opacity(0.15)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        ) :
+                        AnyShapeStyle(Color(.systemGray6))
                     )
+                    .cornerRadius(14)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(
+                                hasUserReacted ?
+                                LinearGradient(colors: [.purple.opacity(0.5), .pink.opacity(0.4)], startPoint: .topLeading, endPoint: .bottomTrailing) :
+                                LinearGradient(colors: [.clear, .clear], startPoint: .topLeading, endPoint: .bottomTrailing),
+                                lineWidth: 1.5
+                            )
+                    )
+                    .shadow(color: hasUserReacted ? Color.purple.opacity(0.15) : .clear, radius: 4, y: 2)
                 }
                 .buttonStyle(.plain)
             }
@@ -436,12 +455,19 @@ struct MessageBubbleGradient: View {
     private var bubbleBackground: some View {
         if isFromCurrentUser {
             LinearGradient(
-                colors: [Color.purple, Color.pink],
-                startPoint: .leading,
-                endPoint: .trailing
+                colors: [
+                    Color.purple,
+                    Color.purple.opacity(0.9),
+                    Color.pink.opacity(0.85)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
             )
+            .shadow(color: Color.purple.opacity(0.25), radius: 8, x: 0, y: 4)
         } else {
-            Color(.systemGray5)
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(.systemGray6))
+                .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
         }
     }
 }

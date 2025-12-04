@@ -11,79 +11,133 @@ struct TypingIndicator: View {
     let userName: String
 
     @State private var animationOffset: CGFloat = 0
+    @State private var dotScale: CGFloat = 1.0
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 8) {
-            // User avatar circle
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [Color.purple.opacity(0.7), Color.pink.opacity(0.6)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+        HStack(alignment: .bottom, spacing: 10) {
+            // User avatar circle with enhanced styling
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.purple.opacity(0.85),
+                                Color.pink.opacity(0.75),
+                                Color.purple.opacity(0.65)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     )
-                )
-                .frame(width: 28, height: 28)
-                .overlay(
-                    Text(userName.prefix(1))
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.white)
-                )
+                    .frame(width: 32, height: 32)
+                    .shadow(color: Color.purple.opacity(0.3), radius: 4, y: 2)
 
-            // Typing bubble with animated dots
-            HStack(spacing: 6) {
-                ForEach(0..<3) { index in
+                Text(userName.prefix(1))
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.white, .white.opacity(0.95)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+            }
+
+            // Typing bubble with animated gradient dots
+            HStack(spacing: 7) {
+                ForEach(0..<3, id: \.self) { index in
                     Circle()
-                        .fill(Color.gray.opacity(0.6))
-                        .frame(width: 8, height: 8)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.purple.opacity(0.7),
+                                    Color.pink.opacity(0.6)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 9, height: 9)
+                        .scaleEffect(dotScale)
                         .offset(y: animationOffset)
                         .animation(
-                            Animation.easeInOut(duration: 0.6)
+                            Animation.easeInOut(duration: 0.5)
                                 .repeatForever(autoreverses: true)
-                                .delay(Double(index) * 0.2),
+                                .delay(Double(index) * 0.15),
                             value: animationOffset
+                        )
+                        .animation(
+                            Animation.easeInOut(duration: 0.5)
+                                .repeatForever(autoreverses: true)
+                                .delay(Double(index) * 0.15),
+                            value: dotScale
                         )
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(Color(.systemGray5))
-            .cornerRadius(16)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(Color(.systemGray6))
+                    .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+            )
 
             Spacer()
         }
         .padding(.horizontal)
         .onAppear {
-            animationOffset = -4
+            animationOffset = -5
+            dotScale = 0.85
         }
     }
 }
 
-// Alternative minimal typing indicator
+// Alternative minimal typing indicator with enhanced styling
 struct TypingIndicatorMinimal: View {
     @State private var animationOffset: CGFloat = 0
+    @State private var dotOpacity: Double = 1.0
 
     var body: some View {
-        HStack(spacing: 4) {
-            ForEach(0..<3) { index in
+        HStack(spacing: 5) {
+            ForEach(0..<3, id: \.self) { index in
                 Circle()
-                    .fill(Color.gray)
-                    .frame(width: 6, height: 6)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.purple.opacity(0.6),
+                                Color.pink.opacity(0.5)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 7, height: 7)
+                    .opacity(dotOpacity)
                     .offset(y: animationOffset)
                     .animation(
-                        Animation.easeInOut(duration: 0.6)
+                        Animation.easeInOut(duration: 0.5)
                             .repeatForever(autoreverses: true)
-                            .delay(Double(index) * 0.2),
+                            .delay(Double(index) * 0.15),
                         value: animationOffset
+                    )
+                    .animation(
+                        Animation.easeInOut(duration: 0.5)
+                            .repeatForever(autoreverses: true)
+                            .delay(Double(index) * 0.15),
+                        value: dotOpacity
                     )
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color(.systemGray6))
+                .shadow(color: .black.opacity(0.03), radius: 3, y: 1)
+        )
         .onAppear {
-            animationOffset = -3
+            animationOffset = -4
+            dotOpacity = 0.6
         }
     }
 }

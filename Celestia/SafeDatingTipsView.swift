@@ -9,24 +9,120 @@ import SwiftUI
 
 struct SafeDatingTipsView: View {
     @State private var selectedCategory: TipCategory = .beforeMeeting
+    @State private var animateHeader = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Category Picker
-            categoryPicker
+        ZStack {
+            // Premium gradient background
+            LinearGradient(
+                colors: [
+                    Color.blue.opacity(0.08),
+                    Color.purple.opacity(0.05),
+                    Color(.systemGroupedBackground)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
 
-            // Tips List
-            ScrollView {
-                VStack(spacing: 16) {
-                    ForEach(SafetyTip.tips(for: selectedCategory)) { tip in
-                        SafetyTipCard(tip: tip)
+            VStack(spacing: 0) {
+                // Premium header card
+                premiumHeader
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+
+                // Category Picker
+                categoryPicker
+
+                // Tips List
+                ScrollView {
+                    VStack(spacing: 16) {
+                        ForEach(SafetyTip.tips(for: selectedCategory)) { tip in
+                            SafetyTipCard(tip: tip)
+                        }
                     }
+                    .padding()
                 }
-                .padding()
             }
         }
         .navigationTitle("Safe Dating Tips")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            withAnimation(.spring(response: 0.6)) {
+                animateHeader = true
+            }
+        }
+    }
+
+    // MARK: - Premium Header
+
+    private var premiumHeader: some View {
+        HStack(spacing: 14) {
+            // Premium icon with radial glow
+            ZStack {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [Color.blue.opacity(0.25), Color.purple.opacity(0.1), Color.clear],
+                            center: .center,
+                            startRadius: 5,
+                            endRadius: 35
+                        )
+                    )
+                    .frame(width: 70, height: 70)
+
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.blue.opacity(0.2), Color.purple.opacity(0.15)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 50, height: 50)
+
+                Image(systemName: "shield.checkered")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.blue, .purple],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Stay Safe")
+                    .font(.headline)
+                    .fontWeight(.bold)
+
+                Text("Important tips for meeting people online")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 18)
+                .fill(Color(.systemBackground))
+                .shadow(color: .blue.opacity(0.1), radius: 12, y: 6)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [.blue.opacity(0.2), .purple.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
+        .scaleEffect(animateHeader ? 1 : 0.95)
+        .opacity(animateHeader ? 1 : 0)
     }
 
     // MARK: - Category Picker
@@ -46,9 +142,12 @@ struct SafeDatingTipsView: View {
                 }
             }
             .padding(.horizontal)
-            .padding(.vertical, 12)
+            .padding(.vertical, 14)
         }
-        .background(Color(.systemGroupedBackground))
+        .background(
+            Rectangle()
+                .fill(.ultraThinMaterial)
+        )
     }
 }
 
@@ -61,27 +160,50 @@ struct CategoryTab: View {
 
     var body: some View {
         Button(action: onTap) {
-            VStack(spacing: 4) {
-                Image(systemName: category.icon)
-                    .font(.title3)
+            VStack(spacing: 6) {
+                ZStack {
+                    if isSelected {
+                        Circle()
+                            .fill(Color.white.opacity(0.2))
+                            .frame(width: 36, height: 36)
+                    }
+
+                    Image(systemName: category.icon)
+                        .font(.system(size: 18, weight: .semibold))
+                }
 
                 Text(category.title)
-                    .font(.caption.bold())
+                    .font(.caption)
+                    .fontWeight(.bold)
             }
             .foregroundColor(isSelected ? .white : .primary)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
             .background(
                 isSelected ?
                 LinearGradient(
-                    colors: [.blue, .purple],
-                    startPoint: .leading,
-                    endPoint: .trailing
+                    colors: [.blue, .purple, .blue.opacity(0.8)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
                 ) :
-                LinearGradient(colors: [Color.white], startPoint: .leading, endPoint: .trailing)
+                LinearGradient(colors: [Color(.systemBackground)], startPoint: .leading, endPoint: .trailing)
             )
-            .cornerRadius(12)
-            .shadow(color: .black.opacity(isSelected ? 0.15 : 0.05), radius: 5, y: 2)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .shadow(color: isSelected ? .blue.opacity(0.3) : .black.opacity(0.05), radius: isSelected ? 10 : 5, y: isSelected ? 5 : 2)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(
+                        isSelected ?
+                        LinearGradient(colors: [Color.clear], startPoint: .leading, endPoint: .trailing) :
+                        LinearGradient(
+                            colors: [Color.gray.opacity(0.15), Color.gray.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            )
+            .scaleEffect(isSelected ? 1.02 : 1.0)
         }
     }
 }
@@ -92,33 +214,71 @@ struct SafetyTipCard: View {
     let tip: SafetyTip
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Icon and Title
-            HStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
+            // Icon and Title with premium styling
+            HStack(spacing: 14) {
+                // Premium icon with radial glow
                 ZStack {
                     Circle()
-                        .fill(tip.priority.color.opacity(0.1))
-                        .frame(width: 40, height: 40)
+                        .fill(
+                            RadialGradient(
+                                colors: [tip.priority.color.opacity(0.25), tip.priority.color.opacity(0.1), Color.clear],
+                                center: .center,
+                                startRadius: 5,
+                                endRadius: 28
+                            )
+                        )
+                        .frame(width: 56, height: 56)
+
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [tip.priority.color.opacity(0.2), tip.priority.color.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 44, height: 44)
 
                     Image(systemName: tip.icon)
-                        .font(.title3)
-                        .foregroundColor(tip.priority.color)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [tip.priority.color, tip.priority.color.opacity(0.8)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                 }
 
-                Text(tip.title)
-                    .font(.headline)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(tip.title)
+                        .font(.headline)
+                        .fontWeight(.bold)
+
+                    if tip.priority == .critical {
+                        HStack(spacing: 4) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.caption2)
+                            Text("IMPORTANT")
+                                .font(.caption2)
+                                .fontWeight(.bold)
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(
+                            LinearGradient(
+                                colors: [.red, .orange],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .clipShape(Capsule())
+                    }
+                }
 
                 Spacer()
-
-                if tip.priority == .critical {
-                    Text("IMPORTANT")
-                        .font(.caption2.bold())
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.red)
-                        .cornerRadius(6)
-                }
             }
 
             // Description
@@ -126,31 +286,83 @@ struct SafetyTipCard: View {
                 .font(.body)
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+                .lineSpacing(3)
 
-            // Action items if present
+            // Premium action items
             if !tip.actionItems.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(tip.actionItems, id: \.self) { item in
-                        HStack(alignment: .top, spacing: 8) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                                .font(.caption)
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(Array(tip.actionItems.enumerated()), id: \.element) { index, item in
+                        HStack(alignment: .top, spacing: 10) {
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [.green.opacity(0.2), .mint.opacity(0.15)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 24, height: 24)
+
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [.green, .mint],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                            }
 
                             Text(item)
-                                .font(.caption)
+                                .font(.subheadline)
                                 .foregroundColor(.primary)
                         }
                     }
                 }
-                .padding(12)
-                .background(Color.green.opacity(0.05))
-                .cornerRadius(8)
+                .padding(14)
+                .background(
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.green.opacity(0.08), Color.mint.opacity(0.04)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [.green.opacity(0.2), .mint.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
             }
         }
-        .padding()
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 5, y: 2)
+        .padding(18)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.systemBackground))
+                .shadow(color: tip.priority.color.opacity(0.1), radius: 12, y: 6)
+                .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [tip.priority.color.opacity(0.15), tip.priority.color.opacity(0.08)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
     }
 }
 

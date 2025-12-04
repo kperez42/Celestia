@@ -53,43 +53,124 @@ enum LegalDocumentType: String, CaseIterable {
 struct LegalDocumentView: View {
     let documentType: LegalDocumentType
     @Environment(\.dismiss) var dismiss
+    @State private var animateHeader = false
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    // Header
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack(spacing: 12) {
-                            Image(systemName: documentType.icon)
-                                .font(.title)
-                                .foregroundColor(documentType.iconColor)
+            ZStack {
+                // Premium gradient background
+                LinearGradient(
+                    colors: [
+                        documentType.iconColor.opacity(0.08),
+                        documentType.iconColor.opacity(0.03),
+                        Color(.systemGroupedBackground)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        // Premium Header with radial glow
+                        VStack(spacing: 16) {
+                            ZStack {
+                                // Radial glow
+                                Circle()
+                                    .fill(
+                                        RadialGradient(
+                                            colors: [
+                                                documentType.iconColor.opacity(0.25),
+                                                documentType.iconColor.opacity(0.1),
+                                                Color.clear
+                                            ],
+                                            center: .center,
+                                            startRadius: 20,
+                                            endRadius: 70
+                                        )
+                                    )
+                                    .frame(width: 140, height: 140)
+                                    .scaleEffect(animateHeader ? 1.05 : 1.0)
+                                    .animation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true), value: animateHeader)
+
+                                // Inner circle
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                documentType.iconColor.opacity(0.15),
+                                                documentType.iconColor.opacity(0.08)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 80, height: 80)
+
+                                Image(systemName: documentType.icon)
+                                    .font(.system(size: 36, weight: .medium))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [documentType.iconColor, documentType.iconColor.opacity(0.7)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .shadow(color: documentType.iconColor.opacity(0.3), radius: 8)
+                            }
 
                             Text(documentType.rawValue)
-                                .font(.title2)
-                                .fontWeight(.bold)
-                        }
+                                .font(.system(size: 22, weight: .bold, design: .rounded))
 
-                        Text("Last Updated: \(documentType.lastUpdated)")
+                            // Last updated badge
+                            HStack(spacing: 6) {
+                                Image(systemName: "clock.fill")
+                                    .font(.caption2)
+                                Text("Last Updated: \(documentType.lastUpdated)")
+                            }
                             .font(.caption)
                             .foregroundColor(.secondary)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule()
+                                    .fill(documentType.iconColor.opacity(0.1))
+                            )
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 20)
+                        .opacity(animateHeader ? 1 : 0)
+                        .offset(y: animateHeader ? 0 : 20)
+
+                        // Document Content
+                        documentContent
+
+                        Spacer(minLength: 40)
                     }
-                    .padding(.bottom, 8)
-
-                    // Document Content
-                    documentContent
-
-                    Spacer(minLength: 40)
+                    .padding(20)
                 }
-                .padding(20)
             }
-            .background(Color(.systemGroupedBackground))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
+                    Button {
                         dismiss()
+                    } label: {
+                        Text("Done")
+                            .fontWeight(.semibold)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [documentType.iconColor, documentType.iconColor.opacity(0.7)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
                     }
+                }
+            }
+            .onAppear {
+                withAnimation(.spring(response: 0.6)) {
+                    animateHeader = true
                 }
             }
         }
@@ -1118,18 +1199,34 @@ struct LegalSection<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             Text(title)
                 .font(.headline)
+                .fontWeight(.bold)
                 .foregroundColor(.primary)
 
             content
                 .font(.subheadline)
                 .foregroundColor(.secondary)
         }
-        .padding(16)
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
+        .padding(18)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(.systemBackground))
+                .shadow(color: .purple.opacity(0.06), radius: 10, y: 5)
+                .shadow(color: .black.opacity(0.03), radius: 4, y: 2)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.05)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
     }
 }
 
@@ -1138,11 +1235,24 @@ struct LegalSubsection<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundColor(.primary)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(width: 3, height: 16)
+                    .cornerRadius(1.5)
+
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+            }
 
             content
         }
@@ -1157,9 +1267,20 @@ struct SimpleBulletPoint: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Text("•")
-                .foregroundColor(.purple)
+        HStack(alignment: .top, spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.purple.opacity(0.2), .pink.opacity(0.15)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 8, height: 8)
+            }
+            .frame(width: 8, height: 20, alignment: .center)
+
             Text(text)
         }
         .font(.subheadline)
@@ -1172,36 +1293,102 @@ struct ResourceLink: View {
     var website: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.subheadline)
-                .fontWeight(.medium)
+                .fontWeight(.semibold)
 
             if let number = number {
-                HStack {
-                    Image(systemName: "phone.fill")
-                        .font(.caption)
-                        .foregroundColor(.green)
+                HStack(spacing: 10) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [.green.opacity(0.2), .mint.opacity(0.15)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 28, height: 28)
+
+                        Image(systemName: "phone.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.green, .mint],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    }
+
                     Text(number)
-                        .font(.caption)
-                        .foregroundColor(.blue)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.green, .mint],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
                 }
             }
 
             if let website = website {
-                HStack {
-                    Image(systemName: "globe")
-                        .font(.caption)
-                        .foregroundColor(.blue)
+                HStack(spacing: 10) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [.blue.opacity(0.2), .purple.opacity(0.15)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 28, height: 28)
+
+                        Image(systemName: "globe")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.blue, .purple],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    }
+
                     Text(website)
-                        .font(.caption)
-                        .foregroundColor(.blue)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.blue, .purple],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
                 }
             }
         }
-        .padding(12)
-        .background(Color(.systemGray6))
-        .cornerRadius(8)
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color(.systemBackground))
+                .shadow(color: .purple.opacity(0.06), radius: 8, y: 4)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [.purple.opacity(0.1), .pink.opacity(0.05)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
     }
 }
 

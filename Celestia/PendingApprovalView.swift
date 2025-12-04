@@ -54,7 +54,18 @@ struct PendingApprovalView: View {
                     actionButtons
                 }
             }
-            .background(Color(.systemGroupedBackground))
+            .background(
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.95, green: 0.94, blue: 1.0),
+                        Color(red: 0.98, green: 0.96, blue: 1.0),
+                        Color.white
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+            )
             .navigationTitle("Profile Status")
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showEditProfile) {
@@ -81,22 +92,54 @@ struct PendingApprovalView: View {
     // MARK: - Header Section
     private var headerSection: some View {
         ZStack {
+            // Large radial glow background
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            Color.blue.opacity(0.2),
+                            Color.purple.opacity(0.12),
+                            Color.clear
+                        ],
+                        center: .center,
+                        startRadius: 30,
+                        endRadius: 100
+                    )
+                )
+                .frame(width: 200, height: 200)
+                .scaleEffect(pulseAnimation ? 1.15 : 1.0)
+
+            // Rotating outer ring
             Circle()
                 .stroke(
                     LinearGradient(
-                        colors: [.blue.opacity(0.3), .purple.opacity(0.3)],
+                        colors: [.blue.opacity(0.4), .purple.opacity(0.3), .pink.opacity(0.2), .blue.opacity(0.3)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
                     lineWidth: 3
                 )
-                .frame(width: 130, height: 130)
+                .frame(width: 140, height: 140)
                 .rotationEffect(.degrees(animateIcon ? 360 : 0))
 
+            // Second rotating ring (opposite direction)
+            Circle()
+                .stroke(
+                    LinearGradient(
+                        colors: [.purple.opacity(0.2), .cyan.opacity(0.15), .purple.opacity(0.2)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ),
+                    lineWidth: 2
+                )
+                .frame(width: 125, height: 125)
+                .rotationEffect(.degrees(animateIcon ? -180 : 180))
+
+            // Middle glow layer
             Circle()
                 .fill(
                     LinearGradient(
-                        colors: [.blue.opacity(0.15), .purple.opacity(0.1)],
+                        colors: [.blue.opacity(0.2), .purple.opacity(0.15)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
@@ -104,9 +147,23 @@ struct PendingApprovalView: View {
                 .frame(width: 110, height: 110)
                 .scaleEffect(pulseAnimation ? 1.05 : 1.0)
 
+            // Inner glow
             Circle()
-                .fill(Color.blue.opacity(0.1))
+                .fill(Color.white.opacity(0.3))
+                .frame(width: 95, height: 95)
+                .blur(radius: 8)
+
+            // Icon background
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.9), Color.white.opacity(0.7)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
                 .frame(width: 90, height: 90)
+                .shadow(color: .blue.opacity(0.2), radius: 10, y: 4)
 
             Image(systemName: "clock.badge.checkmark.fill")
                 .font(.system(size: 42, weight: .medium))
@@ -117,6 +174,7 @@ struct PendingApprovalView: View {
                         endPoint: .bottomTrailing
                     )
                 )
+                .shadow(color: .purple.opacity(0.3), radius: 8)
                 .symbolEffect(.pulse, options: .repeating)
         }
         .padding(.top, 40)
@@ -149,9 +207,16 @@ struct PendingApprovalView: View {
 
     // MARK: - Title Section
     private var titleSection: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
             Text("Profile Under Review")
-                .font(.title2.bold())
+                .font(.system(size: 26, weight: .bold, design: .rounded))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.blue, .purple],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
                 .multilineTextAlignment(.center)
 
             Text("We're making sure everything looks great!")
@@ -169,16 +234,28 @@ struct PendingApprovalView: View {
             HStack {
                 ZStack {
                     Circle()
-                        .fill(Color.blue.opacity(0.15))
-                        .frame(width: 44, height: 44)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.blue.opacity(0.2), Color.purple.opacity(0.15)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 48, height: 48)
+                        .shadow(color: .blue.opacity(0.15), radius: 6, y: 2)
+
                     Image(systemName: "person.crop.circle.badge.clock.fill")
-                        .font(.system(size: 22))
-                        .foregroundStyle(.blue, .orange)
+                        .font(.system(size: 24))
+                        .foregroundStyle(
+                            LinearGradient(colors: [.blue, .purple], startPoint: .topLeading, endPoint: .bottomTrailing),
+                            LinearGradient(colors: [.orange, .yellow], startPoint: .top, endPoint: .bottom)
+                        )
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Review in Progress")
                         .font(.headline)
+                        .foregroundColor(.primary)
                     Text("Usually takes less than 24 hours")
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -186,25 +263,45 @@ struct PendingApprovalView: View {
 
                 Spacer()
 
-                HStack(spacing: 4) {
-                    ForEach(0..<3) { index in
+                HStack(spacing: 5) {
+                    ForEach(0..<3, id: \.self) { index in
                         Circle()
-                            .fill(Color.blue)
+                            .fill(
+                                LinearGradient(
+                                    colors: [.blue, .purple],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
                             .frame(width: 8, height: 8)
                             .opacity(pulseAnimation ? (index == 0 ? 1.0 : index == 1 ? 0.6 : 0.3) : (index == 0 ? 0.3 : index == 1 ? 0.6 : 1.0))
                             .animation(.easeInOut(duration: 0.6).delay(Double(index) * 0.2).repeatForever(autoreverses: true), value: pulseAnimation)
                     }
                 }
             }
-            .padding()
+            .padding(16)
             .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.blue.opacity(0.08))
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.blue.opacity(0.08), Color.purple.opacity(0.05)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(Color.blue.opacity(0.2), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [Color.blue.opacity(0.25), Color.purple.opacity(0.15)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
             )
+            .shadow(color: .blue.opacity(0.08), radius: 10, y: 4)
         }
         .padding(.horizontal)
         .opacity(appearAnimation ? 1 : 0)
@@ -216,12 +313,40 @@ struct PendingApprovalView: View {
     private var progressTimeline: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Review Progress")
-                    .font(.headline)
+                HStack(spacing: 8) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.blue.opacity(0.15), Color.purple.opacity(0.1)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 32, height: 32)
+
+                        Image(systemName: "chart.line.uptrend.xyaxis")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(
+                                LinearGradient(colors: [.blue, .purple], startPoint: .leading, endPoint: .trailing)
+                            )
+                    }
+
+                    Text("Review Progress")
+                        .font(.headline)
+                }
+
                 Spacer()
+
                 Text("Submitted \(submittedTimeAgo)")
-                    .font(.caption)
+                    .font(.caption.weight(.medium))
                     .foregroundColor(.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(
+                        Capsule()
+                            .fill(Color.blue.opacity(0.08))
+                    )
             }
             .padding(.bottom, 16)
 
@@ -260,13 +385,21 @@ struct PendingApprovalView: View {
         }
         .padding()
         .background(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 18)
                 .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
+                .shadow(color: .black.opacity(0.04), radius: 12, y: 4)
+                .shadow(color: .blue.opacity(0.06), radius: 20, y: 8)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(Color(.separator).opacity(0.2), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 18)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [Color.blue.opacity(0.15), Color.purple.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
         )
         .padding(.horizontal)
         .opacity(appearAnimation ? 1 : 0)
@@ -277,10 +410,25 @@ struct PendingApprovalView: View {
     // MARK: - Checklist Section
     private var checklistSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Image(systemName: "checklist")
-                    .font(.headline)
-                    .foregroundColor(.purple)
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.purple.opacity(0.15), Color.pink.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 32, height: 32)
+
+                    Image(systemName: "checklist")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(
+                            LinearGradient(colors: [.purple, .pink], startPoint: .leading, endPoint: .trailing)
+                        )
+                }
+
                 Text("What We're Checking")
                     .font(.headline)
             }
@@ -310,13 +458,21 @@ struct PendingApprovalView: View {
         }
         .padding()
         .background(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 18)
                 .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
+                .shadow(color: .black.opacity(0.04), radius: 12, y: 4)
+                .shadow(color: .purple.opacity(0.06), radius: 20, y: 8)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(Color(.separator).opacity(0.2), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 18)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [Color.purple.opacity(0.15), Color.pink.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
         )
         .padding(.horizontal)
         .opacity(appearAnimation ? 1 : 0)
@@ -327,14 +483,24 @@ struct PendingApprovalView: View {
     // MARK: - While You Wait Card
     private var whileYouWaitCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack {
+            HStack(spacing: 10) {
                 ZStack {
                     Circle()
-                        .fill(Color.orange.opacity(0.15))
-                        .frame(width: 36, height: 36)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.orange.opacity(0.2), Color.yellow.opacity(0.15)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 38, height: 38)
+                        .shadow(color: .orange.opacity(0.15), radius: 6, y: 2)
+
                     Image(systemName: "lightbulb.fill")
                         .font(.system(size: 18))
-                        .foregroundColor(.orange)
+                        .foregroundStyle(
+                            LinearGradient(colors: [.orange, .yellow], startPoint: .top, endPoint: .bottom)
+                        )
                 }
 
                 Text("While You Wait")
@@ -346,16 +512,30 @@ struct PendingApprovalView: View {
                 .foregroundColor(.primary.opacity(0.85))
                 .lineSpacing(4)
         }
-        .padding()
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.orange.opacity(0.08))
+            RoundedRectangle(cornerRadius: 18)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.orange.opacity(0.1), Color.yellow.opacity(0.06)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(Color.orange.opacity(0.2), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 18)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [Color.orange.opacity(0.25), Color.yellow.opacity(0.15)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
         )
+        .shadow(color: .orange.opacity(0.08), radius: 10, y: 4)
         .padding(.horizontal)
         .opacity(appearAnimation ? 1 : 0)
         .offset(y: appearAnimation ? 0 : 30)
@@ -364,7 +544,7 @@ struct PendingApprovalView: View {
 
     // MARK: - Action Buttons
     private var actionButtons: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 14) {
             Button(action: {
                 HapticManager.shared.impact(.medium)
                 showSignUpEdit = true
@@ -378,16 +558,17 @@ struct PendingApprovalView: View {
                 .font(.headline)
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
+                .padding(.vertical, 18)
                 .background(
                     LinearGradient(
-                        colors: [.purple, .pink],
-                        startPoint: .leading,
-                        endPoint: .trailing
+                        colors: [.purple, .pink, .purple.opacity(0.9)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
                     )
                 )
-                .cornerRadius(16)
-                .shadow(color: .purple.opacity(0.3), radius: 8, y: 4)
+                .cornerRadius(18)
+                .shadow(color: .purple.opacity(0.35), radius: 12, y: 6)
+                .shadow(color: .pink.opacity(0.2), radius: 20, y: 10)
             }
 
             Button(action: {
@@ -408,11 +589,30 @@ struct PendingApprovalView: View {
                     }
                 }
                 .font(.headline)
-                .foregroundColor(.blue)
+                .foregroundStyle(
+                    LinearGradient(colors: [.blue, .purple], startPoint: .leading, endPoint: .trailing)
+                )
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(Color.blue.opacity(0.1))
-                .cornerRadius(16)
+                .padding(.vertical, 18)
+                .background(
+                    LinearGradient(
+                        colors: [Color.blue.opacity(0.1), Color.purple.opacity(0.08)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(18)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [Color.blue.opacity(0.2), Color.purple.opacity(0.15)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
             }
             .disabled(isRefreshing)
 
@@ -421,7 +621,7 @@ struct PendingApprovalView: View {
                 authService.signOut()
             }) {
                 Text("Sign Out")
-                    .font(.subheadline)
+                    .font(.subheadline.weight(.medium))
                     .foregroundColor(.secondary)
             }
             .padding(.top, 8)
@@ -438,17 +638,46 @@ struct PendingApprovalView: View {
     private var pendingToastOverlay: some View {
         if showStillPendingToast {
             HStack(spacing: 10) {
-                Image(systemName: "clock.badge.checkmark")
-                    .foregroundColor(.blue)
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.blue.opacity(0.15), Color.purple.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 28, height: 28)
+
+                    Image(systemName: "clock.badge.checkmark")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(
+                            LinearGradient(colors: [.blue, .purple], startPoint: .leading, endPoint: .trailing)
+                        )
+                }
+
                 Text("Still under review - check back soon!")
                     .font(.subheadline.weight(.medium))
+                    .foregroundColor(.primary)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
             .background(
                 Capsule()
                     .fill(Color(.systemBackground))
-                    .shadow(color: .black.opacity(0.15), radius: 10, y: 4)
+                    .shadow(color: .black.opacity(0.1), radius: 12, y: 4)
+                    .shadow(color: .blue.opacity(0.08), radius: 20, y: 8)
+            )
+            .overlay(
+                Capsule()
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [Color.blue.opacity(0.15), Color.purple.opacity(0.1)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ),
+                        lineWidth: 1
+                    )
             )
             .padding(.top, 60)
             .transition(.move(edge: .top).combined(with: .opacity))
@@ -497,20 +726,69 @@ private struct ReviewStepView: View {
     let color: Color
     let isAnimated: Bool
 
+    private var secondaryColor: Color {
+        switch color {
+        case .green: return .mint
+        case .blue: return .purple
+        case .purple: return .pink
+        default: return color.opacity(0.7)
+        }
+    }
+
     var body: some View {
         VStack(spacing: 8) {
             ZStack {
-                // Background circle
+                // Outer glow for completed/active
+                if isCompleted || isActive {
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [color.opacity(0.2), Color.clear],
+                                center: .center,
+                                startRadius: 15,
+                                endRadius: 35
+                            )
+                        )
+                        .frame(width: 60, height: 60)
+                }
+
+                // Background circle with gradient
                 Circle()
-                    .fill(isCompleted ? color : (isActive ? color.opacity(0.15) : Color(.systemGray5)))
-                    .frame(width: 44, height: 44)
+                    .fill(
+                        isCompleted ?
+                        LinearGradient(
+                            colors: [color, secondaryColor],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ) :
+                        (isActive ?
+                         LinearGradient(
+                            colors: [color.opacity(0.2), secondaryColor.opacity(0.15)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                         ) :
+                         LinearGradient(
+                            colors: [Color(.systemGray5), Color(.systemGray6)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                         ))
+                    )
+                    .frame(width: 46, height: 46)
+                    .shadow(color: isCompleted ? color.opacity(0.3) : .clear, radius: 6, y: 2)
 
                 // Pulse ring for active step
                 if isActive {
                     Circle()
-                        .stroke(color.opacity(0.3), lineWidth: 2)
-                        .frame(width: 52, height: 52)
-                        .scaleEffect(isAnimated ? 1.2 : 1.0)
+                        .stroke(
+                            LinearGradient(
+                                colors: [color.opacity(0.4), secondaryColor.opacity(0.2)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 2
+                        )
+                        .frame(width: 56, height: 56)
+                        .scaleEffect(isAnimated ? 1.3 : 1.0)
                         .opacity(isAnimated ? 0 : 1)
                         .animation(.easeOut(duration: 1.5).repeatForever(autoreverses: false), value: isAnimated)
                 }
@@ -518,13 +796,18 @@ private struct ReviewStepView: View {
                 // Icon
                 Image(systemName: icon)
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(isCompleted ? .white : (isActive ? color : .gray))
+                    .foregroundStyle(
+                        isCompleted ? .white :
+                        (isActive ?
+                         LinearGradient(colors: [color, secondaryColor], startPoint: .leading, endPoint: .trailing) :
+                         LinearGradient(colors: [.gray, .gray.opacity(0.8)], startPoint: .leading, endPoint: .trailing))
+                    )
             }
             .scaleEffect(isAnimated ? 1.0 : 0.5)
             .opacity(isAnimated ? 1.0 : 0)
 
             Text(title)
-                .font(.caption2.weight(.medium))
+                .font(.caption2.weight(.semibold))
                 .foregroundColor(isCompleted || isActive ? .primary : .secondary)
                 .opacity(isAnimated ? 1.0 : 0)
         }
@@ -572,16 +855,37 @@ private struct ChecklistRow: View {
     let description: String
     let color: Color
 
+    private var secondaryColor: Color {
+        switch color {
+        case .blue: return .purple
+        case .purple: return .pink
+        case .green: return .mint
+        default: return color.opacity(0.7)
+        }
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             ZStack {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(color.opacity(0.12))
-                    .frame(width: 38, height: 38)
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(
+                        LinearGradient(
+                            colors: [color.opacity(0.15), secondaryColor.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 40, height: 40)
 
                 Image(systemName: icon)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(color)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [color, secondaryColor],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
             }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -597,14 +901,43 @@ private struct ChecklistRow: View {
 
             Spacer()
 
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundColor(.green.opacity(0.7))
-                .font(.body)
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.green.opacity(0.15), Color.mint.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 26, height: 26)
+
+                Image(systemName: "checkmark")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.green, .mint],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
         }
-        .padding(12)
+        .padding(14)
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemGray6))
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color(.systemGray6).opacity(0.7))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [color.opacity(0.1), secondaryColor.opacity(0.05)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
         )
     }
 }

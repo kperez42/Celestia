@@ -20,16 +20,33 @@ struct ProfileApprovedCelebrationView: View {
 
     var body: some View {
         ZStack {
-            // Background gradient
-            LinearGradient(
-                colors: [
-                    Color.purple.opacity(0.3),
-                    Color.blue.opacity(0.2),
-                    Color.pink.opacity(0.2)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            // Premium radiant background
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.95, green: 0.94, blue: 1.0),
+                        Color(red: 0.98, green: 0.96, blue: 1.0),
+                        Color.white
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                // Radial glow overlays
+                RadialGradient(
+                    colors: [Color.green.opacity(0.2), Color.clear],
+                    center: .top,
+                    startRadius: 50,
+                    endRadius: 400
+                )
+
+                RadialGradient(
+                    colors: [Color.blue.opacity(0.1), Color.clear],
+                    center: .bottomTrailing,
+                    startRadius: 50,
+                    endRadius: 350
+                )
+            }
             .ignoresSafeArea()
 
             // Confetti layer
@@ -41,59 +58,104 @@ struct ProfileApprovedCelebrationView: View {
             VStack(spacing: 32) {
                 Spacer()
 
-                // Animated checkmark with glow
+                // Animated checkmark with premium radial glow
                 ZStack {
-                    // Outer glow rings
+                    // Large radial glow background
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    Color.green.opacity(0.2),
+                                    Color.blue.opacity(0.1),
+                                    Color.clear
+                                ],
+                                center: .center,
+                                startRadius: 40,
+                                endRadius: 140
+                            )
+                        )
+                        .frame(width: 280, height: 280)
+                        .scaleEffect(glowAnimation ? 1.05 : 1.0)
+                        .animation(
+                            .easeInOut(duration: 2.0)
+                            .repeatForever(autoreverses: true),
+                            value: glowAnimation
+                        )
+
+                    // Outer glow rings with gradient stroke
                     ForEach(0..<3) { index in
                         Circle()
                             .stroke(
                                 LinearGradient(
-                                    colors: [.green.opacity(0.3), .blue.opacity(0.2)],
+                                    colors: [
+                                        Color.green.opacity(0.4 - Double(index) * 0.1),
+                                        Color.blue.opacity(0.3 - Double(index) * 0.08)
+                                    ],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 ),
-                                lineWidth: 2
+                                lineWidth: 2.5 - CGFloat(index) * 0.5
                             )
-                            .frame(width: CGFloat(140 + index * 30), height: CGFloat(140 + index * 30))
-                            .scaleEffect(glowAnimation ? 1.1 : 1.0)
-                            .opacity(glowAnimation ? 0.3 : 0.6)
+                            .frame(width: CGFloat(160 + index * 35), height: CGFloat(160 + index * 35))
+                            .scaleEffect(glowAnimation ? 1.08 : 1.0)
+                            .opacity(glowAnimation ? 0.4 : 0.7)
                             .animation(
                                 .easeInOut(duration: 1.5)
                                 .repeatForever(autoreverses: true)
-                                .delay(Double(index) * 0.2),
+                                .delay(Double(index) * 0.15),
                                 value: glowAnimation
                             )
                     }
 
-                    // Inner gradient circle
+                    // Inner gradient background circle
                     Circle()
                         .fill(
                             LinearGradient(
-                                colors: [.green, .green.opacity(0.8)],
+                                colors: [
+                                    Color.green.opacity(0.15),
+                                    Color.blue.opacity(0.1)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 140, height: 140)
+
+                    // Main gradient circle
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.green,
+                                    Color(red: 0.2, green: 0.7, blue: 0.5),
+                                    Color.green.opacity(0.9)
+                                ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
                         .frame(width: 120, height: 120)
                         .shadow(color: .green.opacity(0.5), radius: 20, y: 5)
+                        .shadow(color: .green.opacity(0.3), radius: 40, y: 10)
 
-                    // Checkmark
+                    // Checkmark with subtle shadow
                     Image(systemName: "checkmark")
                         .font(.system(size: 60, weight: .bold))
                         .foregroundColor(.white)
+                        .shadow(color: .black.opacity(0.2), radius: 2, y: 2)
                         .scaleEffect(scaleAnimation ? 1.0 : 0.3)
                         .opacity(scaleAnimation ? 1.0 : 0)
                 }
                 .scaleEffect(appearAnimation ? 1.0 : 0.5)
                 .opacity(appearAnimation ? 1.0 : 0)
 
-                // Title with gradient
+                // Title with premium gradient
                 VStack(spacing: 12) {
                     Text("You're Approved!")
-                        .font(.system(size: 34, weight: .bold))
+                        .font(.system(size: 34, weight: .bold, design: .rounded))
                         .foregroundStyle(
                             LinearGradient(
-                                colors: [.primary, .primary.opacity(0.8)],
+                                colors: [.green, Color(red: 0.2, green: 0.6, blue: 0.5), .blue],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
@@ -101,35 +163,102 @@ struct ProfileApprovedCelebrationView: View {
                         .scaleEffect(appearAnimation ? 1.0 : 0.8)
 
                     Text("Welcome to Celestia")
-                        .font(.title2)
-                        .foregroundColor(.secondary)
+                        .font(.title2.weight(.medium))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.secondary, .secondary.opacity(0.7)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
                 }
                 .opacity(appearAnimation ? 1.0 : 0)
                 .offset(y: appearAnimation ? 0 : 30)
                 .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.3), value: appearAnimation)
 
-                // Celebration message
+                // Celebration message with premium card styling
                 VStack(spacing: 16) {
                     HStack(spacing: 8) {
-                        Image(systemName: "sparkles")
-                            .foregroundColor(.yellow)
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color.yellow.opacity(0.2), Color.orange.opacity(0.15)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 32, height: 32)
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 14))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.yellow, .orange],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                        }
+
                         Text("Your profile is now live")
                             .font(.headline)
-                        Image(systemName: "sparkles")
-                            .foregroundColor(.yellow)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.primary, .primary.opacity(0.85)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color.yellow.opacity(0.2), Color.orange.opacity(0.15)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 32, height: 32)
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 14))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.yellow, .orange],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                        }
                     }
 
                     Text("Start connecting with amazing people in your community. Your journey begins now!")
                         .font(.body)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
-                        .padding(.horizontal, 24)
+                        .padding(.horizontal, 16)
                 }
                 .padding(24)
                 .background(
-                    RoundedRectangle(cornerRadius: 20)
+                    RoundedRectangle(cornerRadius: 24)
                         .fill(Color(.systemBackground))
-                        .shadow(color: .black.opacity(0.1), radius: 15, y: 5)
+                        .shadow(color: .black.opacity(0.08), radius: 20, y: 8)
+                        .shadow(color: .green.opacity(0.1), radius: 30, y: 12)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color.green.opacity(0.2),
+                                    Color.blue.opacity(0.15),
+                                    Color.green.opacity(0.1)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
                 )
                 .padding(.horizontal, 24)
                 .opacity(appearAnimation ? 1.0 : 0)
@@ -138,13 +267,13 @@ struct ProfileApprovedCelebrationView: View {
 
                 Spacer()
 
-                // Continue button
+                // Premium continue button with glow
                 Button(action: {
                     dismissWithAnimation()
                 }) {
                     HStack(spacing: 12) {
                         Text("Start Exploring")
-                            .font(.headline)
+                            .font(.headline.weight(.semibold))
                         Image(systemName: "arrow.right.circle.fill")
                             .font(.title3)
                     }
@@ -153,14 +282,20 @@ struct ProfileApprovedCelebrationView: View {
                     .padding(.vertical, 18)
                     .background(
                         LinearGradient(
-                            colors: [.green, .blue],
+                            colors: [
+                                Color.green,
+                                Color(red: 0.2, green: 0.65, blue: 0.5),
+                                Color.blue
+                            ],
                             startPoint: .leading,
                             endPoint: .trailing
                         )
                     )
-                    .cornerRadius(16)
-                    .shadow(color: .green.opacity(0.4), radius: 10, y: 5)
+                    .cornerRadius(20)
+                    .shadow(color: .green.opacity(0.4), radius: 12, y: 6)
+                    .shadow(color: .blue.opacity(0.3), radius: 20, y: 10)
                 }
+                .scaleButton()
                 .padding(.horizontal, 24)
                 .opacity(appearAnimation ? 1.0 : 0)
                 .offset(y: appearAnimation ? 0 : 50)
@@ -288,10 +423,20 @@ struct CelebrationConfettiView: View {
         1.5 + (Double(piece.id % 10) * 0.15)
     }
 
+    // Gradient colors for premium confetti
+    private var confettiGradient: LinearGradient {
+        LinearGradient(
+            colors: [piece.color, piece.color.opacity(0.7)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
     var body: some View {
         Image(systemName: piece.shape)
             .font(.system(size: 12 + CGFloat(piece.id % 6)))
-            .foregroundColor(piece.color)
+            .foregroundStyle(confettiGradient)
+            .shadow(color: piece.color.opacity(0.5), radius: 3, y: 1)
             .scaleEffect(piece.scale)
             .rotationEffect(.degrees(rotating ? piece.rotation + 720 : piece.rotation))
             .rotation3DEffect(.degrees(swaying ? 25 : -25), axis: (x: 1, y: 0, z: 0))

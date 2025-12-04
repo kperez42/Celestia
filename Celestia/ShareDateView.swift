@@ -19,6 +19,7 @@ struct ShareDateView: View {
     @State private var additionalNotes = ""
     @State private var selectedContacts: Set<EmergencyContact> = []
     @State private var showMatchPicker = false
+    @State private var animateHeader = false
 
     var body: some View {
         ScrollView {
@@ -37,7 +38,22 @@ struct ShareDateView: View {
             }
             .padding()
         }
-        .background(Color(.systemGroupedBackground))
+        .background(
+            // Premium gradient background
+            LinearGradient(
+                colors: [
+                    Color.blue.opacity(0.08),
+                    Color.purple.opacity(0.05),
+                    Color(.systemGroupedBackground)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+        )
+        .onAppear {
+            animateHeader = true
+        }
         .navigationTitle("Share Your Date")
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -54,103 +70,277 @@ struct ShareDateView: View {
     // MARK: - Header Section
 
     private var headerSection: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "person.2.badge.gearshape")
-                .font(.system(size: 50))
-                .foregroundColor(.blue)
+        VStack(spacing: 16) {
+            ZStack {
+                // Radial glow
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                Color.blue.opacity(0.25),
+                                Color.purple.opacity(0.1),
+                                Color.clear
+                            ],
+                            center: .center,
+                            startRadius: 20,
+                            endRadius: 70
+                        )
+                    )
+                    .frame(width: 140, height: 140)
+                    .scaleEffect(animateHeader ? 1.05 : 1.0)
+                    .animation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true), value: animateHeader)
 
-            Text("Stay Safe on Your Date")
-                .font(.title2.bold())
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.blue.opacity(0.2), .purple.opacity(0.15)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 90, height: 90)
 
-            Text("Share your date plans with trusted contacts. They'll receive your details and can check in on you.")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
+                Image(systemName: "person.2.badge.gearshape")
+                    .font(.system(size: 40))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.blue, .purple],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .symbolEffect(.pulse, options: .repeating)
+            }
+
+            VStack(spacing: 8) {
+                Text("Stay Safe on Your Date")
+                    .font(.title2.bold())
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.blue, .purple],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+
+                Text("Share your date plans with trusted contacts. They'll receive your details and can check in on you.")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
         }
-        .padding()
+        .padding(.vertical, 24)
+        .padding(.horizontal)
         .frame(maxWidth: .infinity)
-        .background(Color.white)
-        .cornerRadius(16)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.systemBackground))
+                .shadow(color: .blue.opacity(0.08), radius: 15, y: 5)
+                .shadow(color: .black.opacity(0.03), radius: 5, y: 2)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [Color.blue.opacity(0.15), Color.purple.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
     }
 
     // MARK: - Date Details Section
 
     private var dateDetailsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Date Details")
-                .font(.headline)
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [.purple.opacity(0.2), .pink.opacity(0.15)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 36, height: 36)
+
+                    Image(systemName: "calendar.badge.clock")
+                        .font(.system(size: 16))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+
+                Text("Date Details")
+                    .font(.headline)
+            }
 
             VStack(spacing: 16) {
                 // Match Selection
                 Button {
                     showMatchPicker = true
                 } label: {
-                    HStack {
-                        Image(systemName: "person.crop.circle")
-                            .font(.title2)
-                            .foregroundColor(.purple)
+                    HStack(spacing: 14) {
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    RadialGradient(
+                                        colors: [.purple.opacity(0.2), .purple.opacity(0.08), Color.clear],
+                                        center: .center,
+                                        startRadius: 5,
+                                        endRadius: 22
+                                    )
+                                )
+                                .frame(width: 44, height: 44)
 
-                        VStack(alignment: .leading) {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [.purple.opacity(0.15), .pink.opacity(0.1)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 36, height: 36)
+
+                            Image(systemName: "person.crop.circle")
+                                .font(.system(size: 16))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.purple, .pink],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                        }
+
+                        VStack(alignment: .leading, spacing: 4) {
                             Text("Who are you meeting?")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
 
                             Text(selectedMatch?.fullName ?? "Select match")
-                                .font(.body)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
                                 .foregroundColor(.primary)
                         }
 
                         Spacer()
 
                         Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundColor(.gray)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.secondary.opacity(0.6))
                     }
-                    .padding()
-                    .background(Color.white)
-                    .cornerRadius(12)
+                    .padding(16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color(.systemBackground))
+                            .shadow(color: .purple.opacity(0.06), radius: 10, y: 5)
+                            .shadow(color: .black.opacity(0.03), radius: 4, y: 2)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .strokeBorder(
+                                LinearGradient(
+                                    colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.05)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1
+                            )
+                    )
                 }
 
                 // Date & Time
-                VStack(alignment: .leading, spacing: 8) {
-                    Label("Date & Time", systemImage: "calendar.clock")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "calendar.clock")
+                            .font(.system(size: 14))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.blue, .cyan],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                        Text("Date & Time")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondary)
+                    }
 
                     DatePicker("", selection: $dateTime, in: Date()...)
                         .datePickerStyle(.graphical)
                         .padding()
-                        .background(Color.white)
-                        .cornerRadius(12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color(.systemBackground))
+                                .shadow(color: .black.opacity(0.04), radius: 8, y: 4)
+                        )
                 }
 
                 // Location
-                VStack(alignment: .leading, spacing: 8) {
-                    Label("Location", systemImage: "mappin.circle")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "mappin.circle")
+                            .font(.system(size: 14))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.red, .orange],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                        Text("Location")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondary)
+                    }
 
                     TextField("Restaurant name or address", text: $location)
                         .textFieldStyle(.plain)
-                        .padding()
-                        .background(Color.white)
-                        .cornerRadius(12)
+                        .padding(16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(Color(.systemBackground))
+                                .shadow(color: .black.opacity(0.04), radius: 8, y: 4)
+                        )
                 }
 
                 // Additional Notes
-                VStack(alignment: .leading, spacing: 8) {
-                    Label("Additional Notes (Optional)", systemImage: "note.text")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "note.text")
+                            .font(.system(size: 14))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.green, .mint],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                        Text("Additional Notes (Optional)")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondary)
+                    }
 
                     TextEditor(text: $additionalNotes)
                         .frame(height: 100)
-                        .padding(8)
-                        .background(Color.white)
-                        .cornerRadius(12)
+                        .padding(12)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(14)
+                        .shadow(color: .black.opacity(0.04), radius: 8, y: 4)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(Color.gray.opacity(0.15), lineWidth: 1)
                         )
                 }
             }
@@ -162,8 +352,32 @@ struct ShareDateView: View {
     private var contactsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Share With")
-                    .font(.headline)
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [.green.opacity(0.2), .mint.opacity(0.15)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 36, height: 36)
+
+                        Image(systemName: "person.2.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.green, .mint],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    }
+
+                    Text("Share With")
+                        .font(.headline)
+                }
 
                 Spacer()
 
@@ -172,45 +386,90 @@ struct ShareDateView: View {
                 } label: {
                     Text("Manage")
                         .font(.subheadline)
-                        .foregroundColor(.blue)
+                        .fontWeight(.medium)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.blue, .purple],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
                 }
             }
 
             if viewModel.emergencyContacts.isEmpty {
                 // Empty state
-                VStack(spacing: 16) {
-                    Image(systemName: "person.crop.circle.badge.plus")
-                        .font(.system(size: 40))
-                        .foregroundColor(.gray.opacity(0.5))
+                VStack(spacing: 20) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    colors: [.gray.opacity(0.15), .gray.opacity(0.05), Color.clear],
+                                    center: .center,
+                                    startRadius: 20,
+                                    endRadius: 60
+                                )
+                            )
+                            .frame(width: 120, height: 120)
 
-                    Text("No Emergency Contacts")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [.gray.opacity(0.1), .gray.opacity(0.05)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 80, height: 80)
 
-                    Text("Add trusted contacts who can check on you during your date.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
+                        Image(systemName: "person.crop.circle.badge.plus")
+                            .font(.system(size: 36))
+                            .foregroundColor(.gray.opacity(0.5))
+                    }
+
+                    VStack(spacing: 8) {
+                        Text("No Emergency Contacts")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+
+                        Text("Add trusted contacts who can check on you during your date.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
 
                     NavigationLink {
                         EmergencyContactsView()
                     } label: {
-                        Text("Add Contacts")
-                            .font(.subheadline.bold())
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 12)
-                            .background(Color.blue)
-                            .cornerRadius(10)
+                        HStack(spacing: 8) {
+                            Image(systemName: "plus.circle.fill")
+                            Text("Add Contacts")
+                        }
+                        .font(.subheadline.bold())
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 12)
+                        .background(
+                            LinearGradient(
+                                colors: [.blue, .purple],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .cornerRadius(12)
+                        .shadow(color: .blue.opacity(0.3), radius: 8, y: 4)
                     }
                 }
-                .padding()
+                .padding(24)
                 .frame(maxWidth: .infinity)
-                .background(Color.white)
-                .cornerRadius(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 18)
+                        .fill(Color(.systemBackground))
+                        .shadow(color: .black.opacity(0.04), radius: 10, y: 4)
+                )
             } else {
                 // Contacts list
-                VStack(spacing: 8) {
+                VStack(spacing: 10) {
                     ForEach(viewModel.emergencyContacts) { contact in
                         ContactSelectionRow(
                             contact: contact,
@@ -282,21 +541,52 @@ struct ContactSelectionRow: View {
 
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 12) {
+            HStack(spacing: 14) {
                 // Profile image
-                Circle()
-                    .fill(Color.blue.opacity(0.1))
-                    .frame(width: 40, height: 40)
-                    .overlay(
-                        Text(contact.name.prefix(1))
-                            .font(.headline)
-                            .foregroundColor(.blue)
-                    )
+                ZStack {
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    (isSelected ? Color.green : Color.blue).opacity(0.2),
+                                    (isSelected ? Color.green : Color.blue).opacity(0.08),
+                                    Color.clear
+                                ],
+                                center: .center,
+                                startRadius: 5,
+                                endRadius: 25
+                            )
+                        )
+                        .frame(width: 50, height: 50)
+
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: isSelected
+                                    ? [.green.opacity(0.2), .mint.opacity(0.15)]
+                                    : [.blue.opacity(0.15), .cyan.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 44, height: 44)
+
+                    Text(contact.name.prefix(1))
+                        .font(.headline)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: isSelected ? [.green, .mint] : [.blue, .cyan],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
 
                 // Info
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(contact.name)
-                        .font(.body)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
                         .foregroundColor(.primary)
 
                     Text(contact.phoneNumber)
@@ -307,13 +597,39 @@ struct ContactSelectionRow: View {
                 Spacer()
 
                 // Checkmark
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
-                    .foregroundColor(isSelected ? .blue : .gray.opacity(0.3))
+                ZStack {
+                    Circle()
+                        .fill(isSelected ? Color.green.opacity(0.15) : Color.gray.opacity(0.08))
+                        .frame(width: 32, height: 32)
+
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 22))
+                        .foregroundStyle(
+                            isSelected
+                                ? LinearGradient(colors: [.green, .mint], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                : LinearGradient(colors: [.gray.opacity(0.3), .gray.opacity(0.3)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                        )
+                }
             }
-            .padding()
-            .background(Color.white)
-            .cornerRadius(12)
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: isSelected ? .green.opacity(0.08) : .black.opacity(0.04), radius: 10, y: 5)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: isSelected
+                                ? [Color.green.opacity(0.2), Color.mint.opacity(0.1)]
+                                : [Color.gray.opacity(0.1), Color.gray.opacity(0.05)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            )
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -324,6 +640,7 @@ struct ContactSelectionRow: View {
 struct DateSharedConfirmationView: View {
     let confirmation: DateShareConfirmation
     @Environment(\.dismiss) var dismiss
+    @State private var animateSuccess = false
 
     var body: some View {
         NavigationStack {
@@ -332,19 +649,57 @@ struct DateSharedConfirmationView: View {
 
                 // Success Icon
                 ZStack {
+                    // Outer radial glow
                     Circle()
-                        .fill(Color.green.opacity(0.1))
-                        .frame(width: 100, height: 100)
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    Color.green.opacity(0.3),
+                                    Color.mint.opacity(0.15),
+                                    Color.clear
+                                ],
+                                center: .center,
+                                startRadius: 30,
+                                endRadius: 90
+                            )
+                        )
+                        .frame(width: 180, height: 180)
+                        .scaleEffect(animateSuccess ? 1.1 : 1.0)
+                        .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: animateSuccess)
+
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [.green.opacity(0.2), .mint.opacity(0.15)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 120, height: 120)
 
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 60))
-                        .foregroundColor(.green)
+                        .font(.system(size: 70))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.green, .mint],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .symbolEffect(.bounce, options: .repeating.speed(0.3))
                 }
 
                 // Message
                 VStack(spacing: 12) {
                     Text("Date Details Shared!")
                         .font(.title.bold())
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.green, .mint],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
 
                     Text("Your trusted contacts have been notified and will receive updates.")
                         .font(.subheadline)
@@ -354,24 +709,59 @@ struct DateSharedConfirmationView: View {
                 }
 
                 // Shared with
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 14) {
                     Text("Shared with:")
                         .font(.caption.bold())
                         .foregroundColor(.secondary)
 
                     ForEach(confirmation.sharedWith, id: \.self) { name in
-                        HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
+                        HStack(spacing: 12) {
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [.green.opacity(0.15), .mint.opacity(0.1)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 28, height: 28)
+
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [.green, .mint],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                            }
+
                             Text(name)
                                 .font(.body)
+                                .fontWeight(.medium)
                         }
                     }
                 }
-                .padding()
+                .padding(18)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.systemGroupedBackground))
-                .cornerRadius(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color(.systemBackground))
+                        .shadow(color: .green.opacity(0.08), radius: 10, y: 5)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [Color.green.opacity(0.15), Color.mint.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
 
                 Spacer()
 
@@ -379,18 +769,43 @@ struct DateSharedConfirmationView: View {
                 Button {
                     dismiss()
                 } label: {
-                    Text("Done")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .cornerRadius(16)
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill")
+                        Text("Done")
+                    }
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(
+                        LinearGradient(
+                            colors: [.green, .mint],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(16)
+                    .shadow(color: .green.opacity(0.3), radius: 10, y: 5)
                 }
             }
             .padding()
+            .background(
+                LinearGradient(
+                    colors: [
+                        Color.green.opacity(0.05),
+                        Color.mint.opacity(0.03),
+                        Color(.systemGroupedBackground)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+            )
             .navigationTitle("Success")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                animateSuccess = true
+            }
         }
     }
 }

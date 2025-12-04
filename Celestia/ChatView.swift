@@ -97,18 +97,33 @@ struct ChatView: View {
         VStack(spacing: 0) {
             // Network status banner - shows when offline
             if !networkMonitor.isConnected {
-                HStack(spacing: 8) {
-                    Image(systemName: "wifi.slash")
-                        .font(.subheadline)
-                    Text("No Internet Connection")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.white.opacity(0.2))
+                            .frame(width: 32, height: 32)
+                        Image(systemName: "wifi.slash")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("No Internet Connection")
+                            .font(.subheadline.weight(.semibold))
+                        Text("Messages will be sent when you're back online")
+                            .font(.caption)
+                            .opacity(0.9)
+                    }
                     Spacer()
                 }
                 .foregroundColor(.white)
                 .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(Color.orange)
+                .padding(.vertical, 10)
+                .background(
+                    LinearGradient(
+                        colors: [Color.orange, Color.red.opacity(0.8)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
             }
 
             // Custom header
@@ -273,15 +288,32 @@ struct ChatView: View {
 
     private var customHeader: some View {
         HStack(spacing: 12) {
-            // Back button
+            // Back button with gradient styling
             Button {
                 dismiss()
                 HapticManager.shared.impact(.light)
             } label: {
-                Image(systemName: "chevron.left")
-                    .font(.body.weight(.semibold))
-                    .foregroundColor(.purple)
-                    .frame(width: 44, height: 44)
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.purple.opacity(0.12), Color.pink.opacity(0.08)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 40, height: 40)
+
+                    Image(systemName: "chevron.left")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
             }
             .accessibilityElement(
                 label: "Back",
@@ -290,35 +322,60 @@ struct ChatView: View {
                 identifier: AccessibilityIdentifier.backButton
             )
 
-            // Profile image
+            // Profile image with online indicator
             Button {
                 showingUserProfile = true
                 HapticManager.shared.impact(.light)
             } label: {
-                if let photoURL = otherUserData.photos.first, let url = URL(string: photoURL) {
-                    CachedCardImage(url: url, priority: .immediate)
-                        .frame(width: 40, height: 40)
-                        .clipShape(Circle())
-                } else {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.purple.opacity(0.7), Color.pink.opacity(0.6)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
+                ZStack(alignment: .bottomTrailing) {
+                    if let photoURL = otherUserData.photos.first, let url = URL(string: photoURL) {
+                        CachedCardImage(url: url, priority: .immediate)
+                            .frame(width: 44, height: 44)
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(
+                                        LinearGradient(
+                                            colors: [Color.purple.opacity(0.3), Color.pink.opacity(0.2)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        lineWidth: 2
+                                    )
                             )
-                        )
-                        .frame(width: 40, height: 40)
-                        .overlay(
-                            Text(otherUserData.fullName.prefix(1))
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundColor(.white)
-                        )
+                    } else {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.purple.opacity(0.8), Color.pink.opacity(0.7)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 44, height: 44)
+                            .overlay(
+                                Text(otherUserData.fullName.prefix(1))
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundColor(.white)
+                            )
+                    }
+
+                    // Online indicator
+                    if otherUserData.isOnline {
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 12, height: 12)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color(.systemBackground), lineWidth: 2)
+                            )
+                            .offset(x: 2, y: 2)
+                    }
                 }
             }
 
             // Name and status
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(otherUserData.fullName)
                         .font(.headline)
@@ -327,21 +384,30 @@ struct ChatView: View {
 
                     if otherUserData.isVerified {
                         Image(systemName: "checkmark.seal.fill")
-                            .font(.system(size: 12))
-                            .foregroundColor(.blue)
+                            .font(.system(size: 14))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.blue, .cyan],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
                     }
                 }
 
                 if typingService.isOtherUserTyping {
-                    Text("typing...")
-                        .font(.caption)
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.purple, .pink],
-                                startPoint: .leading,
-                                endPoint: .trailing
+                    HStack(spacing: 4) {
+                        TypingDotsIndicator()
+                        Text("typing...")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.purple, .pink],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
                             )
-                        )
+                    }
                 } else {
                     // Consider user active if they're online OR were active in the last 5 minutes
                     let interval = Date().timeIntervalSince(otherUserData.lastActive)
@@ -350,11 +416,18 @@ struct ChatView: View {
                     if isActive {
                         HStack(spacing: 4) {
                             Circle()
-                                .fill(Color.green)
-                                .frame(width: 6, height: 6)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [.green, .mint],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 8, height: 8)
+                                .shadow(color: .green.opacity(0.4), radius: 3)
                             Text(otherUserData.isOnline ? "Online" : "Active now")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                                .font(.caption.weight(.medium))
+                                .foregroundColor(.green)
                         }
                     } else {
                         Text("Active \(otherUserData.lastActive.timeAgoShort())")
@@ -366,7 +439,7 @@ struct ChatView: View {
 
             Spacer()
 
-            // More options menu
+            // More options menu with gradient styling
             Menu {
                 Button {
                     showingUserProfile = true
@@ -397,15 +470,23 @@ struct ChatView: View {
                     Label("Unmatch", systemImage: "xmark.circle")
                 }
             } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.system(size: 20))
-                    .foregroundColor(.gray)
-                    .frame(width: 44, height: 44)
+                ZStack {
+                    Circle()
+                        .fill(Color(.systemGray6))
+                        .frame(width: 40, height: 40)
+
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.secondary)
+                }
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(Color(.systemBackground))
+        .background(
+            Color(.systemBackground)
+                .shadow(color: .black.opacity(0.04), radius: 8, y: 2)
+        )
     }
     
     // MARK: - Messages ScrollView
@@ -491,12 +572,26 @@ struct ChatView: View {
                         }
                     }
 
+                    // Get the last read message ID to only show "Read" on the most recent
+                    let lastReadId = lastReadMessageId()
+
                     ForEach(groupedMessages(), id: \.0) { section in
-                        // Date divider
-                        Text(section.0)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .padding(.vertical, 8)
+                        // Enhanced date divider with pill design
+                        HStack {
+                            Spacer()
+                            Text(section.0)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 6)
+                                .background(
+                                    Capsule()
+                                        .fill(Color(.systemGray6))
+                                        .shadow(color: .black.opacity(0.03), radius: 2, y: 1)
+                                )
+                            Spacer()
+                        }
+                        .padding(.vertical, 12)
 
                         // Messages for this date
                         ForEach(section.1) { message in
@@ -504,6 +599,7 @@ struct ChatView: View {
                                 message: message,
                                 isFromCurrentUser: message.senderId == authService.currentUser?.id || message.senderId == "current_user",
                                 currentUserId: authService.currentUser?.id,
+                                showReadStatus: message.id == lastReadId,
                                 onReaction: { emoji in
                                     handleReaction(messageId: message.id ?? "", emoji: emoji)
                                 },
@@ -625,59 +721,122 @@ struct ChatView: View {
     // MARK: - Conversation Starters
 
     private func conversationStartersView(currentUser: User) -> some View {
-        VStack(spacing: 16) {
-            // Header
-            VStack(spacing: 8) {
-                Image(systemName: "bubble.left.and.bubble.right.fill")
-                    .font(.system(size: 40))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.purple, .pink],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+        VStack(spacing: 20) {
+            // Header with animated glow
+            VStack(spacing: 12) {
+                ZStack {
+                    // Subtle glow behind icon
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [Color.purple.opacity(0.2), Color.pink.opacity(0.1), Color.clear],
+                                center: .center,
+                                startRadius: 20,
+                                endRadius: 60
+                            )
                         )
-                    )
+                        .frame(width: 100, height: 100)
+
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.purple.opacity(0.15), Color.pink.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 80, height: 80)
+
+                    Image(systemName: "bubble.left.and.bubble.right.fill")
+                        .font(.system(size: 36))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .pink, .purple.opacity(0.8)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .shadow(color: .purple.opacity(0.3), radius: 8, y: 4)
+                }
 
                 Text("Start the Conversation")
-                    .font(.headline)
+                    .font(.system(size: 20, weight: .bold))
                     .foregroundColor(.primary)
 
                 Text("Choose an icebreaker to send")
-                    .font(.subheadline)
+                    .font(.system(size: 14))
                     .foregroundColor(.secondary)
             }
             .padding(.top, 40)
-            .padding(.bottom, 8)
+            .padding(.bottom, 4)
 
-            // Conversation starters
-            VStack(spacing: 12) {
+            // Conversation starters with enhanced styling
+            VStack(spacing: 14) {
                 ForEach(ConversationStarters.shared.generateStarters(currentUser: currentUser, otherUser: otherUser)) { starter in
                     Button {
                         messageText = starter.text
                         HapticManager.shared.impact(.light)
                     } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: starter.icon)
-                                .font(.title3)
-                                .foregroundColor(.purple)
-                                .frame(width: 32)
+                        HStack(spacing: 14) {
+                            // Icon with gradient background
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.purple.opacity(0.15), Color.pink.opacity(0.1)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 44, height: 44)
+
+                                Image(systemName: starter.icon)
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [.purple, .pink],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                            }
 
                             Text(starter.text)
-                                .font(.body)
+                                .font(.system(size: 15))
                                 .foregroundColor(.primary)
                                 .multilineTextAlignment(.leading)
                                 .lineLimit(2)
 
                             Spacer()
 
-                            Image(systemName: "arrow.right.circle")
-                                .font(.title3)
-                                .foregroundColor(.purple.opacity(0.5))
+                            Image(systemName: "arrow.right.circle.fill")
+                                .font(.system(size: 22))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.purple.opacity(0.6), .pink.opacity(0.5)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
                         }
                         .padding(16)
-                        .background(Color(.systemBackground))
-                        .cornerRadius(12)
-                        .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color(.systemBackground))
+                                .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 2)
+                                .shadow(color: .purple.opacity(0.05), radius: 12, x: 0, y: 4)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.05)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 1
+                                )
+                        )
                     }
                 }
             }
@@ -723,6 +882,19 @@ struct ChatView: View {
         lastMessageCount = messageService.messages.count
     }
 
+    /// Returns the ID of the last read message from the current user
+    /// This is used to only show "Read" indicator on the most recent read message
+    private func lastReadMessageId() -> String? {
+        guard let currentUserId = authService.currentUser?.id else { return nil }
+
+        // Find all messages from current user that are read, then get the last one
+        let currentUserReadMessages = messageService.messages.filter { message in
+            (message.senderId == currentUserId || message.senderId == "current_user") && message.isRead
+        }
+
+        return currentUserReadMessages.last?.id
+    }
+
     private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool = true) {
         let scrollAction = {
             if typingService.isOtherUserTyping {
@@ -756,19 +928,38 @@ struct ChatView: View {
 
         // Only show if they've used some messages
         if remaining < maxDaily {
-            HStack(spacing: 8) {
-                Image(systemName: remaining > 0 ? "bubble.left.and.bubble.right" : "lock.fill")
-                    .font(.caption)
-                    .foregroundColor(remaining > 0 ? .orange : .red)
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            remaining > 0 ?
+                            LinearGradient(colors: [Color.orange.opacity(0.15), Color.yellow.opacity(0.1)], startPoint: .topLeading, endPoint: .bottomTrailing) :
+                            LinearGradient(colors: [Color.red.opacity(0.15), Color.orange.opacity(0.1)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                        )
+                        .frame(width: 32, height: 32)
 
-                if remaining > 0 {
-                    Text("\(remaining) daily message\(remaining == 1 ? "" : "s") left")
+                    Image(systemName: remaining > 0 ? "bubble.left.and.bubble.right.fill" : "lock.fill")
                         .font(.caption)
+                        .foregroundStyle(
+                            remaining > 0 ?
+                            LinearGradient(colors: [.orange, .yellow], startPoint: .topLeading, endPoint: .bottomTrailing) :
+                            LinearGradient(colors: [.red, .orange], startPoint: .topLeading, endPoint: .bottomTrailing)
+                        )
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    if remaining > 0 {
+                        Text("\(remaining) daily message\(remaining == 1 ? "" : "s") left")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(.primary)
+                    } else {
+                        Text("Daily limit reached")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(.red)
+                    }
+                    Text("Get unlimited with Premium")
+                        .font(.caption2)
                         .foregroundColor(.secondary)
-                } else {
-                    Text("Daily limit reached")
-                        .font(.caption)
-                        .foregroundColor(.red)
                 }
 
                 Spacer()
@@ -777,21 +968,33 @@ struct ChatView: View {
                     showingPremiumUpgrade = true
                     HapticManager.shared.impact(.light)
                 } label: {
-                    Text("Unlimited")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(
-                            LinearGradient(colors: [.purple, .pink], startPoint: .leading, endPoint: .trailing)
+                    HStack(spacing: 4) {
+                        Image(systemName: "crown.fill")
+                            .font(.caption2)
+                        Text("Upgrade")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(
+                        LinearGradient(
+                            colors: [.purple, .pink, .purple.opacity(0.9)],
+                            startPoint: .leading,
+                            endPoint: .trailing
                         )
-                        .cornerRadius(12)
+                    )
+                    .clipShape(Capsule())
+                    .shadow(color: .purple.opacity(0.3), radius: 4, y: 2)
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(remaining > 0 ? Color.orange.opacity(0.1) : Color.red.opacity(0.1))
+            .padding(.vertical, 10)
+            .background(
+                remaining > 0 ?
+                LinearGradient(colors: [Color.orange.opacity(0.08), Color.yellow.opacity(0.04)], startPoint: .leading, endPoint: .trailing) :
+                LinearGradient(colors: [Color.red.opacity(0.08), Color.orange.opacity(0.04)], startPoint: .leading, endPoint: .trailing)
+            )
         }
     }
 
@@ -902,14 +1105,26 @@ struct ChatView: View {
                 replyPreviewBar(message: replyMessage)
             }
 
-            // Image preview
+            // Image preview with enhanced styling
             if let image = selectedImage {
-                HStack {
+                HStack(spacing: 12) {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
                         .frame(width: 80, height: 80)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [Color.purple.opacity(0.3), Color.pink.opacity(0.2)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 2
+                                )
+                        )
+                        .shadow(color: .purple.opacity(0.2), radius: 6, y: 3)
 
                     TextField("Add a caption...", text: $messageText, axis: .vertical)
                         .padding(.horizontal, 8)
@@ -919,26 +1134,51 @@ struct ChatView: View {
                         selectedImage = nil
                         selectedImageItem = nil
                         messageText = ""
+                        HapticManager.shared.impact(.light)
                     } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title2)
-                            .foregroundColor(.secondary)
+                        ZStack {
+                            Circle()
+                                .fill(Color(.systemGray5))
+                                .frame(width: 32, height: 32)
+                            Image(systemName: "xmark")
+                                .font(.caption.weight(.bold))
+                                .foregroundColor(.secondary)
+                        }
                     }
                     .accessibilityLabel("Remove image")
                     .accessibilityHint("Cancel sending this image")
                 }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-                .background(Color(.systemGray6))
-                .cornerRadius(12)
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color(.systemGray6))
+                )
             }
 
             HStack(spacing: 12) {
-                // Photo picker button
+                // Photo picker button with gradient styling
                 PhotosPicker(selection: $selectedImageItem, matching: .images) {
-                    Image(systemName: "photo.fill")
-                        .font(.title3)
-                        .foregroundColor(.purple)
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.purple.opacity(0.12), Color.pink.opacity(0.08)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 40, height: 40)
+
+                        Image(systemName: "photo.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.purple, .pink],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    }
                 }
                 .accessibilityLabel("Attach photo")
                 .accessibilityHint("Select a photo to send")
@@ -951,12 +1191,26 @@ struct ChatView: View {
                     }
                 }
 
-                // Text input
+                // Text input with enhanced styling
                 TextField("Message...", text: $messageText, axis: .vertical)
                     .focused($isInputFocused)
-                    .padding(12)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
                     .background(Color(.systemGray6))
-                    .cornerRadius(20)
+                    .cornerRadius(22)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 22)
+                            .stroke(
+                                isInputFocused ?
+                                LinearGradient(
+                                    colors: [Color.purple.opacity(0.3), Color.pink.opacity(0.2)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ) :
+                                LinearGradient(colors: [Color.clear], startPoint: .leading, endPoint: .trailing),
+                                lineWidth: 1.5
+                            )
+                    )
                     .lineLimit(1...5)
                     .dynamicTypeSize(min: .small, max: .accessibility2)
                     .accessibilityElement(
@@ -974,7 +1228,7 @@ struct ChatView: View {
                         typingService.setTyping(!newValue.isEmpty)
                     }
 
-                // Send button - simplified for performance
+                // Send button with gradient styling
                 Button {
                     sendMessage()
                 } label: {
@@ -983,14 +1237,30 @@ struct ChatView: View {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle(tint: .purple))
                         } else {
-                            Image(systemName: (messageText.isEmpty && selectedImage == nil) ? "arrow.up.circle" : "arrow.up.circle.fill")
-                                .font(.largeTitle)
-                                .foregroundColor((messageText.isEmpty && selectedImage == nil) ? .gray.opacity(0.5) : .purple)
+                            let canSend = !messageText.isEmpty || selectedImage != nil
+                            Circle()
+                                .fill(
+                                    canSend ?
+                                    LinearGradient(
+                                        colors: [.purple, .pink, .purple.opacity(0.9)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ) :
+                                    LinearGradient(colors: [Color(.systemGray5)], startPoint: .leading, endPoint: .trailing)
+                                )
+                                .frame(width: 40, height: 40)
+                                .shadow(color: canSend ? .purple.opacity(0.3) : .clear, radius: 6, y: 3)
+
+                            Image(systemName: "arrow.up")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(canSend ? .white : .gray)
                         }
                     }
                     .frame(width: 44, height: 44)
                 }
                 .disabled((messageText.isEmpty && selectedImage == nil) || isSending)
+                .scaleEffect((messageText.isEmpty && selectedImage == nil) || isSending ? 1.0 : 1.0)
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: messageText.isEmpty && selectedImage == nil)
                 .accessibilityElement(
                     label: isSending ? "Sending" : "Send message",
                     hint: isSending ? "Message is being sent" : "Send your message to \(otherUser.fullName)",
@@ -999,20 +1269,28 @@ struct ChatView: View {
                 )
             }
 
-            // Character count (if over 100 characters)
+            // Character count with enhanced styling
             if messageText.count > 100 {
                 HStack {
                     Spacer()
                     Text("\(messageText.count)/\(AppConstants.Limits.maxMessageLength)")
-                        .font(.caption2)
+                        .font(.caption2.weight(.medium))
                         .foregroundColor(messageText.count > AppConstants.Limits.maxMessageLength - 50 ? .red : .secondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule()
+                                .fill(messageText.count > AppConstants.Limits.maxMessageLength - 50 ? Color.red.opacity(0.1) : Color(.systemGray6))
+                        )
                 }
             }
         }
-        .padding(.horizontal)
+        .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(Color(.systemBackground))
-        .shadow(color: .black.opacity(0.05), radius: 5, y: -2)
+        .background(
+            Color(.systemBackground)
+                .shadow(color: .black.opacity(0.06), radius: 12, y: -4)
+        )
     }
     
     // MARK: - Helper Functions
@@ -1658,6 +1936,39 @@ struct ChatView: View {
                 showErrorToast = true
                 HapticManager.shared.notification(.error)
             }
+        }
+    }
+}
+
+// MARK: - Typing Dots Indicator
+
+struct TypingDotsIndicator: View {
+    @State private var animating = false
+
+    var body: some View {
+        HStack(spacing: 3) {
+            ForEach(0..<3, id: \.self) { index in
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 5, height: 5)
+                    .scaleEffect(animating ? 1.0 : 0.5)
+                    .opacity(animating ? 1.0 : 0.5)
+                    .animation(
+                        Animation.easeInOut(duration: 0.4)
+                            .repeatForever(autoreverses: true)
+                            .delay(Double(index) * 0.15),
+                        value: animating
+                    )
+            }
+        }
+        .onAppear {
+            animating = true
         }
     }
 }

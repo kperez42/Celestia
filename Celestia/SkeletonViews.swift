@@ -16,9 +16,9 @@ struct SkeletonView: View {
     var body: some View {
         LinearGradient(
             colors: [
-                Color.gray.opacity(0.2),
-                Color.gray.opacity(0.3),
-                Color.gray.opacity(0.2)
+                Color.purple.opacity(0.08),
+                Color.pink.opacity(0.12),
+                Color.purple.opacity(0.08)
             ],
             startPoint: isAnimating ? .leading : .trailing,
             endPoint: isAnimating ? .trailing : .leading
@@ -262,40 +262,89 @@ struct GridSkeleton: View {
 // MARK: - Match Card Skeleton
 
 struct MatchCardSkeleton: View {
+    @State private var shimmerAnimation = false
+
     var body: some View {
         VStack(spacing: 0) {
-            // Profile image skeleton
-            SkeletonView()
-                .frame(height: 220)
+            // Profile image skeleton with shimmer
+            ZStack {
+                SkeletonView()
+                    .frame(height: 220)
+
+                // Shimmer overlay
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0),
+                                Color.white.opacity(0.3),
+                                Color.white.opacity(0)
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .rotationEffect(.degrees(20))
+                    .offset(x: shimmerAnimation ? 300 : -300)
+                    .animation(
+                        .linear(duration: 2)
+                        .repeatForever(autoreverses: false),
+                        value: shimmerAnimation
+                    )
+            }
+            .clipped()
 
             // User info section
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 6) {
                     SkeletonView()
                         .frame(width: 80, height: 18)
-                        .cornerRadius(6)
+                        .cornerRadius(8)
 
                     SkeletonView()
                         .frame(width: 30, height: 18)
-                        .cornerRadius(6)
+                        .cornerRadius(8)
 
                     Spacer()
+
+                    SkeletonView()
+                        .frame(width: 18, height: 18)
+                        .cornerRadius(9)
+                }
+
+                HStack(spacing: 4) {
+                    SkeletonView()
+                        .frame(width: 14, height: 14)
+                        .cornerRadius(7)
+                    SkeletonView()
+                        .frame(width: 100, height: 14)
+                        .cornerRadius(6)
                 }
 
                 SkeletonView()
-                    .frame(width: 120, height: 14)
-                    .cornerRadius(6)
-
-                SkeletonView()
-                    .frame(width: 90, height: 24)
-                    .cornerRadius(12)
+                    .frame(width: 90, height: 26)
+                    .cornerRadius(13)
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(Color.white)
+        .background(Color(.systemBackground))
         .cornerRadius(16)
-        .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
+        .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(
+                    LinearGradient(
+                        colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.05)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
+        .onAppear {
+            shimmerAnimation = true
+        }
     }
 }
 

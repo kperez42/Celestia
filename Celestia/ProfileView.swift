@@ -514,41 +514,56 @@ struct ProfileView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Profile Completion")
                         .font(.headline)
+                        .foregroundColor(.primary)
                     Text("Complete your profile to get more matches")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                
+
                 Spacer()
-                
+
                 ZStack {
                     Circle()
-                        .stroke(Color.gray.opacity(0.2), lineWidth: 6)
-                    
+                        .stroke(
+                            LinearGradient(
+                                colors: [Color.gray.opacity(0.15), Color.gray.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 7
+                        )
+
                     Circle()
                         .trim(from: 0, to: CGFloat(profileCompletion) / 100)
                         .stroke(
                             LinearGradient(
-                                colors: [.purple, .pink],
+                                colors: [.purple, .pink, .purple.opacity(0.8)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             ),
-                            style: StrokeStyle(lineWidth: 6, lineCap: .round)
+                            style: StrokeStyle(lineWidth: 7, lineCap: .round)
                         )
                         .rotationEffect(.degrees(-90))
                         .animation(.spring(response: 1.0, dampingFraction: 0.7), value: profileCompletion)
-                    
+                        .shadow(color: .purple.opacity(0.3), radius: 4, x: 0, y: 0)
+
                     Text("\(profileCompletion)%")
                         .font(.caption)
                         .fontWeight(.bold)
-                        .foregroundColor(.purple)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
                 }
-                .frame(width: 50, height: 50)
+                .frame(width: 56, height: 56)
             }
-            
+
             // Missing items
             if profileCompletion < 100 {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 10) {
                     if user.bio.isEmpty {
                         missingItem(icon: "text.alignleft", text: "Add a bio")
                     }
@@ -565,21 +580,52 @@ struct ProfileView: View {
             }
         }
         .padding(20)
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+                .shadow(color: .black.opacity(0.04), radius: 20, x: 0, y: 8)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(
+                    LinearGradient(
+                        colors: [Color.purple.opacity(0.15), Color.pink.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
         .padding(.horizontal, 20)
     }
 
     private func missingItem(icon: String, text: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.caption)
-                .foregroundColor(.purple)
-                .frame(width: 20)
-            
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.purple.opacity(0.15), Color.pink.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 28, height: 28)
+
+                Image(systemName: icon)
+                    .font(.caption)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+
             Text(text)
-                .font(.caption)
+                .font(.subheadline)
                 .foregroundColor(.secondary)
         }
     }
@@ -597,12 +643,20 @@ struct ProfileView: View {
                     icon: "heart.fill",
                     value: isLoadingStats ? "-" : "\(accurateLikesReceived)",
                     label: "Liked",
-                    color: .pink
+                    colors: [.pink, .red]
                 )
             }
 
-            Divider()
-                .frame(height: 50)
+            // Vertical divider with gradient
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [Color.clear, Color.gray.opacity(0.2), Color.clear],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(width: 1, height: 60)
 
             // Viewed
             Button {
@@ -617,12 +671,20 @@ struct ProfileView: View {
                     icon: "eye.fill",
                     value: isLoadingStats ? "-" : "\(accurateProfileViews)",
                     label: "Viewed",
-                    color: .blue
+                    colors: [.blue, .cyan]
                 )
             }
 
-            Divider()
-                .frame(height: 50)
+            // Vertical divider with gradient
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [Color.clear, Color.gray.opacity(0.2), Color.clear],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(width: 1, height: 60)
 
             // Saved
             Button {
@@ -633,30 +695,45 @@ struct ProfileView: View {
                     icon: "bookmark.fill",
                     value: isLoadingStats ? "-" : "\(accurateMatchCount)",
                     label: "Saved",
-                    color: .purple
+                    colors: [.purple, .pink]
                 )
             }
         }
         .padding(.vertical, 20)
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+                .shadow(color: .black.opacity(0.04), radius: 20, x: 0, y: 8)
+        )
         .padding(.horizontal, 20)
         .scaleEffect(animateStats ? 1 : 0.8)
         .opacity(animateStats ? 1 : 0)
     }
 
-    private func statCard(icon: String, value: String, label: String, color: Color) -> some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [color, color.opacity(0.7)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+    private func statCard(icon: String, value: String, label: String, colors: [Color]) -> some View {
+        VStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [colors[0].opacity(0.15), colors.last!.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     )
-                )
+                    .frame(width: 44, height: 44)
+
+                Image(systemName: icon)
+                    .font(.title3)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: colors,
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
 
             Text(value)
                 .font(.title2)
@@ -665,7 +742,7 @@ struct ProfileView: View {
 
             Text(label)
                 .font(.caption)
-                .fontWeight(.medium)
+                .fontWeight(.semibold)
                 .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity)
@@ -681,12 +758,24 @@ struct ProfileView: View {
             HStack(spacing: 16) {
                 ZStack {
                     Circle()
-                        .fill(Color.green.opacity(0.12))
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.green.opacity(0.15), Color.mint.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                         .frame(width: 60, height: 60)
 
                     Image(systemName: "gift.fill")
                         .font(.title)
-                        .foregroundColor(.green)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.green, .mint],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
@@ -707,9 +796,16 @@ struct ProfileView: View {
                     .foregroundColor(.secondary)
             }
             .padding(20)
-            .background(Color(.systemBackground))
-            .cornerRadius(16)
-            .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+                    .shadow(color: .black.opacity(0.04), radius: 20, x: 0, y: 8)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(Color.green.opacity(0.1), lineWidth: 1)
+            )
         }
         .accessibilityLabel("Invite Friends")
         .accessibilityHint("Open referral dashboard to invite friends and earn free premium days")
@@ -763,12 +859,24 @@ struct ProfileView: View {
             HStack(spacing: 16) {
                 ZStack {
                     Circle()
-                        .fill(Color.blue.opacity(0.12))
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.blue.opacity(0.15), Color.cyan.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                         .frame(width: 60, height: 60)
 
                     Image(systemName: "checkmark.seal.fill")
                         .font(.title)
-                        .foregroundColor(.blue)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.blue, .cyan],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
@@ -789,9 +897,16 @@ struct ProfileView: View {
                     .foregroundColor(.secondary)
             }
             .padding(20)
-            .background(Color(.systemBackground))
-            .cornerRadius(16)
-            .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+                    .shadow(color: .black.opacity(0.04), radius: 20, x: 0, y: 8)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(Color.blue.opacity(0.1), lineWidth: 1)
+            )
         }
         .accessibilityLabel("Get Verified")
         .accessibilityHint("Complete photo verification to earn the blue checkmark badge")
@@ -810,18 +925,19 @@ struct ProfileView: View {
                     Circle()
                         .fill(
                             LinearGradient(
-                                colors: [Color.purple.opacity(0.15), Color.pink.opacity(0.1)],
+                                colors: [Color.purple.opacity(0.2), Color.pink.opacity(0.15)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
                         .frame(width: 60, height: 60)
+                        .shadow(color: .purple.opacity(0.2), radius: 8, x: 0, y: 2)
 
                     Image(systemName: "crown.fill")
                         .font(.title)
                         .foregroundStyle(
                             LinearGradient(
-                                colors: [.purple, .pink],
+                                colors: [.purple, .pink, .purple.opacity(0.8)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
@@ -846,9 +962,23 @@ struct ProfileView: View {
                     .foregroundColor(.secondary)
             }
             .padding(20)
-            .background(Color(.systemBackground))
-            .cornerRadius(16)
-            .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+                    .shadow(color: .black.opacity(0.04), radius: 20, x: 0, y: 8)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(
+                        LinearGradient(
+                            colors: [Color.purple.opacity(0.2), Color.pink.opacity(0.15)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            )
         }
         .accessibilityLabel("Upgrade to Premium")
         .accessibilityHint("Unlock unlimited likes, see who likes you, and access all premium features")
@@ -867,18 +997,19 @@ struct ProfileView: View {
                     Circle()
                         .fill(
                             LinearGradient(
-                                colors: [Color.purple.opacity(0.15), Color.pink.opacity(0.1)],
+                                colors: [Color.yellow.opacity(0.2), Color.orange.opacity(0.15)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
                         .frame(width: 60, height: 60)
+                        .shadow(color: .yellow.opacity(0.3), radius: 8, x: 0, y: 2)
 
                     Image(systemName: "crown.fill")
                         .font(.title)
                         .foregroundStyle(
                             LinearGradient(
-                                colors: [.purple, .pink],
+                                colors: [.yellow, .orange],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
@@ -886,9 +1017,21 @@ struct ProfileView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Premium Member")
-                        .font(.headline)
-                        .foregroundColor(.primary)
+                    HStack(spacing: 6) {
+                        Text("Premium Member")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.caption)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.yellow, .orange],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    }
 
                     Text("Manage your subscription")
                         .font(.caption)
@@ -903,9 +1046,23 @@ struct ProfileView: View {
                     .foregroundColor(.secondary)
             }
             .padding(20)
-            .background(Color(.systemBackground))
-            .cornerRadius(16)
-            .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+                    .shadow(color: .black.opacity(0.04), radius: 20, x: 0, y: 8)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(
+                        LinearGradient(
+                            colors: [Color.yellow.opacity(0.3), Color.orange.opacity(0.2)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            )
         }
         .accessibilityLabel("Manage Subscription")
         .accessibilityHint("View subscription plans, features, and account details")
@@ -916,17 +1073,41 @@ struct ProfileView: View {
 
     private func sectionDivider() -> some View {
         Rectangle()
-            .fill(Color(.separator).opacity(0.5))
+            .fill(
+                LinearGradient(
+                    colors: [Color.clear, Color(.separator).opacity(0.4), Color.clear],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
             .frame(height: 1)
-            .padding(.horizontal, 40)
+            .padding(.horizontal, 30)
             .padding(.vertical, 12)
     }
 
     private func sectionHeader(title: String, icon: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.body.weight(.semibold))
-                .foregroundColor(.secondary)
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.purple.opacity(0.12), Color.pink.opacity(0.08)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 32, height: 32)
+
+                Image(systemName: icon)
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
 
             Text(title)
                 .font(.headline)
@@ -1040,42 +1221,61 @@ struct ProfileView: View {
 
     private func detailsCard(user: User) -> some View {
         VStack(spacing: 16) {
-            detailRow(icon: "person.fill", label: "Gender", value: user.gender)
-            Divider()
-            detailRow(icon: "heart.circle.fill", label: "Looking for", value: user.lookingFor)
+            detailRow(icon: "person.fill", label: "Gender", value: user.gender, colors: [.purple, .pink])
+            gradientDivider()
+            detailRow(icon: "heart.circle.fill", label: "Looking for", value: user.lookingFor, colors: [.pink, .red])
 
             // Height
             if let height = user.height {
-                Divider()
-                detailRow(icon: "ruler", label: "Height", value: "\(height) cm (\(heightToFeetInches(height)))")
+                gradientDivider()
+                detailRow(icon: "ruler", label: "Height", value: "\(height) cm (\(heightToFeetInches(height)))", colors: [.blue, .cyan])
             }
 
             // Education
             if let education = user.educationLevel, education != "Prefer not to say" {
-                Divider()
-                detailRow(icon: "graduationcap.fill", label: "Education", value: education)
+                gradientDivider()
+                detailRow(icon: "graduationcap.fill", label: "Education", value: education, colors: [.orange, .yellow])
             }
 
             // Relationship goal
             if let goal = user.relationshipGoal, goal != "Prefer not to say" {
-                Divider()
-                detailRow(icon: "heart.text.square", label: "Relationship goal", value: goal)
+                gradientDivider()
+                detailRow(icon: "heart.text.square", label: "Relationship goal", value: goal, colors: [.red, .pink])
             }
 
             // Religion
             if let religion = user.religion, religion != "Prefer not to say" {
-                Divider()
-                detailRow(icon: "sparkles", label: "Religion", value: religion)
+                gradientDivider()
+                detailRow(icon: "sparkles", label: "Religion", value: religion, colors: [.purple, .indigo])
             }
 
-            Divider()
-            detailRow(icon: "calendar", label: "Member since", value: formatDate(user.timestamp))
+            gradientDivider()
+            detailRow(icon: "calendar", label: "Member since", value: formatDate(user.timestamp), colors: [.green, .mint])
         }
         .padding(20)
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+                .shadow(color: .black.opacity(0.04), radius: 20, x: 0, y: 8)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(Color.purple.opacity(0.08), lineWidth: 1)
+        )
         .padding(.horizontal, 20)
+    }
+
+    private func gradientDivider() -> some View {
+        Rectangle()
+            .fill(
+                LinearGradient(
+                    colors: [Color.clear, Color(.separator).opacity(0.3), Color.clear],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            .frame(height: 1)
     }
 
     // MARK: - Lifestyle Card
@@ -1090,58 +1290,71 @@ struct ProfileView: View {
 
         if hasLifestyle {
             VStack(alignment: .leading, spacing: 16) {
-                HStack(spacing: 8) {
-                    Image(systemName: "leaf.fill")
-                        .font(.title3)
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.green, .mint],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.green.opacity(0.15), Color.mint.opacity(0.1)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
                             )
-                        )
+                            .frame(width: 36, height: 36)
+
+                        Image(systemName: "leaf.fill")
+                            .font(.callout)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.green, .mint],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    }
 
                     Text("Lifestyle")
                         .font(.title3.weight(.semibold))
                         .foregroundColor(.primary)
                 }
 
-                VStack(spacing: 12) {
+                VStack(spacing: 14) {
                     if let smoking = user.smoking, smoking != "Prefer not to say" {
-                        detailRow(icon: "smoke", label: "Smoking", value: smoking)
+                        detailRow(icon: "smoke", label: "Smoking", value: smoking, colors: [.gray, .secondary])
                     }
                     if let drinking = user.drinking, drinking != "Prefer not to say" {
-                        if user.smoking != nil && user.smoking != "Prefer not to say" { Divider() }
-                        detailRow(icon: "wineglass", label: "Drinking", value: drinking)
+                        if user.smoking != nil && user.smoking != "Prefer not to say" { gradientDivider() }
+                        detailRow(icon: "wineglass", label: "Drinking", value: drinking, colors: [.purple, .pink])
                     }
                     if let exercise = user.exercise, exercise != "Prefer not to say" {
                         if (user.smoking != nil && user.smoking != "Prefer not to say") ||
-                           (user.drinking != nil && user.drinking != "Prefer not to say") { Divider() }
-                        detailRow(icon: "figure.run", label: "Exercise", value: exercise)
+                           (user.drinking != nil && user.drinking != "Prefer not to say") { gradientDivider() }
+                        detailRow(icon: "figure.run", label: "Exercise", value: exercise, colors: [.orange, .red])
                     }
                     if let diet = user.diet, diet != "Prefer not to say" {
                         if (user.smoking != nil && user.smoking != "Prefer not to say") ||
                            (user.drinking != nil && user.drinking != "Prefer not to say") ||
-                           (user.exercise != nil && user.exercise != "Prefer not to say") { Divider() }
-                        detailRow(icon: "fork.knife", label: "Diet", value: diet)
+                           (user.exercise != nil && user.exercise != "Prefer not to say") { gradientDivider() }
+                        detailRow(icon: "fork.knife", label: "Diet", value: diet, colors: [.green, .mint])
                     }
                     if let pets = user.pets, pets != "Prefer not to say" {
                         if (user.smoking != nil && user.smoking != "Prefer not to say") ||
                            (user.drinking != nil && user.drinking != "Prefer not to say") ||
                            (user.exercise != nil && user.exercise != "Prefer not to say") ||
-                           (user.diet != nil && user.diet != "Prefer not to say") { Divider() }
-                        detailRow(icon: "pawprint.fill", label: "Pets", value: pets)
+                           (user.diet != nil && user.diet != "Prefer not to say") { gradientDivider() }
+                        detailRow(icon: "pawprint.fill", label: "Pets", value: pets, colors: [.brown, .orange])
                     }
                 }
             }
             .padding(20)
             .background(
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: 20)
                     .fill(Color(.systemBackground))
-                    .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+                    .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+                    .shadow(color: .black.opacity(0.04), radius: 20, x: 0, y: 8)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: 20)
                     .stroke(Color.green.opacity(0.1), lineWidth: 1)
             )
             .padding(.horizontal, 20)
@@ -1156,18 +1369,36 @@ struct ProfileView: View {
         return "\(feet)'\(inches)\""
     }
 
-    private func detailRow(icon: String, label: String, value: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .foregroundColor(.purple)
-                .frame(width: 24)
-            
+    private func detailRow(icon: String, label: String, value: String, colors: [Color] = [.purple, .pink]) -> some View {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [colors[0].opacity(0.15), colors.last!.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 36, height: 36)
+
+                Image(systemName: icon)
+                    .font(.callout)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: colors,
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+
             Text(label)
                 .font(.subheadline)
                 .foregroundColor(.secondary)
-            
+
             Spacer()
-            
+
             Text(value)
                 .font(.subheadline)
                 .fontWeight(.semibold)
@@ -1368,44 +1599,84 @@ struct ProfileView: View {
     }
 
     // MARK: - Preferences Card
-    
+
     private func preferencesCard(user: User) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: "slider.horizontal.3")
-                    .foregroundColor(.purple)
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.indigo.opacity(0.15), Color.purple.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 36, height: 36)
+
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.callout)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.indigo, .purple],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+
                 Text("Discovery Preferences")
                     .font(.headline)
+                    .foregroundColor(.primary)
             }
 
-            VStack(spacing: 12) {
+            VStack(spacing: 14) {
                 HStack {
-                    Text("Age range")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                    HStack(spacing: 8) {
+                        Image(systemName: "person.2.fill")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text("Age range")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
                     Spacer()
                     Text("\(user.ageRangeMin) - \(user.ageRangeMax)")
                         .font(.subheadline)
                         .fontWeight(.semibold)
+                        .foregroundColor(.primary)
                 }
 
-                Divider()
+                gradientDivider()
 
                 HStack {
-                    Text("Max distance")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                    HStack(spacing: 8) {
+                        Image(systemName: "location.fill")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text("Max distance")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
                     Spacer()
                     Text("\(user.maxDistance) km")
                         .font(.subheadline)
                         .fontWeight(.semibold)
+                        .foregroundColor(.primary)
                 }
             }
         }
         .padding(20)
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+                .shadow(color: .black.opacity(0.04), radius: 20, x: 0, y: 8)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(Color.indigo.opacity(0.08), lineWidth: 1)
+        )
         .padding(.horizontal, 20)
     }
 
@@ -1442,29 +1713,49 @@ struct ProfileView: View {
         }
         .padding(20)
         .background(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 20)
                 .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+                .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+                .shadow(color: .black.opacity(0.04), radius: 20, x: 0, y: 8)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.gray.opacity(0.1), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(
+                    LinearGradient(
+                        colors: [Color.orange.opacity(0.1), Color.pink.opacity(0.08)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
         )
         .padding(.horizontal, 20)
     }
 
     private func achievementBadge(icon: String, title: String, subtitle: String, colors: [Color]) -> some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             ZStack {
+                // Outer glow ring
+                Circle()
+                    .stroke(
+                        LinearGradient(
+                            colors: [colors[0].opacity(0.3), colors.last!.opacity(0.2)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 2
+                    )
+                    .frame(width: 68, height: 68)
+
                 Circle()
                     .fill(
                         LinearGradient(
-                            colors: [colors[0].opacity(0.2), colors[1].opacity(0.15)],
+                            colors: [colors[0].opacity(0.2), colors.last!.opacity(0.15)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
-                    .frame(width: 64, height: 64)
+                    .frame(width: 60, height: 60)
 
                 Image(systemName: icon)
                     .font(.title2)
@@ -1475,6 +1766,7 @@ struct ProfileView: View {
                             endPoint: .bottomTrailing
                         )
                     )
+                    .shadow(color: colors[0].opacity(0.3), radius: 4, x: 0, y: 2)
             }
 
             VStack(spacing: 4) {
@@ -1492,13 +1784,13 @@ struct ProfileView: View {
     }
     
     // MARK: - Action Buttons
-    
+
     private var actionButtons: some View {
         VStack(spacing: 12) {
             actionButton(
                 icon: "questionmark.circle.fill",
                 title: "Help & Support",
-                color: .blue,
+                colors: [.blue, .cyan],
                 accessibilityHint: "Contact Celestia support team for assistance"
             ) {
                 guard let url = URL(string: "mailto:support@celestia.app"),
@@ -1512,7 +1804,7 @@ struct ProfileView: View {
             actionButton(
                 icon: "shield.checkered",
                 title: "Privacy & Safety",
-                color: .green,
+                colors: [.green, .mint],
                 accessibilityHint: "Manage privacy settings and safety features"
             ) {
                 showingSettings = true
@@ -1521,7 +1813,7 @@ struct ProfileView: View {
             actionButton(
                 icon: "arrow.right.square.fill",
                 title: "Sign Out",
-                color: .red,
+                colors: [.red, .orange],
                 accessibilityHint: "Sign out of your Celestia account"
             ) {
                 showingLogoutConfirmation = true
@@ -1530,18 +1822,30 @@ struct ProfileView: View {
         .padding(.horizontal, 20)
         .padding(.bottom, 40)
     }
-    
-    private func actionButton(icon: String, title: String, color: Color, accessibilityHint: String, action: @escaping () -> Void) -> some View {
+
+    private func actionButton(icon: String, title: String, colors: [Color], accessibilityHint: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 14) {
                 ZStack {
                     Circle()
-                        .fill(color.opacity(0.15))
+                        .fill(
+                            LinearGradient(
+                                colors: [colors[0].opacity(0.15), colors.last!.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                         .frame(width: 44, height: 44)
 
                     Image(systemName: icon)
                         .font(.body)
-                        .foregroundColor(color)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: colors,
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                 }
 
                 Text(title)
@@ -1556,9 +1860,12 @@ struct ProfileView: View {
                     .foregroundColor(.secondary)
             }
             .padding(16)
-            .background(Color.white)
-            .cornerRadius(16)
-            .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+                    .shadow(color: .black.opacity(0.04), radius: 20, x: 0, y: 8)
+            )
         }
         .accessibilityLabel(title)
         .accessibilityHint(accessibilityHint)
@@ -1569,27 +1876,54 @@ struct ProfileView: View {
     private var profileLoadingView: some View {
         ScrollView {
             VStack(spacing: 0) {
-                // Hero header skeleton
+                // Hero header skeleton with animated gradient
                 ZStack {
                     LinearGradient(
-                        colors: [.purple.opacity(0.3), .pink.opacity(0.2)],
+                        colors: [
+                            .purple.opacity(0.4),
+                            .pink.opacity(0.3),
+                            .blue.opacity(0.25)
+                        ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                     .frame(height: 340)
 
+                    // Decorative shimmer circles
+                    GeometryReader { geo in
+                        Circle()
+                            .fill(Color.white.opacity(0.08))
+                            .frame(width: 200, height: 200)
+                            .blur(radius: 40)
+                            .offset(x: -80, y: 50)
+
+                        Circle()
+                            .fill(Color.yellow.opacity(0.1))
+                            .frame(width: 120, height: 120)
+                            .blur(radius: 30)
+                            .offset(x: geo.size.width - 60, y: 100)
+                    }
+                    .frame(height: 340)
+
                     VStack {
                         Spacer()
 
-                        // Profile image skeleton
-                        SkeletonView()
+                        // Profile image skeleton with shimmer
+                        ShimmerView()
                             .frame(width: 160, height: 160)
                             .clipShape(Circle())
                             .overlay(
                                 Circle()
-                                    .stroke(Color.white, lineWidth: 4)
+                                    .stroke(
+                                        LinearGradient(
+                                            colors: [Color.white, Color.white.opacity(0.8)],
+                                            startPoint: .top,
+                                            endPoint: .bottom
+                                        ),
+                                        lineWidth: 4
+                                    )
                             )
-                            .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
+                            .shadow(color: .black.opacity(0.2), radius: 20, y: 10)
                     }
                     .padding(.bottom, 40)
                 }
@@ -1599,38 +1933,66 @@ struct ProfileView: View {
                     // Stats row skeleton
                     HStack(spacing: 12) {
                         ForEach(0..<3, id: \.self) { _ in
-                            SkeletonView()
-                                .frame(height: 80)
-                                .cornerRadius(16)
+                            VStack(spacing: 10) {
+                                ShimmerView()
+                                    .frame(width: 44, height: 44)
+                                    .clipShape(Circle())
+
+                                ShimmerView()
+                                    .frame(width: 30, height: 20)
+                                    .cornerRadius(6)
+
+                                ShimmerView()
+                                    .frame(width: 50, height: 14)
+                                    .cornerRadius(6)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
                         }
                     }
-                    .padding(.horizontal)
+                    .padding(20)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(Color(.systemBackground))
+                            .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+                            .shadow(color: .black.opacity(0.04), radius: 20, x: 0, y: 8)
+                    )
+                    .padding(.horizontal, 20)
                     .padding(.top, -20)
 
                     // Card skeletons
-                    ForEach(0..<5, id: \.self) { _ in
-                        VStack(alignment: .leading, spacing: 12) {
-                            SkeletonView()
-                                .frame(width: 120, height: 20)
-                                .cornerRadius(6)
+                    ForEach(0..<4, id: \.self) { _ in
+                        VStack(alignment: .leading, spacing: 14) {
+                            HStack(spacing: 12) {
+                                ShimmerView()
+                                    .frame(width: 32, height: 32)
+                                    .clipShape(Circle())
 
-                            SkeletonView()
+                                ShimmerView()
+                                    .frame(width: 120, height: 20)
+                                    .cornerRadius(8)
+                            }
+
+                            ShimmerView()
                                 .frame(height: 16)
-                                .cornerRadius(6)
+                                .cornerRadius(8)
 
-                            SkeletonView()
+                            ShimmerView()
                                 .frame(height: 16)
-                                .cornerRadius(6)
+                                .cornerRadius(8)
 
-                            SkeletonView()
+                            ShimmerView()
                                 .frame(width: 200, height: 16)
-                                .cornerRadius(6)
+                                .cornerRadius(8)
                         }
                         .padding(20)
-                        .background(Color.white)
-                        .cornerRadius(16)
-                        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
-                        .padding(.horizontal)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(Color(.systemBackground))
+                                .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+                                .shadow(color: .black.opacity(0.04), radius: 20, x: 0, y: 8)
+                        )
+                        .padding(.horizontal, 20)
                     }
                 }
                 .padding(.bottom, 30)
