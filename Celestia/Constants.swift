@@ -140,15 +140,15 @@ enum AppConstants {
     }
     
     // MARK: - Rate Limiting
-    // TODO: SUBSCRIPTION - Lower these limits back to 10 for production release
-    // Premium users should bypass these limits entirely (check in RateLimiter)
+    // PRODUCTION: These limits apply to free users only
+    // Premium users bypass these limits entirely (check in RateLimiter)
     enum RateLimit {
         static let messageInterval: TimeInterval = 0.5
         static let likeInterval: TimeInterval = 1.0
         static let searchInterval: TimeInterval = 0.3
         static let maxMessagesPerMinute = 30
-        static let maxLikesPerDay = 1000 // TESTING: Was 10 - For free users, premium gets unlimited
-        static let maxDailyMessagesForFreeUsers = 1000 // TESTING: Was 10 - Total daily messages across ALL conversations
+        static let maxLikesPerDay = 10 // Free users get 10 likes per day, premium unlimited
+        static let maxDailyMessagesForFreeUsers = 20 // Free users get 20 messages per day total, premium unlimited
     }
     
     // MARK: - Cache
