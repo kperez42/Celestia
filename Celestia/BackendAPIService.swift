@@ -171,7 +171,7 @@ class BackendAPIService: BackendAPIServiceProtocol {
     func validateContent(_ content: String, type: ContentType) async throws -> ContentValidationResponse {
         // Return immediately if backend is disabled - use client-side validation
         guard Configuration.isEnabled else {
-            return ContentValidationResponse(isAppropriate: true, violations: [], confidence: 1.0)
+            return ContentValidationResponse(isAppropriate: true, violations: [], severity: .none, filteredContent: nil)
         }
 
         Logger.shared.info("Validating content server-side, type: \(type.rawValue)", category: .moderation)
@@ -198,7 +198,7 @@ class BackendAPIService: BackendAPIServiceProtocol {
     func checkRateLimit(userId: String, action: RateLimitAction) async throws -> RateLimitResponse {
         // Return immediately if backend is disabled - use client-side rate limiting
         guard Configuration.isEnabled else {
-            return RateLimitResponse(allowed: true, remaining: 999, resetTime: nil)
+            return RateLimitResponse(allowed: true, remaining: 999, resetAt: nil, retryAfter: nil)
         }
 
         let payload: [String: Any] = [
