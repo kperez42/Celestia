@@ -2,7 +2,7 @@
 //  SafetyCenter.swift
 //  Celestia
 //
-//  Comprehensive safety features: verification, reporting, blocking, date sharing
+//  Safety features: reporting and blocking
 //
 
 import SwiftUI
@@ -22,20 +22,8 @@ struct SafetyCenterView: View {
                     // Header
                     headerSection
 
-                    // Verification Status
-                    verificationSection
-
                     // Safety Tools
                     safetyToolsSection
-
-                    // Date Safety
-                    dateSafetySection
-
-                    // Emergency Contacts
-                    emergencyContactsSection
-
-                    // Resources
-                    resourcesSection
                 }
                 .padding()
             }
@@ -69,7 +57,7 @@ struct SafetyCenterView: View {
             Text("Your Safety Matters")
                 .font(.title2.bold())
 
-            Text("We're committed to keeping you safe. Use these tools to protect yourself.")
+            Text("Use these tools to protect yourself and report issues.")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -78,52 +66,6 @@ struct SafetyCenterView: View {
         .frame(maxWidth: .infinity)
         .background(Color.white)
         .cornerRadius(16)
-    }
-
-    // MARK: - Verification Section
-
-    private var verificationSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            SafetySectionHeader(title: "Verification", icon: "checkmark.seal.fill")
-
-            VStack(spacing: 12) {
-                NavigationLink {
-                    ManualIDVerificationView()
-                } label: {
-                    SafetyOptionRow(
-                        icon: "person.text.rectangle.fill",
-                        title: "ID Verification",
-                        subtitle: "Submit ID and selfie for verification",
-                        color: .purple,
-                        isCompleted: viewModel.idVerified
-                    )
-                }
-
-                NavigationLink {
-                    PhoneVerificationView()
-                } label: {
-                    SafetyOptionRow(
-                        icon: "phone.fill",
-                        title: "Phone Number",
-                        subtitle: "Verify your phone",
-                        color: .green,
-                        isCompleted: viewModel.phoneVerified
-                    )
-                }
-
-                NavigationLink {
-                    SocialMediaVerificationView()
-                } label: {
-                    SafetyOptionRow(
-                        icon: "at",
-                        title: "Social Media",
-                        subtitle: "Link your social accounts",
-                        color: .pink,
-                        isCompleted: viewModel.socialMediaVerified
-                    )
-                }
-            }
-        }
     }
 
     // MARK: - Safety Tools Section
@@ -153,137 +95,6 @@ struct SafetyCenterView: View {
                         title: "Report & Support",
                         subtitle: "Report issues or users",
                         color: .orange
-                    )
-                }
-
-                NavigationLink {
-                    SafetySettingsView()
-                } label: {
-                    SafetyOptionRow(
-                        icon: "gear",
-                        title: "Privacy Settings",
-                        subtitle: "Control who sees your profile",
-                        color: .gray
-                    )
-                }
-            }
-        }
-    }
-
-    // MARK: - Date Safety Section
-
-    private var dateSafetySection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            SafetySectionHeader(title: "Date Safety", icon: "calendar.badge.exclamationmark")
-
-            VStack(spacing: 12) {
-                NavigationLink {
-                    ShareDateView()
-                } label: {
-                    SafetyOptionRow(
-                        icon: "person.2.fill",
-                        title: "Share Your Date",
-                        subtitle: "Let trusted contacts know your plans",
-                        color: .blue
-                    )
-                }
-
-                NavigationLink {
-                    SafeDateLocationsView()
-                } label: {
-                    SafetyOptionRow(
-                        icon: "mappin.and.ellipse",
-                        title: "Safe Meeting Spots",
-                        subtitle: "Public places recommended for first dates",
-                        color: .green
-                    )
-                }
-
-                NavigationLink {
-                    DateCheckInView()
-                } label: {
-                    SafetyOptionRow(
-                        icon: "bell.badge.fill",
-                        title: "Date Check-In",
-                        subtitle: "Set reminders during your date",
-                        color: .orange
-                    )
-                }
-            }
-        }
-    }
-
-    // MARK: - Emergency Contacts Section
-
-    private var emergencyContactsSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            SafetySectionHeader(title: "Emergency", icon: "phone.badge.plus")
-
-            VStack(spacing: 12) {
-                NavigationLink {
-                    EmergencyContactsView()
-                } label: {
-                    SafetyOptionRow(
-                        icon: "person.crop.circle.badge.plus",
-                        title: "Emergency Contacts",
-                        subtitle: "\(viewModel.emergencyContactsCount) contacts added",
-                        color: .red
-                    )
-                }
-
-                Button {
-                    viewModel.showQuickSOS = true
-                } label: {
-                    SafetyOptionRow(
-                        icon: "sos",
-                        title: "Quick SOS",
-                        subtitle: "Instantly alert your contacts",
-                        color: .red
-                    )
-                }
-            }
-        }
-    }
-
-    // MARK: - Resources Section
-
-    private var resourcesSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            SafetySectionHeader(title: "Resources", icon: "book.fill")
-
-            VStack(spacing: 12) {
-                NavigationLink {
-                    SafeDatingTipsView()
-                } label: {
-                    SafetyOptionRow(
-                        icon: "lightbulb.fill",
-                        title: "Safe Dating Tips",
-                        subtitle: "Learn how to stay safe",
-                        color: .yellow
-                    )
-                }
-
-                NavigationLink {
-                    CommunityGuidelinesView()
-                } label: {
-                    SafetyOptionRow(
-                        icon: "doc.text.fill",
-                        title: "Community Guidelines",
-                        subtitle: "Our rules and standards",
-                        color: .blue
-                    )
-                }
-
-                Button {
-                    if let url = URL(string: "https://www.rainn.org/") {
-                        UIApplication.shared.open(url)
-                    }
-                } label: {
-                    SafetyOptionRow(
-                        icon: "link",
-                        title: "Support Hotlines",
-                        subtitle: "Access help resources",
-                        color: .purple
                     )
                 }
             }
@@ -376,12 +187,7 @@ struct SafetyOptionRow: View {
 
 @MainActor
 class SafetyCenterViewModel: ObservableObject {
-    @Published var idVerified = false
-    @Published var phoneVerified = false
-    @Published var socialMediaVerified = false
     @Published var blockedCount = 0
-    @Published var emergencyContactsCount = 0
-    @Published var showQuickSOS = false
 
     private let db = Firestore.firestore()
 
@@ -389,26 +195,11 @@ class SafetyCenterViewModel: ObservableObject {
         guard let userId = AuthService.shared.currentUser?.id else { return }
 
         do {
-            // Load verification status
-            let userDoc = try await db.collection("users").document(userId).getDocument()
-            if let verificationData = userDoc.data()?["verificationStatus"] as? [String: Bool] {
-                idVerified = verificationData["idVerified"] ?? false
-                phoneVerified = verificationData["phoneVerified"] ?? false
-                socialMediaVerified = verificationData["socialMediaVerified"] ?? false
-            }
-
             // Load blocked users count
             let blockedSnapshot = try await db.collection("blocked_users")
                 .whereField("userId", isEqualTo: userId)
                 .getDocuments()
             blockedCount = blockedSnapshot.documents.count
-
-            // Load emergency contacts count
-            let contactsSnapshot = try await db.collection("emergency_contacts")
-                .whereField("userId", isEqualTo: userId)
-                .getDocuments()
-            emergencyContactsCount = contactsSnapshot.documents.count
-
         } catch {
             Logger.shared.error("Error loading safety data", category: .general, error: error)
         }
