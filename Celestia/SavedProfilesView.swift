@@ -285,7 +285,7 @@ struct SavedProfilesView: View {
                                     HStack(spacing: 4) {
                                         Image(systemName: "eye")
                                             .font(.caption)
-                                        Text("\(viewModel.viewedProfiles.count) views")
+                                        Text("\(viewModel.viewedProfiles.count) viewed you")
                                             .fontWeight(.semibold)
                                     }
                                 }
