@@ -779,16 +779,27 @@ struct SavedProfilesView: View {
                     isSuperLike: false
                 )
 
-                if isMatch {
-                    HapticManager.shared.notification(.success)
-                    Logger.shared.info("Liked saved profile - it's a match!", category: .matching)
-                } else {
-                    HapticManager.shared.impact(.medium)
-                    Logger.shared.info("Liked saved profile", category: .matching)
+                await MainActor.run {
+                    if isMatch {
+                        HapticManager.shared.notification(.success)
+                        Logger.shared.info("Liked saved profile - it's a match!", category: .matching)
+                    } else {
+                        HapticManager.shared.impact(.medium)
+                        Logger.shared.info("Liked saved profile", category: .matching)
+                    }
+                }
+            } catch let error as CelestiaError {
+                Logger.shared.error("Error liking saved profile", category: .matching, error: error)
+                await MainActor.run {
+                    HapticManager.shared.notification(.error)
+                    viewModel.errorMessage = error.localizedDescription
                 }
             } catch {
                 Logger.shared.error("Error liking saved profile", category: .matching, error: error)
-                HapticManager.shared.notification(.error)
+                await MainActor.run {
+                    HapticManager.shared.notification(.error)
+                    viewModel.errorMessage = "Failed to send like. Please try again."
+                }
             }
         }
     }
