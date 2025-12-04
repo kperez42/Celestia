@@ -1152,18 +1152,43 @@ struct CachedCardImage: View {
                 }
 
                 if image == nil && loadError == nil {
-                    // Static placeholder - no loading animation for cleaner look
-                    LinearGradient(
-                        colors: [Color.purple.opacity(0.2), Color.pink.opacity(0.1)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .frame(width: displayWidth, height: displayHeight)
-                    .overlay(
+                    // Beautiful placeholder with gradient and subtle icon
+                    ZStack {
+                        LinearGradient(
+                            colors: [
+                                Color.purple.opacity(0.15),
+                                Color.pink.opacity(0.1),
+                                Color.purple.opacity(0.08)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+
+                        // Subtle glow effect
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    colors: [Color.white.opacity(0.12), Color.clear],
+                                    center: .center,
+                                    startRadius: 0,
+                                    endRadius: min(displayWidth, displayHeight) * 0.4
+                                )
+                            )
+                            .frame(width: min(displayWidth, displayHeight) * 0.6, height: min(displayWidth, displayHeight) * 0.6)
+                            .blur(radius: 20)
+
+                        // Person icon with gradient
                         Image(systemName: "person.fill")
-                            .font(.system(size: min(displayWidth, displayHeight) * 0.3))
-                            .foregroundColor(.white.opacity(0.4))
-                    )
+                            .font(.system(size: min(displayWidth, displayHeight) * 0.25, weight: .light))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [Color.white.opacity(0.5), Color.white.opacity(0.3)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                    }
+                    .frame(width: displayWidth, height: displayHeight)
                     .onAppear {
                         // Only load if we haven't checked cache yet or need to fetch
                         if !hasCheckedCache {

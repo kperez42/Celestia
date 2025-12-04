@@ -77,9 +77,13 @@ struct ProfileFeedCard: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)
         }
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+                .shadow(color: .black.opacity(0.04), radius: 20, x: 0, y: 8)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 20))
         // PERFORMANCE: GPU acceleration for smooth scrolling
         .compositingGroup()
         .onAppear {
@@ -155,7 +159,7 @@ struct ProfileFeedCard: View {
         }
         .frame(height: Self.cardImageHeight)
         .clipShape(
-            RoundedCorner(radius: 16, corners: [.topLeft, .topRight])
+            RoundedCorner(radius: 20, corners: [.topLeft, .topRight])
         )
         .contentShape(Rectangle())
         .onTapGesture {
@@ -374,6 +378,10 @@ struct ActionButton: View {
     @State private var isAnimating = false
     @State private var isPressed = false
 
+    private var isActive: Bool {
+        label == "Liked" || label == "Saved"
+    }
+
     var body: some View {
         Button(action: {
             action()
@@ -387,26 +395,41 @@ struct ActionButton: View {
                 }
             }
         }) {
-            VStack(spacing: 6) {
+            VStack(spacing: 8) {
                 ZStack {
+                    // Background circle with gradient for active state
                     Circle()
-                        .fill(color.opacity(isProcessing ? 0.25 : (isPressed || label == "Saved" ? 0.25 : 0.15)))
-                        .frame(width: 56, height: 56)
-                        .scaleEffect(isAnimating ? 1.2 : (isPressed ? 0.95 : 1.0))
+                        .fill(
+                            isActive ?
+                            AnyShapeStyle(
+                                LinearGradient(
+                                    colors: [color, color.opacity(0.8)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            ) :
+                            AnyShapeStyle(color.opacity(isPressed ? 0.2 : 0.12))
+                        )
+                        .frame(width: 60, height: 60)
+                        .scaleEffect(isAnimating ? 1.15 : (isPressed ? 0.92 : 1.0))
+                        .shadow(
+                            color: isActive ? color.opacity(0.4) : .clear,
+                            radius: isActive ? 8 : 0,
+                            y: isActive ? 4 : 0
+                        )
 
-                    // Show icon always (no loading spinner to avoid UIKit rendering issues)
+                    // Icon
                     Image(systemName: icon)
-                        .font(.title3)
-                        .fontWeight(label == "Saved" ? .bold : .medium)
-                        .foregroundColor(color)
-                        .scaleEffect(isAnimating ? 1.3 : 1.0)
+                        .font(.system(size: 22, weight: isActive ? .bold : .medium))
+                        .foregroundColor(isActive ? .white : color)
+                        .scaleEffect(isAnimating ? 1.25 : 1.0)
                         .opacity(isProcessing ? 0.5 : 1.0)
                 }
 
                 Text(label)
-                    .font(.caption2)
-                    .fontWeight(label == "Saved" ? .semibold : .medium)
-                    .foregroundColor(label == "Saved" ? color : (isProcessing ? color.opacity(0.6) : .secondary))
+                    .font(.caption)
+                    .fontWeight(isActive ? .semibold : .medium)
+                    .foregroundColor(isActive ? color : (isProcessing ? color.opacity(0.6) : .secondary))
             }
         }
         .buttonStyle(ResponsiveButtonStyle(isPressed: $isPressed))
@@ -442,7 +465,7 @@ struct ProfileFeedCardSkeleton: View {
             SkeletonView()
                 .frame(height: Self.cardImageHeight)
                 .clipped()
-                .cornerRadius(16, corners: [.topLeft, .topRight])
+                .cornerRadius(20, corners: [.topLeft, .topRight])
 
             // User Details skeleton
             VStack(alignment: .leading, spacing: 8) {
@@ -484,13 +507,13 @@ struct ProfileFeedCardSkeleton: View {
             // Action Buttons skeleton
             HStack(spacing: 12) {
                 ForEach(0..<4, id: \.self) { _ in
-                    VStack(spacing: 6) {
+                    VStack(spacing: 8) {
                         SkeletonView()
-                            .frame(width: 56, height: 56)
+                            .frame(width: 60, height: 60)
                             .clipShape(Circle())
 
                         SkeletonView()
-                            .frame(width: 40, height: 12)
+                            .frame(width: 44, height: 14)
                             .cornerRadius(4)
                     }
                     .frame(maxWidth: .infinity)
@@ -499,9 +522,13 @@ struct ProfileFeedCardSkeleton: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 16)
         }
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+                .shadow(color: .black.opacity(0.04), radius: 20, x: 0, y: 8)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 20))
     }
 }
 
