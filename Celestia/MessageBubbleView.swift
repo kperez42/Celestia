@@ -613,7 +613,7 @@ struct FullScreenMessageImageViewer: View {
             ZStack {
                 // Black background with opacity based on drag
                 Color.black
-                    .opacity(max(0, 1 - (dismissDragOffset / 300)))
+                    .opacity(max(0.0, 1.0 - Double(dismissDragOffset) / 300.0))
                     .ignoresSafeArea()
 
                 // Zoomable image
@@ -709,7 +709,7 @@ struct FullScreenMessageImageViewer: View {
                         .foregroundColor(.white.opacity(0.6))
                         .padding(.bottom, 40)
                 }
-                .opacity(max(0, 1 - (dismissDragOffset / 150)))
+                .opacity(max(0.0, 1.0 - Double(dismissDragOffset) / 150.0))
             }
         }
         .background(Color.black)
