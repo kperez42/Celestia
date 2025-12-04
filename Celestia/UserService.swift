@@ -105,8 +105,36 @@ class UserService: ObservableObject, UserServiceProtocol {
 
         do {
             Logger.shared.info("UserService: Executing Firestore query...", category: .database)
+            Logger.shared.info("UserService: Query details - showMeInSearch=true, ageRange=\(ageRange?.description ?? "none"), lookingFor=\(lookingFor ?? "Everyone")", category: .database)
+
             let snapshot = try await query.getDocuments()
             lastDocument = snapshot.documents.last
+
+            // DEBUG: Log raw document count and any issues
+            Logger.shared.info("UserService: Raw Firestore response - \(snapshot.documents.count) documents", category: .database)
+
+            if snapshot.documents.isEmpty {
+                // Additional debug: Try a simpler query to check if ANY users exist
+                Logger.shared.warning("UserService: No documents returned! Running diagnostic query...", category: .database)
+
+                // Check if there are ANY users with showMeInSearch=true
+                let diagnosticSnapshot = try? await db.collection("users")
+                    .whereField("showMeInSearch", isEqualTo: true)
+                    .limit(to: 5)
+                    .getDocuments()
+
+                let diagnosticCount = diagnosticSnapshot?.documents.count ?? 0
+                Logger.shared.info("UserService: DIAGNOSTIC - Users with showMeInSearch=true: \(diagnosticCount)", category: .database)
+
+                // Check age distribution of those users
+                if let docs = diagnosticSnapshot?.documents {
+                    for doc in docs {
+                        let age = doc.data()["age"] as? Int ?? -1
+                        let gender = doc.data()["gender"] as? String ?? "unknown"
+                        Logger.shared.info("UserService: DIAGNOSTIC - Found user age=\(age), gender=\(gender)", category: .database)
+                    }
+                }
+            }
 
             // Get existing user IDs to prevent duplicates
             let existingIds = Set(users.compactMap { $0.id })

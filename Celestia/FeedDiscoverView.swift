@@ -921,6 +921,36 @@ struct FeedDiscoverView: View {
                 reset: true
             )
 
+            // FALLBACK: If no users found with strict filters, try with expanded age range
+            if UserService.shared.users.isEmpty, let ageRange = ageRange {
+                Logger.shared.info("FeedDiscoverView: No users with age \(ageRange). Trying expanded range...", category: .database)
+
+                // Try with ±10 years expanded range
+                let expandedMin = max(18, ageRange.lowerBound - 10)
+                let expandedMax = min(99, ageRange.upperBound + 10)
+
+                try await UserService.shared.fetchUsers(
+                    excludingUserId: currentUserId,
+                    lookingFor: lookingForValue,
+                    ageRange: expandedMin...expandedMax,
+                    limit: 50,
+                    reset: true
+                )
+
+                if UserService.shared.users.isEmpty {
+                    Logger.shared.info("FeedDiscoverView: Still no users. Trying without age filter...", category: .database)
+
+                    // Last resort: try without any age filter
+                    try await UserService.shared.fetchUsers(
+                        excludingUserId: currentUserId,
+                        lookingFor: lookingForValue,
+                        ageRange: nil,
+                        limit: 50,
+                        reset: true
+                    )
+                }
+            }
+
             await MainActor.run {
                 users = UserService.shared.users
                 Logger.shared.info("FeedDiscoverView: Loaded \(users.count) users", category: .database)
