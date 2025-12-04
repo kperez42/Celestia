@@ -177,6 +177,7 @@ class SafetyManager: ObservableObject {
     // MARK: - Safety Alerts
 
     /// Create a safety alert
+    /// NOTE: Defers state modification to avoid "Modifying state during view update" warning
     func createSafetyAlert(type: SafetyAlertType, message: String, severity: AlertSeverity) {
         let alert = SafetyAlert(
             id: UUID().uuidString,
@@ -186,7 +187,10 @@ class SafetyManager: ObservableObject {
             createdAt: Date()
         )
 
-        activeAlerts.append(alert)
+        // FIX: Defer state modification to next run loop to avoid SwiftUI warning
+        Task { @MainActor in
+            activeAlerts.append(alert)
+        }
 
         Logger.shared.warning("Safety alert created: \(type.rawValue)", category: .general)
 
@@ -199,7 +203,10 @@ class SafetyManager: ObservableObject {
 
     /// Dismiss alert
     func dismissAlert(_ alert: SafetyAlert) {
-        activeAlerts.removeAll { $0.id == alert.id }
+        // FIX: Defer state modification to avoid SwiftUI warning
+        Task { @MainActor in
+            activeAlerts.removeAll { $0.id == alert.id }
+        }
     }
 
     // MARK: - Safety Tips
