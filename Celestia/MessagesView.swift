@@ -684,10 +684,10 @@ struct ConversationRow: View {
             VStack(alignment: .leading, spacing: 8) {
                 // Name and time
                 HStack {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Text(user.fullName)
                             .font(.headline)
-                            .fontWeight(.semibold)
+                            .fontWeight(.bold)
                             .foregroundColor(.primary)
                             .lineLimit(1)
                             .truncationMode(.tail)
@@ -695,22 +695,40 @@ struct ConversationRow: View {
                         if user.isVerified {
                             Image(systemName: "checkmark.seal.fill")
                                 .font(.caption)
-                                .foregroundColor(.blue)
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.blue, .cyan],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .shadow(color: .blue.opacity(0.3), radius: 2)
                         }
-                        
+
                         if user.isPremium {
                             Image(systemName: "crown.fill")
                                 .font(.caption2)
-                                .foregroundColor(.yellow)
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.yellow, .orange],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .shadow(color: .yellow.opacity(0.4), radius: 2)
                         }
                     }
-                    
+
                     Spacer()
-                    
+
                     if let timestamp = match.lastMessageTimestamp {
-                        Text(timeAgo(from: timestamp))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        HStack(spacing: 4) {
+                            Image(systemName: "clock")
+                                .font(.system(size: 10))
+                            Text(timeAgo(from: timestamp))
+                                .font(.caption)
+                        }
+                        .foregroundColor(.secondary)
                     }
                 }
                 
@@ -751,25 +769,33 @@ struct ConversationRow: View {
         .padding(18)
         .background(
             ZStack {
-                if unreadCount > 0 {
+                if unreadCount > 0 || isNewMatch {
                     LinearGradient(
                         colors: [
-                            Color.purple.opacity(0.08),
-                            Color.pink.opacity(0.05)
+                            Color.purple.opacity(0.1),
+                            Color.pink.opacity(0.06),
+                            Color.purple.opacity(0.04)
                         ],
-                        startPoint: .leading,
-                        endPoint: .trailing
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
                     )
                 } else {
-                    Color.white
+                    Color(.systemBackground)
                 }
             }
         )
-        .cornerRadius(20)
+        .clipShape(RoundedRectangle(cornerRadius: 20))
         .shadow(
-            color: unreadCount > 0 ? Color.purple.opacity(0.15) : Color.black.opacity(0.05),
-            radius: 8,
+            color: unreadCount > 0 || isNewMatch ? Color.purple.opacity(0.15) : Color.black.opacity(0.06),
+            radius: unreadCount > 0 || isNewMatch ? 12 : 8,
+            x: 0,
             y: 4
+        )
+        .shadow(
+            color: unreadCount > 0 || isNewMatch ? Color.pink.opacity(0.08) : Color.black.opacity(0.03),
+            radius: unreadCount > 0 || isNewMatch ? 20 : 16,
+            x: 0,
+            y: 8
         )
         .overlay(
             RoundedRectangle(cornerRadius: 20)
@@ -801,50 +827,82 @@ struct ConversationRow: View {
                 .stroke(
                     LinearGradient(
                         colors: [
-                            Color.purple.opacity(0.3),
-                            Color.pink.opacity(0.2)
+                            Color.purple.opacity(0.4),
+                            Color.pink.opacity(0.3),
+                            Color.purple.opacity(0.2)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
-                    lineWidth: 2
+                    lineWidth: 3
                 )
         )
+        .shadow(color: .purple.opacity(0.2), radius: 8, x: 0, y: 4)
     }
-    
+
     private var placeholderImage: some View {
         ZStack {
             LinearGradient(
                 colors: [
-                    Color.purple.opacity(0.7),
-                    Color.pink.opacity(0.6),
-                    Color.blue.opacity(0.5)
+                    Color.purple.opacity(0.85),
+                    Color.pink.opacity(0.75),
+                    Color.purple.opacity(0.65)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            
+
+            // Subtle radial glow
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [Color.white.opacity(0.2), Color.clear],
+                        center: .center,
+                        startRadius: 10,
+                        endRadius: 35
+                    )
+                )
+                .blur(radius: 8)
+
             Text(user.fullName.prefix(1))
                 .font(.system(size: 28, weight: .bold))
-                .foregroundColor(.white)
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.white, .white.opacity(0.9)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
         }
     }
-    
+
     private var unreadBadge: some View {
         Text("\(unreadCount)")
             .font(.caption.weight(.bold))
             .foregroundColor(.white)
-            .frame(minWidth: 24, minHeight: 24)
+            .frame(minWidth: 26, minHeight: 26)
             .padding(.horizontal, 8)
             .background(
-                LinearGradient(
-                    colors: [Color.purple, Color.pink.opacity(0.9)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+                ZStack {
+                    // Glow effect
+                    Capsule()
+                        .fill(Color.purple.opacity(0.3))
+                        .blur(radius: 4)
+
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.purple, Color.pink, Color.purple.opacity(0.9)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
             )
             .clipShape(Capsule())
-            .shadow(color: .purple.opacity(0.4), radius: 6, y: 2)
+            .shadow(color: .purple.opacity(0.5), radius: 8, y: 3)
+            .shadow(color: .pink.opacity(0.3), radius: 4, y: 2)
     }
     
     private func timeAgo(from date: Date) -> String {
