@@ -394,71 +394,101 @@ struct MessagesView: View {
     }
     
     // MARK: - Empty State
-    
+
+    @State private var emptyStateIconPulse: CGFloat = 1.0
+
     private var emptyStateView: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 28) {
             Spacer()
-            
-            // Icon
+
+            // Icon with animated glow
             ZStack {
+                // Outer pulsing glow
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [Color.purple.opacity(0.25), Color.pink.opacity(0.15), Color.clear],
+                            center: .center,
+                            startRadius: 30,
+                            endRadius: 90
+                        )
+                    )
+                    .frame(width: 180, height: 180)
+                    .scaleEffect(emptyStateIconPulse)
+
                 Circle()
                     .fill(
                         LinearGradient(
-                            colors: [Color.purple.opacity(0.2), Color.pink.opacity(0.1)],
+                            colors: [Color.purple.opacity(0.2), Color.pink.opacity(0.15), Color.purple.opacity(0.1)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
                     .frame(width: 140, height: 140)
-                
+                    .shadow(color: .purple.opacity(0.2), radius: 20)
+
                 Image(systemName: "message.circle.fill")
                     .font(.system(size: 70))
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [.purple, .pink],
+                            colors: [.purple, .pink, .purple.opacity(0.8)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
+                    .shadow(color: .purple.opacity(0.3), radius: 8, y: 4)
             }
-            
-            VStack(spacing: 12) {
+            .onAppear {
+                withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
+                    emptyStateIconPulse = 1.1
+                }
+            }
+
+            VStack(spacing: 14) {
                 Text("No Messages Yet")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                
+                    .font(.system(size: 26, weight: .bold))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.primary, .primary.opacity(0.8)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+
                 Text("When you match with someone, you'll be able to chat here")
-                    .font(.subheadline)
+                    .font(.system(size: 15))
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
+                    .padding(.horizontal, 36)
             }
-            
-            // CTA Button
+
+            // CTA Button with enhanced styling
             Button {
                 selectedTab = 0
                 HapticManager.shared.impact(.medium)
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "heart.fill")
+                        .font(.system(size: 16))
                     Text("Start Swiping")
-                        .fontWeight(.semibold)
+                        .font(.system(size: 16, weight: .semibold))
                 }
                 .foregroundColor(.white)
-                .padding(.horizontal, 28)
-                .padding(.vertical, 14)
+                .padding(.horizontal, 32)
+                .padding(.vertical, 16)
                 .background(
                     LinearGradient(
-                        colors: [Color.purple, Color.pink],
+                        colors: [Color.purple, Color.pink, Color.purple.opacity(0.9)],
                         startPoint: .leading,
                         endPoint: .trailing
                     )
                 )
-                .cornerRadius(25)
-                .shadow(color: .purple.opacity(0.4), radius: 15, y: 8)
+                .cornerRadius(28)
+                .shadow(color: .purple.opacity(0.4), radius: 16, y: 8)
+                .shadow(color: .pink.opacity(0.2), radius: 8, y: 4)
             }
-            .padding(.top, 10)
-            
+            .padding(.top, 8)
+
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -467,41 +497,54 @@ struct MessagesView: View {
     // MARK: - No Search Results
 
     private var noSearchResultsView: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 24) {
             Spacer()
 
             ZStack {
+                // Subtle glow
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [Color.purple.opacity(0.2), Color.pink.opacity(0.1), Color.clear],
+                            center: .center,
+                            startRadius: 20,
+                            endRadius: 70
+                        )
+                    )
+                    .frame(width: 140, height: 140)
+
                 Circle()
                     .fill(
                         LinearGradient(
-                            colors: [Color.purple.opacity(0.15), Color.pink.opacity(0.1)],
+                            colors: [Color.purple.opacity(0.15), Color.pink.opacity(0.1), Color.purple.opacity(0.08)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
-                    .frame(width: 100, height: 100)
+                    .frame(width: 110, height: 110)
+                    .shadow(color: .purple.opacity(0.15), radius: 12)
 
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 40))
+                    .font(.system(size: 44))
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [.purple, .pink],
+                            colors: [.purple, .pink, .purple.opacity(0.8)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
+                    .shadow(color: .purple.opacity(0.25), radius: 6, y: 3)
             }
 
-            VStack(spacing: 8) {
+            VStack(spacing: 10) {
                 Text("No Results")
-                    .font(.title3)
-                    .fontWeight(.semibold)
+                    .font(.system(size: 22, weight: .bold))
 
                 Text("No conversations match \"\(searchDebouncer.debouncedText)\"")
-                    .font(.subheadline)
+                    .font(.system(size: 14))
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
+                    .padding(.horizontal, 36)
             }
 
             Spacer()

@@ -1646,140 +1646,255 @@ struct MatchCelebrationOverlay: View {
     @State private var showConfetti = false
     @State private var heartScale: CGFloat = 0.5
     @State private var textOpacity: Double = 0
+    @State private var sparkleRotation: Double = 0
+    @State private var pulseScale: CGFloat = 1.0
 
     var body: some View {
         ZStack {
-            // Background blur
-            Color.black.opacity(0.8)
-                .ignoresSafeArea()
-                .onTapGesture {
-                    onDismiss()
-                }
+            // Enhanced gradient background
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.95),
+                    Color.purple.opacity(0.3),
+                    Color.pink.opacity(0.2),
+                    Color.black.opacity(0.95)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+            .onTapGesture {
+                onDismiss()
+            }
 
-            VStack(spacing: 24) {
-                // Animated hearts
+            // Sparkle particles
+            ForEach(0..<12, id: \.self) { index in
+                Image(systemName: "sparkle")
+                    .font(.system(size: CGFloat.random(in: 8...16)))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.pink, .purple, .white],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .offset(
+                        x: cos(Double(index) * .pi / 6 + sparkleRotation) * CGFloat(120 + index * 8),
+                        y: sin(Double(index) * .pi / 6 + sparkleRotation) * CGFloat(120 + index * 8)
+                    )
+                    .opacity(showConfetti ? 0.8 : 0)
+                    .scaleEffect(showConfetti ? 1.0 : 0.3)
+            }
+
+            VStack(spacing: 28) {
+                // Animated hearts with enhanced styling
                 ZStack {
+                    // Multiple pulsing glow rings
+                    ForEach(0..<3, id: \.self) { ring in
+                        Circle()
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color.pink.opacity(0.4 - Double(ring) * 0.1),
+                                        Color.purple.opacity(0.3 - Double(ring) * 0.1)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 2
+                            )
+                            .frame(width: CGFloat(180 + ring * 40), height: CGFloat(180 + ring * 40))
+                            .scaleEffect(pulseScale)
+                            .opacity(showConfetti ? 0.6 : 0)
+                    }
+
                     // Outer glow
                     Circle()
                         .fill(
                             RadialGradient(
-                                colors: [Color.pink.opacity(0.4), Color.clear],
+                                colors: [
+                                    Color.pink.opacity(0.5),
+                                    Color.purple.opacity(0.3),
+                                    Color.clear
+                                ],
                                 center: .center,
                                 startRadius: 40,
-                                endRadius: 120
+                                endRadius: 140
                             )
                         )
-                        .frame(width: 240, height: 240)
-                        .scaleEffect(showConfetti ? 1.2 : 0.8)
+                        .frame(width: 280, height: 280)
+                        .scaleEffect(showConfetti ? 1.15 : 0.8)
                         .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: showConfetti)
 
-                    // User photos
-                    HStack(spacing: -30) {
+                    // User photos with enhanced styling
+                    HStack(spacing: -35) {
                         // Your photo placeholder
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [.purple, .pink],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 100, height: 100)
-                            .overlay(
-                                Image(systemName: "person.fill")
-                                    .font(.system(size: 40))
-                                    .foregroundColor(.white)
-                            )
-                            .overlay(Circle().stroke(Color.white, lineWidth: 4))
-
-                        // Their photo
-                        if let imageURL = URL(string: user.profileImageURL), !user.profileImageURL.isEmpty {
-                            CachedAsyncImage(url: imageURL) { image in
-                                image
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 100, height: 100)
-                                    .clipShape(Circle())
-                                    .overlay(Circle().stroke(Color.white, lineWidth: 4))
-                            } placeholder: {
-                                Circle()
-                                    .fill(Color.gray.opacity(0.3))
-                                    .frame(width: 100, height: 100)
-                            }
-                        } else {
+                        ZStack {
                             Circle()
                                 .fill(
                                     LinearGradient(
-                                        colors: [.pink, .orange],
+                                        colors: [.purple, .pink, .purple.opacity(0.8)],
                                         startPoint: .topLeading,
                                         endPoint: .bottomTrailing
                                     )
                                 )
-                                .frame(width: 100, height: 100)
-                                .overlay(
-                                    Text(user.fullName.prefix(1))
-                                        .font(.system(size: 40, weight: .bold))
-                                        .foregroundColor(.white)
+                                .frame(width: 110, height: 110)
+                                .shadow(color: .purple.opacity(0.5), radius: 12, y: 4)
+
+                            Image(systemName: "person.fill")
+                                .font(.system(size: 44))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.white, .white.opacity(0.9)],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
                                 )
-                                .overlay(Circle().stroke(Color.white, lineWidth: 4))
                         }
+                        .overlay(
+                            Circle()
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [.white, .white.opacity(0.8)],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    ),
+                                    lineWidth: 4
+                                )
+                                .shadow(color: .white.opacity(0.3), radius: 4)
+                        )
+
+                        // Their photo
+                        ZStack {
+                            if let imageURL = URL(string: user.profileImageURL), !user.profileImageURL.isEmpty {
+                                CachedAsyncImage(url: imageURL) { image in
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 110, height: 110)
+                                        .clipShape(Circle())
+                                } placeholder: {
+                                    Circle()
+                                        .fill(Color.gray.opacity(0.3))
+                                        .frame(width: 110, height: 110)
+                                }
+                            } else {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [.pink, .orange, .pink.opacity(0.8)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 110, height: 110)
+                                    .overlay(
+                                        Text(user.fullName.prefix(1))
+                                            .font(.system(size: 44, weight: .bold))
+                                            .foregroundStyle(
+                                                LinearGradient(
+                                                    colors: [.white, .white.opacity(0.9)],
+                                                    startPoint: .top,
+                                                    endPoint: .bottom
+                                                )
+                                            )
+                                    )
+                            }
+                        }
+                        .shadow(color: .pink.opacity(0.5), radius: 12, y: 4)
+                        .overlay(
+                            Circle()
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [.white, .white.opacity(0.8)],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    ),
+                                    lineWidth: 4
+                                )
+                                .shadow(color: .white.opacity(0.3), radius: 4)
+                        )
                     }
 
-                    // Heart in center
-                    Image(systemName: "heart.fill")
-                        .font(.system(size: 30))
-                        .foregroundColor(.pink)
-                        .offset(y: 40)
-                        .scaleEffect(heartScale)
+                    // Heart in center with gradient and glow
+                    ZStack {
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 36))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.pink, .red, .pink],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .shadow(color: .pink.opacity(0.8), radius: 10)
+                            .shadow(color: .red.opacity(0.5), radius: 20)
+                    }
+                    .offset(y: 50)
+                    .scaleEffect(heartScale * pulseScale)
                 }
                 .scaleEffect(heartScale)
 
-                // Text
-                VStack(spacing: 12) {
+                // Text with gradient
+                VStack(spacing: 14) {
                     Text("It's a Match!")
-                        .font(.system(size: 36, weight: .bold))
-                        .foregroundColor(.white)
-
-                    Text("You and \(user.fullName) liked each other")
-                        .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.8))
-                }
-                .opacity(textOpacity)
-
-                // Action buttons
-                VStack(spacing: 12) {
-                    Button {
-                        onMessage()
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "message.fill")
-                            Text("Send a Message")
-                                .fontWeight(.semibold)
-                        }
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(
+                        .font(.system(size: 38, weight: .bold))
+                        .foregroundStyle(
                             LinearGradient(
-                                colors: [.pink, .purple],
+                                colors: [.white, .pink.opacity(0.9), .white],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
                         )
-                        .cornerRadius(30)
+                        .shadow(color: .pink.opacity(0.5), radius: 10)
+
+                    Text("You and \(user.fullName) liked each other")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.white.opacity(0.85))
+                }
+                .opacity(textOpacity)
+
+                // Action buttons with enhanced styling
+                VStack(spacing: 14) {
+                    Button {
+                        HapticManager.shared.impact(.medium)
+                        onMessage()
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "message.fill")
+                                .font(.system(size: 18))
+                            Text("Send a Message")
+                                .font(.system(size: 17, weight: .semibold))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 18)
+                        .background(
+                            LinearGradient(
+                                colors: [.pink, .purple, .pink.opacity(0.9)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .cornerRadius(28)
+                        .shadow(color: .pink.opacity(0.5), radius: 12, y: 6)
                     }
 
                     Button {
                         onDismiss()
                     } label: {
                         Text("Keep Browsing")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundColor(.white.opacity(0.8))
-                            .padding(.vertical, 12)
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(.white.opacity(0.7))
+                            .padding(.vertical, 14)
+                            .padding(.horizontal, 24)
+                            .background(
+                                Capsule()
+                                    .fill(Color.white.opacity(0.1))
+                            )
                     }
                 }
-                .padding(.horizontal, 40)
+                .padding(.horizontal, 36)
                 .opacity(textOpacity)
             }
         }
@@ -1793,6 +1908,14 @@ struct MatchCelebrationOverlay: View {
             }
             withAnimation(.easeInOut(duration: 0.3).delay(0.1)) {
                 showConfetti = true
+            }
+            // Sparkle rotation
+            withAnimation(.linear(duration: 8).repeatForever(autoreverses: false)) {
+                sparkleRotation = .pi * 2
+            }
+            // Pulse animation
+            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true).delay(0.3)) {
+                pulseScale = 1.08
             }
         }
     }
