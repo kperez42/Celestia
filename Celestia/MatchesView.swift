@@ -302,11 +302,19 @@ struct MatchesView: View {
     }
     
     private var searchBar: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "magnifyingglass")
-                .foregroundColor(.white.opacity(0.8))
-            
+        HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(Color.white.opacity(0.2))
+                    .frame(width: 36, height: 36)
+
+                Image(systemName: "magnifyingglass")
+                    .font(.callout.weight(.medium))
+                    .foregroundColor(.white)
+            }
+
             TextField("Search matches...", text: $searchText)
+                .font(.body)
                 .foregroundColor(.white)
                 .accentColor(.white)
                 .placeholder(when: searchText.isEmpty) {
@@ -321,23 +329,37 @@ struct MatchesView: View {
                     hint: "Type to search your matches by name or location",
                     identifier: AccessibilityIdentifier.searchField
                 )
-            
+
             if !searchText.isEmpty {
                 Button {
-                    withAnimation {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         searchText = ""
                         searchDebouncer.clear()
                     }
                     HapticManager.shared.impact(.light)
                 } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.white.opacity(0.8))
+                    ZStack {
+                        Circle()
+                            .fill(Color.white.opacity(0.25))
+                            .frame(width: 28, height: 28)
+
+                        Image(systemName: "xmark")
+                            .font(.caption.weight(.bold))
+                            .foregroundColor(.white)
+                    }
                 }
             }
         }
-        .padding(12)
-        .background(Color.white.opacity(0.2))
-        .cornerRadius(12)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.white.opacity(0.15))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                )
+        )
         .padding(.horizontal, 20)
     }
     
@@ -407,36 +429,73 @@ struct MatchesView: View {
     
     private func filterChip(icon: String, title: String, count: Int = 0, isActive: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 Image(systemName: icon)
-                    .font(.caption)
+                    .font(.caption.weight(.semibold))
                 Text(title)
                     .font(.caption)
-                    .fontWeight(.medium)
+                    .fontWeight(.semibold)
                 if count > 0 {
                     Text("\(count)")
                         .font(.caption2)
                         .fontWeight(.bold)
                         .foregroundColor(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(isActive ? Color.white.opacity(0.3) : Color.red)
-                        .clipShape(Capsule())
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(
+                            Capsule()
+                                .fill(
+                                    isActive ?
+                                    LinearGradient(
+                                        colors: [Color.white.opacity(0.3), Color.white.opacity(0.2)],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    ) :
+                                    LinearGradient(
+                                        colors: [Color.red, Color.pink],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                        )
                 }
             }
             .foregroundColor(isActive ? .white : .purple)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
             .background(
                 isActive ?
                 LinearGradient(
-                    colors: [Color.purple, Color.blue],
+                    colors: [Color.purple, Color.pink, Color.purple.opacity(0.9)],
                     startPoint: .leading,
                     endPoint: .trailing
                 ) :
-                LinearGradient(colors: [Color.purple.opacity(0.1)], startPoint: .leading, endPoint: .trailing)
+                LinearGradient(
+                    colors: [Color.purple.opacity(0.12), Color.pink.opacity(0.08)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
             )
-            .cornerRadius(20)
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(
+                        isActive ?
+                        Color.clear :
+                        LinearGradient(
+                            colors: [Color.purple.opacity(0.2), Color.pink.opacity(0.15)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            )
+            .shadow(
+                color: isActive ? Color.purple.opacity(0.3) : Color.clear,
+                radius: 8,
+                x: 0,
+                y: 4
+            )
         }
         .accessibilityLabel("\(title) filter, \(count) matches")
         .accessibilityHint(isActive ? "Active. Tap to deactivate" : "Tap to activate")

@@ -190,10 +190,16 @@ struct MainTabView: View {
 
     private var customTabBar: some View {
         VStack(spacing: 0) {
-            // Top separator
+            // Top separator with gradient
             Rectangle()
-                .fill(Color(.separator).opacity(0.2))
-                .frame(height: 0.5)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.clear, Color(.separator).opacity(0.15), Color.clear],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .frame(height: 1)
 
             HStack(spacing: 0) {
                 // Discover
@@ -202,7 +208,7 @@ struct MainTabView: View {
                     title: "Discover",
                     isSelected: selectedTab == 0,
                     badgeCount: 0,
-                    color: .orange
+                    colors: [.orange, .red]
                 ) {
                     selectedTab = 0
                 }
@@ -213,7 +219,7 @@ struct MainTabView: View {
                     title: "Likes",
                     isSelected: selectedTab == 1,
                     badgeCount: newMatchesCount,
-                    color: .pink
+                    colors: [.pink, .red]
                 ) {
                     selectedTab = 1
                 }
@@ -224,7 +230,7 @@ struct MainTabView: View {
                     title: "Messages",
                     isSelected: selectedTab == 2,
                     badgeCount: unreadCount,
-                    color: .blue
+                    colors: [.blue, .cyan]
                 ) {
                     selectedTab = 2
                 }
@@ -235,7 +241,7 @@ struct MainTabView: View {
                     title: "Saved",
                     isSelected: selectedTab == 3,
                     badgeCount: 0,
-                    color: .yellow
+                    colors: [.yellow, .orange]
                 ) {
                     selectedTab = 3
                 }
@@ -246,7 +252,7 @@ struct MainTabView: View {
                     title: "Profile",
                     isSelected: selectedTab == 4,
                     badgeCount: 0,
-                    color: .purple
+                    colors: [.purple, .pink]
                 ) {
                     selectedTab = 4
                 }
@@ -258,19 +264,20 @@ struct MainTabView: View {
                         title: "Admin",
                         isSelected: selectedTab == 5,
                         badgeCount: 0,
-                        color: .indigo
+                        colors: [.indigo, .purple]
                     ) {
                         selectedTab = 5
                     }
                 }
             }
             .padding(.horizontal, 4)
-            .padding(.top, 4)
-            .padding(.bottom, 8)
+            .padding(.top, 6)
+            .padding(.bottom, 10)
         }
         .background {
             Color(.systemBackground)
-                .shadow(color: .black.opacity(0.06), radius: 8, y: -4)
+                .shadow(color: .black.opacity(0.08), radius: 12, y: -4)
+                .shadow(color: .black.opacity(0.04), radius: 4, y: -2)
                 .ignoresSafeArea(edges: .bottom)
         }
     }
@@ -360,7 +367,7 @@ struct TabBarButton: View {
     let title: String
     let isSelected: Bool
     let badgeCount: Int
-    let color: Color
+    let colors: [Color]
     let action: () -> Void
 
     private var accessibilityHint: String {
@@ -396,36 +403,77 @@ struct TabBarButton: View {
                     ZStack {
                         if isSelected {
                             Circle()
-                                .fill(color.opacity(0.15))
-                                .frame(width: 36, height: 36)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [colors[0].opacity(0.2), colors.last!.opacity(0.12)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 40, height: 40)
                         }
 
                         Image(systemName: icon)
-                            .font(.system(size: 20, weight: isSelected ? .semibold : .regular))
-                            .foregroundColor(isSelected ? color : Color(.systemGray2))
+                            .font(.system(size: 22, weight: isSelected ? .semibold : .regular))
+                            .foregroundStyle(
+                                isSelected ?
+                                LinearGradient(
+                                    colors: colors,
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ) :
+                                LinearGradient(
+                                    colors: [Color(.systemGray2), Color(.systemGray2)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .shadow(
+                                color: isSelected ? colors[0].opacity(0.3) : .clear,
+                                radius: 4,
+                                y: 2
+                            )
                     }
-                    .frame(width: 36, height: 36)
+                    .frame(width: 40, height: 40)
 
-                    // Badge
+                    // Badge with gradient
                     if badgeCount > 0 {
                         Text(badgeCount > 99 ? "99+" : "\(badgeCount)")
                             .font(.system(size: 10, weight: .bold))
                             .foregroundColor(.white)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
                             .background(
                                 Capsule()
-                                    .fill(Color.red)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [.red, .pink],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
                                     .shadow(color: .red.opacity(0.4), radius: 4, y: 2)
                             )
-                            .offset(x: 10, y: -4)
+                            .offset(x: 12, y: -6)
                     }
                 }
 
                 // Title
                 Text(title)
-                    .font(.system(size: 10, weight: isSelected ? .semibold : .medium))
-                    .foregroundColor(isSelected ? color : Color(.systemGray2))
+                    .font(.system(size: 10, weight: isSelected ? .bold : .medium))
+                    .foregroundStyle(
+                        isSelected ?
+                        LinearGradient(
+                            colors: colors,
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ) :
+                        LinearGradient(
+                            colors: [Color(.systemGray2), Color(.systemGray2)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 6)

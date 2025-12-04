@@ -319,13 +319,33 @@ struct MessagesView: View {
     }
 
     // MARK: - Search Bar
-    
+
     private var searchBar: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "magnifyingglass")
-                .foregroundColor(.gray)
+        HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.purple.opacity(0.12), Color.pink.opacity(0.08)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 36, height: 36)
+
+                Image(systemName: "magnifyingglass")
+                    .font(.callout.weight(.medium))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
 
             TextField("Search conversations...", text: $searchText)
+                .font(.body)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
                 .onChange(of: searchText) { newValue in
@@ -334,21 +354,43 @@ struct MessagesView: View {
 
             if !searchText.isEmpty {
                 Button {
-                    withAnimation {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         searchText = ""
                         searchDebouncer.clear()
                     }
                     HapticManager.shared.impact(.light)
                 } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.gray)
+                    ZStack {
+                        Circle()
+                            .fill(Color.gray.opacity(0.15))
+                            .frame(width: 28, height: 28)
+
+                        Image(systemName: "xmark")
+                            .font(.caption.weight(.bold))
+                            .foregroundColor(.gray)
+                    }
                 }
             }
         }
-        .padding(14)
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+                .shadow(color: .black.opacity(0.04), radius: 20, x: 0, y: 8)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(
+                    LinearGradient(
+                        colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.08)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
     }
