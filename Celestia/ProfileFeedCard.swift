@@ -23,8 +23,19 @@ struct ProfileFeedCard: View {
     @State private var isLiked = false
     @State private var isProcessingLike = false
     @State private var isProcessingSave = false
+    @State private var showFullScreenPhoto = false
+    @State private var selectedPhotoIndex = 0
 
     // MARK: - Computed Properties
+
+    // Get all available photos for the user
+    private var allPhotos: [String] {
+        let photos = user.photos.filter { !$0.isEmpty }
+        if photos.isEmpty && !user.profileImageURL.isEmpty {
+            return [user.profileImageURL]
+        }
+        return photos
+    }
 
     // Get the best available photo URL (photos array first, then profileImageURL)
     private var displayPhotoURL: String {
@@ -104,7 +115,7 @@ struct ProfileFeedCard: View {
                 url: URL(string: displayPhotoURL),
                 targetHeight: Self.cardImageHeight,
                 cornerRadius: 0,  // We apply corner radius to specific corners below
-                priority: .normal
+                priority: .high  // High priority for better quality
             )
             .frame(height: Self.cardImageHeight)
             .frame(maxWidth: .infinity)
@@ -121,6 +132,26 @@ struct ProfileFeedCard: View {
                 endPoint: .bottom
             )
             .frame(height: Self.cardImageHeight * 0.4)
+
+            // Photo count indicator if multiple photos
+            if allPhotos.count > 1 {
+                HStack {
+                    Spacer()
+                    HStack(spacing: 4) {
+                        Image(systemName: "photo.stack.fill")
+                            .font(.caption2)
+                        Text("\(allPhotos.count)")
+                            .font(.caption2.weight(.semibold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.ultraThinMaterial)
+                    .cornerRadius(12)
+                    .padding(12)
+                }
+                .frame(maxHeight: .infinity, alignment: .top)
+            }
         }
         .frame(height: Self.cardImageHeight)
         .clipShape(
@@ -129,7 +160,17 @@ struct ProfileFeedCard: View {
         .contentShape(Rectangle())
         .onTapGesture {
             HapticManager.shared.impact(.medium)
-            onViewProfile()
+            selectedPhotoIndex = 0
+            showFullScreenPhoto = true
+        }
+        .fullScreenCover(isPresented: $showFullScreenPhoto) {
+            CardFullScreenPhotoViewer(
+                photos: allPhotos,
+                selectedIndex: $selectedPhotoIndex,
+                isPresented: $showFullScreenPhoto,
+                userName: user.fullName,
+                onViewProfile: onViewProfile
+            )
         }
     }
 
@@ -461,6 +502,237 @@ struct ProfileFeedCardSkeleton: View {
         .background(Color(.systemBackground))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
+    }
+}
+
+// MARK: - Card Full Screen Photo Viewer
+
+struct CardFullScreenPhotoViewer: View {
+    let photos: [String]
+    @Binding var selectedIndex: Int
+    @Binding var isPresented: Bool
+    let userName: String
+    let onViewProfile: () -> Void
+
+    @State private var dismissDragOffset: CGFloat = 0
+    @State private var isDismissing = false
+
+    private let dismissThreshold: CGFloat = 150
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                // Black background with opacity based on drag
+                Color.black
+                    .opacity(backgroundOpacity)
+                    .ignoresSafeArea()
+
+                // Photo carousel with smooth swiping
+                TabView(selection: $selectedIndex) {
+                    ForEach(Array(photos.enumerated()), id: \.offset) { index, photoURL in
+                        FullScreenPhotoItem(
+                            url: URL(string: photoURL),
+                            isCurrentPhoto: index == selectedIndex
+                        )
+                        .tag(index)
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .automatic))
+                .indexViewStyle(.page(backgroundDisplayMode: .always))
+                .offset(y: dismissDragOffset)
+                .scaleEffect(dismissScale)
+                .onChange(of: selectedIndex) { _, newIndex in
+                    ImageCache.shared.prefetchAdjacentPhotos(photos: photos, currentIndex: newIndex)
+                }
+
+                // Top controls overlay
+                VStack {
+                    HStack {
+                        // Close button
+                        Button {
+                            HapticManager.shared.impact(.light)
+                            isPresented = false
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.title3.weight(.semibold))
+                                .foregroundColor(.white)
+                                .frame(width: 44, height: 44)
+                                .background(.ultraThinMaterial)
+                                .clipShape(Circle())
+                                .shadow(color: .black.opacity(0.3), radius: 8, y: 2)
+                        }
+
+                        Spacer()
+
+                        // Photo counter
+                        if photos.count > 1 {
+                            Text("\(selectedIndex + 1) / \(photos.count)")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(.ultraThinMaterial)
+                                .cornerRadius(20)
+                                .shadow(color: .black.opacity(0.3), radius: 8, y: 2)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 60)
+
+                    Spacer()
+
+                    // Bottom user info and view profile button
+                    VStack(spacing: 16) {
+                        Text(userName)
+                            .font(.title2.weight(.bold))
+                            .foregroundColor(.white)
+                            .shadow(color: .black.opacity(0.5), radius: 4, y: 2)
+
+                        Button {
+                            HapticManager.shared.impact(.medium)
+                            isPresented = false
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                onViewProfile()
+                            }
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "person.circle.fill")
+                                    .font(.body)
+                                Text("View Profile")
+                                    .font(.body.weight(.semibold))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 14)
+                            .background(
+                                LinearGradient(
+                                    colors: [.purple, .pink],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(25)
+                            .shadow(color: .purple.opacity(0.4), radius: 10, y: 4)
+                        }
+                    }
+                    .padding(.bottom, 50)
+                }
+                .opacity(controlsOpacity)
+            }
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        if value.translation.height > 0 {
+                            dismissDragOffset = value.translation.height
+                        }
+                    }
+                    .onEnded { value in
+                        if value.translation.height > dismissThreshold {
+                            isDismissing = true
+                            HapticManager.shared.impact(.light)
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                dismissDragOffset = geometry.size.height
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                isPresented = false
+                            }
+                        } else {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                dismissDragOffset = 0
+                            }
+                        }
+                    }
+            )
+        }
+        .statusBarHidden()
+        .onAppear {
+            ImageCache.shared.prefetchAdjacentPhotos(photos: photos, currentIndex: selectedIndex)
+        }
+    }
+
+    private var backgroundOpacity: Double {
+        let progress = min(dismissDragOffset / dismissThreshold, 1.0)
+        return 1.0 - (progress * 0.5)
+    }
+
+    private var dismissScale: CGFloat {
+        let progress = min(dismissDragOffset / dismissThreshold, 1.0)
+        return 1.0 - (progress * 0.1)
+    }
+
+    private var controlsOpacity: Double {
+        let progress = min(dismissDragOffset / dismissThreshold, 1.0)
+        return 1.0 - progress
+    }
+}
+
+// MARK: - Full Screen Photo Item
+
+struct FullScreenPhotoItem: View {
+    let url: URL?
+    let isCurrentPhoto: Bool
+
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                Color.black
+
+                CachedCardImage(url: url, priority: isCurrentPhoto ? .immediate : .high)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .scaleEffect(scale)
+                    .offset(offset)
+                    .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
+                    .gesture(
+                        MagnificationGesture()
+                            .onChanged { value in
+                                let delta = value / lastScale
+                                lastScale = value
+                                scale = min(max(scale * delta, 1), 4)
+                            }
+                            .onEnded { _ in
+                                lastScale = 1.0
+                                if scale < 1 {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                        scale = 1
+                                        offset = .zero
+                                    }
+                                }
+                            }
+                    )
+                    .simultaneousGesture(
+                        scale > 1 ?
+                        DragGesture()
+                            .onChanged { value in
+                                offset = CGSize(
+                                    width: lastOffset.width + value.translation.width,
+                                    height: lastOffset.height + value.translation.height
+                                )
+                            }
+                            .onEnded { _ in
+                                lastOffset = offset
+                            }
+                        : nil
+                    )
+                    .onTapGesture(count: 2) {
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
+                            if scale > 1 {
+                                scale = 1
+                                offset = .zero
+                                lastOffset = .zero
+                            } else {
+                                scale = 2
+                            }
+                        }
+                        HapticManager.shared.impact(.light)
+                    }
+            }
+        }
     }
 }
 
