@@ -48,8 +48,9 @@ struct ChatView: View {
     @State private var failedMessage: (text: String, image: UIImage?)?
 
     // Cached grouped messages to prevent recalculation on every render
+    // NOTE: Cache is updated via onChange, not during body computation (fixes "Modifying state during view update" warning)
     @State private var cachedGroupedMessages: [(String, [Message])] = []
-    @State private var lastMessageCount = 0
+    @State private var lastMessageCount = -1
 
     // Track initial load to prevent scroll animation on first load
     @State private var isInitialLoad = true
@@ -216,6 +217,10 @@ struct ChatView: View {
                 Task { @MainActor in
                     hasLoadedMessagesForThisChat = true
                 }
+            }
+            // FIX: Update grouped messages cache outside of body computation
+            Task { @MainActor in
+                updateGroupedMessagesCache()
             }
             // SWIFTUI FIX: Defer safety check with longer delay to avoid modifying state during view update
             // Only check if message count actually increased (not on initial load or deletions)
@@ -568,7 +573,10 @@ struct ChatView: View {
                 if isInitialLoad {
                     // Initial load - defaultScrollAnchor handles positioning
                     // Just mark as loaded, no need to scroll since we start at bottom
-                    isInitialLoad = false
+                    // FIX: Defer state change to avoid "Modifying state during view update"
+                    Task { @MainActor in
+                        isInitialLoad = false
+                    }
                 } else {
                     // Subsequent messages - animate smoothly to bottom
                     // Use slight delay to allow layout to settle
@@ -659,13 +667,19 @@ struct ChatView: View {
         .padding(.horizontal)
     }
 
+    /// Returns cached grouped messages - cache is updated via updateGroupedMessagesCache()
+    /// NOTE: This function is called from body, so it must NOT modify @State (causes "Modifying state during view update")
     private func groupedMessages() -> [(String, [Message])] {
-        // Use cache if messages haven't changed
+        // Return cache if available and valid
         if messageService.messages.count == lastMessageCount && !cachedGroupedMessages.isEmpty {
             return cachedGroupedMessages
         }
+        // Cache miss - compute fresh (cache will be updated by onChange modifier)
+        return computeGroupedMessages()
+    }
 
-        // Recalculate and cache
+    /// Computes grouped messages - pure function with no side effects
+    private func computeGroupedMessages() -> [(String, [Message])] {
         let grouped = Dictionary(grouping: messageService.messages) { message -> String in
             if Self.calendar.isDateInToday(message.timestamp) {
                 return "Today"
@@ -676,19 +690,19 @@ struct ChatView: View {
             }
         }
 
-        let sorted = grouped.sorted { first, second in
+        return grouped.sorted { first, second in
             // Sort by the date of the first message in each group
             if let firstMessage = first.value.first, let secondMessage = second.value.first {
                 return firstMessage.timestamp < secondMessage.timestamp
             }
             return false
         }
+    }
 
-        // Update cache
-        cachedGroupedMessages = sorted
+    /// Updates the grouped messages cache - call from onChange, not from body
+    private func updateGroupedMessagesCache() {
+        cachedGroupedMessages = computeGroupedMessages()
         lastMessageCount = messageService.messages.count
-
-        return sorted
     }
 
     private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool = true) {
