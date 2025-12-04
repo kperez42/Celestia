@@ -250,7 +250,7 @@ struct SavedProfilesView: View {
             }
 
             VStack(spacing: 12) {
-                HStack(alignment: .center) {
+                HStack(alignment: .top) {
                     // Title section
                     HStack(spacing: 12) {
                         Image(systemName: "bookmark.circle.fill")
@@ -265,14 +265,39 @@ struct SavedProfilesView: View {
                             .shadow(color: .white.opacity(0.4), radius: 10)
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Saved")
-                                .font(.largeTitle.weight(.bold))
-                                .foregroundColor(.white)
+                            HStack {
+                                Text("Saved")
+                                    .font(.largeTitle.weight(.bold))
+                                    .foregroundColor(.white)
 
-                            HStack(spacing: 8) {
-                                HStack(spacing: 4) {
+                                Spacer()
+
+                                // Clear all button - moved up to align with title
+                                if !viewModel.savedProfiles.isEmpty {
+                                    Button {
+                                        showClearAllConfirmation = true
+                                        HapticManager.shared.impact(.light)
+                                    } label: {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "trash")
+                                                .font(.caption)
+                                            Text("Clear")
+                                                .font(.caption)
+                                                .fontWeight(.medium)
+                                        }
+                                        .foregroundColor(.white.opacity(0.8))
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 6)
+                                        .background(Color.red.opacity(0.3))
+                                        .cornerRadius(20)
+                                    }
+                                }
+                            }
+
+                            HStack(spacing: 6) {
+                                HStack(spacing: 3) {
                                     Image(systemName: "bookmark.fill")
-                                        .font(.caption)
+                                        .font(.caption2)
                                     Text("\(viewModel.savedProfiles.count)")
                                         .fontWeight(.semibold)
                                 }
@@ -280,11 +305,11 @@ struct SavedProfilesView: View {
                                 if viewModel.viewedProfiles.count > 0 {
                                     Circle()
                                         .fill(Color.white.opacity(0.5))
-                                        .frame(width: 4, height: 4)
+                                        .frame(width: 3, height: 3)
 
-                                    HStack(spacing: 4) {
+                                    HStack(spacing: 2) {
                                         Image(systemName: "eye")
-                                            .font(.caption)
+                                            .font(.caption2)
                                         Text("\(viewModel.viewedProfiles.count) viewed you")
                                             .fontWeight(.semibold)
                                     }
@@ -293,41 +318,18 @@ struct SavedProfilesView: View {
                                 if viewModel.savedYouProfiles.count > 0 {
                                     Circle()
                                         .fill(Color.white.opacity(0.5))
-                                        .frame(width: 4, height: 4)
+                                        .frame(width: 3, height: 3)
 
-                                    HStack(spacing: 4) {
+                                    HStack(spacing: 2) {
                                         Image(systemName: "person.2.fill")
-                                            .font(.caption)
+                                            .font(.caption2)
                                         Text("\(viewModel.savedYouProfiles.count) saved you")
                                             .fontWeight(.semibold)
                                     }
                                 }
                             }
-                            .font(.caption)
+                            .font(.caption2)
                             .foregroundColor(.white.opacity(0.95))
-                        }
-                    }
-
-                    Spacer()
-
-                    // Clear all button
-                    if !viewModel.savedProfiles.isEmpty {
-                        Button {
-                            showClearAllConfirmation = true
-                            HapticManager.shared.impact(.light)
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "trash")
-                                    .font(.caption)
-                                Text("Clear")
-                                    .font(.caption)
-                                    .fontWeight(.medium)
-                            }
-                            .foregroundColor(.white.opacity(0.8))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(Color.red.opacity(0.3))
-                            .cornerRadius(20)
                         }
                     }
                 }
