@@ -495,11 +495,22 @@ struct ChatView: View {
                     let lastReadId = lastReadMessageId()
 
                     ForEach(groupedMessages(), id: \.0) { section in
-                        // Date divider
-                        Text(section.0)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .padding(.vertical, 8)
+                        // Enhanced date divider with pill design
+                        HStack {
+                            Spacer()
+                            Text(section.0)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 6)
+                                .background(
+                                    Capsule()
+                                        .fill(Color(.systemGray6))
+                                        .shadow(color: .black.opacity(0.03), radius: 2, y: 1)
+                                )
+                            Spacer()
+                        }
+                        .padding(.vertical, 12)
 
                         // Messages for this date
                         ForEach(section.1) { message in

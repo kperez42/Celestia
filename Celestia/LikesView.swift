@@ -906,19 +906,30 @@ struct LikeProfileCard: View {
             ZStack(alignment: .topTrailing) {
                 profileImage
 
-                // Verified badge
+                // Verified badge with enhanced styling
                 if user.isVerified {
                     Image(systemName: "checkmark.seal.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(.blue)
-                        .background(Circle().fill(.white).padding(-2))
-                        .padding(8)
+                        .font(.system(size: 22))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.blue, .cyan],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .background(
+                            Circle()
+                                .fill(.white)
+                                .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
+                                .padding(-3)
+                        )
+                        .padding(10)
                 }
             }
             .frame(height: imageHeight)
             .clipped()
             .contentShape(Rectangle())
-            .cornerRadius(16, corners: [.topLeft, .topRight])
+            .cornerRadius(20, corners: [.topLeft, .topRight])
 
             // User info
             VStack(alignment: .leading, spacing: 8) {
@@ -937,7 +948,13 @@ struct LikeProfileCard: View {
                 HStack(spacing: 4) {
                     Image(systemName: "mappin.circle.fill")
                         .font(.system(size: 12))
-                        .foregroundColor(.purple)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                     Text(user.location)
                         .font(.system(size: 13))
                         .foregroundColor(.secondary)
@@ -973,9 +990,13 @@ struct LikeProfileCard: View {
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+                .shadow(color: .black.opacity(0.04), radius: 20, x: 0, y: 8)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 20))
         .onTapGesture {
             HapticManager.shared.impact(.light)
             onTap()
@@ -1000,14 +1021,37 @@ struct LikeProfileCard: View {
     private var placeholderImage: some View {
         ZStack {
             LinearGradient(
-                colors: [Color.purple.opacity(0.7), Color.pink.opacity(0.6)],
+                colors: [
+                    Color.purple.opacity(0.8),
+                    Color.pink.opacity(0.7),
+                    Color.purple.opacity(0.6)
+                ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
 
+            // Subtle radial glow
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [Color.white.opacity(0.2), Color.clear],
+                        center: .center,
+                        startRadius: 20,
+                        endRadius: 80
+                    )
+                )
+                .blur(radius: 15)
+
             Text(user.fullName.prefix(1))
                 .font(.system(size: 48, weight: .bold))
-                .foregroundColor(.white)
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.white, .white.opacity(0.9)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
         }
     }
 }
@@ -1019,27 +1063,68 @@ struct LikeCardSkeleton: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Rectangle()
-                .fill(Color.gray.opacity(0.2))
+            // Image placeholder with shimmer effect
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        Color.gray.opacity(0.15),
+                        Color.gray.opacity(0.1),
+                        Color.gray.opacity(0.15)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
                 .frame(height: 180)
 
+                // Shimmer overlay
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [Color.white.opacity(0.15), Color.clear],
+                            center: .center,
+                            startRadius: 10,
+                            endRadius: 60
+                        )
+                    )
+                    .blur(radius: 20)
+                    .offset(x: isAnimating ? 50 : -50)
+            }
+            .frame(height: 180)
+            .cornerRadius(20, corners: [.topLeft, .topRight])
+
             VStack(alignment: .leading, spacing: 8) {
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.gray.opacity(0.2))
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.gray.opacity(0.15), Color.gray.opacity(0.1)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
                     .frame(width: 120, height: 20)
 
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.gray.opacity(0.2))
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.gray.opacity(0.12), Color.gray.opacity(0.08)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
                     .frame(width: 80, height: 14)
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
-        .opacity(isAnimating ? 0.5 : 1.0)
-        .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isAnimating)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 2)
+                .shadow(color: .black.opacity(0.03), radius: 16, x: 0, y: 6)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .opacity(isAnimating ? 0.6 : 1.0)
+        .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: isAnimating)
         .onAppear { isAnimating = true }
     }
 }
@@ -1060,31 +1145,66 @@ struct BlurredLikeCard: View {
                     CachedCardImage(url: imageURL)
                         .frame(height: imageHeight)
                 } else {
-                    LinearGradient(
-                        colors: [.purple.opacity(0.7), .pink.opacity(0.6)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .frame(height: imageHeight)
-                    .overlay {
+                    ZStack {
+                        LinearGradient(
+                            colors: [
+                                .purple.opacity(0.8),
+                                .pink.opacity(0.7),
+                                .purple.opacity(0.6)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+
+                        // Radial glow
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    colors: [Color.white.opacity(0.2), Color.clear],
+                                    center: .center,
+                                    startRadius: 20,
+                                    endRadius: 80
+                                )
+                            )
+                            .blur(radius: 15)
+
                         Text(user.fullName.prefix(1))
                             .font(.system(size: 48, weight: .bold))
-                            .foregroundColor(.white)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.white, .white.opacity(0.9)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
                     }
+                    .frame(height: imageHeight)
                 }
 
-                // Verified badge
+                // Verified badge with enhanced styling
                 if user.isVerified {
                     Image(systemName: "checkmark.seal.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(.blue)
-                        .background(Circle().fill(.white).padding(-2))
-                        .padding(8)
+                        .font(.system(size: 22))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.blue, .cyan],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .background(
+                            Circle()
+                                .fill(.white)
+                                .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
+                                .padding(-3)
+                        )
+                        .padding(10)
                 }
             }
             .frame(height: imageHeight)
             .clipped()
-            .cornerRadius(16, corners: [.topLeft, .topRight])
+            .cornerRadius(20, corners: [.topLeft, .topRight])
 
             // User info - visible
             VStack(alignment: .leading, spacing: 8) {
@@ -1099,16 +1219,29 @@ struct BlurredLikeCard: View {
 
                     Spacer()
 
-                    // Heart indicator showing they liked you
+                    // Heart indicator showing they liked you with glow
                     Image(systemName: "heart.fill")
-                        .foregroundColor(.pink)
-                        .font(.caption)
+                        .font(.system(size: 14))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.pink, .red.opacity(0.8)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .shadow(color: .pink.opacity(0.4), radius: 4)
                 }
 
                 HStack(spacing: 4) {
                     Image(systemName: "mappin.circle.fill")
                         .font(.system(size: 12))
-                        .foregroundColor(.purple)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                     Text(user.location)
                         .font(.system(size: 13))
                         .foregroundColor(.secondary)
@@ -1118,9 +1251,13 @@ struct BlurredLikeCard: View {
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+                .shadow(color: .black.opacity(0.04), radius: 20, x: 0, y: 8)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 20))
     }
 }
 
@@ -1150,16 +1287,16 @@ struct LikeActionButton: View {
             }
             action()
         } label: {
-            HStack(spacing: 4) {
+            HStack(spacing: 5) {
                 Image(systemName: icon)
-                    .font(.system(size: 12))
+                    .font(.system(size: 12, weight: .semibold))
                     .scaleEffect(isAnimating ? 1.3 : 1.0)
                 Text(text)
                     .font(.system(size: 12, weight: .semibold))
             }
             .foregroundColor(.white)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
+            .padding(.vertical, 9)
             .background(
                 LinearGradient(
                     colors: colors,
@@ -1167,7 +1304,8 @@ struct LikeActionButton: View {
                     endPoint: .trailing
                 )
             )
-            .cornerRadius(8)
+            .cornerRadius(10)
+            .shadow(color: colors.first?.opacity(0.35) ?? .clear, radius: 6, x: 0, y: 3)
             .scaleEffect(isPressed ? 0.95 : (isAnimating ? 1.05 : 1.0))
         }
         .buttonStyle(PlainButtonStyle())
@@ -1403,17 +1541,18 @@ struct SwipeableLikeCard: View {
 
     var body: some View {
         ZStack {
-            // Background action indicator
+            // Background action indicator with enhanced styling
             if showLikeBack {
                 HStack {
                     Spacer()
-                    VStack(spacing: 4) {
+                    VStack(spacing: 6) {
                         Image(systemName: "heart.fill")
-                            .font(.title)
+                            .font(.system(size: 28))
                             .foregroundColor(.white)
+                            .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
                         Text("Like")
                             .font(.caption)
-                            .fontWeight(.semibold)
+                            .fontWeight(.bold)
                             .foregroundColor(.white)
                     }
                     .frame(width: 80)
@@ -1422,12 +1561,12 @@ struct SwipeableLikeCard: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(
                     LinearGradient(
-                        colors: [.pink, .red],
-                        startPoint: .leading,
-                        endPoint: .trailing
+                        colors: [.pink, .red.opacity(0.9), .pink.opacity(0.8)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
                     )
                 )
-                .cornerRadius(16)
+                .cornerRadius(20)
             }
 
             // Main card content
@@ -1477,13 +1616,20 @@ struct SwipeableLikeCard: View {
             if showLikeOverlay && showLikeBack {
                 VStack {
                     Image(systemName: "heart.fill")
-                        .font(.system(size: 50))
-                        .foregroundColor(.pink)
-                        .shadow(color: .pink.opacity(0.5), radius: 10)
+                        .font(.system(size: 54))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.pink, .red],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .shadow(color: .pink.opacity(0.6), radius: 12)
+                        .shadow(color: .red.opacity(0.3), radius: 20)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.black.opacity(0.3))
-                .cornerRadius(16)
+                .background(Color.black.opacity(0.35))
+                .clipShape(RoundedRectangle(cornerRadius: 20))
                 .allowsHitTesting(false)
             }
         }
