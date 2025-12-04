@@ -100,7 +100,7 @@ class AccessibilityAuditor {
 
     /// Checks if all interactive elements have VoiceOver labels
     private static func checkVoiceOverLabels() -> [AccessibilityIssue] {
-        var issues: [AccessibilityIssue] = []
+        let issues: [AccessibilityIssue] = []
 
         #if os(iOS)
         // In a real implementation, this would traverse the view hierarchy
@@ -112,7 +112,7 @@ class AccessibilityAuditor {
 
     /// Checks if all interactive elements meet minimum 44x44pt tap target size
     private static func checkMinimumTapTargets() -> [AccessibilityIssue] {
-        var issues: [AccessibilityIssue] = []
+        let issues: [AccessibilityIssue] = []
 
         #if os(iOS)
         // This would check all buttons and interactive elements in production
@@ -156,7 +156,7 @@ class AccessibilityAuditor {
 
     /// Checks keyboard navigation support
     private static func checkKeyboardNavigation() -> [AccessibilityIssue] {
-        var issues: [AccessibilityIssue] = []
+        let issues: [AccessibilityIssue] = []
 
         // This would check for proper keyboard navigation in forms
         // Template for demonstration
@@ -166,7 +166,7 @@ class AccessibilityAuditor {
 
     /// Checks Dynamic Type support
     private static func checkDynamicTypeSupport() -> [AccessibilityWarning] {
-        var warnings: [AccessibilityWarning] = []
+        let warnings: [AccessibilityWarning] = []
 
         // This would verify all text uses Dynamic Type
         // Template for demonstration
@@ -176,7 +176,7 @@ class AccessibilityAuditor {
 
     /// Checks Reduce Motion support
     private static func checkReduceMotionSupport() -> [AccessibilityWarning] {
-        var warnings: [AccessibilityWarning] = []
+        let warnings: [AccessibilityWarning] = []
 
         #if os(iOS)
         if !UIAccessibility.isReduceMotionEnabled {
