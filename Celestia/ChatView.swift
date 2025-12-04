@@ -640,59 +640,122 @@ struct ChatView: View {
     // MARK: - Conversation Starters
 
     private func conversationStartersView(currentUser: User) -> some View {
-        VStack(spacing: 16) {
-            // Header
-            VStack(spacing: 8) {
-                Image(systemName: "bubble.left.and.bubble.right.fill")
-                    .font(.system(size: 40))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.purple, .pink],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+        VStack(spacing: 20) {
+            // Header with animated glow
+            VStack(spacing: 12) {
+                ZStack {
+                    // Subtle glow behind icon
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [Color.purple.opacity(0.2), Color.pink.opacity(0.1), Color.clear],
+                                center: .center,
+                                startRadius: 20,
+                                endRadius: 60
+                            )
                         )
-                    )
+                        .frame(width: 100, height: 100)
+
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.purple.opacity(0.15), Color.pink.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 80, height: 80)
+
+                    Image(systemName: "bubble.left.and.bubble.right.fill")
+                        .font(.system(size: 36))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .pink, .purple.opacity(0.8)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .shadow(color: .purple.opacity(0.3), radius: 8, y: 4)
+                }
 
                 Text("Start the Conversation")
-                    .font(.headline)
+                    .font(.system(size: 20, weight: .bold))
                     .foregroundColor(.primary)
 
                 Text("Choose an icebreaker to send")
-                    .font(.subheadline)
+                    .font(.system(size: 14))
                     .foregroundColor(.secondary)
             }
             .padding(.top, 40)
-            .padding(.bottom, 8)
+            .padding(.bottom, 4)
 
-            // Conversation starters
-            VStack(spacing: 12) {
+            // Conversation starters with enhanced styling
+            VStack(spacing: 14) {
                 ForEach(ConversationStarters.shared.generateStarters(currentUser: currentUser, otherUser: otherUser)) { starter in
                     Button {
                         messageText = starter.text
                         HapticManager.shared.impact(.light)
                     } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: starter.icon)
-                                .font(.title3)
-                                .foregroundColor(.purple)
-                                .frame(width: 32)
+                        HStack(spacing: 14) {
+                            // Icon with gradient background
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.purple.opacity(0.15), Color.pink.opacity(0.1)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 44, height: 44)
+
+                                Image(systemName: starter.icon)
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [.purple, .pink],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                            }
 
                             Text(starter.text)
-                                .font(.body)
+                                .font(.system(size: 15))
                                 .foregroundColor(.primary)
                                 .multilineTextAlignment(.leading)
                                 .lineLimit(2)
 
                             Spacer()
 
-                            Image(systemName: "arrow.right.circle")
-                                .font(.title3)
-                                .foregroundColor(.purple.opacity(0.5))
+                            Image(systemName: "arrow.right.circle.fill")
+                                .font(.system(size: 22))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.purple.opacity(0.6), .pink.opacity(0.5)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
                         }
                         .padding(16)
-                        .background(Color(.systemBackground))
-                        .cornerRadius(12)
-                        .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color(.systemBackground))
+                                .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 2)
+                                .shadow(color: .purple.opacity(0.05), radius: 12, x: 0, y: 4)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.05)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 1
+                                )
+                        )
                     }
                 }
             }

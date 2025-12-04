@@ -200,26 +200,39 @@ struct UserDetailView: View {
     }
 
     private var lastActiveView: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             let interval = Date().timeIntervalSince(user.lastActive)
             let isActive = user.isOnline || interval < 300
 
             if isActive {
-                Circle()
-                    .fill(Color.green)
-                    .frame(width: 8, height: 8)
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [.green, .mint],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 10, height: 10)
+                        .shadow(color: .green.opacity(0.5), radius: 4)
+
+                    Circle()
+                        .stroke(Color.white, lineWidth: 2)
+                        .frame(width: 10, height: 10)
+                }
                 Text(user.isOnline ? "Online" : "Active now")
                     .foregroundColor(.green)
                     .fontWeight(.semibold)
             } else {
                 Circle()
-                    .fill(Color.gray.opacity(0.5))
+                    .fill(Color.gray.opacity(0.4))
                     .frame(width: 8, height: 8)
                 Text("Active \(user.lastActive.timeAgoShort()) ago")
                     .foregroundColor(.secondary)
             }
         }
-        .font(.caption)
+        .font(.system(size: 13))
     }
 
     // MARK: - Bio Section
@@ -394,12 +407,15 @@ struct UserDetailView: View {
             dismiss()
         } label: {
             Image(systemName: "xmark")
-                .font(.title2)
+                .font(.system(size: 22, weight: .semibold))
                 .foregroundColor(.gray)
                 .frame(width: 60, height: 60)
-                .background(Color.white)
-                .clipShape(Circle())
-                .shadow(color: Color.black.opacity(0.1), radius: 5)
+                .background(
+                    Circle()
+                        .fill(Color.white)
+                        .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+                        .shadow(color: .black.opacity(0.04), radius: 16, x: 0, y: 6)
+                )
         }
         .accessibilityLabel("Pass")
         .accessibilityHint("Skip this profile and return to browsing")
@@ -429,12 +445,19 @@ struct UserDetailView: View {
             }
         } label: {
             Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
-                .font(.title2)
-                .foregroundColor(.orange)
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(
+                    isSaved ?
+                    LinearGradient(colors: [.orange, .yellow], startPoint: .topLeading, endPoint: .bottomTrailing) :
+                    LinearGradient(colors: [.orange, .orange], startPoint: .topLeading, endPoint: .bottomTrailing)
+                )
                 .frame(width: 60, height: 60)
-                .background(Color.white)
-                .clipShape(Circle())
-                .shadow(color: Color.black.opacity(0.1), radius: 5)
+                .background(
+                    Circle()
+                        .fill(Color.white)
+                        .shadow(color: isSaved ? .orange.opacity(0.2) : .black.opacity(0.06), radius: 8, x: 0, y: 2)
+                        .shadow(color: .black.opacity(0.04), radius: 16, x: 0, y: 6)
+                )
         }
         .accessibilityLabel(isSaved ? "Remove from saved" : "Save profile")
         .accessibilityHint("Bookmark this profile for later")
@@ -445,12 +468,21 @@ struct UserDetailView: View {
             openChat()
         } label: {
             Image(systemName: "message.fill")
-                .font(.title2)
-                .foregroundColor(.blue)
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.blue, .cyan],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
                 .frame(width: 60, height: 60)
-                .background(Color.white)
-                .clipShape(Circle())
-                .shadow(color: Color.black.opacity(0.1), radius: 5)
+                .background(
+                    Circle()
+                        .fill(Color.white)
+                        .shadow(color: .blue.opacity(0.15), radius: 8, x: 0, y: 2)
+                        .shadow(color: .black.opacity(0.04), radius: 16, x: 0, y: 6)
+                )
         }
         .accessibilityLabel("Message")
         .accessibilityHint("Start a conversation with \(user.fullName)")
@@ -467,26 +499,36 @@ struct UserDetailView: View {
                         .scaleEffect(1.0)
                 } else {
                     Image(systemName: isLiked ? "heart.fill" : "heart")
-                        .font(.title2)
-                        .foregroundColor(isLiked ? .pink : .white)
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(
+                            isLiked ?
+                            LinearGradient(colors: [.pink, .red], startPoint: .topLeading, endPoint: .bottomTrailing) :
+                            LinearGradient(colors: [.white, .white.opacity(0.95)], startPoint: .top, endPoint: .bottom)
+                        )
                 }
             }
-            .frame(width: 60, height: 60)
+            .frame(width: 64, height: 64)
             .background(
                 Group {
                     if isLiked {
-                        Color.white
+                        Circle()
+                            .fill(Color.white)
+                            .shadow(color: .pink.opacity(0.3), radius: 12, x: 0, y: 4)
+                            .shadow(color: .black.opacity(0.04), radius: 16, x: 0, y: 6)
                     } else {
-                        LinearGradient(
-                            colors: [Color.purple, Color.pink],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.purple, Color.pink, Color.purple.opacity(0.9)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .shadow(color: .purple.opacity(0.4), radius: 12, x: 0, y: 4)
+                            .shadow(color: .pink.opacity(0.2), radius: 20, x: 0, y: 8)
                     }
                 }
             )
-            .clipShape(Circle())
-            .shadow(color: Color.black.opacity(0.1), radius: 5)
         }
         .disabled(isProcessing)
         .accessibilityLabel(isLiked ? "Unlike" : "Like")
@@ -778,35 +820,56 @@ struct ProfileSectionCard<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.title3)
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: iconColors,
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 10) {
+                // Icon with subtle background
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [iconColors[0].opacity(0.15), iconColors.last?.opacity(0.1) ?? iconColors[0].opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
                         )
-                    )
+                        .frame(width: 36, height: 36)
+
+                    Image(systemName: icon)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: iconColors,
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
 
                 Text(title)
-                    .font(.title3.weight(.semibold))
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(.primary)
             }
 
             content
         }
-        .padding(16)
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 20)
                 .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+                .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 2)
+                .shadow(color: .black.opacity(0.03), radius: 16, x: 0, y: 6)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(borderColor.opacity(0.1), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(
+                    LinearGradient(
+                        colors: [borderColor.opacity(0.15), borderColor.opacity(0.05)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
         )
     }
 }
@@ -818,22 +881,30 @@ struct ProfileTagView: View {
 
     var body: some View {
         Text(text)
-            .font(.subheadline.weight(.medium))
+            .font(.system(size: 14, weight: .medium))
             .padding(.horizontal, 16)
-            .padding(.vertical, 8)
+            .padding(.vertical, 9)
             .background(
                 LinearGradient(
-                    colors: [colors[0].opacity(0.15), colors[1].opacity(0.1)],
+                    colors: [colors[0].opacity(0.15), colors[1].opacity(0.08)],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
             )
             .foregroundColor(textColor)
-            .cornerRadius(20)
+            .cornerRadius(22)
             .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(textColor.opacity(0.2), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 22)
+                    .stroke(
+                        LinearGradient(
+                            colors: [textColor.opacity(0.25), textColor.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
             )
+            .shadow(color: textColor.opacity(0.08), radius: 4, y: 2)
     }
 }
 
@@ -841,27 +912,46 @@ struct PromptCard: View {
     let prompt: ProfilePrompt
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             Text(prompt.question)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundColor(.purple)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.purple, .pink],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
 
             Text(prompt.answer)
-                .font(.body)
+                .font(.system(size: 15))
                 .foregroundColor(.primary)
                 .fixedSize(horizontal: false, vertical: true)
+                .lineSpacing(3)
         }
-        .padding(16)
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            LinearGradient(
-                colors: [Color.purple.opacity(0.05), Color.pink.opacity(0.03)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            RoundedRectangle(cornerRadius: 16)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.purple.opacity(0.06), Color.pink.opacity(0.03), Color.purple.opacity(0.04)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
         )
-        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(
+                    LinearGradient(
+                        colors: [Color.purple.opacity(0.15), Color.pink.opacity(0.08)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
     }
 }
 
@@ -871,23 +961,35 @@ struct DetailRow: View {
     let value: String
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.body)
-                .foregroundColor(.secondary)
-                .frame(width: 24)
+        HStack(spacing: 14) {
+            // Icon with subtle background
+            ZStack {
+                Circle()
+                    .fill(Color.indigo.opacity(0.1))
+                    .frame(width: 32, height: 32)
+
+                Image(systemName: icon)
+                    .font(.system(size: 14))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.indigo, .purple],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
 
             Text(label)
-                .font(.subheadline)
+                .font(.system(size: 14))
                 .foregroundColor(.secondary)
 
             Spacer()
 
             Text(value)
-                .font(.subheadline)
-                .fontWeight(.medium)
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(.primary)
         }
+        .padding(.vertical, 4)
     }
 }
 
