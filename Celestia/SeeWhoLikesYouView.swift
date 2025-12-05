@@ -418,8 +418,9 @@ class SeeWhoLikesYouViewModel: ObservableObject {
         }
 
         // Maintain original order (by like timestamp) by reordering based on input IDs
+        // BUGFIX: Use effectiveId for reliable user identification
         let idOrder = Dictionary(uniqueKeysWithValues: ids.enumerated().map { ($1, $0) })
-        users.sort { (idOrder[$0.id ?? ""] ?? Int.max) < (idOrder[$1.id ?? ""] ?? Int.max) }
+        users.sort { (idOrder[$0.effectiveId ?? ""] ?? Int.max) < (idOrder[$1.effectiveId ?? ""] ?? Int.max) }
 
         return users
     }
