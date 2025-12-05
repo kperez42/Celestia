@@ -137,14 +137,15 @@ class UserService: ObservableObject, UserServiceProtocol {
             }
 
             // Get existing user IDs to prevent duplicates
-            let existingIds = Set(users.compactMap { $0.id })
+            // BUGFIX: Use effectiveId for reliable user identification
+            let existingIds = Set(users.compactMap { $0.effectiveId })
 
             let newUsers = snapshot.documents.compactMap { try? $0.data(as: User.self) }
                 .filter { user in
                     // Exclude current user
-                    guard user.id != excludingUserId else { return false }
+                    guard user.effectiveId != excludingUserId else { return false }
                     // Exclude duplicates already in the array
-                    guard let userId = user.id, !existingIds.contains(userId) else { return false }
+                    guard let userId = user.effectiveId, !existingIds.contains(userId) else { return false }
                     // SAFETY: Client-side profileStatus filter (avoids complex composite index)
                     // Exclude: pending (unapproved), suspended, flagged, banned profiles
                     // Include: active, or empty/nil (existing users without field set)
@@ -204,7 +205,8 @@ class UserService: ObservableObject, UserServiceProtocol {
 
             for try await chunkUsers in group {
                 for user in chunkUsers {
-                    if let userId = user.id {
+                    // BUGFIX: Use effectiveId for reliable user identification
+                    if let userId = user.effectiveId {
                         users[userId] = user
                     }
                 }
