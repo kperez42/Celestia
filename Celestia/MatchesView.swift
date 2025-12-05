@@ -101,11 +101,8 @@ struct MatchesView: View {
     }
     
     var unreadCount: Int {
-        #if DEBUG
-        let userId = authService.currentUser?.id ?? "current_user"
-        #else
-        guard let userId = authService.currentUser?.id else { return 0 }
-        #endif
+        // BUGFIX: Use effectiveId for reliable user identification
+        guard let userId = authService.currentUser?.effectiveId else { return 0 }
         return matchService.matches.reduce(0) { $0 + ($1.unreadCount[userId] ?? 0) }
     }
     

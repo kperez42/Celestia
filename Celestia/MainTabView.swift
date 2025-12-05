@@ -108,7 +108,8 @@ struct MainTabView: View {
         }
         .onChange(of: matchService.matches) { _, newMatches in
             // AUDIT FIX: Calculate both counts from authoritative Match data
-            guard let userId = authService.currentUser?.id else { return }
+            // BUGFIX: Use effectiveId for reliable user identification
+            guard let userId = authService.currentUser?.effectiveId else { return }
 
             // Update new matches count (matches without any messages yet)
             newMatchesCount = newMatches.filter { $0.lastMessage == nil }.count

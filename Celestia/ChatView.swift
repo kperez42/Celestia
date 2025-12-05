@@ -201,7 +201,7 @@ struct ChatView: View {
         .detectScreenshots(
             context: ScreenshotDetectionService.ScreenshotContext.chat(
                 matchId: match.id ?? "",
-                otherUserId: otherUser.id ?? ""
+                otherUserId: otherUser.effectiveId ?? ""
             ),
             userName: otherUser.fullName
         )
@@ -1037,7 +1037,7 @@ struct ChatView: View {
     private func setupChat() {
         guard let matchId = match.id else { return }
         guard let currentUserId = authService.currentUser?.effectiveId else { return }
-        guard let otherUserId = otherUser.id else { return }
+        guard let otherUserId = otherUser.effectiveId else { return }
 
         // BUGFIX: Only mark as loaded if messages are actually for THIS match
         // This prevents race condition where messages from a different chat cause
@@ -1071,7 +1071,7 @@ struct ChatView: View {
     }
 
     private func setupUserListener() {
-        guard let otherUserId = otherUser.id else { return }
+        guard let otherUserId = otherUser.effectiveId else { return }
 
         // Listen to real-time updates for the other user's data (especially online status)
         let db = Firestore.firestore()
@@ -1109,7 +1109,7 @@ struct ChatView: View {
 
         guard let matchId = match.id else { return }
         guard let currentUserId = authService.currentUser?.effectiveId else { return }
-        guard let receiverId = otherUser.id else { return }
+        guard let receiverId = otherUser.effectiveId else { return }
 
         // Clear typing indicator immediately
         typingService.messageSent()
@@ -1588,7 +1588,7 @@ struct ChatView: View {
         guard let failed = failedMessage else { return }
         guard let matchId = match.id else { return }
         guard let currentUserId = authService.currentUser?.effectiveId else { return }
-        guard let receiverId = otherUser.id else { return }
+        guard let receiverId = otherUser.effectiveId else { return }
 
         // Hide error toast and set sending preview
         showErrorToast = false
@@ -1656,7 +1656,7 @@ struct ChatView: View {
 
     /// Block the user and dismiss the chat
     private func blockUser() {
-        guard let userId = otherUser.id,
+        guard let userId = otherUser.effectiveId,
               let currentUserId = authService.currentUser?.effectiveId else { return }
 
         HapticManager.shared.notification(.warning)

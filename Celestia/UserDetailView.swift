@@ -552,8 +552,9 @@ struct UserDetailView: View {
         }
 
         Task {
-            guard let currentUserId = authService.currentUser?.id,
-                  let viewedUserId = user.id else { return }
+            // BUGFIX: Use effectiveId for reliable user identification
+            guard let currentUserId = authService.currentUser?.effectiveId,
+                  let viewedUserId = user.effectiveId else { return }
 
             // If no callback provided, fetch like status from backend
             if onLikeChanged == nil {
@@ -595,8 +596,9 @@ struct UserDetailView: View {
     // MARK: - Actions
 
     func sendInterest() {
-        guard let currentUserID = authService.currentUser?.id,
-              let targetUserID = user.id,
+        // BUGFIX: Use effectiveId for reliable user identification
+        guard let currentUserID = authService.currentUser?.effectiveId,
+              let targetUserID = user.effectiveId,
               !isProcessing else { return }
 
         guard currentUserID != targetUserID else {
@@ -640,8 +642,9 @@ struct UserDetailView: View {
     }
 
     func toggleLike() {
-        guard let currentUserID = authService.currentUser?.id,
-              let targetUserID = user.id,
+        // BUGFIX: Use effectiveId for reliable user identification
+        guard let currentUserID = authService.currentUser?.effectiveId,
+              let targetUserID = user.effectiveId,
               !isProcessing else { return }
 
         guard currentUserID != targetUserID else {
@@ -735,8 +738,9 @@ struct UserDetailView: View {
     }
 
     func openChat() {
-        guard let currentUserId = authService.currentUser?.id,
-              let targetUserId = user.id else { return }
+        // BUGFIX: Use effectiveId for reliable user identification
+        guard let currentUserId = authService.currentUser?.effectiveId,
+              let targetUserId = user.effectiveId else { return }
 
         // Prevent messaging yourself
         guard currentUserId != targetUserId else {
