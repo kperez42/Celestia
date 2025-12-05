@@ -448,7 +448,8 @@ struct MatchesView: View {
                         MatchProfileCard(
                             match: match,
                             user: user,
-                            currentUserId: authService.currentUser?.id ?? "current_user",
+                            // BUGFIX: Use effectiveId for reliable user identification
+                            currentUserId: authService.currentUser?.effectiveId ?? "",
                             onInfoTap: {
                                 selectedUserForProfile = user
                             }
@@ -662,7 +663,8 @@ struct MatchesView: View {
     // MARK: - Helper Functions
 
     private func loadMatches() async {
-        guard let userId = authService.currentUser?.id else {
+        // BUGFIX: Use effectiveId for reliable user identification
+        guard let userId = authService.currentUser?.effectiveId else {
             return
         }
 
@@ -702,12 +704,8 @@ struct MatchesView: View {
     }
     
     private func getMatchedUser(_ match: Match) -> User? {
-        #if DEBUG
-        // In debug mode, use "current_user" as default if not authenticated
-        let currentUserId = authService.currentUser?.id ?? "current_user"
-        #else
-        guard let currentUserId = authService.currentUser?.id else { return nil }
-        #endif
+        // BUGFIX: Use effectiveId for reliable user identification
+        guard let currentUserId = authService.currentUser?.effectiveId else { return nil }
 
         let otherUserId = match.user1Id == currentUserId ? match.user2Id : match.user1Id
         return matchedUsers[otherUserId]
