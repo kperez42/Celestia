@@ -124,14 +124,15 @@ struct MainTabView: View {
         .task {
             // PERFORMANCE FIX: Use real-time listeners instead of polling
             // This eliminates battery drain from constant polling
-            guard let userId = authService.currentUser?.id else { return }
+            // BUGFIX: Use effectiveId for reliable user identification
+            guard let userId = authService.currentUser?.effectiveId else { return }
 
             // Small delay to ensure auth token is fully propagated
             // This prevents brief "permission denied" errors in logs during signup
             try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
 
             // Verify user is still authenticated after delay
-            guard authService.currentUser?.id == userId else { return }
+            guard authService.currentUser?.effectiveId == userId else { return }
 
             // PUSH NOTIFICATIONS: Initialize and request permissions
             await PushNotificationManager.shared.initialize()

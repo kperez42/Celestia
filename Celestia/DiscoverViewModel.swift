@@ -100,8 +100,8 @@ class DiscoverViewModel: ObservableObject {
     }
     
     func loadUsers(currentUser: User, limit: Int = 20) {
-        // Validate current user has an ID
-        guard let userId = currentUser.id, !userId.isEmpty else {
+        // BUGFIX: Use effectiveId for reliable user identification
+        guard let userId = currentUser.effectiveId, !userId.isEmpty else {
             errorMessage = "Unable to load users: User account not properly initialized"
             isLoading = false
             Logger.shared.error("Cannot load users: Current user has no ID", category: .matching)
@@ -269,9 +269,10 @@ class DiscoverViewModel: ObservableObject {
         isProcessingAction = true
 
         let likedUser = users[currentIndex]
+        // BUGFIX: Use effectiveId for reliable user identification
         guard let currentUser = authService.currentUser,
-              let currentUserId = currentUser.id,
-              let likedUserId = likedUser.id else {
+              let currentUserId = currentUser.effectiveId,
+              let likedUserId = likedUser.effectiveId else {
             isProcessingAction = false
             return
         }
@@ -426,9 +427,10 @@ class DiscoverViewModel: ObservableObject {
         isProcessingAction = true
 
         let superLikedUser = users[currentIndex]
+        // BUGFIX: Use effectiveId for reliable user identification
         guard let currentUser = authService.currentUser,
-              let currentUserId = currentUser.id,
-              let superLikedUserId = superLikedUser.id else {
+              let currentUserId = currentUser.effectiveId,
+              let superLikedUserId = superLikedUser.effectiveId else {
             isProcessingAction = false
             return
         }

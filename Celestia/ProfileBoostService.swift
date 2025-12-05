@@ -50,8 +50,9 @@ class ProfileBoostService: ObservableObject {
 
     /// Activate profile boost
     func activateBoost() async throws {
+        // BUGFIX: Use effectiveId for reliable user identification
         guard let currentUser = authService.currentUser,
-              let userId = currentUser.id else {
+              let userId = currentUser.effectiveId else {
             throw ProfileBoostError.noCurrentUser
         }
 

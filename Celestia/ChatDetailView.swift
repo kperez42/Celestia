@@ -31,7 +31,9 @@ struct ChatDetailView: View {
 
     init(otherUser: User) {
         self.otherUser = otherUser
-        _viewModel = StateObject(wrappedValue: ChatViewModel(currentUserId: "", otherUserId: otherUser.id ?? ""))
+        // Note: currentUserId is set to placeholder here and updated in onAppear with actual effectiveId
+        // This is because we don't have access to authService in init
+        _viewModel = StateObject(wrappedValue: ChatViewModel(currentUserId: "", otherUserId: otherUser.effectiveId ?? ""))
     }
 
     var body: some View {
@@ -46,7 +48,7 @@ struct ChatDetailView: View {
                         ForEach(viewModel.messages) { message in
                             MessageBubbleGradient(
                                 message: message,
-                                isFromCurrentUser: message.senderID == authService.currentUser?.id,
+                                isFromCurrentUser: message.senderID == authService.currentUser?.effectiveId,
                                 showReadStatus: message.id == lastReadId
                             )
                             .id(message.id)
@@ -79,7 +81,8 @@ struct ChatDetailView: View {
         .navigationTitle(otherUser.fullName)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            if let currentUserId = authService.currentUser?.id {
+            // BUGFIX: Use effectiveId for reliable user identification
+            if let currentUserId = authService.currentUser?.effectiveId {
                 viewModel.updateCurrentUserId(currentUserId)
                 viewModel.loadMessages()
             }
