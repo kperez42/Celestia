@@ -347,7 +347,7 @@ class SeeWhoLikesYouViewModel: ObservableObject {
             return
         }
 
-        guard let currentUserId = AuthService.shared.currentUser?.id else { return }
+        guard let currentUserId = AuthService.shared.currentUser?.effectiveId else { return }
 
         // Only show loading if we have no cached data
         let shouldShowLoading = usersWhoLiked.isEmpty
