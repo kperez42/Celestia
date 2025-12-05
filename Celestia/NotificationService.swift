@@ -204,8 +204,8 @@ class NotificationService: ObservableObject, ListenerLifecycleAware {
             return
         }
 
-        // Send local notification (for testing/development)
         #if DEBUG
+        // Send local notification for testing/development
         do {
             // Convert [AnyHashable: Any] to [String: Any]
             let stringUserInfo = payload.userInfo.reduce(into: [String: Any]()) { result, pair in
@@ -224,11 +224,14 @@ class NotificationService: ObservableObject, ListenerLifecycleAware {
         } catch {
             Logger.shared.error("Failed to send local notification", category: .general, error: error)
         }
+        #else
+        // Send remote notification in production via backend to FCM/APNs
+        do {
+            try await sendRemoteNotification(payload: payload)
+        } catch {
+            Logger.shared.error("Failed to send remote notification", category: .general, error: error)
+        }
         #endif
-
-        // In production, this would send via your backend to FCM/APNs
-        // Example:
-        // try await sendRemoteNotification(payload: payload)
     }
 
     // MARK: - Backend Integration

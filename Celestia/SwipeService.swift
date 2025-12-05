@@ -29,6 +29,17 @@ class SwipeService: ObservableObject, SwipeServiceProtocol {
 
     /// Record a like from user1 to user2 and check for mutual match
     func likeUser(fromUserId: String, toUserId: String, isSuperLike: Bool = false) async throws -> Bool {
+        // SECURITY: Validate input parameters
+        guard !fromUserId.isEmpty, !toUserId.isEmpty else {
+            Logger.shared.error("Invalid user IDs: fromUserId='\(fromUserId)', toUserId='\(toUserId)'", category: .matching)
+            throw CelestiaError.invalidInput("User IDs cannot be empty")
+        }
+
+        guard fromUserId != toUserId else {
+            Logger.shared.warning("Attempted self-like prevented: \(fromUserId)", category: .matching)
+            throw CelestiaError.invalidOperation("Cannot like yourself")
+        }
+
         // SECURITY: Backend rate limit validation for swipes
         do {
             let action: RateLimitAction = isSuperLike ? .sendSuperLike : .swipe
