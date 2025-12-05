@@ -34,6 +34,9 @@ struct LikesView: View {
     @State private var showMatchCelebration = false
     @State private var matchedUser: User?
 
+    // BUGFIX: Track which user is being liked back to prevent rapid-tap issues
+    @State private var processingLikeBackUserId: String?
+
     struct ChatPresentation: Identifiable {
         let id = UUID()
         let match: Match
@@ -545,6 +548,14 @@ struct LikesView: View {
     }
 
     private func handleLikeBack(user: User) {
+        guard let targetUserId = user.effectiveId else { return }
+
+        // BUGFIX: Prevent rapid-tap duplicate likes
+        guard processingLikeBackUserId == nil else {
+            Logger.shared.debug("Like back already in progress, ignoring tap", category: .matching)
+            return
+        }
+
         // Check daily like limit for free users (premium gets unlimited)
         let isPremium = authService.currentUser?.isPremium ?? false
         if !isPremium {
@@ -556,7 +567,17 @@ struct LikesView: View {
             }
         }
 
+        // BUGFIX: Set processing state to prevent rapid taps
+        processingLikeBackUserId = targetUserId
+
         Task {
+            defer {
+                // BUGFIX: Always reset processing state when done
+                Task { @MainActor in
+                    processingLikeBackUserId = nil
+                }
+            }
+
             let isMatch = await viewModel.likeBackUser(user)
             if isMatch {
                 // Show match celebration

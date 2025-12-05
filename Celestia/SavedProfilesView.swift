@@ -30,6 +30,9 @@ struct SavedProfilesView: View {
     // Chat presentation
     @State private var chatPresentation: SavedChatPresentation?
 
+    // BUGFIX: Track which user is being liked to prevent rapid-tap issues
+    @State private var processingLikeUserId: String?
+
     struct SavedChatPresentation: Identifiable {
         let id = UUID()
         let match: Match
@@ -760,6 +763,12 @@ struct SavedProfilesView: View {
             return
         }
 
+        // BUGFIX: Prevent rapid-tap duplicate likes
+        guard processingLikeUserId == nil else {
+            Logger.shared.debug("Like already in progress, ignoring tap", category: .matching)
+            return
+        }
+
         // Check daily like limit for free users (premium gets unlimited)
         let isPremium = authService.currentUser?.isPremium ?? false
         if !isPremium {
@@ -771,7 +780,17 @@ struct SavedProfilesView: View {
             }
         }
 
+        // BUGFIX: Set processing state to prevent rapid taps
+        processingLikeUserId = targetUserId
+
         Task {
+            defer {
+                // BUGFIX: Always reset processing state when done
+                Task { @MainActor in
+                    processingLikeUserId = nil
+                }
+            }
+
             do {
                 let isMatch = try await SwipeService.shared.likeUser(
                     fromUserId: currentUserId,
