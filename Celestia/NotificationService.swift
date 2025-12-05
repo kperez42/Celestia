@@ -346,7 +346,8 @@ class NotificationService: ObservableObject, ListenerLifecycleAware {
 
     /// Check if current user has sent any messages in a match
     private func checkIfUserHasMessaged(matchId: String) async -> Bool {
-        guard let currentUserId = AuthService.shared.currentUser?.id else {
+        // BUGFIX: Use effectiveId for reliable user identification
+        guard let currentUserId = AuthService.shared.currentUser?.effectiveId else {
             return false
         }
 

@@ -162,8 +162,9 @@ struct ReportUserView: View {
     }
 
     private func submitReport() {
-        guard let userId = user.id,
-              let currentUserId = AuthService.shared.currentUser?.id else { return }
+        // BUGFIX: Use effectiveId for reliable user identification
+        guard let userId = user.effectiveId,
+              let currentUserId = AuthService.shared.currentUser?.effectiveId else { return }
 
         isSubmitting = true
         HapticManager.shared.impact(.medium)

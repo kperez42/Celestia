@@ -79,7 +79,8 @@ class FirestoreUserRepository: UserRepository {
                 .compactMap { try? $0.data(as: User.self) }
                 .filter { user in
                     // Exclude current user and non-active profiles
-                    guard user.id != currentUserId else { return false }
+                    // BUGFIX: Use effectiveId for reliable comparison
+                    guard user.effectiveId != currentUserId else { return false }
                     let status = user.profileStatus.lowercased()
                     return status == "active" || status.isEmpty
                 }
@@ -109,8 +110,10 @@ class FirestoreUserRepository: UserRepository {
                     .compactMap { try? $0.data(as: User.self) }
                     .filter { user in
                         // Exclude current user, duplicates, and non-active profiles
-                        guard user.id != currentUserId else { return false }
-                        guard !results.contains(where: { $0.id == user.id }) else { return false }
+                        // BUGFIX: Use effectiveId for reliable comparison
+                        guard user.effectiveId != currentUserId else { return false }
+                        guard let userId = user.effectiveId,
+                              !results.contains(where: { $0.effectiveId == userId }) else { return false }
                         let status = user.profileStatus.lowercased()
                         return status == "active" || status.isEmpty
                     }
