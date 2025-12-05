@@ -270,7 +270,7 @@ struct ProfileView: View {
                 }
             }
             .detectScreenshots(
-                context: .profile(userId: authService.currentUser?.id ?? ""),
+                context: .profile(userId: authService.currentUser?.effectiveId ?? ""),
                 userName: authService.currentUser?.fullName ?? "User"
             )
     }
@@ -1651,7 +1651,7 @@ struct ProfileView: View {
     }
 
     private func refreshProfileData() async {
-        guard let userId = authService.currentUser?.id else { return }
+        guard let userId = authService.currentUser?.effectiveId else { return }
 
         isRefreshing = true
         defer { isRefreshing = false }
@@ -1674,7 +1674,7 @@ struct ProfileView: View {
     }
 
     private func loadAccurateStats() async {
-        guard let userId = authService.currentUser?.id else { return }
+        guard let userId = authService.currentUser?.effectiveId else { return }
 
         isLoadingStats = true
 

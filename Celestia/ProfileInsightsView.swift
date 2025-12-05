@@ -1039,7 +1039,7 @@ struct ProfileInsightsView: View {
 
     private func loadInsights() {
         // Load real analytics data from backend
-        guard let userId = authService.currentUser?.id else { return }
+        guard let userId = authService.currentUser?.effectiveId else { return }
 
         Task {
             do {
@@ -1050,7 +1050,7 @@ struct ProfileInsightsView: View {
                 insights.passesReceived = insights.swipesReceived - insights.likesReceived
 
                 // Use accurate match count from ProfileStatsService
-                if let userId = authService.currentUser?.id {
+                if let userId = authService.currentUser?.effectiveId {
                     let accurateStats = try await ProfileStatsService.shared.getAccurateStats(userId: userId)
                     insights.matchCount = accurateStats.matchCount
                     insights.likesReceived = accurateStats.likesReceived

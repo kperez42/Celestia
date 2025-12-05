@@ -227,7 +227,7 @@ struct ChatDetailView: View {
     /// Returns the ID of the last read message from the current user
     /// This is used to only show "Read" indicator on the most recent read message
     private func lastReadMessageId() -> String? {
-        guard let currentUserId = authService.currentUser?.id else { return nil }
+        guard let currentUserId = authService.currentUser?.effectiveId else { return nil }
 
         // Find all messages from current user that are read, then get the last one
         let currentUserReadMessages = viewModel.messages.filter { message in

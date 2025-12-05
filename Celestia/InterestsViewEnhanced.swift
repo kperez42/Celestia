@@ -373,7 +373,7 @@ struct InterestsViewEnhanced: View {
 
     // PERFORMANCE FIX: Use batch queries instead of N+1 queries
     private func loadData() async {
-        guard let userId = authService.currentUser?.id else { return }
+        guard let userId = authService.currentUser?.effectiveId else { return }
 
         do {
             try await interestService.fetchReceivedInterests(userId: userId)

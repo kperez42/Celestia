@@ -327,7 +327,7 @@ struct MainTabView: View {
     }
 
     private func dismissWarning() {
-        guard let userId = authService.currentUser?.id else { return }
+        guard let userId = authService.currentUser?.effectiveId else { return }
 
         // Hide banner with animation
         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {

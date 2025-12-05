@@ -98,7 +98,7 @@ class ProfileBoostService: ObservableObject {
 
     /// Deactivate profile boost (when it expires)
     private func deactivateBoost() async {
-        guard let userId = authService.currentUser?.id else { return }
+        guard let userId = authService.currentUser?.effectiveId else { return }
 
         do {
             try await db.collection("users").document(userId).updateData([
