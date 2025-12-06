@@ -34,8 +34,9 @@ struct LikesView: View {
     @State private var showMatchCelebration = false
     @State private var matchedUser: User?
 
-    // BUGFIX: Track which user is being liked back to prevent rapid-tap issues
-    @State private var processingLikeBackUserId: String?
+    // Error handling state
+    @State private var showErrorAlert = false
+    @State private var errorMessage = ""
 
     struct ChatPresentation: Identifiable {
         let id = UUID()
@@ -156,6 +157,11 @@ struct LikesView: View {
             }
             .sheet(isPresented: $showFilters) {
                 filterSheet
+            }
+            .alert("Error", isPresented: $showErrorAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(errorMessage)
             }
             .overlay {
                 // Match celebration overlay
@@ -571,21 +577,22 @@ struct LikesView: View {
         processingLikeBackUserId = targetUserId
 
         Task {
-            defer {
-                // BUGFIX: Always reset processing state when done
-                Task { @MainActor in
-                    processingLikeBackUserId = nil
-                }
-            }
-
-            let isMatch = await viewModel.likeBackUser(user)
-            if isMatch {
-                // Show match celebration
-                await MainActor.run {
+            let result = await viewModel.likeBackUser(user)
+            await MainActor.run {
+                switch result {
+                case .match:
+                    // Show match celebration
                     matchedUser = user
                     withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                         showMatchCelebration = true
                     }
+                case .liked:
+                    // Successfully liked but no match yet
+                    HapticManager.shared.impact(.medium)
+                case .error(let message):
+                    // Show error to user
+                    errorMessage = message
+                    showErrorAlert = true
                 }
             }
         }
@@ -1210,6 +1217,14 @@ struct LikeActionButton: View {
     }
 }
 
+// MARK: - Like Result
+
+enum LikeResult {
+    case match
+    case liked
+    case error(String)
+}
+
 // MARK: - View Model
 
 @MainActor
@@ -1364,10 +1379,13 @@ class LikesViewModel: ObservableObject {
         return matchesCache[userId]
     }
 
-    @discardableResult
-    func likeBackUser(_ user: User) async -> Bool {
-        guard let targetUserId = user.effectiveId else { return false }
-        guard let currentUserId = AuthService.shared.currentUser?.effectiveId else { return false }
+    func likeBackUser(_ user: User) async -> LikeResult {
+        guard let targetUserId = user.effectiveId else {
+            return .error("Unable to like this user. Please try again.")
+        }
+        guard let currentUserId = AuthService.shared.currentUser?.effectiveId else {
+            return .error("Please sign in to like profiles.")
+        }
 
         do {
             let isMatch = try await SwipeService.shared.likeUser(
@@ -1387,20 +1405,23 @@ class LikesViewModel: ObservableObject {
                     }
                 }
                 Logger.shared.info("Liked back user - now mutual!", category: .matching)
-                return true
+                return .match
             } else {
                 await MainActor.run {
                     if !usersILiked.contains(where: { $0.effectiveId == targetUserId }) {
                         usersILiked.append(user)
                     }
                 }
-                HapticManager.shared.impact(.medium)
-                return false
+                return .liked
             }
+        } catch let error as CelestiaError {
+            Logger.shared.error("Error liking back user", category: .matching, error: error)
+            HapticManager.shared.notification(.error)
+            return .error(error.localizedDescription)
         } catch {
             Logger.shared.error("Error liking back user", category: .matching, error: error)
             HapticManager.shared.notification(.error)
-            return false
+            return .error("Failed to send like. Please check your connection and try again.")
         }
     }
 }

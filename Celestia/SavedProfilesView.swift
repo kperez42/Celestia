@@ -807,22 +807,17 @@ struct SavedProfilesView: View {
                         Logger.shared.info("Liked saved profile", category: .matching)
                     }
                 }
+            } catch let error as CelestiaError {
+                Logger.shared.error("Error liking saved profile", category: .matching, error: error)
+                await MainActor.run {
+                    HapticManager.shared.notification(.error)
+                    viewModel.errorMessage = error.localizedDescription
+                }
             } catch {
                 Logger.shared.error("Error liking saved profile", category: .matching, error: error)
                 await MainActor.run {
                     HapticManager.shared.notification(.error)
-                    // BUGFIX: Show user-visible error message
                     viewModel.errorMessage = "Failed to send like. Please try again."
-
-                    // Auto-clear error after 3 seconds
-                    Task {
-                        try? await Task.sleep(nanoseconds: 3_000_000_000)
-                        await MainActor.run {
-                            if viewModel.errorMessage == "Failed to send like. Please try again." {
-                                viewModel.errorMessage = ""
-                            }
-                        }
-                    }
                 }
             }
         }
