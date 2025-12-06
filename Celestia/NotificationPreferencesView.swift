@@ -164,8 +164,12 @@ struct NotificationPreferencesView: View {
             return $preferences.newMessagesEnabled
         case .profileView:
             return $preferences.profileViewsEnabled
+        case .newLike:
+            return $preferences.newLikesEnabled
         case .superLike:
             return $preferences.superLikesEnabled
+        case .dailyDigest:
+            return $preferences.dailyDigestEnabled
         case .premiumOffer:
             return $preferences.premiumOffersEnabled
         case .generalUpdate:
