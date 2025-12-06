@@ -38,6 +38,9 @@ struct LikesView: View {
     @State private var showErrorAlert = false
     @State private var errorMessage = ""
 
+    // BUGFIX: Track in-progress like back to prevent rapid-tap duplicates
+    @State private var processingLikeBackUserId: String?
+
     struct ChatPresentation: Identifiable {
         let id = UUID()
         let match: Match
@@ -579,6 +582,9 @@ struct LikesView: View {
         Task {
             let result = await viewModel.likeBackUser(user)
             await MainActor.run {
+                // BUGFIX: Clear processing state to allow future likes
+                processingLikeBackUserId = nil
+
                 switch result {
                 case .match:
                     // Show match celebration
