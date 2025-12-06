@@ -173,7 +173,7 @@ struct ChatView: View {
                 Task {
                     do {
                         if let matchId = match.id,
-                           let currentUserId = authService.currentUser?.id {
+                           let currentUserId = authService.currentUser?.effectiveId {
                             try await MatchService.shared.unmatch(matchId: matchId, userId: currentUserId)
                             dismiss()
                         }
@@ -201,7 +201,7 @@ struct ChatView: View {
         .detectScreenshots(
             context: ScreenshotDetectionService.ScreenshotContext.chat(
                 matchId: match.id ?? "",
-                otherUserId: otherUser.id ?? ""
+                otherUserId: otherUser.effectiveId ?? ""
             ),
             userName: otherUser.fullName
         )
@@ -505,8 +505,8 @@ struct ChatView: View {
                         ForEach(section.1) { message in
                             MessageBubbleGradient(
                                 message: message,
-                                isFromCurrentUser: message.senderId == authService.currentUser?.id || message.senderId == "current_user",
-                                currentUserId: authService.currentUser?.id,
+                                isFromCurrentUser: message.senderId == authService.currentUser?.effectiveId || message.senderId == "current_user",
+                                currentUserId: authService.currentUser?.effectiveId,
                                 showReadStatus: message.id == lastReadId,
                                 onReaction: { emoji in
                                     handleReaction(messageId: message.id ?? "", emoji: emoji)
@@ -730,7 +730,7 @@ struct ChatView: View {
     /// Returns the ID of the last read message from the current user
     /// This is used to only show "Read" indicator on the most recent read message
     private func lastReadMessageId() -> String? {
-        guard let currentUserId = authService.currentUser?.id else { return nil }
+        guard let currentUserId = authService.currentUser?.effectiveId else { return nil }
 
         // Find all messages from current user that are read, then get the last one
         let currentUserReadMessages = messageService.messages.filter { message in
@@ -823,7 +823,7 @@ struct ChatView: View {
                 .cornerRadius(2)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Replying to \(message.senderId == authService.currentUser?.id ? "yourself" : otherUser.fullName)")
+                Text("Replying to \(message.senderId == authService.currentUser?.effectiveId ? "yourself" : otherUser.fullName)")
                     .font(.caption)
                     .fontWeight(.semibold)
                     .foregroundColor(.purple)
@@ -1036,8 +1036,8 @@ struct ChatView: View {
     
     private func setupChat() {
         guard let matchId = match.id else { return }
-        guard let currentUserId = authService.currentUser?.id else { return }
-        guard let otherUserId = otherUser.id else { return }
+        guard let currentUserId = authService.currentUser?.effectiveId else { return }
+        guard let otherUserId = otherUser.effectiveId else { return }
 
         // BUGFIX: Only mark as loaded if messages are actually for THIS match
         // This prevents race condition where messages from a different chat cause
@@ -1071,7 +1071,7 @@ struct ChatView: View {
     }
 
     private func setupUserListener() {
-        guard let otherUserId = otherUser.id else { return }
+        guard let otherUserId = otherUser.effectiveId else { return }
 
         // Listen to real-time updates for the other user's data (especially online status)
         let db = Firestore.firestore()
@@ -1108,8 +1108,8 @@ struct ChatView: View {
         guard (hasText || hasImage) && !isSending else { return }
 
         guard let matchId = match.id else { return }
-        guard let currentUserId = authService.currentUser?.id else { return }
-        guard let receiverId = otherUser.id else { return }
+        guard let currentUserId = authService.currentUser?.effectiveId else { return }
+        guard let receiverId = otherUser.effectiveId else { return }
 
         // Clear typing indicator immediately
         typingService.messageSent()
@@ -1505,7 +1505,7 @@ struct ChatView: View {
 
     /// Handle reaction on a message
     private func handleReaction(messageId: String, emoji: String) {
-        guard let currentUserId = authService.currentUser?.id else { return }
+        guard let currentUserId = authService.currentUser?.effectiveId else { return }
 
         Task {
             do {
@@ -1549,7 +1549,7 @@ struct ChatView: View {
     private func saveEditedMessage() {
         guard let message = editingMessage,
               let messageId = message.id,
-              let currentUserId = authService.currentUser?.id else {
+              let currentUserId = authService.currentUser?.effectiveId else {
             return
         }
 
@@ -1587,8 +1587,8 @@ struct ChatView: View {
     private func retryFailedMessage() {
         guard let failed = failedMessage else { return }
         guard let matchId = match.id else { return }
-        guard let currentUserId = authService.currentUser?.id else { return }
-        guard let receiverId = otherUser.id else { return }
+        guard let currentUserId = authService.currentUser?.effectiveId else { return }
+        guard let receiverId = otherUser.effectiveId else { return }
 
         // Hide error toast and set sending preview
         showErrorToast = false
@@ -1656,8 +1656,8 @@ struct ChatView: View {
 
     /// Block the user and dismiss the chat
     private func blockUser() {
-        guard let userId = otherUser.id,
-              let currentUserId = authService.currentUser?.id else { return }
+        guard let userId = otherUser.effectiveId,
+              let currentUserId = authService.currentUser?.effectiveId else { return }
 
         HapticManager.shared.notification(.warning)
 

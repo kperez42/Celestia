@@ -124,7 +124,8 @@ class BlockReportService: ObservableObject, ListenerLifecycleAware {
     }
 
     func getBlockedUsers() async throws -> [User] {
-        guard let currentUserId = AuthService.shared.currentUser?.id else {
+        // BUGFIX: Use effectiveId for reliable user identification
+        guard let currentUserId = AuthService.shared.currentUser?.effectiveId else {
             return []
         }
 
@@ -149,7 +150,8 @@ class BlockReportService: ObservableObject, ListenerLifecycleAware {
     }
 
     private func loadBlockedUsers() {
-        guard let currentUserId = AuthService.shared.currentUser?.id else { return }
+        // BUGFIX: Use effectiveId for reliable user identification
+        guard let currentUserId = AuthService.shared.currentUser?.effectiveId else { return }
 
         // AUDIT FIX: Remove existing listener before creating new one
         blockedUsersListener?.remove()

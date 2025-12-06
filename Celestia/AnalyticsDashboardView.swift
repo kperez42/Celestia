@@ -69,7 +69,7 @@ struct AnalyticsDashboardView: View {
     }
 
     private func loadAnalytics() {
-        guard let userId = authService.currentUser?.id else { return }
+        guard let userId = authService.currentUser?.effectiveId else { return }
 
         Task {
             do {

@@ -12,8 +12,10 @@ struct ProfileFeedCard: View {
     let currentUser: User?  // NEW: For calculating shared interests
     let initialIsFavorited: Bool
     let initialIsLiked: Bool
-    let onLike: () -> Void
-    let onUnlike: () -> Void
+    // BUGFIX: Changed to completion-based callbacks to prevent rapid-tap issues
+    // The completion(success) is called when the async operation finishes
+    let onLike: (@escaping (Bool) -> Void) -> Void
+    let onUnlike: (@escaping (Bool) -> Void) -> Void
     let onFavorite: () -> Void
     let onMessage: () -> Void
     let onViewPhotos: () -> Void
@@ -271,17 +273,28 @@ struct ProfileFeedCard: View {
 
                     if isLiked {
                         // Unlike
+                        let previousState = isLiked
                         isLiked = false  // Optimistic update
-                        onUnlike()
+                        onUnlike { success in
+                            // BUGFIX: Only reset processing after async operation completes
+                            isProcessingLike = false
+                            if !success {
+                                // Revert optimistic update on failure
+                                isLiked = previousState
+                            }
+                        }
                     } else {
                         // Like
+                        let previousState = isLiked
                         isLiked = true  // Optimistic update
-                        onLike()
-                    }
-
-                    // Reset processing state after delay
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        isProcessingLike = false
+                        onLike { success in
+                            // BUGFIX: Only reset processing after async operation completes
+                            isProcessingLike = false
+                            if !success {
+                                // Revert optimistic update on failure
+                                isLiked = previousState
+                            }
+                        }
                     }
                 }
             )
@@ -767,8 +780,8 @@ struct FullScreenPhotoItem: View {
             ),
             initialIsFavorited: false,
             initialIsLiked: false,
-            onLike: {},
-            onUnlike: {},
+            onLike: { completion in completion(true) },
+            onUnlike: { completion in completion(true) },
             onFavorite: {},
             onMessage: {},
             onViewPhotos: {},

@@ -181,7 +181,8 @@ class SafetyCenterViewModel: ObservableObject {
     private let db = Firestore.firestore()
 
     func loadSafetyData() async {
-        guard let userId = AuthService.shared.currentUser?.id else { return }
+        // BUGFIX: Use effectiveId for reliable user identification
+        guard let userId = AuthService.shared.currentUser?.effectiveId else { return }
 
         do {
             // Load blocked users count

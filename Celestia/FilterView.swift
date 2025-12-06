@@ -227,7 +227,8 @@ struct FilterView: View {
 
     private func applyFilters() {
         Task {
-            guard var currentUser = authService.currentUser else { return }
+            guard var currentUser = authService.currentUser,
+                  let currentUserId = currentUser.effectiveId else { return }
 
             isLoading = true
 
@@ -244,7 +245,7 @@ struct FilterView: View {
 
                 // Fetch users with new filters
                 try await userService.fetchUsers(
-                    excludingUserId: currentUser.id ?? "",
+                    excludingUserId: currentUserId,
                     lookingFor: lookingFor == "Everyone" ? nil : lookingFor,
                     ageRange: ageRangeInt,
                     country: nil

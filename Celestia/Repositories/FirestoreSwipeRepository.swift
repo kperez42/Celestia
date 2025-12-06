@@ -15,19 +15,38 @@ class FirestoreSwipeRepository: SwipeRepository {
     // MARK: - SwipeRepository Protocol Implementation
 
     func createLike(fromUserId: String, toUserId: String, isSuperLike: Bool) async throws {
+        // Validate inputs at repository level as defense-in-depth
+        guard !fromUserId.isEmpty, !toUserId.isEmpty else {
+            Logger.shared.error("Repository received empty user IDs", category: .matching)
+            throw CelestiaError.invalidInput("User IDs cannot be empty")
+        }
+
+        guard fromUserId != toUserId else {
+            Logger.shared.error("Repository received self-like attempt", category: .matching)
+            throw CelestiaError.invalidOperation("Cannot like yourself")
+        }
+
         let likeData: [String: Any] = [
             "fromUserId": fromUserId,
             "toUserId": toUserId,
             "isSuperLike": isSuperLike,
             "timestamp": Timestamp(date: Date()),
-            "isActive": true
+            "isActive": true,
+            "createdAt": FieldValue.serverTimestamp()
         ]
 
-        try await db.collection("likes")
-            .document("\(fromUserId)_\(toUserId)")
-            .setData(likeData)
+        let documentId = "\(fromUserId)_\(toUserId)"
 
-        Logger.shared.debug("Like created: \(fromUserId) -> \(toUserId)", category: .matching)
+        do {
+            try await db.collection("likes")
+                .document(documentId)
+                .setData(likeData, merge: true) // Use merge to handle re-likes gracefully
+
+            Logger.shared.debug("✅ Like persisted to Firestore: \(documentId)", category: .matching)
+        } catch {
+            Logger.shared.error("❌ Failed to persist like to Firestore: \(documentId)", category: .matching, error: error)
+            throw error
+        }
     }
 
     func createPass(fromUserId: String, toUserId: String) async throws {
@@ -46,18 +65,32 @@ class FirestoreSwipeRepository: SwipeRepository {
     }
 
     func checkMutualLike(fromUserId: String, toUserId: String) async throws -> Bool {
-        let mutualLikeDoc = try await db.collection("likes")
-            .document("\(toUserId)_\(fromUserId)")
-            .getDocument()
-
-        if mutualLikeDoc.exists,
-           let data = mutualLikeDoc.data(),
-           data["isActive"] as? Bool == true {
-            Logger.shared.info("Mutual like detected: \(fromUserId) <-> \(toUserId)", category: .matching)
-            return true
+        // Validate inputs
+        guard !fromUserId.isEmpty, !toUserId.isEmpty else {
+            Logger.shared.error("checkMutualLike received empty user IDs", category: .matching)
+            return false
         }
 
-        return false
+        let documentId = "\(toUserId)_\(fromUserId)"
+
+        do {
+            let mutualLikeDoc = try await db.collection("likes")
+                .document(documentId)
+                .getDocument()
+
+            if mutualLikeDoc.exists,
+               let data = mutualLikeDoc.data(),
+               data["isActive"] as? Bool == true {
+                Logger.shared.info("🎉 Mutual like detected: \(fromUserId) <-> \(toUserId)", category: .matching)
+                return true
+            }
+
+            Logger.shared.debug("No mutual like found for: \(documentId)", category: .matching)
+            return false
+        } catch {
+            Logger.shared.error("Error checking mutual like: \(documentId)", category: .matching, error: error)
+            throw error
+        }
     }
 
     func hasSwipedOn(fromUserId: String, toUserId: String) async throws -> (liked: Bool, passed: Bool) {

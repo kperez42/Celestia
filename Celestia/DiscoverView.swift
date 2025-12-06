@@ -815,12 +815,12 @@ struct UserCardView: View {
             }
             .cornerRadius(20)
             .onAppear {
-                // Check if user is already saved
-                isSaved = savedProfilesVM.savedProfiles.contains(where: { $0.user.id == user.id })
+                // BUGFIX: Use effectiveId for reliable user identification (handles @DocumentID edge cases)
+                isSaved = savedProfilesVM.savedProfiles.contains(where: { $0.user.effectiveId == user.effectiveId })
             }
             .onChange(of: savedProfilesVM.savedProfiles) { _ in
-                // Sync saved state when savedProfiles array changes (e.g., saved/unsaved from another view)
-                isSaved = savedProfilesVM.savedProfiles.contains(where: { $0.user.id == user.id })
+                // BUGFIX: Use effectiveId for reliable user identification (handles @DocumentID edge cases)
+                isSaved = savedProfilesVM.savedProfiles.contains(where: { $0.user.effectiveId == user.effectiveId })
             }
         }
         .frame(maxHeight: .infinity) // Fill available space

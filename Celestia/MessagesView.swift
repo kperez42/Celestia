@@ -67,9 +67,9 @@ struct MessagesView: View {
 
     var totalUnread: Int {
         #if DEBUG
-        let userId = authService.currentUser?.id ?? "current_user"
+        let userId = authService.currentUser?.effectiveId ?? "current_user"
         #else
-        guard let userId = authService.currentUser?.id else { return 0 }
+        guard let userId = authService.currentUser?.effectiveId else { return 0 }
         #endif
         return matchService.matches.reduce(0) { $0 + ($1.unreadCount[userId] ?? 0) }
     }
@@ -362,7 +362,7 @@ struct MessagesView: View {
                     ConversationRow(
                         match: match,
                         user: user,
-                        currentUserId: authService.currentUser?.id ?? "current_user"
+                        currentUserId: authService.currentUser?.effectiveId ?? "current_user"
                     )
                     .onTapGesture {
                         HapticManager.shared.impact(.medium)
@@ -515,7 +515,7 @@ struct MessagesView: View {
         // Track performance for messages loading
         let loadStart = Date()
 
-        guard let userId = authService.currentUser?.id else {
+        guard let userId = authService.currentUser?.effectiveId else {
             return
         }
 
@@ -545,7 +545,7 @@ struct MessagesView: View {
     }
     
     private func getMatchedUser(_ match: Match) -> User? {
-        guard let currentUserId = authService.currentUser?.id else { return nil }
+        guard let currentUserId = authService.currentUser?.effectiveId else { return nil }
         let otherUserId = match.user1Id == currentUserId ? match.user2Id : match.user1Id
         return matchedUsers[otherUserId]
     }

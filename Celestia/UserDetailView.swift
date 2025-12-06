@@ -22,6 +22,7 @@ struct UserDetailView: View {
     @State private var showingError = false
     @State private var errorMessage = ""
     @State private var isSaved = false
+    @State private var isSavingProfile = false  // Prevents rapid-tap duplicates
     @State private var isLiked = false
     @State private var showingChat = false
     @State private var chatMatch: Match?
@@ -63,7 +64,8 @@ struct UserDetailView: View {
         }
         .onAppear(perform: handleOnAppear)
         .onChange(of: savedProfilesVM.savedProfiles) { _ in
-            isSaved = savedProfilesVM.savedProfiles.contains(where: { $0.user.id == user.id })
+            // BUGFIX: Use effectiveId for reliable user identification (handles @DocumentID edge cases)
+            isSaved = savedProfilesVM.savedProfiles.contains(where: { $0.user.effectiveId == user.effectiveId })
         }
         .alert("Like Sent! 💫", isPresented: $showingInterestSent) {
             Button("OK") { dismiss() }
@@ -407,10 +409,21 @@ struct UserDetailView: View {
 
     private var saveButton: some View {
         Button {
+            // DUPLICATE PREVENTION: Block rapid taps while operation is in progress
+            guard !isSavingProfile else { return }
+
             HapticManager.shared.impact(.light)
             let wasAlreadySaved = isSaved
             isSaved.toggle()
+            isSavingProfile = true
+
             Task {
+                defer {
+                    Task { @MainActor in
+                        isSavingProfile = false
+                    }
+                }
+
                 if isSaved {
                     // Saving - check for success and revert on failure
                     let success = await savedProfilesVM.saveProfile(user: user)
@@ -428,14 +441,23 @@ struct UserDetailView: View {
                 }
             }
         } label: {
-            Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
-                .font(.title2)
-                .foregroundColor(.orange)
-                .frame(width: 60, height: 60)
-                .background(Color.white)
-                .clipShape(Circle())
-                .shadow(color: Color.black.opacity(0.1), radius: 5)
+            ZStack {
+                if isSavingProfile {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .orange))
+                        .scaleEffect(0.8)
+                } else {
+                    Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
+                        .font(.title2)
+                        .foregroundColor(.orange)
+                }
+            }
+            .frame(width: 60, height: 60)
+            .background(Color.white)
+            .clipShape(Circle())
+            .shadow(color: Color.black.opacity(0.1), radius: 5)
         }
+        .disabled(isSavingProfile)
         .accessibilityLabel(isSaved ? "Remove from saved" : "Save profile")
         .accessibilityHint("Bookmark this profile for later")
     }
@@ -520,7 +542,8 @@ struct UserDetailView: View {
     }
 
     private func handleOnAppear() {
-        isSaved = savedProfilesVM.savedProfiles.contains(where: { $0.user.id == user.id })
+        // BUGFIX: Use effectiveId for reliable user identification (handles @DocumentID edge cases)
+        isSaved = savedProfilesVM.savedProfiles.contains(where: { $0.user.effectiveId == user.effectiveId })
 
         // Use initial like state from parent if callback is provided (synced)
         // Otherwise fetch from backend
@@ -529,8 +552,9 @@ struct UserDetailView: View {
         }
 
         Task {
-            guard let currentUserId = authService.currentUser?.id,
-                  let viewedUserId = user.id else { return }
+            // BUGFIX: Use effectiveId for reliable user identification
+            guard let currentUserId = authService.currentUser?.effectiveId,
+                  let viewedUserId = user.effectiveId else { return }
 
             // If no callback provided, fetch like status from backend
             if onLikeChanged == nil {
@@ -572,8 +596,9 @@ struct UserDetailView: View {
     // MARK: - Actions
 
     func sendInterest() {
-        guard let currentUserID = authService.currentUser?.id,
-              let targetUserID = user.id,
+        // BUGFIX: Use effectiveId for reliable user identification
+        guard let currentUserID = authService.currentUser?.effectiveId,
+              let targetUserID = user.effectiveId,
               !isProcessing else { return }
 
         guard currentUserID != targetUserID else {
@@ -617,8 +642,9 @@ struct UserDetailView: View {
     }
 
     func toggleLike() {
-        guard let currentUserID = authService.currentUser?.id,
-              let targetUserID = user.id,
+        // BUGFIX: Use effectiveId for reliable user identification
+        guard let currentUserID = authService.currentUser?.effectiveId,
+              let targetUserID = user.effectiveId,
               !isProcessing else { return }
 
         guard currentUserID != targetUserID else {
@@ -712,8 +738,9 @@ struct UserDetailView: View {
     }
 
     func openChat() {
-        guard let currentUserId = authService.currentUser?.id,
-              let targetUserId = user.id else { return }
+        // BUGFIX: Use effectiveId for reliable user identification
+        guard let currentUserId = authService.currentUser?.effectiveId,
+              let targetUserId = user.effectiveId else { return }
 
         // Prevent messaging yourself
         guard currentUserId != targetUserId else {

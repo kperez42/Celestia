@@ -82,8 +82,9 @@ struct SendInterestView: View {
                 Button {
                     Task {
                         isLoading = true
-                        guard let currentUserId = authService.currentUser?.id else { return }
-                        guard let userId = user.id else { return }
+                        // BUGFIX: Use effectiveId for reliable user identification
+                        guard let currentUserId = authService.currentUser?.effectiveId else { return }
+                        guard let userId = user.effectiveId else { return }
                         
                         do {
                             try await interestService.sendInterest(

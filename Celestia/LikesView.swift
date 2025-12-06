@@ -554,6 +554,14 @@ struct LikesView: View {
     }
 
     private func handleLikeBack(user: User) {
+        guard let targetUserId = user.effectiveId else { return }
+
+        // BUGFIX: Prevent rapid-tap duplicate likes
+        guard processingLikeBackUserId == nil else {
+            Logger.shared.debug("Like back already in progress, ignoring tap", category: .matching)
+            return
+        }
+
         // Check daily like limit for free users (premium gets unlimited)
         let isPremium = authService.currentUser?.isPremium ?? false
         if !isPremium {
@@ -564,6 +572,9 @@ struct LikesView: View {
                 return
             }
         }
+
+        // BUGFIX: Set processing state to prevent rapid taps
+        processingLikeBackUserId = targetUserId
 
         Task {
             let result = await viewModel.likeBackUser(user)

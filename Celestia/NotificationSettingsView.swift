@@ -311,7 +311,7 @@ struct NotificationHistoryView: View {
         .task {
             // Using .task ensures automatic cleanup when view disappears
             // The task is automatically cancelled when the view is dismissed
-            guard let userId = authService.currentUser?.id else { return }
+            guard let userId = authService.currentUser?.effectiveId else { return }
 
             notificationService.listenToNotifications(userId: userId)
 

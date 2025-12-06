@@ -59,23 +59,19 @@ struct MatchesView: View {
         }
 
         // Apply unread filter
+        // BUGFIX: Use effectiveId for reliable user identification
         if showOnlyUnread {
-            #if DEBUG
-            let userId = authService.currentUser?.id ?? "current_user"
-            matches = matches.filter { ($0.unreadCount[userId] ?? 0) > 0 }
-            #else
-            if let userId = authService.currentUser?.id {
+            if let userId = authService.currentUser?.effectiveId {
                 matches = matches.filter { ($0.unreadCount[userId] ?? 0) > 0 }
             }
-            #endif
         }
 
         // Apply sorting
-        #if DEBUG
-        let currentUserId = authService.currentUser?.id ?? "current_user"
-        #else
-        let currentUserId = authService.currentUser?.id ?? ""
-        #endif
+        // BUGFIX: Use effectiveId for reliable user identification - don't use empty fallback
+        guard let currentUserId = authService.currentUser?.effectiveId else {
+            cachedFilteredMatches = matches
+            return
+        }
         cachedFilteredMatches = matches.sorted { match1, match2 in
             switch sortOption {
             case .recent:
@@ -105,11 +101,8 @@ struct MatchesView: View {
     }
     
     var unreadCount: Int {
-        #if DEBUG
-        let userId = authService.currentUser?.id ?? "current_user"
-        #else
-        guard let userId = authService.currentUser?.id else { return 0 }
-        #endif
+        // BUGFIX: Use effectiveId for reliable user identification
+        guard let userId = authService.currentUser?.effectiveId else { return 0 }
         return matchService.matches.reduce(0) { $0 + ($1.unreadCount[userId] ?? 0) }
     }
     
@@ -455,7 +448,8 @@ struct MatchesView: View {
                         MatchProfileCard(
                             match: match,
                             user: user,
-                            currentUserId: authService.currentUser?.id ?? "current_user",
+                            // BUGFIX: Use effectiveId for reliable user identification
+                            currentUserId: authService.currentUser?.effectiveId ?? "",
                             onInfoTap: {
                                 selectedUserForProfile = user
                             }
@@ -669,7 +663,8 @@ struct MatchesView: View {
     // MARK: - Helper Functions
 
     private func loadMatches() async {
-        guard let userId = authService.currentUser?.id else {
+        // BUGFIX: Use effectiveId for reliable user identification
+        guard let userId = authService.currentUser?.effectiveId else {
             return
         }
 
@@ -709,12 +704,8 @@ struct MatchesView: View {
     }
     
     private func getMatchedUser(_ match: Match) -> User? {
-        #if DEBUG
-        // In debug mode, use "current_user" as default if not authenticated
-        let currentUserId = authService.currentUser?.id ?? "current_user"
-        #else
-        guard let currentUserId = authService.currentUser?.id else { return nil }
-        #endif
+        // BUGFIX: Use effectiveId for reliable user identification
+        guard let currentUserId = authService.currentUser?.effectiveId else { return nil }
 
         let otherUserId = match.user1Id == currentUserId ? match.user2Id : match.user1Id
         return matchedUsers[otherUserId]

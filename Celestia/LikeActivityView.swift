@@ -235,7 +235,7 @@ class LikeActivityViewModel: ObservableObject {
     private let db = Firestore.firestore()
 
     func loadActivity() async {
-        guard let currentUserId = AuthService.shared.currentUser?.id else { return }
+        guard let currentUserId = AuthService.shared.currentUser?.effectiveId else { return }
 
         isLoading = true
         defer { isLoading = false }
@@ -354,7 +354,7 @@ class LikeActivityViewModel: ObservableObject {
 
             do {
                 let usersSnapshot = try await db.collection("users")
-                    .whereField("id", in: chunk)
+                    .whereField(FieldPath.documentID(), in: chunk)
                     .getDocuments()
 
                 for userDoc in usersSnapshot.documents {

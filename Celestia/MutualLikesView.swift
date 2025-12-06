@@ -208,7 +208,7 @@ class MutualLikesViewModel: ObservableObject {
     private let db = Firestore.firestore()
 
     func loadMutualLikes() async {
-        guard let currentUserId = AuthService.shared.currentUser?.id else { return }
+        guard let currentUserId = AuthService.shared.currentUser?.effectiveId else { return }
 
         isLoading = true
         defer { isLoading = false }

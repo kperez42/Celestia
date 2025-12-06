@@ -78,7 +78,8 @@ class ScreenshotDetectionService: ObservableObject {
     // MARK: - Logging
 
     private func logScreenshotEvent(context: ScreenshotContext) {
-        guard let currentUserId = AuthService.shared.currentUser?.id else { return }
+        // BUGFIX: Use effectiveId for reliable user identification
+        guard let currentUserId = AuthService.shared.currentUser?.effectiveId else { return }
 
         let eventData: [String: Any]
 
@@ -125,11 +126,12 @@ class ScreenshotDetectionService: ObservableObject {
     // MARK: - Notifications
 
     private func sendScreenshotNotification(to userId: String, type: String) {
-        guard let currentUser = AuthService.shared.currentUser else { return }
+        guard let currentUser = AuthService.shared.currentUser,
+              let senderId = currentUser.effectiveId else { return }
 
         let notificationData: [String: Any] = [
             "recipientId": userId,
-            "senderId": currentUser.id ?? "",
+            "senderId": senderId,
             "senderName": currentUser.fullName,
             "type": "screenshot_alert",
             "screenshotType": type,

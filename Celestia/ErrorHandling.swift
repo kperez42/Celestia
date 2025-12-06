@@ -96,6 +96,8 @@ enum CelestiaError: LocalizedError, Identifiable {
     case operationCancelled
     case configurationError(String)
     case notImplemented
+    case invalidInput(String)
+    case invalidOperation(String)
 
     // General Errors
     case unknown(String)
@@ -244,6 +246,10 @@ enum CelestiaError: LocalizedError, Identifiable {
             return "Configuration error: \(message)"
         case .notImplemented:
             return "This feature is not implemented in test mode."
+        case .invalidInput(let message):
+            return "Invalid input: \(message)"
+        case .invalidOperation(let message):
+            return "Invalid operation: \(message)"
 
         // General
         case .unknown(let message):

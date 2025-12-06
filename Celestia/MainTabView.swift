@@ -108,7 +108,8 @@ struct MainTabView: View {
         }
         .onChange(of: matchService.matches) { _, newMatches in
             // AUDIT FIX: Calculate both counts from authoritative Match data
-            guard let userId = authService.currentUser?.id else { return }
+            // BUGFIX: Use effectiveId for reliable user identification
+            guard let userId = authService.currentUser?.effectiveId else { return }
 
             // Update new matches count (matches without any messages yet)
             newMatchesCount = newMatches.filter { $0.lastMessage == nil }.count
@@ -124,14 +125,15 @@ struct MainTabView: View {
         .task {
             // PERFORMANCE FIX: Use real-time listeners instead of polling
             // This eliminates battery drain from constant polling
-            guard let userId = authService.currentUser?.id else { return }
+            // BUGFIX: Use effectiveId for reliable user identification
+            guard let userId = authService.currentUser?.effectiveId else { return }
 
             // Small delay to ensure auth token is fully propagated
             // This prevents brief "permission denied" errors in logs during signup
             try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
 
             // Verify user is still authenticated after delay
-            guard authService.currentUser?.id == userId else { return }
+            guard authService.currentUser?.effectiveId == userId else { return }
 
             // PUSH NOTIFICATIONS: Initialize and request permissions
             await PushNotificationManager.shared.initialize()
@@ -325,7 +327,7 @@ struct MainTabView: View {
     }
 
     private func dismissWarning() {
-        guard let userId = authService.currentUser?.id else { return }
+        guard let userId = authService.currentUser?.effectiveId else { return }
 
         // Hide banner with animation
         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {

@@ -50,8 +50,9 @@ class ProfileBoostService: ObservableObject {
 
     /// Activate profile boost
     func activateBoost() async throws {
+        // BUGFIX: Use effectiveId for reliable user identification
         guard let currentUser = authService.currentUser,
-              let userId = currentUser.id else {
+              let userId = currentUser.effectiveId else {
             throw ProfileBoostError.noCurrentUser
         }
 
@@ -97,7 +98,7 @@ class ProfileBoostService: ObservableObject {
 
     /// Deactivate profile boost (when it expires)
     private func deactivateBoost() async {
-        guard let userId = authService.currentUser?.id else { return }
+        guard let userId = authService.currentUser?.effectiveId else { return }
 
         do {
             try await db.collection("users").document(userId).updateData([

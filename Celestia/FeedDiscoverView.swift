@@ -223,11 +223,11 @@ struct FeedDiscoverView: View {
                         currentUser: authService.currentUser,  // NEW: Pass current user for shared interests
                         initialIsFavorited: favorites.contains(user.effectiveId ?? ""),
                         initialIsLiked: likedUsers.contains(user.effectiveId ?? ""),
-                        onLike: {
-                            handleLike(user: user)
+                        onLike: { completion in
+                            handleLike(user: user, completion: completion)
                         },
-                        onUnlike: {
-                            handleUnlike(user: user)
+                        onUnlike: { completion in
+                            handleUnlike(user: user, completion: completion)
                         },
                         onFavorite: {
                             handleFavorite(user: user)
@@ -1044,7 +1044,7 @@ struct FeedDiscoverView: View {
         }
     }
 
-    private func handleLike(user: User) {
+    private func handleLike(user: User, completion: @escaping (Bool) -> Void) {
         guard let currentUserId = authService.currentUser?.effectiveId,
               let userId = user.effectiveId else {
             showToast(
@@ -1052,6 +1052,7 @@ struct FeedDiscoverView: View {
                 icon: "exclamationmark.triangle.fill",
                 color: .red
             )
+            completion(false)
             return
         }
 
@@ -1062,6 +1063,7 @@ struct FeedDiscoverView: View {
                 icon: "exclamationmark.triangle.fill",
                 color: .orange
             )
+            completion(false)
             return
         }
 
@@ -1072,6 +1074,7 @@ struct FeedDiscoverView: View {
                 // Show upgrade sheet with context message instead of toast
                 upgradeContextMessage = "You've reached your daily like limit. Subscribe to continue liking!"
                 showPremiumUpgrade = true
+                completion(false)
                 return
             }
         }
@@ -1098,6 +1101,8 @@ struct FeedDiscoverView: View {
                 // INSTANT SYNC: Update LikesViewModel immediately so Likes page reflects changes
                 await MainActor.run {
                     likesViewModel.addLikedUser(user, isMatch: isMatch)
+                    // BUGFIX: Call completion with success
+                    completion(true)
                 }
 
                 if isMatch {
@@ -1134,6 +1139,8 @@ struct FeedDiscoverView: View {
                         icon: "exclamationmark.triangle.fill",
                         color: .red
                     )
+                    // BUGFIX: Call completion with failure
+                    completion(false)
                 }
             }
         }
@@ -1193,7 +1200,7 @@ struct FeedDiscoverView: View {
         HapticManager.shared.impact(.light)
     }
 
-    private func handleUnlike(user: User) {
+    private func handleUnlike(user: User, completion: @escaping (Bool) -> Void) {
         guard let currentUserId = authService.currentUser?.effectiveId,
               let userId = user.effectiveId else {
             showToast(
@@ -1201,6 +1208,7 @@ struct FeedDiscoverView: View {
                 icon: "exclamationmark.triangle.fill",
                 color: .red
             )
+            completion(false)
             return
         }
 
@@ -1224,6 +1232,8 @@ struct FeedDiscoverView: View {
                         icon: "heart.slash",
                         color: .gray
                     )
+                    // BUGFIX: Call completion with success
+                    completion(true)
                 }
 
                 Logger.shared.info("Unliked user \(userId)", category: .matching)
@@ -1238,6 +1248,8 @@ struct FeedDiscoverView: View {
                         icon: "exclamationmark.triangle.fill",
                         color: .red
                     )
+                    // BUGFIX: Call completion with failure
+                    completion(false)
                 }
                 Logger.shared.error("Error unliking user", category: .matching, error: error)
             }

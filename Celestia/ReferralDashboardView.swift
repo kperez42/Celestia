@@ -111,7 +111,7 @@ struct ReferralDashboardView: View {
                 }
 
                 // Start real-time listener for updates
-                if let userId = authService.currentUser?.id {
+                if let userId = authService.currentUser?.effectiveId {
                     referralManager.startReferralListener(for: userId)
                 }
             }

@@ -100,8 +100,8 @@ class DiscoverViewModel: ObservableObject {
     }
     
     func loadUsers(currentUser: User, limit: Int = 20) {
-        // Validate current user has an ID
-        guard let userId = currentUser.id, !userId.isEmpty else {
+        // BUGFIX: Use effectiveId for reliable user identification
+        guard let userId = currentUser.effectiveId, !userId.isEmpty else {
             errorMessage = "Unable to load users: User account not properly initialized"
             isLoading = false
             Logger.shared.error("Cannot load users: Current user has no ID", category: .matching)
@@ -162,9 +162,10 @@ class DiscoverViewModel: ObservableObject {
                 }
 
                 // SAFETY: Filter out blocked users
+                // BUGFIX: Use effectiveId for reliable user identification
                 let blockedUserIds = BlockReportService.shared.blockedUserIds
                 let nonBlockedUsers = filteredUsers.filter { user in
-                    guard let userId = user.id else { return true }
+                    guard let userId = user.effectiveId else { return true }
                     return !blockedUserIds.contains(userId)
                 }
                 let blockedRemovedCount = filteredUsers.count - nonBlockedUsers.count
@@ -269,9 +270,10 @@ class DiscoverViewModel: ObservableObject {
         isProcessingAction = true
 
         let likedUser = users[currentIndex]
+        // BUGFIX: Use effectiveId for reliable user identification
         guard let currentUser = authService.currentUser,
-              let currentUserId = currentUser.id,
-              let likedUserId = likedUser.id else {
+              let currentUserId = currentUser.effectiveId,
+              let likedUserId = likedUser.effectiveId else {
             isProcessingAction = false
             return
         }
@@ -354,7 +356,8 @@ class DiscoverViewModel: ObservableObject {
 
     /// Check if user has daily likes remaining (delegates to UserService)
     private func checkDailyLikeLimit() async -> Bool {
-        guard let userId = authService.currentUser?.id else { return false }
+        // BUGFIX: Use effectiveId for reliable user identification
+        guard let userId = authService.currentUser?.effectiveId else { return false }
 
         let hasLikes = await userService.checkDailyLikeLimit(userId: userId)
 
@@ -368,7 +371,8 @@ class DiscoverViewModel: ObservableObject {
 
     /// Decrement daily like count (delegates to UserService)
     private func decrementDailyLikes() async {
-        guard let userId = authService.currentUser?.id else { return }
+        // BUGFIX: Use effectiveId for reliable user identification
+        guard let userId = authService.currentUser?.effectiveId else { return }
 
         await userService.decrementDailyLikes(userId: userId)
         await authService.fetchUser()
@@ -380,8 +384,9 @@ class DiscoverViewModel: ObservableObject {
         isProcessingAction = true
 
         let passedUser = users[currentIndex]
-        guard let currentUserId = authService.currentUser?.id,
-              let passedUserId = passedUser.id else {
+        // BUGFIX: Use effectiveId for reliable user identification
+        guard let currentUserId = authService.currentUser?.effectiveId,
+              let passedUserId = passedUser.effectiveId else {
             isProcessingAction = false
             return
         }
@@ -426,9 +431,10 @@ class DiscoverViewModel: ObservableObject {
         isProcessingAction = true
 
         let superLikedUser = users[currentIndex]
+        // BUGFIX: Use effectiveId for reliable user identification
         guard let currentUser = authService.currentUser,
-              let currentUserId = currentUser.id,
-              let superLikedUserId = superLikedUser.id else {
+              let currentUserId = currentUser.effectiveId,
+              let superLikedUserId = superLikedUser.effectiveId else {
             isProcessingAction = false
             return
         }
@@ -498,7 +504,8 @@ class DiscoverViewModel: ObservableObject {
 
     /// Decrement super like count (delegates to UserService)
     private func decrementSuperLikes() async {
-        guard let userId = authService.currentUser?.id else { return }
+        // BUGFIX: Use effectiveId for reliable user identification
+        guard let userId = authService.currentUser?.effectiveId else { return }
 
         await userService.decrementSuperLikes(userId: userId)
         await authService.fetchUser()
@@ -701,7 +708,8 @@ class DiscoverViewModel: ObservableObject {
 
     /// Report suspicious profile to backend for admin review
     private func reportSuspiciousProfile(user: User, analysis: FakeProfileAnalysis) async {
-        guard let userId = user.id else { return }
+        // BUGFIX: Use effectiveId for reliable user identification
+        guard let userId = user.effectiveId else { return }
 
         // Send to backend moderation queue
         do {
